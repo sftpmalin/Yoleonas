@@ -15,6 +15,74 @@ laissant aux utilisateurs avancés l'accès aux scripts, à Linux et à une API
 documentée. Il n'est donc pas nécessaire de comprendre l'organisation du code
 avant de faire un premier essai.
 
+## Pourquoi ce projet existe
+
+Yoleo est né d'une expérience très concrète : son auteur utilisait Unraid,
+appréciait son principe et son accessibilité, mais ne voulait plus dépendre
+d'une licence payante pour administrer son propre NAS. L'idée n'était pas de
+copier Unraid, son code ni son identité visuelle. L'objectif était de retrouver
+sur une base Debian libre les qualités qui rendent un NAS agréable à utiliser :
+une interface claire, plusieurs disques réunis derrière un espace commun, un
+stockage rapide pour les écritures, Docker, des VM, des partages réseau et des
+outils de sauvegarde regroupés au même endroit.
+
+Le projet assume donc une inspiration d'usage — rendre Linux aussi abordable
+qu'un NAS commercial — tout en reposant sur ses propres choix techniques, son
+propre code et des composants standards de l'écosystème Linux. Yoleo est un
+projet indépendant et n'est ni une version, ni un dérivé, ni un produit affilié
+à Unraid.
+
+### Retrouver le principe du cache avec mergerfs
+
+À l'origine, **mergerfs** sert à réunir plusieurs dossiers ou systèmes de
+fichiers dans une vue unique. Yoleo exploite cette souplesse pour reproduire un
+usage proche du couple « cache + array » connu des utilisateurs d'Unraid, sans
+prétendre réimplémenter son fonctionnement interne à l'identique.
+
+Un profil peut placer `/mnt/cache` en tête des sources et réunir ce stockage
+rapide avec plusieurs disques sous `/mnt/user`. La politique de création
+mergerfs choisit où écrire les nouveaux fichiers : priorité à une branche,
+disque disposant du plus d'espace ou conservation d'une arborescence existante.
+Le moteur `scripts/cache.py` peut ensuite déplacer les données par `rsync` vers
+le disque de destination prévu. Ainsi, mergerfs fournit la vue commune et la
+politique d'écriture, tandis que le moteur de déplacement joue le rôle de
+« mover ». Les deux restent séparés : le moteur peut déplacer des données entre
+deux chemins sans mergerfs, et mergerfs peut fonctionner sans ce moteur.
+
+Cette architecture conserve un avantage important de mergerfs : les disques
+restent lisibles individuellement. Elle ne crée cependant pas automatiquement
+de redondance ; les sauvegardes et, selon la configuration, SnapRAID restent
+nécessaires pour protéger les données.
+
+### Docker avec des fichiers Compose YAML portables
+
+Yoleo privilégie les fichiers **Docker Compose YAML**, le format couramment
+utilisé sous Linux et documenté par l'écosystème Docker. Les stacks restent
+donc lisibles, versionnables et réutilisables avec les commandes Compose
+habituelles, même en dehors de l'interface Yoleo.
+
+Unraid utilise historiquement son propre système de modèles d'applications,
+étroitement intégré à son interface. Ce choix facilite son catalogue, mais il
+peut paraître moins transparent à un utilisateur habitué aux fichiers Compose.
+Yoleo préfère ne pas imposer un format de description spécifique au projet :
+un développeur peut apporter un `compose.yaml`, l'étudier comme n'importe quel
+fichier Linux, le modifier avec son éditeur et le lancer sans conversion.
+
+### Une API pensée dès le début
+
+L'auteur a également ressenti que l'accès à une API officiellement exploitable
+était arrivé très tard dans l'histoire d'Unraid. Yoleo a donc fait le choix
+inverse : définir son contrat API alors que le projet est encore jeune. Cela
+permet aux applications Android et Windows de ne pas dépendre du HTML de
+l'interface et donne immédiatement à d'autres développeurs une base stable pour
+imaginer de meilleurs clients.
+
+Cette comparaison explique une motivation et un choix d'architecture ; elle ne
+cherche pas à affirmer que Yoleo possède déjà la maturité d'un produit développé
+depuis de nombreuses années. Le projet débute, certaines étapes restent
+manuelles, mais l'ISO permet déjà de le découvrir sans reconstruire toute
+l'installation fichier par fichier.
+
 ## Fonctions principales
 
 - supervision du système, des disques et des services Linux ;
