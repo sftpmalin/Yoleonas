@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="Yoleo Agent"
+      Manufacturer="Sftpmalin"
+      Version="1.0.0"
+      Language="1036"
+      UpgradeCode="{6E2E2B07-0A8E-4FA3-A046-1C3C5D27045D}"
+      Scope="perMachine"
+      InstallerVersion="500"
+      Compressed="yes">
+
+    <SummaryInformation Description="Agent de surveillance et de notification Yoleo" />
+    <MajorUpgrade
+        DowngradeErrorMessage="Une version plus récente de Yoleo Agent est déjà installée."
+        Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="YoleoIcon" SourceFile="..\Assets\App.ico" />
+    <Property Id="ARPPRODUCTICON" Value="YoleoIcon" />
+    <Property Id="ARPCOMMENTS" Value="Agent Windows de surveillance et de notification Yoleo" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="CompanyFolder" Name="Sftpmalin">
+        <Directory Id="INSTALLFOLDER" Name="Yoleo Agent">
+          <Component
+              Id="YoleoAgentComponent"
+              Guid="{9DD5C1E4-DBB4-4F2E-9D1F-F7A0C6A06A8A}"
+              Bitness="always64">
+            <File
+                Id="YoleoAgentExe"
+                Source="..\dist\YoleoAgent.exe"
+                Name="YoleoAgent.exe"
+                KeyPath="yes">
+              <Shortcut
+                  Id="StartMenuShortcut"
+                  Directory="ApplicationProgramsFolder"
+                  Name="Yoleo Agent"
+                  Description="Agent de surveillance Yoleo"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Advertise="yes"
+                  Icon="YoleoIcon" />
+            </File>
+            <RegistryValue
+                Id="AutoStartRegistryValue"
+                Root="HKLM"
+                Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                Name="YoleoAgent"
+                Type="string"
+                Value="&quot;[#YoleoAgentExe]&quot;" />
+            <RemoveFolder
+                Id="RemoveApplicationProgramsFolder"
+                Directory="ApplicationProgramsFolder"
+                On="uninstall" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Yoleo Agent" />
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="Yoleo Agent" Level="1">
+      <ComponentRef Id="YoleoAgentComponent" />
+    </Feature>
+  </Package>
+</Wix>
