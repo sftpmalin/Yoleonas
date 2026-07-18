@@ -8,6 +8,13 @@ Yoleonas est une interface libre de gestion de NAS Linux. Elle rassemble dans
 une interface web les fonctions courantes d'administration du serveur et
 fournit des applications clientes pour surveiller et piloter le NAS.
 
+Le moyen le plus simple de le découvrir est de télécharger l'ISO, de préparer
+une clé USB et de l'essayer sur une machine de test. L'objectif du projet est
+de proposer une expérience visuelle et accessible aux débutants, tout en
+laissant aux utilisateurs avancés l'accès aux scripts, à Linux et à une API
+documentée. Il n'est donc pas nécessaire de comprendre l'organisation du code
+avant de faire un premier essai.
+
 ## Fonctions principales
 
 - supervision du système, des disques et des services Linux ;
@@ -157,6 +164,61 @@ Yoleo côté serveur est donc disponible sans réinstaller l'application sur le
 téléphone. Les notifications du gestionnaire de tâches utilisent le service
 worker et l'abonnement Web Push du navigateur ; Chrome demandera l'autorisation
 la première fois que l'utilisateur les active.
+
+## API native pour créer d'autres applications
+
+Yoleo ne se limite pas à l'interface web et aux applications fournies dans ce
+dépôt. Il expose une **API JSON versionnée sous `/api/v1`**, accompagnée d'un
+contrat technique détaillé : **[consulter la documentation complète de l'API](system/API.txt)**.
+
+Un autre développeur peut donc créer sa propre application Android, Windows,
+Linux ou son propre tableau de bord. Il peut reprendre seulement les fonctions
+qui l'intéressent, proposer une interface différente ou réaliser un client
+mobile plus complet que l'application actuelle. L'application officielle est
+un exemple d'utilisation de l'API, pas une limite imposée au projet.
+
+### Ce que l'API permet déjà
+
+- tester la disponibilité du NAS et découvrir les capacités réellement prises
+  en charge par la version installée ;
+- obtenir en une seule requête un instantané de surveillance : système, CPU,
+  mémoire, réseau, températures, ventilateurs, GPU, stockage et montages ;
+- afficher l'état des services, conteneurs Docker, machines virtuelles, partages
+  Samba, tâches, sauvegardes et constructions d'images ;
+- démarrer ou arrêter des conteneurs, le service Docker, des machines virtuelles,
+  des tâches planifiées et des sauvegardes, uniquement à travers des actions
+  explicitement autorisées ;
+- parcourir les volumes NAS, créer des dossiers, renommer, copier, déplacer ou
+  supprimer des éléments dans les racines autorisées ;
+- envoyer et télécharger des fichiers, télécharger un dossier sous forme de ZIP
+  et produire un catalogue récursif avec empreintes SHA-256 pour contrôler les
+  transferts ou développer une fonction de synchronisation.
+
+La route `/api/v1/capabilities` permet à une application de ne présenter que
+les fonctions disponibles. Les clients doivent ignorer les nouveaux champs
+JSON qu'ils ne connaissent pas, ce qui permet à l'API d'évoluer sans casser les
+applications existantes.
+
+### Sécurité de l'API
+
+L'accès distant est conçu autour de plusieurs protections complémentaires :
+
+1. une connexion HTTPS avec vérification normale du certificat du serveur ;
+2. un certificat client P12 contrôlé par le proxy en mTLS ;
+3. une authentification du compte Linux avec PAM ;
+4. un jeton Bearer indépendant et révocable pour chaque appareil.
+
+Le mot de passe n'est pas conservé par l'API et les jetons sont stockés côté
+serveur uniquement sous forme d'empreinte SHA-256. Les actions exposées sont
+placées sur des listes blanches : l'API n'accepte pas de commande shell libre,
+et les opérations dangereuses de suppression de conteneur ou de VM ne sont pas
+ouvertes arbitrairement aux applications.
+
+Pour développer un client, commencez par lire [`system/API.txt`](system/API.txt),
+appelez `/api/v1/health`, authentifiez l'appareil, puis interrogez
+`/api/v1/capabilities`. Le document décrit les routes, les exemples JSON, les
+codes d'erreur stables, le stockage sécurisé recommandé sur Android et Windows,
+ainsi que les règles à respecter pour contribuer de nouvelles fonctions.
 
 <details>
 <summary><strong>Voir la galerie complète des 34 captures</strong></summary>
