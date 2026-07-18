@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/yoleo-logo.png" alt="Logo Yoleo NAS OS" width="180">
+</p>
+
 # Yoleonas
 
 Yoleonas est une interface libre de gestion de NAS Linux. Elle rassemble dans
@@ -13,6 +17,186 @@ fournit des applications clientes pour surveiller et piloter le NAS.
 - gestion des utilisateurs, tâches planifiées et sauvegardes ;
 - machines virtuelles libvirt et accès terminal ;
 - API sécurisée utilisée par les applications clientes.
+
+## Aperçu de Yoleo NAS OS
+
+Les captures ci-dessous proviennent d'une installation réelle. Les noms
+d'utilisateurs, adresses IP, chemins locaux, numéros de série et identifiants
+propres à la machine ont été remplacés par des valeurs de démonstration.
+
+### Tableau de bord
+
+![Tableau de bord Yoleo NAS OS](docs/images/dashboard.jpg)
+
+La page d'accueil donne immédiatement l'état du NAS : charge, mémoire,
+températures, stockage et services essentiels. Le menu latéral regroupe les
+fonctions par usage afin d'éviter de devoir administrer chaque outil depuis le
+terminal.
+
+### Stockage
+
+![Vue des disques](docs/images/disk-overview.jpg)
+
+La partie stockage inventorie les disques et présente leur état. Les vues
+complémentaires permettent d'examiner les identifiants matériels, puis de
+construire et surveiller le pool de données utilisé par le NAS.
+
+![Pool de stockage](docs/images/storage-pool.jpg)
+
+Yoleo rassemble la gestion du stockage agrégé, de mergerfs, du RAID, de
+SnapRAID et des espaces temporaires en mémoire.
+
+Avec **mergerfs**, plusieurs disques et dossiers restent des systèmes de
+fichiers indépendants mais sont présentés aux utilisateurs et aux applications
+comme un seul espace de stockage. Les données ne sont pas découpées comme dans
+un RAID : la politique choisie décide sur quel disque chaque nouveau fichier
+est écrit. Cette séparation permet encore d'accéder directement au contenu de
+chaque disque. mergerfs n'apporte toutefois pas, à lui seul, de redondance ; une
+copie, un backup ou une protection SnapRAID reste nécessaire pour protéger les
+données contre la panne d'un disque.
+
+### Docker
+
+![Gestion des conteneurs Docker](docs/images/docker-containers.jpg)
+
+L'écran Docker centralise l'état des conteneurs et leurs actions courantes. Des
+pages dédiées gèrent aussi les variables d'environnement, les stacks Compose,
+les images, les fichiers YAML et le lancement de nouveaux conteneurs.
+
+![Stacks Docker Compose](docs/images/docker-stacks.jpg)
+
+Le projet comprend également les outils nécessaires pour construire des
+images et les publier dans un registre local de démonstration.
+
+### Machines virtuelles
+
+![Gestion des machines virtuelles](docs/images/virtual-machines.jpg)
+
+Les machines virtuelles libvirt peuvent être créées, démarrées, arrêtées et
+configurées depuis l'interface. Les vues de stockage et de paramètres servent à
+choisir les images disque, les ISO et les ressources attribuées à chaque VM.
+
+### Fichiers, utilisateurs et automatisation
+
+![Gestionnaire de fichiers](docs/images/file-manager.jpg)
+
+Le gestionnaire de fichiers permet de parcourir les volumes du NAS. Les autres
+écrans administrent les comptes Linux et Samba, les droits, les tâches
+planifiées et les scripts de sauvegarde.
+
+![Gestionnaire de sauvegardes](docs/images/backup-jobs.jpg)
+
+Les sauvegardes sont organisées par usages — données, archives, cache,
+configuration et système — avec suivi de l'exécution et accès aux journaux.
+
+Le moteur distingue plusieurs opérations :
+
+- **Backup** effectue une duplication avec `rsync` vers un autre emplacement.
+  Il sert à conserver une seconde copie des données, avec des options de miroir
+  et de suppression de la source selon le profil choisi.
+- **Archive** fabrique des fichiers datés compressés au format `tar.gz` ou
+  `tar.7z`. Elle est adaptée à la conservation de versions successives et peut
+  traiter une arborescence complète ou chaque dossier séparément.
+- **Cache** est le nom historique du moteur de déplacement. Il déplace des
+  données d'une source vers une destination selon des profils configurables ;
+  il peut donc déplacer des fichiers entre deux disques même si mergerfs n'est
+  pas utilisé. Ce n'est pas le cache interne de mergerfs et il reste un outil
+  autonome.
+- **Sauvegarde système et configuration** protège séparément les fichiers de
+  Yoleo et la configuration du NAS afin de faciliter une restauration.
+
+Les profils peuvent lancer des commandes avant et après l'opération. Cela
+permet notamment d'arrêter proprement les conteneurs concernés, de copier ou
+d'archiver leurs données, puis de redémarrer uniquement ceux qui fonctionnaient
+avant la sauvegarde.
+
+### Tâches planifiées et notifications
+
+![Gestionnaire de tâches planifiées](docs/images/scheduled-tasks.jpg)
+
+Le gestionnaire de tâches sert à programmer les scripts et commandes du NAS,
+à lancer une tâche manuellement et à consulter son historique dans les
+journaux. Chaque navigateur ou téléphone peut s'abonner une seule fois aux
+notifications Web Push. Lorsqu'une tâche a l'option **Notification succès**,
+Yoleo prévient les appareils abonnés quand elle se termine correctement ; une
+fin en erreur peut également déclencher une alerte. L'abonnement est propre au
+navigateur et peut être testé ou supprimé depuis cette page.
+
+### Services et personnalisation
+
+![État d'un service réseau](docs/images/service-dashboard.jpg)
+
+Yoleo regroupe l'administration des services NFS, Samba, SFTP, FTP et
+multimédia, avec leur état systemd et leurs principaux paramètres. L'interface
+peut également être personnalisée, du menu jusqu'à l'apparence de l'écran de
+connexion.
+
+![Personnalisation de l'interface](docs/images/personalization.jpg)
+
+### Utilisation sur Android : application ou PWA
+
+L'application Android fournie dans `appli/android/` est facultative. L'interface
+web de Yoleo est aussi une **PWA** (Progressive Web App) : depuis Chrome sur
+Android, ouvrez l'adresse du NAS, affichez le menu du navigateur puis choisissez
+**Installer l'application** ou **Ajouter à l'écran d'accueil**. Yoleo apparaît
+alors avec son logo parmi les applications et s'ouvre dans une fenêtre dédiée,
+sans qu'il soit nécessaire d'installer l'APK.
+
+La PWA reste l'interface web servie directement par le NAS : une mise à jour de
+Yoleo côté serveur est donc disponible sans réinstaller l'application sur le
+téléphone. Les notifications du gestionnaire de tâches utilisent le service
+worker et l'abonnement Web Push du navigateur ; Chrome demandera l'autorisation
+la première fois que l'utilisateur les active.
+
+<details>
+<summary><strong>Voir la galerie complète des 33 captures</strong></summary>
+
+#### Stockage et système
+
+- [Tableau de bord](docs/images/dashboard.jpg)
+- [Vue générale des disques](docs/images/disk-overview.jpg)
+- [Identifiants de disque anonymisés](docs/images/disk-identifiers.jpg)
+- [Pool de stockage](docs/images/storage-pool.jpg)
+- [Ramdrive](docs/images/ramdrive.jpg)
+- [Installation](docs/images/installation.jpg)
+
+#### Docker et construction d'images
+
+- [Conteneurs Docker](docs/images/docker-containers.jpg)
+- [Variables d'environnement Docker](docs/images/docker-environment.jpg)
+- [Stacks Compose](docs/images/docker-stacks.jpg)
+- [Images Docker](docs/images/docker-images.jpg)
+- [Docker Run](docs/images/docker-run.jpg)
+- [Éditeur Docker Compose](docs/images/docker-compose.jpg)
+- [Construction d'images](docs/images/image-builds.jpg)
+- [Registre de conteneurs](docs/images/container-registry.jpg)
+
+#### Administration, partage et sauvegarde
+
+- [Gestionnaire de fichiers](docs/images/file-manager.jpg)
+- [Utilisateurs Linux](docs/images/users.jpg)
+- [Utilisateurs Samba](docs/images/samba-users.jpg)
+- [Partages NFS](docs/images/nfs-shares.jpg)
+- [Service MiniDLNA](docs/images/minidlna-service.jpg)
+- [État des services](docs/images/service-dashboard.jpg)
+- [Service SFTP](docs/images/sftp-service.jpg)
+- [Tâches planifiées](docs/images/scheduled-tasks.jpg)
+- [Scripts de sauvegarde](docs/images/backup-jobs.jpg)
+- [Sauvegardes système](docs/images/backup-system.jpg)
+- [Sauvegardes de configuration](docs/images/backup-configuration.jpg)
+- [Certificats P12](docs/images/certificates.jpg)
+- [FFmpeg à distance](docs/images/ffmpeg-remote.jpg)
+
+#### Machines virtuelles et interface
+
+- [Machines virtuelles](docs/images/virtual-machines.jpg)
+- [Stockage des VM](docs/images/vm-storage.jpg)
+- [Paramètres d'une VM](docs/images/vm-settings.jpg)
+- [Connexion](docs/images/login.jpg)
+- [Personnalisation générale](docs/images/personalization.jpg)
+- [Personnalisation du menu](docs/images/menu-personalization.jpg)
+
+</details>
 
 ## Organisation du dépôt
 
