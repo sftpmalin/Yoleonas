@@ -252,7 +252,20 @@ avant la sauvegarde.
 
 Le gestionnaire de tâches sert à programmer les scripts et commandes du NAS,
 à lancer une tâche manuellement et à consulter son historique dans les
-journaux. Chaque navigateur ou téléphone peut s'abonner une seule fois aux
+journaux. Il s'agit concrètement d'une **interface graphique pour le cron
+standard de Linux** : l'utilisateur choisit une fréquence simple — toutes les
+minutes ou heures, chaque jour, semaine, mois ou année — ou saisit directement
+une expression cron complète. Yoleo conserve la définition lisible dans sa base
+SQLite, génère automatiquement le fichier cron correspondant et le resynchronise
+si nécessaire. Une tâche configurée en mode manuel reste disponible dans
+l'interface sans créer de ligne cron.
+
+Le travail est donc exécuté par le planificateur Linux habituel, pas par un
+moteur de planification propriétaire. Un administrateur peut inspecter le cron
+généré et ses journaux, tandis qu'un débutant bénéficie d'un formulaire, de
+boutons de lancement et d'arrêt, d'un historique et d'indications de résultat.
+
+Chaque navigateur ou téléphone peut s'abonner une seule fois aux
 notifications Web Push. Lorsqu'une tâche a l'option **Notification succès**,
 Yoleo prévient les appareils abonnés quand elle se termine correctement ; une
 fin en erreur peut également déclencher une alerte. L'abonnement est propre au
