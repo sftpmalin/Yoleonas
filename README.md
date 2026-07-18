@@ -83,6 +83,57 @@ depuis de nombreuses années. Le projet débute, certaines étapes restent
 manuelles, mais l'ISO permet déjà de le découvrir sans reconstruire toute
 l'installation fichier par fichier.
 
+## Une base Debian 13, pas un Linux réinventé
+
+Yoleo NAS OS est construit sur **Debian 13**. L'interface ne cherche pas à
+remplacer les composants reconnus de Linux par des services propriétaires ou
+des copies développées spécialement pour le projet. Elle configure, pilote et
+présente dans une interface commune les outils standards installés sur le NAS.
+
+Concrètement :
+
+- les services démarrent et sont surveillés avec **systemd** ;
+- les partages Windows utilisent **Samba** ;
+- les partages Unix/Linux utilisent le serveur **NFS** du système ;
+- les conteneurs utilisent **Docker** et Docker Compose ;
+- les machines virtuelles reposent sur **KVM, QEMU et libvirt** ;
+- l'agrégation souple des disques utilise **mergerfs** ;
+- les copies, déplacements et miroirs de sauvegarde reposent notamment sur
+  **rsync**, avec `tar.gz` ou `tar.7z` pour les archives ;
+- les comptes et permissions restent des comptes et droits Linux ordinaires ;
+- les journaux et états de service restent accessibles avec les outils Debian
+  habituels, même sans passer par l'interface.
+
+Yoleo n'a donc pas réécrit Samba, NFS, Docker ou le moteur de virtualisation.
+Il fournit une couche d'administration qui prépare leurs fichiers de
+configuration, appelle leurs commandes officielles et traduit leur état dans
+une interface plus accessible. Un administrateur Linux conserve la possibilité
+d'inspecter et de dépanner le système avec les méthodes classiques.
+
+### Ce que cela signifie pour la sécurité
+
+Le modèle est comparable, dans son principe, à celui d'autres distributions de
+NAS comme OpenMediaVault ou Unraid : l'interface orchestre des briques Linux
+éprouvées au lieu de créer ses propres protocoles réseau. Cela permet de
+bénéficier des correctifs, mécanismes de permissions et pratiques de sécurité
+de Debian et des projets utilisés.
+
+Cela ne signifie pas qu'un NAS est automatiquement invulnérable. La sécurité
+dépend aussi de sa configuration et de son entretien. Il faut notamment :
+
+- appliquer régulièrement les mises à jour de Debian et des services ;
+- choisir des mots de passe solides et limiter les comptes autorisés ;
+- ne pas exposer directement l'interface Flask interne ou les services inutiles
+  à Internet ;
+- utiliser HTTPS et, pour l'API distante, les protections mTLS P12, PAM et
+  jeton Bearer documentées ;
+- configurer le pare-feu, les partages et les droits selon le réseau utilisé ;
+- conserver des sauvegardes indépendantes du NAS.
+
+L'objectif est donc rassurant mais précis : Yoleo ajoute une interface et de
+l'automatisation autour de composants Linux connus. Il ne remplace pas leur
+sécurité et ne masque pas le système Debian situé en dessous.
+
 ## Fonctions principales
 
 - supervision du système, des disques et des services Linux ;
