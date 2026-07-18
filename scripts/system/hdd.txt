@@ -1,0 +1,14 @@
+hdd_sleep.sh
+- hdd_sleep.sh -list
+- hdd_sleep.sh -status
+- hdd_sleep.sh -stop
+- hdd_sleep.sh -30
+- hdd_sleep.sh -60
+- hdd_sleep.sh -off
+- hdd_sleep.sh -remove
+
+disk_spy.sh
+- disk_spy.sh -top
+- disk_spy.sh -fatrace
+- disk_spy.sh -atop
+- disk_spy.sh -lsof /mnt/disk1
