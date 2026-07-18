@@ -46,6 +46,8 @@ construire et surveiller le pool de données utilisé par le NAS.
 Yoleo rassemble la gestion du stockage agrégé, de mergerfs, du RAID, de
 SnapRAID et des espaces temporaires en mémoire.
 
+![Configuration des profils mergerfs](docs/images/mergerfs.jpg)
+
 Avec **mergerfs**, plusieurs disques et dossiers restent des systèmes de
 fichiers indépendants mais sont présentés aux utilisateurs et aux applications
 comme un seul espace de stockage. Les données ne sont pas découpées comme dans
@@ -54,6 +56,14 @@ est écrit. Cette séparation permet encore d'accéder directement au contenu de
 chaque disque. mergerfs n'apporte toutefois pas, à lui seul, de redondance ; une
 copie, un backup ou une protection SnapRAID reste nécessaire pour protéger les
 données contre la panne d'un disque.
+
+La capture montre deux profils montés et rendus persistants dans `fstab`. Pour
+chaque profil, Yoleo affiche la destination commune, la liste des disques ou
+dossiers sources et les options mergerfs appliquées. Les boutons permettent de
+modifier le profil, le monter ou le démonter à chaud, le redémarrer, le mettre
+en pause ou le supprimer. Le profil `/mnt/user`, par exemple, rassemble le
+cache et plusieurs disques derrière un chemin unique, sans effacer l'organisation
+réelle des fichiers sur chaque support.
 
 ### Docker
 
@@ -149,7 +159,7 @@ worker et l'abonnement Web Push du navigateur ; Chrome demandera l'autorisation
 la première fois que l'utilisateur les active.
 
 <details>
-<summary><strong>Voir la galerie complète des 33 captures</strong></summary>
+<summary><strong>Voir la galerie complète des 34 captures</strong></summary>
 
 #### Stockage et système
 
@@ -157,6 +167,7 @@ la première fois que l'utilisateur les active.
 - [Vue générale des disques](docs/images/disk-overview.jpg)
 - [Identifiants de disque anonymisés](docs/images/disk-identifiers.jpg)
 - [Pool de stockage](docs/images/storage-pool.jpg)
+- [Profils mergerfs](docs/images/mergerfs.jpg)
 - [Ramdrive](docs/images/ramdrive.jpg)
 - [Installation](docs/images/installation.jpg)
 
