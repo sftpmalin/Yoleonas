@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mosaïque d'émoticônes système / Linux</title>
+  <style>
+    :root{
+      --bg:#0b1118;
+      --panel:#111b26;
+      --panel2:#0f1720;
+      --border:#243446;
+      --text:#e9f2ff;
+      --muted:#8fa4b8;
+      --accent:#00e5ff;
+      --accent2:#ff6ad5;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:radial-gradient(circle at top left,#172b3d 0,#0b1118 42%,#070b10 100%);
+      color:var(--text);
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:10;
+      background:rgba(7,11,16,.92);
+      backdrop-filter:blur(10px);
+      border-bottom:1px solid var(--border);
+      padding:16px 18px;
+    }
+    h1{margin:0 0 6px;font-size:24px;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+    .tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    input{
+      min-width:260px;
+      flex:1;
+      max-width:520px;
+      background:#071019;
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px 12px;
+      outline:none;
+    }
+    input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,255,.12)}
+    button.action{
+      background:#10202d;
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+    }
+    button.action:hover{border-color:var(--accent);color:#fff}
+    main{padding:18px;max-width:1400px;margin:auto}
+    section{
+      background:linear-gradient(180deg,rgba(17,27,38,.92),rgba(12,18,26,.92));
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:16px;
+      margin-bottom:18px;
+      box-shadow:0 12px 30px rgba(0,0,0,.22);
+    }
+    h2{
+      margin:0 0 12px;
+      font-size:18px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      color:#fff;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
+      gap:10px;
+    }
+    .tile{
+      min-height:78px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:7px;
+      border:1px solid #203245;
+      border-radius:15px;
+      background:linear-gradient(180deg,#101a25,#0b131c);
+      cursor:pointer;
+      user-select:none;
+      transition:transform .12s ease,border-color .12s ease,background .12s ease;
+    }
+    .tile:hover{
+      transform:translateY(-2px);
+      border-color:var(--accent);
+      background:linear-gradient(180deg,#132437,#0b1824);
+    }
+    .emoji{font-size:30px;line-height:1}
+    .label{font-size:12px;color:var(--muted);text-align:center;padding:0 6px;line-height:1.15}
+    .toast{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      background:#071019;
+      border:1px solid var(--accent);
+      color:#fff;
+      border-radius:14px;
+      padding:12px 14px;
+      box-shadow:0 12px 30px rgba(0,0,0,.4);
+      opacity:0;
+      transform:translateY(10px);
+      pointer-events:none;
+      transition:.18s ease;
+      z-index:99;
+    }
+    .toast.show{opacity:1;transform:translateY(0)}
+    .hidden{display:none!important}
+    footer{color:var(--muted);font-size:12px;text-align:center;padding:24px}
+    @media(max-width:600px){
+      header{position:static}
+      .grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+      .tile{min-height:72px}
+      .emoji{font-size:28px}
+      input{min-width:100%}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🧩 Mosaïque d'émoticônes système / Linux</h1>
+    <div class="sub">Clique sur une tuile pour copier l'émoticône. Recherche possible par mot-clé.</div>
+    <div class="tools">
+      <input id="search" placeholder="Rechercher : linux, docker, disque, réseau, sécurité, vm...">
+      <button class="action" onclick="copyAllVisible()">Copier toutes les visibles</button>
+      <button class="action" onclick="clearSearch()">Réinitialiser</button>
+    </div>
+  </header>
+
+  <main id="content"></main>
+  <div class="toast" id="toast">Copié</div>
+  <footer>Page locale autonome — aucune dépendance externe.</footer>
+
+  <script>
+    const groups = [
+      {title:'Linux / système', icon:'🐧', items:[
+        ['🐧','Linux pingouin tux'],['💻','ordinateur poste système'],['🖥️','serveur écran desktop'],['⌨️','clavier console'],['🖱️','souris interface'],['🧠','kernel noyau'],['⚙️','réglages système'],['🛠️','outils maintenance'],['🔧','configuration réparation'],['🧰','boîte outils env'],['📟','terminal console'],['🖲️','trackball contrôle'],['🔌','alimentation service'],['🔋','batterie énergie'],['🧯','dépannage urgence'],['🧪','test laboratoire'],['📦','paquet package apt'],['🧱','brique module'],['🧩','plugin composant'],['🧬','processus génétique système'],['🕹️','contrôle pilotage'],['🪛','tournevis réglage'],['🪚','atelier build'],['🏗️','construction build'],['🧹','nettoyage cache'],['🧲','aimant montage'],['🗜️','compression outil'],['🧵','thread fil exécution'],['🪪','identité host'],['🧾','rapport configuration']
+      ]},
+      {title:'Terminal / scripts / logs', icon:'📟', items:[
+        ['📟','terminal tty console'],['>_','shell invite prompt'],['#️⃣','root hashtag'],['📝','script édition'],['📜','logs journal'],['📄','fichier texte'],['📑','documents conf'],['🗒️','notes config'],['🧾','journal rapport'],['📋','clipboard copier'],['✂️','couper script'],['📌','pin fixer'],['🔍','chercher grep'],['🔎','inspecter find'],['✅','ok succès'],['❌','erreur échec'],['⚠️','warning attention'],['🚨','alerte critique'],['⏳','attente tâche'],['⌛','temps terminé'],['🔁','relancer boucle'],['🔄','refresh recharger'],['▶️','start lancer'],['⏸️','pause suspendre'],['⏹️','stop arrêter'],['⏺️','record capture'],['⏭️','suivant next'],['⏮️','retour previous'],['🧯','secours rollback'],['🪤','trap signal']
+      ]},
+      {title:'Réseau / LAN / DNS', icon:'🌐', items:[
+        ['🌐','internet réseau'],['🕸️','web réseau maillage'],['🛰️','satellite liaison'],['📡','antenne wifi radio'],['🛜','wifi'],['🔗','lien link'],['⛓️','chaîne bridge'],['🧭','route gateway'],['🗺️','plan réseau'],['🏠','LAN maison'],['🏢','réseau entreprise'],['🔌','prise ethernet'],['📶','signal réseau'],['📥','download entrant'],['📤','upload sortant'],['🔀','switch routage'],['↔️','transfert bidirectionnel'],['⬆️','up upload'],['⬇️','down download'],['🧱','pare-feu mur'],['🛡️','protection réseau'],['🔐','VPN sécurisé'],['🔑','clé ssh'],['🪪','certificat identité'],['📛','nom DNS'],['🏷️','label mDNS'],['🧵','socket thread'],['🌍','domaine public'],['🧿','surveillance réseau'],['📊','stats réseau']
+      ]},
+      {title:'Stockage / disques / fichiers', icon:'💽', items:[
+        ['💽','disque optique stockage'],['💾','disquette sauvegarde'],['🖴','disque dur'],['🗄️','armoire stockage'],['🗃️','archive tiroir'],['📁','dossier fermé'],['📂','dossier ouvert'],['🗂️','classement fichiers'],['🧺','panier cache'],['🧊','froid archive'],['🪣','bucket stockage'],['📦','paquet archive'],['🧱','bloc disque'],['🧮','calcul espace'],['📏','taille mesure'],['🧲','montage mount'],['🔒','volume verrouillé'],['🔓','volume ouvert'],['🧹','wipe nettoyer'],['🧯','sécurité destructive'],['🔁','sync réplication'],['🪞','miroir mirror'],['🧬','raid logique'],['🧫','pool stockage'],['🧪','test disque'],['🩺','smart santé'],['⚕️','santé diagnostic'],['📉','espace faible'],['📈','croissance données'],['🧾','fstab conf']
+      ]},
+      {title:'Docker / conteneurs / images', icon:'🐳', items:[
+        ['🐳','docker baleine'],['🐋','container baleine'],['📦','image docker'],['🧊','layer couche'],['🏗️','build image'],['🚢','shipping déploiement'],['⚓','ancre service'],['🧩','compose stack'],['🧰','env variables'],['🔐','registry login'],['🏷️','tag image'],['📚','registry dépôt'],['📥','pull télécharger'],['📤','push envoyer'],['▶️','start container'],['⏹️','stop container'],['🔄','restart container'],['🧹','prune nettoyage'],['🧪','test image'],['🧯','erreur container'],['📜','logs docker'],['🔌','ports docker'],['🌐','network docker'],['💾','volume docker'],['🗂️','compose yml'],['📝','yaml édition'],['🔍','inspect docker'],['🧬','sha256 digest'],['🔒','privé sécurisé'],['🚀','déploiement']
+      ]},
+      {title:'VM / virtualisation / GPU', icon:'🖥️', items:[
+        ['🖥️','machine virtuelle écran'],['🧠','cpu vcpu'],['💾','ram mémoire'],['💽','disque vm'],['📀','iso boot'],['🧬','xml libvirt'],['🕹️','console vnc'],['🎮','gpu carte graphique'],['🖼️','affichage vidéo'],['⚡','accélération'],['🔥','performance'],['🌡️','température'],['🧊','refroidissement'],['🔌','passthrough pci'],['🧲','attacher périphérique'],['🔧','réglages vm'],['🛠️','maintenance vm'],['🧰','drivers outils'],['🪟','windows'],['🐧','linux guest'],['🚀','démarrer vm'],['⏹️','arrêter vm'],['⏸️','pause vm'],['🔁','redémarrer vm'],['📸','snapshot'],['🪞','clone miroir'],['🔐','secure boot'],['🧾','firmware bios uefi'],['🏷️','type q35 i440fx'],['📡','réseau virtuel']
+      ]},
+      {title:'Sécurité / utilisateurs / droits', icon:'🛡️', items:[
+        ['🛡️','sécurité protection'],['🔐','verrouillé sécurisé'],['🔒','lock fermé'],['🔓','unlock ouvert'],['🔑','clé mot passe'],['🗝️','ancienne clé'],['👤','utilisateur'],['👥','groupe users'],['🧑‍💻','admin technicien'],['🪪','identité certificat'],['📛','badge nom'],['🧾','audit rapport'],['👁️','surveillance vue'],['🕵️','inspection sécurité'],['🚫','interdit deny'],['✅','autorisé allow'],['⚠️','alerte warning'],['🚨','intrusion critique'],['🧱','firewall pare-feu'],['🪪','p12 certificat'],['📜','règle politique'],['🧰','permissions chmod'],['🗂️','acl droits'],['📁','dossier droits'],['🧹','nettoyer accès'],['🔍','scanner audit'],['🧿','monitoring sécurité'],['🧯','incident réponse'],['📌','règle fixe'],['🔁','rotation clés']
+      ]},
+      {title:'Services / NAS / partage', icon:'🧩', items:[
+        ['🧩','service module'],['🏠','maison réseau'],['🗄️','NAS stockage'],['📂','partage dossier'],['🤝','partage samba nfs'],['📡','service réseau'],['🎬','media vidéo'],['🎵','audio musique'],['🖼️','photos images'],['📺','TV media'],['📻','diffusion dlna'],['🧲','mount service'],['🚪','porte port'],['🔌','daemon service'],['⚙️','systemd service'],['🧰','options service'],['🧾','conf service'],['📜','logs service'],['▶️','démarrer service'],['⏹️','arrêter service'],['🔄','redémarrer service'],['✅','actif ok'],['❌','inactif erreur'],['🕒','planning cron'],['⏰','heure schedule'],['📆','calendrier tâche'],['🤖','automation'],['🧹','mover cache'],['📦','archive backup'],['🔁','rsync sync']
+      ]},
+      {title:'Monitoring / performance', icon:'📊', items:[
+        ['📊','graph statistiques'],['📈','hausse performance'],['📉','baisse charge'],['🧮','calcul métriques'],['⏱️','chrono temps'],['🕒','temps service'],['🌡️','température'],['🔥','chaud charge'],['🧊','froid idle'],['⚡','énergie puissance'],['🔋','batterie conso'],['🌀','ventilateur fan'],['💨','air refroidissement'],['🧠','cpu charge'],['💾','ram mémoire'],['💽','io disque'],['🌐','trafic réseau'],['📡','signal'],['🔍','analyse'],['🩺','diagnostic santé'],['🧿','surveillance'],['🚨','alerte'],['⚠️','warning'],['✅','sain ok'],['❌','panne erreur'],['📝','rapport'],['📋','tableau état'],['🧪','benchmark test'],['🎯','objectif seuil'],['📌','seuil fixe']
+      ]},
+      {title:'État / actions rapides', icon:'✅', items:[
+        ['✅','validé ok'],['☑️','case cochée'],['✔️','check'],['❎','case erreur'],['❌','croix erreur'],['🚫','bloqué interdit'],['⛔','stop interdit'],['⚠️','attention'],['ℹ️','information'],['❓','question aide'],['💡','idée astuce'],['🔔','notification'],['🔕','silence'],['⭐','favori veille disque'],['📌','épinglé'],['🎯','cible'],['🚀','lancer rapide'],['🧭','navigation'],['🔙','retour'],['🔜','suite'],['⬅️','gauche'],['➡️','droite'],['⬆️','haut'],['⬇️','bas'],['🔼','monter'],['🔽','descendre'],['➕','ajouter'],['➖','retirer'],['✏️','modifier'],['🗑️','supprimer']
+      ]},
+      {title:'Icônes utiles pour menus Yoleo', icon:'🧭', items:[
+        ['🏠','Accueil'],['🖥️','Système'],['💽','Stockage'],['🐳','Docker'],['🏗️','Build'],['🤝','Partage'],['🧩','Services'],['🖥️','Virtuel Machine'],['👥','Utilisateurs'],['📂','Fichiers'],['📟','Terminal'],['🧰','Options'],['📜','Logs'],['📡','LAN'],['🛡️','Pare-feu'],['🧾','Configuration'],['🔧','Maintenance'],['🧪','Dépannage'],['💾','Sauvegarde'],['📦','Archives'],['🧹','Cache'],['🔁','Sync'],['🐧','Linux'],['🔐','ENV'],['🧩','Stacks'],['📝','YML'],['🐳','Images Docker'],['🌐','LAN Docker'],['🎬','Media'],['🤖','Tâches']
+      ]}
+    ];
+
+    const main = document.getElementById('content');
+    const toast = document.getElementById('toast');
+    let toastTimer = null;
+
+    function makePage(){
+      groups.forEach(group => {
+        const section = document.createElement('section');
+        section.dataset.group = group.title.toLowerCase();
+        const h2 = document.createElement('h2');
+        h2.textContent = `${group.icon} ${group.title}`;
+        const grid = document.createElement('div');
+        grid.className = 'grid';
+        group.items.forEach(([emoji,label]) => {
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+          tile.dataset.text = `${emoji} ${label} ${group.title}`.toLowerCase();
+          tile.title = `Copier ${emoji}`;
+          tile.innerHTML = `<div class="emoji">${emoji}</div><div class="label">${label}</div>`;
+          tile.addEventListener('click', () => copyText(emoji));
+          grid.appendChild(tile);
+        });
+        section.appendChild(h2);
+        section.appendChild(grid);
+        main.appendChild(section);
+      });
+    }
+
+    function copyText(text){
+      navigator.clipboard.writeText(text).then(() => showToast(`Copié : ${text}`));
+    }
+
+    function showToast(msg){
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 1200);
+    }
+
+    function filter(){
+      const q = document.getElementById('search').value.trim().toLowerCase();
+      document.querySelectorAll('section').forEach(section => {
+        let visibleCount = 0;
+        section.querySelectorAll('.tile').forEach(tile => {
+          const ok = !q || tile.dataset.text.includes(q);
+          tile.classList.toggle('hidden', !ok);
+          if(ok) visibleCount++;
+        });
+        section.classList.toggle('hidden', visibleCount === 0);
+      });
+    }
+
+    function clearSearch(){
+      document.getElementById('search').value = '';
+      filter();
+    }
+
+    function copyAllVisible(){
+      const emojis = [...document.querySelectorAll('.tile:not(.hidden) .emoji')].map(e => e.textContent).join(' ');
+      copyText(emojis);
+    }
+
+    document.getElementById('search').addEventListener('input', filter);
+    makePage();
+  </script>
+</body>
+</html>

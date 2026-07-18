@@ -1,0 +1,936 @@
+YOLEO - CONTRAT TECHNIQUE DE L'API JSON NATIVE
+===============================================
+
+Etat du document : 2026-07-15
+Version de l'API : 1
+URL publique     : https://system.sftpmalin.com/api/v1
+Clients prévus   : application Android native et application Windows native
+
+Ce fichier est la référence à lire avant toute modification des applications
+Android/Windows ou de l'API. Le client doit ignorer les champs JSON inconnus
+afin de rester compatible avec les ajouts futurs.
+
+
+1. ARCHITECTURE ET FICHIERS
+---------------------------
+
+- system/app.py
+  Enregistre le Blueprint API sous /api/v1 et empêche la redirection de ces
+  routes vers la page HTML /login.
+
+- system/yoleo_api.py
+  Contient l'API, l'authentification Bearer, le stockage des jetons et les
+  adaptateurs vers les fonctions Yoleo existantes.
+
+- conf/api_tokens.sqlite3
+  Base créée automatiquement au premier login API réussi. Elle contient
+  uniquement l'empreinte SHA-256 des jetons, jamais les jetons en clair.
+  Permissions demandées par le code : 0600.
+
+- system/tests/test_yoleo_api.py
+  Tests du contrat API : santé, protection Bearer, validation JSON, cycle de
+  vie du jeton, aperçu système et listes blanches Docker/VM.
+
+- system/API.txt
+  Le présent contrat technique.
+
+Aucune page HTML, aucun menu et aucun style ne dépendent de cette API.
+
+
+2. SECURITE : TROIS COUCHES DISTINCTES
+--------------------------------------
+
+Couche 1 - HTTPS et certificat serveur
+  Le client se connecte uniquement en HTTPS et doit vérifier normalement le
+  certificat TLS du serveur. Il ne faut jamais désactiver cette vérification.
+
+Couche 2 - certificat client P12 (mTLS)
+  Nginx Proxy Manager termine TLS et exige un certificat client valide avant
+  de transmettre la requête à Flask. Configuration publique constatée :
+
+    ssl_verify_client on;
+    ssl_client_certificate /etc/nginx/client_certs/system.crt;
+    ssl_verify_depth 1;
+
+  Le fichier P12 contient le certificat client et sa clé privée. Son mot de
+  passe sert à ouvrir le P12 localement dans l'application. Le P12 et son mot
+  de passe ne sont jamais envoyés dans un corps JSON et ne sont jamais stockés
+  par l'API Flask.
+
+  Sans certificat client accepté, Nginx refuse la connexion avant Flask
+  (actuellement HTTP 400 côté proxy). Une réponse JSON /api/v1/health prouve
+  donc que le contrôle mTLS public a déjà réussi.
+
+Couche 3 - compte PAM puis jeton Bearer
+  Le login JSON vérifie le nom d'utilisateur et le mot de passe avec PAM.
+  Seul l'utilisateur configuré par PAM_ALLOWED_USER est accepté (actuellement
+  root). Après réussite, l'API délivre un jeton révocable. Les routes privées
+  utilisent ensuite le jeton, pas le mot de passe.
+
+Important : le P12 est une protection forte, mais ne remplace ni le mot de
+passe du compte ni le jeton. La sécurité complète est : HTTPS + mTLS P12 + PAM
++ jeton Bearer.
+
+Le port Flask interne 12345 ne réalise pas lui-même le mTLS. Il doit rester
+limité au réseau interne et ne doit pas être exposé directement à Internet.
+
+
+3. REGLES HTTP ET JSON COMMUNES
+-------------------------------
+
+URL de base :
+  https://system.sftpmalin.com/api/v1
+
+En-têtes d'une requête JSON :
+  Accept: application/json
+  Content-Type: application/json
+
+En-tête supplémentaire d'une route privée :
+  Authorization: Bearer yoleo_<jeton>
+
+Le schéma Bearer est comparé sans tenir compte des majuscules/minuscules. Le
+jeton, lui, doit être transmis exactement. Les cookies de session HTML et les
+jetons CSRF de l'interface Web ne sont pas utilisés par cette API.
+
+Toutes les réponses produites par yoleo_api.py ajoutent :
+  Cache-Control: no-store
+  X-Content-Type-Options: nosniff
+
+Réponse de succès standard :
+  {
+    "ok": true,
+    "api_version": "1",
+    "...": "données propres à la route"
+  }
+
+Réponse d'erreur standard :
+  {
+    "ok": false,
+    "api_version": "1",
+    "error": {
+      "code": "code_stable_pour_le_programme",
+      "message": "message lisible"
+    }
+  }
+
+Les dates émises directement par l'API sont en UTC, ISO 8601, avec suffixe Z.
+Exemple : 2026-07-14T13:44:10Z.
+
+
+4. SEQUENCE DE TEST DE CONNEXION DES APPLICATIONS
+-------------------------------------------------
+
+Dans les paramètres Android et Windows, l'utilisateur renseigne :
+  - adresse HTTPS du serveur ;
+  - nom d'utilisateur ;
+  - mot de passe ;
+  - fichier P12 ;
+  - mot de passe du fichier P12, s'il en possède un.
+
+Ordre recommandé pour le bouton « Test » :
+
+  1. Charger localement le P12 et sa clé privée.
+     Echec => afficher « Chargement du certificat client : échec ».
+
+  2. GET /api/v1/health avec ce certificat client.
+     Réponse JSON ok=true => afficher « Certificat P12 / connexion HTTPS : OK ».
+     Echec TLS/HTTP proxy => ne pas tenter le login.
+
+  3. POST /api/v1/auth/login avec les identifiants.
+     Réponse 200 => afficher « Identifiants : OK » et conserver le jeton dans
+     le stockage sécurisé du système.
+
+  4. GET /api/v1/me avec le nouveau jeton.
+     Réponse 200 => afficher « Vérification du jeton : OK ».
+
+  5. Le bouton OK peut alors enregistrer la configuration et fermer la fenêtre.
+
+Ne jamais journaliser le mot de passe, le mot de passe du P12 ou le jeton brut.
+Android doit protéger ces secrets avec Android Keystore ; Windows doit utiliser
+DPAPI/Credential Manager ou un stockage équivalent lié à l'utilisateur.
+
+
+5. ROUTES PUBLIQUES AU NIVEAU FLASK
+-----------------------------------
+
+« Publique » signifie sans jeton Bearer. Sur l'adresse Internet, le certificat
+client P12 reste obligatoire car le contrôle est effectué avant Flask.
+
+GET /api/v1
+GET /api/v1/
+GET /api/v1/health
+
+Rôle : tester HTTPS, le P12, le proxy et la disponibilité de Flask.
+
+Réponse 200 :
+  {
+    "ok": true,
+    "api_version": "1",
+    "service": "yoleo",
+    "server_time": "2026-07-14T13:44:10Z"
+  }
+
+
+POST /api/v1/auth/login
+
+Rôle : vérifier PAM et créer un jeton pour l'appareil.
+
+Corps JSON :
+  {
+    "username": "root",
+    "password": "mot_de_passe_du_compte",
+    "device_name": "Pixel 9 de Yoan",
+    "platform": "android"
+  }
+
+Champs :
+  username    obligatoire, texte nettoyé, 128 caractères maximum ;
+  password    obligatoire, non normalisé et non conservé par l'API ;
+  device_name facultatif, 120 caractères maximum, défaut « Appareil Yoleo » ;
+  platform    facultatif, 32 caractères maximum, converti en minuscules,
+              valeurs conseillées : android ou windows ; défaut unknown.
+
+Réponse 200 :
+  {
+    "ok": true,
+    "api_version": "1",
+    "authentication": {
+      "access_token": "yoleo_...",
+      "token_type": "Bearer",
+      "expires_at": "2027-07-14T13:44:10Z",
+      "expires_in": 31536000,
+      "username": "root",
+      "device_name": "Pixel 9 de Yoan",
+      "platform": "android"
+    }
+  }
+
+Le jeton brut n'est retourné qu'à cet instant. Sa durée par défaut est de
+365 jours. La variable YOLEO_API_TOKEN_DAYS peut la régler entre 1 et 3650
+jours. Un login crée un jeton indépendant par appareil et purge les jetons déjà
+expirés ou révoqués.
+
+Erreurs :
+  400 invalid_json       corps JSON illisible ou non objet ;
+  401 invalid_credentials utilisateur interdit, mot de passe vide ou PAM refusé ;
+  415 json_required      Content-Type n'indique pas JSON.
+
+
+6. ROUTES PRIVEES : IDENTITE ET CAPACITES
+-----------------------------------------
+
+Toutes les routes suivantes exigent Authorization: Bearer <jeton>.
+Jeton absent, expiré, révoqué ou inconnu :
+  HTTP 401, code authentication_required.
+
+
+POST /api/v1/auth/logout
+
+Révoque immédiatement le jeton utilisé pour la requête.
+
+Réponse 200 :
+  {
+    "ok": true,
+    "api_version": "1",
+    "revoked": true
+  }
+
+Après cette réponse, le client doit supprimer sa copie locale du jeton. Le P12
+et les paramètres du serveur peuvent rester configurés si l'utilisateur veut
+simplement se reconnecter.
+
+
+GET /api/v1/me
+
+Réponse 200 :
+  {
+    "ok": true,
+    "api_version": "1",
+    "identity": {
+      "username": "root",
+      "device_name": "Pixel 9 de Yoan",
+      "platform": "android",
+      "created_at": "2026-07-14T13:44:10Z",
+      "expires_at": "2027-07-14T13:44:10Z"
+    }
+  }
+
+
+GET /api/v1/capabilities
+
+Permet au client d'afficher uniquement les fonctions réellement disponibles.
+
+Réponse 200 actuelle :
+  {
+    "ok": true,
+    "api_version": "1",
+    "capabilities": {
+      "overview": true,
+      "monitoring_snapshot": true,
+      "monitoring_sections": [
+        "system",
+        "storage",
+        "docker",
+        "vms",
+        "samba",
+        "tasks",
+        "backup",
+        "build"
+      ],
+      "docker_actions": [
+        "restart",
+        "restart_docker_service",
+        "start",
+        "start_all",
+        "start_docker_service",
+        "stop",
+        "stop_all",
+        "stop_docker_service"
+      ],
+      "vm_actions": [
+        "destroy",
+        "reboot",
+        "shutdown",
+        "start"
+      ],
+      "task_actions": [
+        "start",
+        "stop"
+      ],
+      "backup_actions": [
+        "start",
+        "stop"
+      ],
+      "file_browser": true,
+      "file_roots": [
+        "/mnt",
+        "/media",
+        "/srv"
+      ],
+      "file_actions": [
+        "copy",
+        "delete",
+        "mkdir",
+        "move",
+        "rename"
+      ],
+      "file_upload": true,
+      "file_download": true,
+      "file_download_directory_zip": true,
+      "file_catalog_sha256": true,
+      "arbitrary_commands": false
+    }
+  }
+
+Le tableau est trié alphabétiquement par le serveur. L'application ne doit pas
+inventer une action absente de cette réponse.
+
+
+7. ROUTE APERCU SYSTEME
+-----------------------
+
+GET /api/v1/overview
+
+Réutilise system.collect_overview(), la même source que l'interface Yoleo.
+
+Réponse 200 :
+  {
+    "ok": true,
+    "api_version": "1",
+    "overview": {
+      "generated_at": "...",
+      "time": "HH:MM:SS",
+      "date": "...",
+      "host": { "...": "..." },
+      "cpu": {
+        "percent": 0.0,
+        "load1": 0.0,
+        "load5": 0.0,
+        "load15": 0.0
+      },
+      "ram": {
+        "percent": 0.0,
+        "used": "...",
+        "total": "..."
+      },
+      "disk": {
+        "mount": "/mnt/user",
+        "percent": 0.0,
+        "used": "...",
+        "total": "..."
+      },
+      "network": { "...": "..." },
+      "services": { "...": "..." },
+      "docker": { "...": "..." },
+      "vms": { "...": "..." },
+      "build": { "...": "..." },
+      "processes": { "total": 0 },
+      "mounts": { "...": "..." },
+      "fans": { "...": "..." },
+      "uptime": "..."
+    }
+  }
+
+Les sous-objets host, network, services, docker, vms, build, mounts et fans
+proviennent des collecteurs de l'interface et peuvent gagner de nouveaux
+champs. Les clients doivent analyser seulement les champs dont ils ont besoin.
+
+Erreur :
+  503 overview_unavailable si le collecteur est momentanément indisponible.
+
+
+8. CLICHE UNIQUE DE SURVEILLANCE
+-------------------------------
+
+GET /api/v1/monitoring/snapshot
+
+Route privée destinée aux agents Android et Windows. Un appel ramène toutes les
+données nécessaires au contrôle périodique ; le client ne doit pas multiplier
+les requêtes par fonction.
+
+Réponse 200 :
+  {
+    "ok": true,
+    "api_version": "1",
+    "monitoring": {
+      "generated_at": "2026-07-14T13:44:10Z",
+      "system": {
+        "cpu_percent": 12.5,
+        "ram_percent": 42.0,
+        "uptime": "4 jours",
+        "host": {
+          "hostname": "system",
+          "os": "Debian GNU/Linux",
+          "kernel": "...",
+          "cpu_model": "...",
+          "local_ip": "192.168.1.2",
+          "boot_time": "11/07/2026 09:15:00"
+        },
+        "network": {
+          "iface": "br0",
+          "ip": "192.168.1.2",
+          "gateway": "192.168.1.1",
+          "state": "up",
+          "speed": "2.5 Gbit/s"
+        },
+        "services": {
+          "total": 123,
+          "active": 48,
+          "running": 45,
+          "failed": 0,
+          "enabled": 61
+        },
+        "temperatures": [
+          {"id": "coretemp:1", "chip": "coretemp", "label": "Package id 0", "current": 42.0, "high": 80.0, "critical": 100.0}
+        ],
+        "fans": {
+          "available": true,
+          "count": 2,
+          "rows": [
+            {"id": "nct:1", "label": "CPU FAN", "rpm": 780, "rpm_label": "780 RPM", "status": "ok"}
+          ]
+        },
+        "gpus": [
+          {"type": "intel", "source": "local", "label": "Intel GPU", "name": "Intel iGPU", "load": "8.0", "mem": "0.0", "temp": "45", "power": "7.2", "fan": "-"}
+        ]
+      },
+      "storage": {
+        "main": {
+          "path": "/mnt/user",
+          "percent": 66.0,
+          "used": "6 Tio",
+          "total": "10 Tio"
+        },
+        "volumes": [
+          {
+            "path": "/mnt/cache",
+            "percent": 81.0,
+            "used": "810 Gio",
+            "free": "190 Gio",
+            "total": "1 Tio",
+            "status": "ok",
+            "status_label": "OK",
+            "ok": true
+          }
+        ],
+        "mounts": [
+          {
+            "path": "/mnt/media0",
+            "label": "media0",
+            "exists": true,
+            "is_mount": true,
+            "source": "/dev/sdb1",
+            "fstype": "xfs",
+            "percent": 72.0,
+            "used": "7,2 Tio",
+            "free": "2,8 Tio",
+            "total": "10 Tio",
+            "status": "ok",
+            "status_label": "OK",
+            "ok": true,
+            "home_selected": true,
+            "home_usage_selected": false
+          }
+        ],
+        "mount_state": "ok",
+        "mount_label": "OK"
+      },
+      "docker": {
+        "available": true,
+        "service": {
+          "service_name": "docker",
+          "state": "active",
+          "label": "Actif",
+          "active": true
+        },
+        "stats": {
+          "total": 12,
+          "running": 11,
+          "stopped": 1
+        },
+        "containers": [
+          {
+            "id": "...",
+            "name": "emby",
+            "state": "running",
+            "stack": "Media",
+            "icon": "https://logo.exemple/emby.png"
+          }
+        ]
+      },
+      "vms": {
+        "available": true,
+        "summary": {
+          "total": 2,
+          "running": 1,
+          "stopped": 1,
+          "paused": 0
+        },
+        "machines": [
+          {
+            "name": "Windows",
+            "state": "running",
+            "state_class": "running",
+            "running": true
+          }
+        ]
+      },
+      "samba": {
+        "available": true,
+        "ok": true,
+        "services": [
+          {
+            "name": "smbd.service",
+            "exists": true,
+            "active": "active",
+            "enabled": "enabled",
+            "ok": true
+          }
+        ]
+      },
+      "tasks": [
+        {
+          "id": 7,
+          "title": "Sauvegarde",
+          "enabled": true,
+          "running": false,
+          "status": "Terminé",
+          "result": "Succès",
+          "last_run": "2026-07-14 10:00:00",
+          "last_end": "2026-07-14 10:01:00",
+          "last_message": "Traitement terminé avec succès.",
+          "updated_at": "2026-07-14 10:01:00"
+        }
+      ],
+      "backup": {
+        "available": true,
+        "summary": {
+          "total": 4,
+          "running": 1
+        },
+        "scripts": [
+          {
+            "filename": "photos.py",
+            "title": "Photos",
+            "mode": "backup",
+            "source": "/mnt/photos/",
+            "target": "/mnt/backup/photos/",
+            "running": true,
+            "result": "En cours",
+            "message": "Copie",
+            "started_at": "...",
+            "ended_at": "",
+            "phase": "copy",
+            "progress_percent": 42,
+            "progress_text": "42 %"
+          }
+        ]
+      },
+      "build": {
+        "available": true,
+        "label": "2 à builder",
+        "total": 8,
+        "projects": 8,
+        "tars": 6,
+        "to_build": 2,
+        "to_push": 1,
+        "meta_missing": 0,
+        "updated_at": "..."
+      },
+      "errors": []
+    }
+  }
+
+Origine des sections :
+  system   : system.collect_overview() + collect_mobile_hardware_stats(),
+             CPU/RAM, hote, IP locale, uptime, resume systemd, temperatures,
+             ventilateurs et GPU Intel/NVIDIA configures dans Systeme ;
+  storage  : disque principal, volumes configurés et inventaire des points de
+             montage possibles sous /mnt, /media et /srv ;
+  docker   : service Docker, inventaire minimal et URL d'icône des conteneurs ;
+  vms      : inventaire libvirt léger, sans lecture des XML ni création de VM ;
+  samba    : smbd, nmbd et le service WSDD installé ;
+  tasks    : tâches, état d'exécution et dernier résultat ;
+  backup   : scripts existants des catégories Backup, Miroir, Archive et Cache,
+             avec leur état et leur progression, sans contenu de script ;
+  build    : cache léger Build, notamment to_build et to_push.
+
+Chaque section est isolée. Si Docker, VM, Samba, Task ou Backup est indisponible, la route
+reste en HTTP 200 et ajoute par exemple :
+  {
+    "section": "docker",
+    "code": "docker_unavailable",
+    "message": "..."
+  }
+dans monitoring.errors. Les autres sections restent utilisables.
+
+Règles du client de surveillance :
+  - mémoriser le dernier cliché ou un état dérivé localement ;
+  - déclencher les alertes sur transition, pas à chaque appel ;
+  - appliquer une hystérésis aux seuils CPU/RAM/stockage ;
+  - une absence de réponse HTTP signifie serveur/proxy/réseau indisponible ;
+  - une réponse 401 signifie jeton à renouveler, pas serveur hors ligne.
+
+La liste storage.mounts réutilise la même détection que la carte d'accueil :
+findmnt puis os.path.ismount. Elle inclut également les dossiers NAS connus qui
+ne sont plus montés, afin que le client puisse distinguer :
+  status=ok                 vrai point de montage ;
+  status=folder             chemin devenu simple dossier local vide ;
+  status=folder_with_data   chemin devenu dossier local contenant des données ;
+  status=missing            chemin absent ;
+  status=error              montage présent mais mesure d'occupation impossible.
+
+Les applications choisissent localement les chemins à surveiller. À chaque
+cliché, un chemin sélectionné doit conserver is_mount=true. Le passage de
+is_mount=true à false déclenche une alerte de baie/point de montage. Le serveur
+ne modifie ni disk_top.conf ni fstab pour cette sélection native.
+
+
+9. ROUTE ACTIONS DOCKER
+-----------------------
+
+POST /api/v1/docker/actions
+
+Réutilise les fonctions métier de dockers.py. Aucune commande shell libre n'est
+acceptée. Les suppressions rm/rmi ne sont volontairement pas exposées.
+
+Action sur un conteneur :
+  {
+    "action": "start",
+    "container_id": "nom_ou_identifiant_du_conteneur"
+  }
+
+Le champ id est accepté comme alias de container_id. container_id est nettoyé
+et limité à 128 caractères.
+
+Actions nécessitant container_id :
+  start
+  stop
+  restart
+
+Actions globales, sans container_id :
+  start_all
+  stop_all
+
+Actions sur le service Docker, sans container_id :
+  start_docker_service
+  restart_docker_service
+  stop_docker_service
+
+Réponse de succès habituelle :
+  {
+    "ok": true,
+    "api_version": "1",
+    "status": "success",
+    "message": "Conteneur démarré."
+  }
+
+Une action sur le service peut aussi renvoyer docker_service_status. Une action
+globale place son bilan détaillé dans message.
+
+Erreurs de validation standard :
+  400 invalid_json        corps JSON illisible ou non objet ;
+  400 action_not_allowed  action absente de la liste blanche ;
+  400 container_required  start/stop/restart sans identifiant ;
+  415 json_required       Content-Type n'indique pas JSON.
+
+Erreur d'accès au moteur Docker :
+  503 docker_unavailable.
+
+Les erreurs métier déjà produites par le module Docker conservent leur statut
+HTTP (par exemple 404 ou 500) et ont cette forme :
+  {
+    "ok": false,
+    "api_version": "1",
+    "status": "error",
+    "message": "..."
+  }
+
+
+10. ROUTE ACTIONS VM
+--------------------
+
+POST /api/v1/vm/actions
+
+Cette route réutilise vm.do_vm_action. Elle pilote uniquement une VM libvirt
+déjà déclarée. Elle ne permet ni création, ni import, ni modification, ni
+suppression d'une VM.
+
+Corps JSON :
+  {
+    "action": "reboot",
+    "name": "Windows"
+  }
+
+Le champ vm_name est accepté comme alias de name. Actions autorisées :
+  start     démarrer une VM arrêtée ;
+  shutdown  demander un arrêt propre ;
+  reboot    demander un redémarrage propre ;
+  destroy   forcer l'arrêt, avec risque de perte des données non enregistrées.
+
+Réponse : résultat métier de vm.do_vm_action, complété par api_version et ok.
+
+Erreurs propres :
+  400 vm_required       nom de VM absent ;
+  503 vm_unavailable    adaptateur libvirt momentanément indisponible.
+
+Toute autre action, notamment define, create, delete, remove ou undefine,
+renvoie 400 action_not_allowed.
+
+
+11. ROUTE ACTIONS TACHES
+------------------------
+
+POST /api/v1/task/actions
+
+Cette route réutilise exclusivement les fonctions métier de task.py. Elle ne
+permet ni création, ni modification, ni suppression de tâche, et n'accepte
+aucune commande shell libre.
+
+Corps JSON :
+  {
+    "action": "start",
+    "task_id": 7
+  }
+
+Le champ id est accepté comme alias de task_id. Actions autorisées :
+  start  lancer la tâche existante en arrière-plan ;
+  stop   demander l'arrêt forcé de la tâche en cours.
+
+Réponse habituelle :
+  {
+    "ok": true,
+    "api_version": "1",
+    "message": "Tâche lancée.",
+    "task_action": {
+      "task_id": 7,
+      "action": "start",
+      "accepted": true,
+      "message": "Tâche lancée."
+    }
+  }
+
+Une commande métier refusée renvoie HTTP 409 avec accepted=false et son
+message explicatif. Erreurs propres :
+  400 task_required      identifiant de tâche absent ou invalide ;
+  404 task_not_found     tâche inexistante ;
+  503 task_unavailable   module de tâches momentanément indisponible.
+
+
+12. ROUTE ACTIONS BACKUP
+------------------------
+
+POST /api/v1/backup/actions
+
+Cette route réutilise uniquement les scripts déjà déclarés dans backup.py.
+Elle ne crée, ne modifie et ne supprime aucun script et n'accepte aucune
+commande libre.
+
+Corps JSON :
+  {
+    "action": "start",
+    "filename": "photos.py"
+  }
+
+Le champ name est accepté comme alias de filename. Actions autorisées :
+  start  lancer un script Backup existant ;
+  stop   forcer l'arrêt du script et libérer ses verrous comme la page Backup.
+
+Le serveur exige une correspondance exacte avec un nom renvoyé dans
+monitoring.backup.scripts. La réponse contient backup_action et l'état minimal
+obtenu immédiatement après la commande.
+
+Erreurs propres :
+  400 backup_required      nom de script absent ;
+  404 backup_not_found     script absent de la configuration Backup ;
+  503 backup_unavailable   module ou action Backup momentanément indisponible.
+
+
+13. EXPLORATEUR DE FICHIERS NATIF
+---------------------------------
+
+L'explorateur Android est confiné aux racines déclarées par
+YOLEO_API_FILE_ROOTS. Valeur par défaut : /mnt,/media,/srv. La racine / seule
+n'est jamais acceptée. Les chemins sont contrôlés après résolution réelle
+afin qu'un lien symbolique ne permette pas de sortir des racines NAS.
+
+POST /api/v1/files/list
+  Corps JSON : {"path":"/mnt/user"}
+  Renvoie files.current, files.parent, files.root, files.roots, files.items et
+  files.truncated. Chaque item contient name, path, is_dir, is_symlink, size,
+  mtime et extension. Les dossiers sont placés avant les fichiers. Maximum :
+  2 000 éléments par dossier.
+
+POST /api/v1/files/actions
+  Corps JSON selon l'action :
+    mkdir  : {"action":"mkdir","directory":"/mnt/user","name":"Photos"}
+    rename : {"action":"rename","source":"/mnt/user/a","name":"b"}
+    copy   : {"action":"copy","source":"/mnt/user/a","destination":"/mnt/cache"}
+    move   : mêmes champs que copy
+    delete : {"action":"delete","source":"/mnt/user/a"}
+  Les racines elles-mêmes sont protégées. Les copies de liens symboliques,
+  les commandes, chmod/chown et l'exécution de fichiers sont interdits.
+
+POST /api/v1/files/upload
+  Requête multipart/form-data avec path, file et overwrite facultatif. Android
+  envoie overwrite=false : un fichier existant provoque HTTP 409 au lieu d'être
+  remplacé silencieusement. Pour une synchronisation, le client fournit aussi
+  sha256. Le serveur reçoit dans un fichier temporaire, recalcule SHA-256 puis
+  remplace atomiquement la destination uniquement si l'empreinte correspond.
+
+POST /api/v1/files/catalog
+  Corps JSON : {"path":"/mnt/user/Photos"}
+  Construit récursivement le catalogue du seul dossier choisi. Chaque entrée
+  contient relative_path, is_dir, size, mtime et sha256. Les liens symboliques
+  sont ignorés. Le plafond par défaut est 100 000 entrées, réglable avec
+  YOLEO_API_CATALOG_MAX_ENTRIES entre 1 000 et 500 000. Un catalogue tronqué
+  ne doit jamais servir à décider des suppressions.
+
+GET /api/v1/files/download?path=/mnt/user/photo.jpg
+  Renvoie le fichier en pièce jointe, avec son type MIME déduit. Pour un
+  dossier, ajouter archive=zip : Yoleo fabrique une archive ZIP ponctuelle,
+  ignore les liens symboliques et la supprime après l'envoi. Cette route reste
+  privée et exige le jeton Bearer en plus du P12 au proxy.
+
+Erreurs propres :
+  400 directory_required       chemin demandé non dossier ;
+  400 archive_required         dossier demandé sans archive=zip ;
+  400 file_required            fichier ou chemin de fichier absent ;
+  400 invalid_file_operation   nom ou opération invalide ;
+  400 invalid_sha256           empreinte annoncée invalide ;
+  400 symlink_forbidden        opération dangereuse sur un lien symbolique ;
+  403 path_forbidden           chemin hors des racines autorisées ;
+  403 root_protected           tentative de modifier une racine NAS ;
+  404 path_not_found           chemin absent ;
+  409 target_exists            destination déjà présente ;
+  422 sha256_mismatch          transfert reçu corrompu ou incomplet ;
+  500 file_operation_failed    opération disque échouée ;
+  503 files_unavailable        lecture ou téléchargement indisponible.
+  503 catalog_unavailable      catalogue SHA-256 impossible.
+
+
+14. ROUTE INCONNUE ET METHODES
+------------------------------
+
+Une route inconnue sous /api/v1 avec GET, POST, PUT, PATCH ou DELETE renvoie :
+  HTTP 404, code not_found, après vérification du jeton Bearer.
+
+Les méthodes OPTIONS/HEAD et les mauvaises méthodes sur une route connue sont
+gérées par Flask. Le client doit utiliser strictement les méthodes documentées.
+
+
+15. CODES D'ERREUR STABLES
+--------------------------
+
+authentication_required  401  jeton absent, invalide, expiré ou révoqué
+invalid_credentials       401  utilisateur/mot de passe refusé par PAM
+invalid_json              400  JSON illisible ou valeur racine non objet
+json_required             415  corps non déclaré application/json
+action_not_allowed        400  action Docker/VM/Tâche/Backup hors liste blanche
+container_required        400  identifiant Docker obligatoire manquant
+vm_required               400  nom de VM obligatoire manquant
+task_required             400  identifiant de tâche obligatoire manquant
+task_not_found            404  tâche inexistante
+backup_required           400  nom de script Backup manquant
+backup_not_found          404  script Backup inexistant
+not_found                 404  route API inexistante
+overview_unavailable      503  collecteur de l'aperçu indisponible
+docker_unavailable        503  moteur/adaptateur Docker indisponible
+vm_unavailable            503  libvirt/adaptateur VM indisponible
+task_unavailable          503  adaptateur des tâches indisponible
+backup_unavailable        503  adaptateur Backup indisponible
+directory_required        400  chemin fichier attendu comme dossier
+file_required             400  fichier absent ou chemin non fichier
+invalid_file_operation    400  nom ou opération de fichier invalide
+symlink_forbidden         400  opération interdite sur un lien symbolique
+path_forbidden            403  chemin hors des racines NAS autorisées
+root_protected            403  modification d'une racine NAS interdite
+path_not_found            404  chemin fichier introuvable
+target_exists             409  destination déjà existante
+file_operation_failed     500  opération disque impossible
+files_unavailable         503  lecture ou téléchargement impossible
+invalid_sha256           400  empreinte SHA-256 annoncée invalide
+sha256_mismatch          422  fichier reçu différent du hash annoncé
+catalog_unavailable      503  création du catalogue SHA-256 impossible
+
+Le programme client doit décider avec error.code et le statut HTTP, jamais en
+comparant le texte français de error.message.
+
+
+16. CYCLE DE VIE ET STOCKAGE DES JETONS
+---------------------------------------
+
+- Préfixe : yoleo_
+- Valeur aléatoire : secrets.token_urlsafe(48)
+- Stockage serveur : SHA-256 du jeton uniquement
+- Durée par défaut : 365 jours
+- Réglage : YOLEO_API_TOKEN_DAYS, borné entre 1 et 3650 jours
+- Révocation : POST /api/v1/auth/logout
+- Nettoyage : à chaque émission, suppression des jetons expirés ou révoqués
+- last_used_at : actualisé au maximum une fois toutes les cinq minutes pour
+  limiter les écritures SQLite entre les workers Gunicorn
+- Partage multi-workers : SQLite avec busy_timeout de 5 secondes
+
+Si une réponse privée renvoie 401, l'application doit supprimer le jeton local,
+revenir à l'écran de connexion et ne jamais boucler automatiquement avec le mot
+de passe sans action explicite de l'utilisateur.
+
+
+17. REGLES POUR LES AJOUTS FUTURS
+---------------------------------
+
+Pour toute nouvelle fonction Android ou Windows :
+
+  1. Lire d'abord ce fichier et GET /api/v1/capabilities.
+  2. Ajouter une route sous /api/v1 sans modifier les pages HTML existantes.
+  3. Réutiliser une fonction métier Yoleo ; ne jamais accepter de commande
+     arbitraire fournie par le client.
+  4. Ajouter une capacité explicite à /capabilities si la fonction est visible
+     dans les applications.
+  5. Garder un code d'erreur stable et un statut HTTP cohérent.
+  6. Ajouter les tests correspondants dans system/tests.
+  7. Mettre à jour API.txt dans la même modification.
+  8. Déployer puis enregistrer tous les fichiers avec system.sh -add, avant le
+     contrôle system.sh -integrity.
+
+FIN DU CONTRAT API V1
