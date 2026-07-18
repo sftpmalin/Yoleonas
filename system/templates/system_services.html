@@ -1,0 +1,497 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<section id="tab-services" class="system-tab-panel active no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+<div class="svc-page">
+    <div class="svc-panel">
+        <div class="summary-grid">
+            <div class="summary-card"><div class="summary-label">Services</div><div class="summary-value cyan" id="sum-total">—</div></div>
+            <div class="summary-card"><div class="summary-label">Actifs</div><div class="summary-value green" id="sum-active">—</div></div>
+            <div class="summary-card"><div class="summary-label">Running</div><div class="summary-value green" id="sum-running">—</div></div>
+            <div class="summary-card"><div class="summary-label">Activés auto</div><div class="summary-value" id="sum-enabled">—</div></div>
+            <div class="summary-card"><div class="summary-label">Désactivés</div><div class="summary-value gray" id="sum-disabled">—</div></div>
+            <div class="summary-card"><div class="summary-label">Erreurs</div><div class="summary-value red" id="sum-failed">—</div></div>
+        </div>
+
+        <div class="top-actions">
+            <div class="search-row">
+                <input class="search-input" id="search-input" placeholder="Filtrer : docker, samba, flask..." oninput="renderCurrent()">
+                <select class="filter-select" id="state-filter" onchange="renderCurrent()">
+                    <option value="all">Tous les états</option>
+                    <option value="active">Actifs</option>
+                    <option value="inactive">Arrêtés</option>
+                    <option value="failed">En erreur</option>
+                    <option value="enabled">Auto activés</option>
+                    <option value="disabled">Auto désactivés</option>
+                </select>
+            </div>
+            <div class="action-message" id="action-message">Prêt.</div>
+        </div>
+
+        <div class="table-card">
+            <div id="last-update" class="table-subtitle" style="display:none">Chargement...</div>
+
+            <div class="table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                <table class="no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                    <thead>
+                        <tr>
+                            <th class="state-col">État</th>
+                            <th class="service-col">Nom du service</th>
+                            <th>Description</th>
+                            <th class="auto-col">Démarrage</th>
+                            <th class="sub-col">Sous-état</th>
+                            <th class="preset-col">Preset</th>
+                            <th class="actions-col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="services-tbody">
+                        <tr><td colspan="7" class="empty-state">Chargement des services...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mobile-list" id="services-mobile">
+                <div class="empty-state">Chargement des services...</div>
+            </div>
+        </div>
+
+        <pre class="output-box" id="action-output"></pre>
+
+        <div class="details-card" id="details-card">
+            <div class="details-title">
+                <span id="details-title">Logs</span>
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeDetails()">Fermer</button>
+            </div>
+            <pre class="details-code" id="details-code">—</pre>
+        </div>
+    </div>
+</div>
+
+<script>
+    const REFRESH_SECONDS = {{ refresh_seconds|int }};
+    let refreshTimer = null;
+    let actionBusy = false;
+    let currentServices = [];
+    let selectedService = '';
+    let selectedActionIndex = 0;
+
+    function esc(value) {
+        return String(value ?? '').replace(/[&<>"']/g, function (m) {
+            return ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'})[m];
+        });
+    }
+
+    function attr(value) { return esc(value).replace(/"/g, '&quot;'); }
+
+    function dotClass(value) {
+        if (value === 'active') return 'dot-active';
+        if (value === 'inactive') return 'dot-inactive';
+        if (value === 'warn') return 'dot-warn';
+        if (value === 'bad') return 'dot-bad';
+        return 'dot-unknown';
+    }
+
+    function badgeClass(value) {
+        if (value === 'enabled') return 'badge-enabled';
+        if (value === 'disabled') return 'badge-disabled';
+        if (value === 'static') return 'badge-static';
+        if (value === 'bad') return 'badge-bad';
+        return 'badge-unknown';
+    }
+
+    function setActionMessage(message, ok = null, output = '') {
+        const box = document.getElementById('action-message');
+        box.className = 'action-message' + (ok === true ? ' ok' : ok === false ? ' bad' : '');
+        box.textContent = message || '—';
+
+        const out = document.getElementById('action-output');
+        if (output) {
+            out.textContent = output;
+            out.classList.add('active');
+        } else {
+            out.textContent = '';
+            out.classList.remove('active');
+        }
+    }
+
+    function updateSummary(summary) {
+        document.getElementById('sum-total').textContent = summary.total ?? '0';
+        document.getElementById('sum-active').textContent = summary.active ?? '0';
+        document.getElementById('sum-running').textContent = summary.running ?? '0';
+        document.getElementById('sum-enabled').textContent = summary.enabled ?? '0';
+        document.getElementById('sum-disabled').textContent = summary.disabled ?? '0';
+        document.getElementById('sum-failed').textContent = summary.failed ?? '0';
+    }
+
+    function rowMatchesFilter(row) {
+        const query = document.getElementById('search-input').value.trim().toLowerCase();
+        const filter = document.getElementById('state-filter').value;
+
+        if (query) {
+            const haystack = [
+                row.name,
+                row.short_name,
+                row.description,
+                row.active_state,
+                row.sub_state,
+                row.unit_file_state
+            ].join(' ').toLowerCase();
+
+            if (!haystack.includes(query)) return false;
+        }
+
+        if (filter === 'all') return true;
+        if (filter === 'active') return row.active_state === 'active';
+        if (filter === 'inactive') return row.active_state === 'inactive';
+        if (filter === 'failed') return row.active_state === 'failed';
+        if (filter === 'enabled') return String(row.unit_file_state || '').startsWith('enabled') || row.unit_file_state === 'linked';
+        if (filter === 'disabled') return row.unit_file_state === 'disabled';
+
+        return true;
+    }
+
+    function serviceActions(row) {
+        const s = attr(row.name);
+        return `
+            <div class="actions-line">
+                <button class="yoleo-btn yoleo-btn-icon yoleo-btn-green" title="Démarrer" data-service="${s}" onclick="selectRow(this.dataset.service, null, false); serviceAction(this.dataset.service, 'start')" ${row.can_start ? '' : 'disabled'}>▶</button>
+                <button class="yoleo-btn yoleo-btn-icon yoleo-btn-red" title="Arrêter" data-service="${s}" onclick="selectRow(this.dataset.service, null, false); serviceAction(this.dataset.service, 'stop')" ${row.can_stop ? '' : 'disabled'}>■</button>
+                <button class="yoleo-btn yoleo-btn-icon yoleo-btn-primary" title="Redémarrer" data-service="${s}" onclick="selectRow(this.dataset.service, null, false); serviceAction(this.dataset.service, 'restart')" ${row.can_restart ? '' : 'disabled'}>↻</button>
+                <button class="yoleo-btn yoleo-btn-icon yoleo-btn-green" title="Activer au démarrage automatique" data-service="${s}" onclick="selectRow(this.dataset.service, null, false); serviceAction(this.dataset.service, 'enable')" ${row.can_enable ? '' : 'disabled'}>●</button>
+                <button class="yoleo-btn yoleo-btn-icon yoleo-btn-orange" title="Désactiver au démarrage" data-service="${s}" onclick="selectRow(this.dataset.service, null, false); serviceAction(this.dataset.service, 'disable')" ${row.can_disable ? '' : 'disabled'}>🚫</button>
+                <button class="yoleo-btn yoleo-btn-icon yoleo-btn-orange" title="Arrêter maintenant + désactiver au démarrage" data-service="${s}" onclick="selectRow(this.dataset.service, null, false); serviceAction(this.dataset.service, 'disable-now')" ${row.can_disable_now ? '' : 'disabled'}>⛔</button>
+                <button class="yoleo-btn yoleo-btn-icon yoleo-btn-muted" title="Voir les logs journalctl" data-service="${s}" onclick="selectRow(this.dataset.service, null, false); loadLogs(this.dataset.service)">📜</button>
+            </div>
+        `;
+    }
+
+    function isTextInputTarget(target) {
+        if (!target) return false;
+        const tag = String(target.tagName || '').toLowerCase();
+        return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
+    }
+
+    function visibleRows() {
+        return (currentServices || []).filter(rowMatchesFilter);
+    }
+
+    function serviceElements(service) {
+        return Array.from(document.querySelectorAll('[data-row-service]'))
+            .filter(el => el.dataset.rowService === service);
+    }
+
+    function isElementVisible(el) {
+        return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+    }
+
+    function selectedHostElement() {
+        const matches = serviceElements(selectedService);
+        return matches.find(isElementVisible) || matches[0] || null;
+    }
+
+    function actionButtonsForSelected() {
+        const host = selectedHostElement();
+        if (!host) return [];
+        return Array.from(host.querySelectorAll('.actions-line button:not(:disabled)'));
+    }
+
+    function updateActionFocus(doFocus = false) {
+        document.querySelectorAll('.yoleo-btn.keyboard-focus').forEach(btn => btn.classList.remove('keyboard-focus'));
+
+        const buttons = actionButtonsForSelected();
+        if (!buttons.length) return;
+
+        if (selectedActionIndex < 0) selectedActionIndex = 0;
+        if (selectedActionIndex >= buttons.length) selectedActionIndex = buttons.length - 1;
+
+        const btn = buttons[selectedActionIndex];
+        btn.classList.add('keyboard-focus');
+
+        if (doFocus && typeof btn.focus === 'function') {
+            btn.focus({preventScroll:true});
+            btn.scrollIntoView({block:'nearest', inline:'nearest'});
+        }
+    }
+
+    function selectRow(service, actionIndex = null, doFocus = false) {
+        selectedService = service || '';
+        if (actionIndex !== null && actionIndex !== undefined) selectedActionIndex = actionIndex;
+
+        document.querySelectorAll('[data-row-service]').forEach(row => {
+            row.classList.toggle('selected', row.dataset.rowService === selectedService);
+        });
+
+        updateActionFocus(doFocus);
+    }
+
+    function moveSelection(delta) {
+        const rows = visibleRows();
+        if (!rows.length) return;
+
+        let idx = rows.findIndex(row => row.name === selectedService);
+        if (idx < 0) idx = delta > 0 ? -1 : 0;
+
+        idx = Math.max(0, Math.min(rows.length - 1, idx + delta));
+        selectRow(rows[idx].name, selectedActionIndex, true);
+    }
+
+    function moveToEdge(edge) {
+        const rows = visibleRows();
+        if (!rows.length) return;
+        const idx = edge === 'end' ? rows.length - 1 : 0;
+        selectRow(rows[idx].name, selectedActionIndex, true);
+    }
+
+    function moveAction(delta) {
+        if (!selectedService) {
+            const rows = visibleRows();
+            if (!rows.length) return;
+            selectedService = rows[0].name;
+        }
+
+        const buttons = actionButtonsForSelected();
+        if (!buttons.length) {
+            selectRow(selectedService, 0, true);
+            return;
+        }
+
+        selectedActionIndex = Math.max(0, Math.min(buttons.length - 1, selectedActionIndex + delta));
+        selectRow(selectedService, selectedActionIndex, true);
+    }
+
+    function clickSelectedAction() {
+        const buttons = actionButtonsForSelected();
+        if (!buttons.length) return;
+        buttons[Math.max(0, Math.min(buttons.length - 1, selectedActionIndex))].click();
+    }
+
+    function renderTable(rows) {
+        const tbody = document.getElementById('services-tbody');
+        tbody.dataset.loaded = '1';
+
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Aucun service trouvé avec ce filtre.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rows.map(row => {
+            const selected = row.name === selectedService ? ' selected' : '';
+            return `
+                <tr class="${selected}" data-row-service="${attr(row.name)}" onclick="selectRow(this.dataset.rowService)">
+                    <td class="state-col">
+                        <div class="status-cell">
+                            <span class="status-dot ${dotClass(row.active_class)}"></span>
+                            <span>${esc(row.active_label || '—')}</span>
+                        </div>
+                    </td>
+                    <td class="service-col">
+                        <div class="service-name">${esc(row.name)}</div>
+                        <div class="service-sub">${esc(row.load_state || '—')}</div>
+                    </td>
+                    <td>
+                        <div class="desc-main">${esc(row.description || '—')}</div>
+                        <div class="desc-sub">${esc(row.short_name || '')}</div>
+                    </td>
+                    <td class="auto-col"><span class="badge ${badgeClass(row.unit_file_class)}">${esc(row.unit_file_label || '—')}</span></td>
+                    <td class="sub-col">${esc(row.sub_state || '—')}</td>
+                    <td class="preset-col">${esc(row.unit_file_preset || '—')}</td>
+                    <td class="actions-col" onclick="event.stopPropagation()">${serviceActions(row)}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function renderMobile(rows) {
+        const box = document.getElementById('services-mobile');
+
+        if (!rows.length) {
+            box.innerHTML = '<div class="empty-state">Aucun service trouvé avec ce filtre.</div>';
+            return;
+        }
+
+        box.innerHTML = rows.map(row => `
+            <div class="mobile-card ${row.name === selectedService ? 'selected' : ''}" data-row-service="${attr(row.name)}" onclick="selectRow(this.dataset.rowService)">
+                <div class="mobile-top">
+                    <div class="mobile-title">
+                        <span class="status-dot ${dotClass(row.active_class)}"></span>
+                        <span class="mobile-name">${esc(row.name)}</span>
+                    </div>
+                    <span class="badge ${badgeClass(row.unit_file_class)}">${esc(row.unit_file_label || '—')}</span>
+                </div>
+                <div class="mobile-grid">
+                    <div class="mobile-kv"><div class="mobile-k">État</div><div class="mobile-v">${esc(row.active_label || '—')}</div></div>
+                    <div class="mobile-kv"><div class="mobile-k">Sous-état</div><div class="mobile-v">${esc(row.sub_state || '—')}</div></div>
+                    <div class="mobile-kv"><div class="mobile-k">Load</div><div class="mobile-v">${esc(row.load_state || '—')}</div></div>
+                    <div class="mobile-kv"><div class="mobile-k">Preset</div><div class="mobile-v">${esc(row.unit_file_preset || '—')}</div></div>
+                    <div class="mobile-kv sys-inline-072"><div class="mobile-k">Description</div><div class="mobile-v">${esc(row.description || '—')}</div></div>
+                </div>
+                <div class="mobile-actions">${serviceActions(row)}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderCurrent() {
+        const rows = visibleRows();
+
+        if (rows.length && !rows.some(row => row.name === selectedService)) {
+            selectedService = rows[0].name;
+            selectedActionIndex = 0;
+        }
+        if (!rows.length) {
+            selectedService = '';
+            selectedActionIndex = 0;
+        }
+
+        renderTable(rows);
+        renderMobile(rows);
+        selectRow(selectedService, selectedActionIndex, false);
+    }
+
+    async function loadServices(force = false) {
+        try {
+            const response = await fetch('/system/api/services', {cache: 'no-store'});
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+
+            const data = await response.json();
+            if (!data.ok && data.message) {
+                setActionMessage(data.message, false, data.output || '');
+            }
+
+            currentServices = data.services || [];
+            updateSummary(data.summary || {});
+            renderCurrent();
+
+            const visible = (currentServices || []).filter(rowMatchesFilter).length;
+            document.getElementById('last-update').textContent =
+                'Dernière mise à jour : ' + (data.generated_at || '—') +
+                ' • affichés : ' + visible + '/' + currentServices.length;
+        } catch (err) {
+            document.getElementById('last-update').textContent = 'Erreur API /system/api/services : ancienne vue conservée';
+            if (!document.getElementById('services-tbody').dataset.loaded) {
+                document.getElementById('services-tbody').innerHTML = '<tr><td colspan="7" class="empty-state">Erreur API /system/api/services</td></tr>';
+                document.getElementById('services-mobile').innerHTML = '<div class="empty-state">Erreur API /system/api/services</div>';
+            }
+            setActionMessage('Erreur Ajax : ' + err.message, false);
+        }
+    }
+
+    async function serviceAction(service, action) {
+        if (actionBusy) return;
+
+        actionBusy = true;
+        const labels = {
+            'start': 'Démarrage...',
+            'stop': 'Arrêt...',
+            'restart': 'Redémarrage...',
+            'enable': 'Activation auto...',
+            'disable': 'Désactivation auto...',
+            'disable-now': 'Arrêt + désactivation...'
+        };
+        setActionMessage((labels[action] || 'Action...') + ' ' + service, null);
+
+        try {
+            const response = await fetch('/system/api/services/action', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({service, action})
+            });
+            const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+            setActionMessage(data.message || (data.ok ? 'OK' : 'Erreur'), !!data.ok, data.output || '');
+            await loadServices(true);
+            if (selectedService === service) selectRow(service);
+        } catch (err) {
+            setActionMessage('Erreur Ajax : ' + err.message, false);
+        } finally {
+            actionBusy = false;
+        }
+    }
+
+    async function loadLogs(service) {
+        selectedService = service;
+        selectRow(service);
+
+        const card = document.getElementById('details-card');
+        const title = document.getElementById('details-title');
+        const code = document.getElementById('details-code');
+
+        card.classList.add('active');
+        title.textContent = '📜 Logs journalctl — ' + service;
+        code.textContent = 'Chargement des logs...';
+
+        try {
+            const response = await fetch('/system/api/services/logs?service=' + encodeURIComponent(service) + '&lines=120', {cache:'no-store'});
+            const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+            if (!data.ok) {
+                code.textContent = (data.message || 'Erreur') + '\n\n' + (data.output || '');
+                return;
+            }
+            code.textContent = data.output || 'Aucun log.';
+        } catch (err) {
+            code.textContent = 'Erreur Ajax : ' + err.message;
+        }
+    }
+
+    function closeDetails() {
+        document.getElementById('details-card').classList.remove('active');
+    }
+
+    document.addEventListener('keydown', function (e) {
+        const servicesPanel = document.getElementById('tab-services');
+        if (!servicesPanel || !servicesPanel.classList.contains('active')) return;
+        if (isTextInputTarget(e.target)) return;
+        if (actionBusy) return;
+
+        const key = e.key;
+
+        if (key === 'ArrowUp') {
+            e.preventDefault();
+            moveSelection(-1);
+            return;
+        }
+
+        if (key === 'ArrowDown') {
+            e.preventDefault();
+            moveSelection(1);
+            return;
+        }
+
+        if (key === 'ArrowLeft') {
+            e.preventDefault();
+            moveAction(-1);
+            return;
+        }
+
+        if (key === 'ArrowRight') {
+            e.preventDefault();
+            moveAction(1);
+            return;
+        }
+
+        if (key === 'Home') {
+            e.preventDefault();
+            moveToEdge('home');
+            return;
+        }
+
+        if (key === 'End') {
+            e.preventDefault();
+            moveToEdge('end');
+            return;
+        }
+
+        if (key === 'Enter' || key === ' ') {
+            const active = document.activeElement;
+            if (active && active.classList && active.classList.contains('yoleo-btn')) return;
+
+            e.preventDefault();
+            clickSelectedAction();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadServices();
+        refreshTimer = setInterval(loadServices, Math.max(3, REFRESH_SECONDS) * 1000);
+    });
+</script>
+            </section>
+{% endblock %}

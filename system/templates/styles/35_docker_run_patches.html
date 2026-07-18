@@ -1,0 +1,508 @@
+/* style4.html : nouvelles corrections CSS ciblées. */
+
+/* Docker > Conteneurs : réécarter les 3 boutons système Docker à côté de Tout démarrer / Tout arrêter. */
+.docker-containers-actions-row .docker-service-inline-zone {
+    gap: 10px;
+}
+
+.docker-containers-actions-row .docker-service-inline-zone .actions-line {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: nowrap;
+    width: auto;
+    min-width: max-content;
+}
+
+.docker-containers-actions-row .docker-service-inline-zone .actions-line .yoleo-btn {
+    flex: 0 0 auto;
+}
+
+.docker-containers-actions-row .docker-service-inline-zone .actions-line .yoleo-btn-compact,
+.docker-containers-actions-row .docker-service-inline-zone > .yoleo-btn-compact {
+    min-width: max-content;
+    padding-left: 14px;
+    padding-right: 14px;
+}
+
+.docker-containers-actions-row .docker-service-inline-zone .actions-line .yoleo-btn-icon {
+    width: 34px;
+    min-width: 34px;
+    max-width: 34px;
+    height: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 1350px) {
+    .docker-containers-actions-row .docker-service-inline-zone .actions-line {
+        justify-content: flex-start;
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+}
+
+
+/* Docker Run : réglette stable + onglet temporaire éditeur. */
+.docker-run-subnav-creation {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.docker-run-temp-edit-tab {
+    max-width: 360px;
+    min-width: 0;
+}
+
+.docker-run-temp-edit-tab span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.docker-run-temp-edit-icon {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    border-radius: 5px;
+    flex: 0 0 auto;
+}
+
+/* Docker Run : Nouveau + recherche sur la même ligne pour supprimer la ligne vide. */
+.docker-run-library-search-actions {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.docker-run-library-search-actions .yoleo-input {
+    min-width: 0;
+}
+
+.docker-run-new-inline-btn {
+    min-width: 110px;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+/* Docker Run : actions de sauvegarde dédiées à l'éditeur temporaire. */
+.docker-run-editor-save-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 1000px) {
+    .docker-run-library-search-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .docker-run-new-inline-btn,
+    .docker-run-library-search-actions .status-pill {
+        width: fit-content;
+    }
+
+    .docker-run-editor-save-actions {
+        justify-content: flex-start;
+    }
+}
+
+
+/* Docker Run : onglets éditeurs persistants, sans couleur de lien brute. */
+.docker-run-open-edit-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.docker-run-temp-edit-shell {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.docker-run-temp-edit-shell .docker-run-temp-edit-tab,
+.docker-run-temp-edit-shell .docker-run-temp-edit-tab:visited,
+.docker-run-unsaved-edit-tab {
+    color: var(--yoleo-text);
+    text-decoration: none;
+}
+
+.docker-run-temp-edit-shell .docker-run-temp-edit-tab.is-active,
+.docker-run-temp-edit-shell .docker-run-temp-edit-tab:hover {
+    color: #fff;
+}
+
+.docker-run-temp-edit-close {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.docker-run-temp-edit-fallback-icon {
+    flex: 0 0 auto;
+}
+
+/* Docker Run : éditeur plein large, sans carte résumé latérale. */
+.docker-run-editor-grid-expanded {
+    display: block;
+}
+
+.docker-run-editor-card-expanded {
+    width: 100%;
+}
+
+.docker-run-editor-topbar-clean {
+    align-items: center;
+}
+
+.docker-run-editor-head-clean {
+    grid-template-columns: minmax(260px, 420px);
+    align-items: end;
+}
+
+.docker-run-command-textarea-expanded {
+    width: calc(100% - 24px);
+    min-height: 68vh;
+}
+
+.docker-run-editor-save-actions .yoleo-btn,
+.docker-run-editor-save-actions .yoleo-btn:visited {
+    text-decoration: none;
+}
+
+
+/* Docker Run : garder les icônes des boutons en blanc, même sur les liens <a>. */
+.docker-run-library .yoleo-btn,
+.docker-run-library .yoleo-btn:visited,
+.docker-run-library .yoleo-btn:hover,
+.docker-run-library .yoleo-btn:focus,
+.docker-run-terminal-section .yoleo-btn,
+.docker-run-terminal-section .yoleo-btn:visited,
+.docker-run-terminal-section .yoleo-btn:hover,
+.docker-run-terminal-section .yoleo-btn:focus,
+.docker-run-editor-save-actions .yoleo-btn,
+.docker-run-editor-save-actions .yoleo-btn:visited,
+.docker-run-editor-save-actions .yoleo-btn:hover,
+.docker-run-editor-save-actions .yoleo-btn:focus,
+.docker-run-temp-edit-close,
+.docker-run-temp-edit-close:visited,
+.docker-run-temp-edit-close:hover,
+.docker-run-temp-edit-close:focus {
+    color: #fff !important;
+    text-decoration: none;
+}
+
+.docker-run-library .yoleo-btn *,
+.docker-run-terminal-section .yoleo-btn *,
+.docker-run-editor-save-actions .yoleo-btn *,
+.docker-run-temp-edit-close * {
+    color: #fff !important;
+}
+
+
+
+/* Docker Run : table bibliothèque avec progression isolée. */
+.docker-run-table th:nth-child(3),
+.docker-run-table td:nth-child(3) {
+    width: 28%;
+}
+
+.docker-run-table th:nth-child(4),
+.docker-run-table td:nth-child(4) {
+    width: 145px;
+    white-space: nowrap;
+}
+
+.docker-run-table th:nth-child(5),
+.docker-run-table td:nth-child(5) {
+    width: 190px;
+}
+
+.docker-run-progress-cell {
+    min-width: 170px;
+}
+
+.docker-run-progress {
+    display: grid;
+    grid-template-columns: minmax(72px, 1fr) 64px;
+    align-items: center;
+    gap: 8px;
+}
+
+.docker-run-progress-track {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, .18);
+    border: 1px solid rgba(148, 163, 184, .22);
+}
+
+.docker-run-progress-track span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: rgba(148, 163, 184, .72);
+    transition: width .25s ease;
+}
+
+.docker-run-progress-label {
+    font-weight: 800;
+    font-size: 11px;
+    text-align: left;
+    white-space: nowrap;
+    color: var(--yoleo-muted);
+}
+
+.docker-run-progress-running .docker-run-progress-track span {
+    width: 55%;
+    background: linear-gradient(90deg, rgba(34,211,238,.35), rgba(34,211,238,.95), rgba(34,211,238,.35));
+    background-size: 180% 100%;
+    animation: docker-run-progress-flow 1s linear infinite;
+}
+
+.docker-run-progress-running .docker-run-progress-label {
+    color: #22d3ee;
+}
+
+.docker-run-progress-success .docker-run-progress-track span {
+    background: rgba(34, 197, 94, .95);
+}
+
+.docker-run-progress-success .docker-run-progress-label {
+    color: #86efac;
+}
+
+.docker-run-progress-error .docker-run-progress-track span {
+    background: rgba(244, 63, 94, .96);
+}
+
+.docker-run-progress-error .docker-run-progress-label {
+    color: #fda4af;
+}
+
+.docker-run-play-spinning {
+    position: relative;
+    pointer-events: none;
+    opacity: .92;
+}
+
+.docker-run-play-spinning::before {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, .35);
+    border-top-color: #fff;
+    animation: docker-run-button-spin .75s linear infinite;
+}
+
+.docker-run-play-spinning {
+    color: transparent !important;
+}
+
+@keyframes docker-run-button-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes docker-run-progress-flow {
+    from { background-position: 0 0; }
+    to { background-position: 180% 0; }
+}
+
+@media (max-width: 1200px) {
+    .docker-run-progress {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .docker-run-progress-label {
+        font-size: 10px;
+    }
+}
+
+
+
+
+
+/* Docker Run : en mobile, remplacer la mosaïque/tableau par une liste type YAML. */
+.docker-run-mobile-yml-list {
+    display: none;
+}
+
+.docker-run-mobile-file-card[hidden] {
+    display: none !important;
+}
+
+.docker-run-mobile-detail-modal.active {
+    display: flex;
+}
+
+.docker-run-mobile-detail-titleline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.docker-run-mobile-detail-icon,
+.docker-run-mobile-file-icon {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: 10px;
+    padding: 4px;
+    background: rgba(255,255,255,.92);
+    box-shadow: 0 4px 10px rgba(0,0,0,.20);
+    flex: 0 0 auto;
+}
+
+.docker-run-mobile-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.docker-run-mobile-detail-grid > div {
+    display: grid;
+    gap: 4px;
+    padding: 10px;
+    border: 1px solid var(--yoleo-border-soft);
+    border-radius: 12px;
+    background: rgba(5, 8, 13, .38);
+    min-width: 0;
+}
+
+.docker-run-mobile-detail-grid span {
+    color: var(--yoleo-accent-2);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .35px;
+    text-transform: uppercase;
+}
+
+.docker-run-mobile-detail-grid b,
+.docker-run-mobile-detail-preview {
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.docker-run-mobile-detail-preview {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid var(--yoleo-border-soft);
+    border-radius: 12px;
+    background: rgba(5, 8, 13, .38);
+}
+
+.docker-run-mobile-detail-actions {
+    align-items: center;
+}
+
+.docker-run-mobile-detail-delete {
+    display: inline-flex;
+    margin: 0;
+}
+
+@media (max-width: 900px) {
+    .docker-run-library .docker-run-desktop-table-wrap {
+        display: none !important;
+    }
+
+    .docker-run-mobile-yml-list {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        width: 100%;
+        padding: 0;
+    }
+
+    .docker-run-mobile-file-card {
+        width: 100%;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        min-height: 64px;
+        text-align: left;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .docker-run-mobile-file-card:hover {
+        transform: none;
+    }
+
+    .docker-run-mobile-file-text {
+        min-width: 0;
+    }
+
+    .docker-run-mobile-file-card .file-name {
+        color: #fff;
+        font-size: 14px;
+        font-weight: 900;
+        line-height: 1.2;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .docker-run-mobile-file-card .file-path {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .docker-run-mobile-chevron {
+        color: var(--yoleo-accent-2);
+        font-size: 26px;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    .docker-run-mobile-detail-sheet {
+        width: min(100%, 560px);
+        max-height: calc(100vh - 24px);
+        overflow: auto;
+    }
+
+    .docker-run-mobile-detail-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .docker-run-mobile-detail-actions .yoleo-btn,
+    .docker-run-mobile-detail-delete,
+    .docker-run-mobile-detail-delete .yoleo-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Docker Run garde une petite navigation horizontale hybride :
+   Bibliothèque + onglets fichier ouverts, tandis que Info/Log restent dans la roue crantée. */
+body.yoleo-has-page-settings .yoleo-content .docker-run-subnav-creation {
+    display: flex !important;
+}

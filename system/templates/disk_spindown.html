@@ -1,0 +1,20 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-sleep" class="disk-section">
+                <section class="yoleo-card disk-card">
+                    <div class="sleep-command-row">
+                        <input class="yoleo-input text-input sleep-minutes-input" id="sleep-minutes" type="number" min="0" max="330" value="10">
+                        <label class="sleep-inline-label" for="sleep-minutes">minutes</label>
+                        <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-primary sleep-apply-btn" onclick="applySleep()">Appliquer</button>
+                        <span class="sleep-command-spacer" aria-hidden="true"></span>
+                        <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="sleepService('status')">État Linux</button>
+                        <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-green" onclick="sleepService('start')">▶ Démarrer</button>
+                        <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-red" onclick="sleepService('disable')">Désactiver</button>
+                    </div>
+                    <div class="table-wrap"><table class="yoleo-table mini-table"><thead><tr><th>Cible</th><th>Disque</th><th>État</th><th>Taille</th><th>Montage</th></tr></thead><tbody id="sleep-tbody"><tr><td colspan="5" class="empty-state">Chargement des HDD...</td></tr></tbody></table></div>
+                    <div class="sleep-status-line" id="sleep-status">Chargement...</div>
+                    <pre class="output-box active" id="sleep-output"></pre>
+                </section>
+            </div>
+{% endblock %}

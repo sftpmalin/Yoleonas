@@ -1,0 +1,193 @@
+/* Système > Gestion conf > Options : ajustements isolés style4. */
+.confmgr-options-head-v4 {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    margin: 0 0 12px;
+}
+
+.confmgr-options-help-v4 {
+    justify-self: center;
+    width: min(720px, 100%);
+    text-align: center;
+    line-height: 1.45;
+}
+
+.confmgr-options-toolbar-v4 {
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+}
+
+.confmgr-options-icon-add-v4 {
+    width: 42px;
+    min-width: 42px;
+    height: 34px;
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+    font-size: 15px;
+}
+
+.conf-open-tabs {
+    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 0 0 14px;
+    padding: 8px;
+    border: 1px solid rgba(148, 163, 184, .22);
+    border-radius: 8px;
+    background: rgba(10, 15, 22, .62);
+}
+
+.conf-open-tabs.is-visible {
+    display: flex;
+}
+
+.conf-open-tabs-inline {
+    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.conf-open-tabs-inline.is-visible {
+    display: inline-flex;
+}
+
+.conf-open-tab-shell {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: min(360px, 100%);
+}
+
+.conf-open-tab {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: min(320px, 100%);
+    border: 1px solid rgba(148, 163, 184, .26);
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(18, 26, 36, .9);
+}
+
+.conf-open-tab-link.yoleo-subnav-link {
+    padding: 7px 10px;
+    gap: 0;
+    color: #e5f6ff;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.conf-open-tab.is-active {
+    border-color: rgba(26, 235, 255, .72);
+    box-shadow: 0 0 0 1px rgba(26, 235, 255, .16);
+}
+
+.conf-open-tab-link:hover {
+    color: #1AEBFF;
+}
+
+.conf-open-tab-close {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.conf-open-tab-close:hover {
+    color: #fff;
+}
+
+@media (max-width: 900px) {
+    .confmgr-options-head-v4 {
+        grid-template-columns: 1fr;
+    }
+
+    .confmgr-options-toolbar-v4 {
+        justify-content: center;
+    }
+}
+
+
+/* Browser commun en window.open : footer/actions collés en bas de la fenêtre.
+   Classes nouvelles et ciblées pour ne pas toucher aux anciennes règles browser. */
+.yoleo-browser-window-bottom-actions-v4 {
+    height: 100vh;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+.yoleo-browser-window-bottom-actions-v4 .browser-page {
+    height: 100vh;
+    min-height: 100vh;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.yoleo-browser-window-bottom-actions-v4 .browser-panel {
+    height: 100%;
+    min-height: 0;
+}
+
+.yoleo-browser-window-bottom-actions-v4 .browser-table-wrap,
+.yoleo-browser-window-bottom-actions-v4 .browser-grid-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.yoleo-browser-window-bottom-actions-v4 .browser-footer {
+    margin-top: auto;
+}
+
+@media (max-width: 900px) {
+    .yoleo-browser-window-bottom-actions-v4 {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+    }
+
+    .yoleo-browser-window-bottom-actions-v4 .browser-page {
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+    }
+}
+
+
+
+
+/* Gestionnaire de configuration : le bandeau des fichiers ouverts fait partie
+   de la navigation locale. Il doit rester visible même quand le menu cranté
+   global est actif, exactement comme Docker Run/YML. */
+.confmgr-route-page .confmgr-file-subnav.yoleo-subnav-keep-with-settings {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 42px;
+    margin: 0 0 14px;
+}
+
+.confmgr-route-page .confmgr-file-subnav .conf-open-tabs-inline.is-visible {
+    display: inline-flex !important;
+}
+
+.confmgr-route-page .confmgr-file-subnav .conf-open-tabs-inline:not(.is-visible) {
+    display: inline-flex !important;
+    min-width: 0;
+}

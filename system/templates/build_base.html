@@ -1,0 +1,72 @@
+{% extends "menu.html" %}
+
+{% set active_build_section = active_build_section|default('tarbuild', true) %}
+{% set build_titles = {
+    'main': ['Build Main', 'Table principale Build en cours de préparation'],
+    'tarbuild': ['Build → TAR', 'Construction des images Docker vers fichiers TAR'],
+    'tar_registry': ['TAR → Registre', 'Import des TAR dans le registre local avec regctl'],
+    'database': ['Base de données Build', 'Registre, plateformes et mode HTTP/HTTPS des images'],
+    'registry': ['Registre', 'Consultation et maintenance du registre local'],
+    'system': ['Système registre', 'Service systemd, processus et chemins du registre host'],
+    'info': ['Info', 'Chemins et configuration Build, TAR et registre'],
+    'logs': ['Logs Build', 'Suivi temps réel des tâches Build et Registre'],
+    'options': ['Options Build', 'Dossiers Build/TAR, registre local, login et Docker HTTP']
+} %}
+{% set build_current_title = build_titles.get(active_build_section, build_titles['tarbuild']) %}
+
+{% block title %}{{ build_current_title[0]|striptags }} - Yoleo{% endblock %}
+{% block page_title %}{{ build_current_title[0] }}{% endblock %}
+{% block page_subtitle %}{{ build_current_title[1] }}{% endblock %}
+
+{% block content %}
+<main class="builds-page" data-active-build-section="{{ active_build_section }}">
+  <div class="builds-panel">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-stack yoleo-page-flash">
+          {% for category, message in messages %}
+            <div class="flash-msg {{ 'success' if category == 'success' else 'error' }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    <script>
+    (function autoClearBuildSuccessMessages(){
+        const removeSuccess = () => {
+            document.querySelectorAll('.flash-msg.success').forEach((el) => {
+                el.style.transition = 'opacity .25s ease, transform .25s ease';
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(-4px)';
+                window.setTimeout(() => {
+                    const parent = el.parentElement;
+                    el.remove();
+                    if (parent && parent.classList.contains('flash-stack') && !parent.querySelector('.flash-msg')) {
+                        parent.remove();
+                    }
+                }, 260);
+            });
+        };
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => window.setTimeout(removeSuccess, 10000));
+        } else {
+            window.setTimeout(removeSuccess, 10000);
+        }
+    })();
+    </script>
+
+    {% set build_options_sections = ['options', 'system', 'tarbuild', 'tar_registry', 'database', 'info', 'logs'] %}
+    {% if active_build_section in build_options_sections %}
+    <nav class="yoleo-subnav build-options-subnav" aria-label="Navigation options Build">
+        <a class="yoleo-subnav-link {{ 'is-active' if active_build_section == 'options' else '' }}" href="/build/options">⚙️ Options registre</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_build_section == 'system' else '' }}" href="/build/system">🧰 Service registre</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_build_section == 'tarbuild' else '' }}" href="/build/tarbuild">🏗️ Build seul</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_build_section == 'tar_registry' else '' }}" href="/build/tar-registry">📦 Fichiers TAR</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_build_section == 'database' else '' }}" href="/build/database">🧮 Base de données</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_build_section == 'info' else '' }}" href="/build/info">ℹ️ Info</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_build_section == 'logs' else '' }}" href="/build/logs">📜 Logs</a>
+    </nav>
+    {% endif %}
+
+    {% block route_content %}{% endblock %}
+{% include "build/common_after.html" %}
+{% endblock %}

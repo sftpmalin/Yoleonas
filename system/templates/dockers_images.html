@@ -1,0 +1,130 @@
+{% extends "dockers_base.html" %}
+
+{% block route_content %}
+<section class="summary-grid">
+        <div class="yoleo-card summary-card"><div class="summary-label">Images</div><div class="summary-value cyan">{{ total }}</div><div class="hint">{{ total_size }}</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">Utilisées</div><div class="summary-value green">{{ used_count }}</div><div class="hint">Conteneurs : {{ containers_size }}</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">Inutilisées</div><div class="summary-value red">{{ unused_count }}</div><div class="hint">{{ unused_size }} supprimable</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">Dangling</div><div class="summary-value gray">{{ dangling_count }}</div><div class="hint">Images sans tag</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">docker.img utilisé</div><div class="summary-value green">{{ docker_img_used }}</div><div class="hint">{{ docker_img_percent }} de {{ docker_img_total }}</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">docker.img libre</div><div class="summary-value cyan">{{ docker_img_free }}</div><div class="hint docker-ellipsis" title="{{ docker_root_dir }}">{{ docker_root_dir }}</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">Cache build</div><div class="summary-value">{{ build_cache_size }}</div><div class="hint">BuildKit / buildx</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">Volumes libres</div><div class="summary-value red">{{ unused_volumes_size }}</div><div class="hint">Docker volumes non attachés</div></div>
+    </section>
+
+    <section class="yoleo-card docker-section docker-images-maintenance">
+        {% if docker_notice %}
+        <div class="docker-images-error-row">
+            <div class="action-message">{{ docker_notice }}</div>
+        </div>
+        {% endif %}
+        {% if docker_error %}
+        <div class="docker-images-error-row">
+            <div class="action-message bad">{{ docker_error }}</div>
+        </div>
+        {% endif %}
+
+        {% if not (_menu_top_active|default(false)) %}
+        <div class="docker-images-actions-compact docker-images-icon-toolbar" aria-label="Actions de maintenance Docker">
+            <button class="yoleo-btn yoleo-btn-red yoleo-btn-icon docker-images-icon-btn" type="button" onclick="dockerOpenDeleteUnusedImages()" title="Supprimer les images inutilisées" aria-label="Supprimer les images inutilisées" {% if unused_count == 0 %}disabled{% endif %}>🧹</button>
+            <button type="button" class="yoleo-btn yoleo-btn-orange yoleo-btn-icon docker-images-icon-btn" title="Supprimer le cache de build Docker" aria-label="Supprimer le cache de build Docker" onclick="dockerOpenMaintenance('prune_build_cache', 'Supprimer le cache de build Docker ?', 'Supprime le cache BuildKit / buildx. Les conteneurs et images utilisées ne sont pas touchés.')">🧱</button>
+            <button type="button" class="yoleo-btn yoleo-btn-orange yoleo-btn-icon docker-images-icon-btn" title="Supprimer les conteneurs arrêtés" aria-label="Supprimer les conteneurs arrêtés" onclick="dockerOpenMaintenance('prune_stopped_containers', 'Supprimer les conteneurs arrêtés ?', 'Supprime uniquement les conteneurs Docker arrêtés.')">⏹</button>
+            <button type="button" class="yoleo-btn yoleo-btn-orange yoleo-btn-icon docker-images-icon-btn" title="Supprimer les images dangling" aria-label="Supprimer les images dangling" onclick="dockerOpenMaintenance('prune_dangling_images', 'Supprimer les images dangling ?', 'Supprime les images sans tag créées après des rebuilds.')">🏷</button>
+            <button type="button" class="yoleo-btn yoleo-btn-orange yoleo-btn-icon docker-images-icon-btn" title="Supprimer les réseaux inutilisés" aria-label="Supprimer les réseaux inutilisés" onclick="dockerOpenMaintenance('prune_unused_networks', 'Supprimer les réseaux inutilisés ?', 'Supprime les réseaux Docker qui ne sont utilisés par aucun conteneur.')">🌐</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-icon docker-images-icon-btn" title="Supprimer les volumes inutilisés" aria-label="Supprimer les volumes inutilisés" onclick="dockerOpenMaintenance('prune_unused_volumes', 'Supprimer les volumes inutilisés ?', 'Attention : supprime les volumes Docker non attachés à un conteneur.')">📦</button>
+            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-images-icon-btn" title="Nettoyage léger Docker" aria-label="Nettoyage léger Docker" onclick="dockerOpenMaintenance('prune_system_safe', 'Lancer un nettoyage léger Docker ?', 'Nettoie conteneurs arrêtés, réseaux inutilisés, images dangling et cache build. Les volumes ne sont pas supprimés.')">✨</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-icon docker-images-icon-btn" title="Grand nettoyage Docker" aria-label="Grand nettoyage Docker" onclick="dockerOpenMaintenance('prune_system_deep', 'Lancer le grand nettoyage Docker ?', 'Action forte : supprime conteneurs arrêtés, réseaux inutilisés, images inutilisées, volumes inutilisés et cache build.')">🔥</button>
+        </div>
+        {% endif %}
+        <div class="maintenance-note docker-images-maintenance-note">Le grand nettoyage peut retirer beaucoup plus que le simple cache. Les images utilisées restent verrouillées dans la liste.</div>
+
+        <div class="table-wrap docker-images-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" data-yoleo-context-zone="docker-images-table"><table class="yoleo-table docker-images-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off"><thead><tr><th>Image</th><th>Stack</th><th>Taille</th><th>Tags</th><th>État</th><th>Actions</th></tr></thead><tbody>
+            {% for img in images %}
+            <tr class="docker-image-row docker-image-keyboard-row" tabindex="-1">
+                <td>
+                    <div class="docker-name-cell">
+                        <img class="docker-icon" src="{{ img.icon }}" alt="" onerror="this.src='/static/logo/docker1.png'">
+                        <div>
+                            <span class="docker-ellipsis" title="{{ img.tags }}">{{ img.tags }}</span>
+                            <div class="hint mono">{{ img.short_id }}</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="status-pill">{{ img.stack }}</span></td>
+                <td>{{ img.size }}</td>
+                <td>
+                    {% if img.all_tags|length > 1 %}
+                    <span class="status-pill">{{ img.all_tags|length }} tags</span>
+                    {% else %}
+                    <span class="hint">tag principal</span>
+                    {% endif %}
+                    {% if img.is_dangling %}<span class="status-pill bad">dangling</span>{% endif %}
+                </td>
+                <td><span class="status-pill {{ 'ok' if img.used else 'bad' }}">{{ 'utilisée' if img.used else 'inutile' }}</span></td>
+                <td class="docker-images-actions-cell">
+                    <div class="actions-line docker-images-row-actions">
+                        <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-image-action-btn" type="button" title="Détails image" aria-label="Détails image" onclick='dockerOpenImageDetails({{ img.id|tojson }}, {{ img.tags|tojson }}, {{ img.icon|tojson }}, {{ img.used|tojson }}, {{ img.size|tojson }}, {{ img.stack|tojson }})'>ℹ</button>
+                        {% if img.used %}
+                        <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon" type="button" disabled title="Image utilisée par un conteneur" aria-label="Image verrouillée">🔒</button>
+                        {% else %}
+                        <button class="yoleo-btn yoleo-btn-red yoleo-btn-icon docker-image-action-btn" type="button" title="Supprimer image" aria-label="Supprimer image" onclick='dockerOpenDeleteOneImage({{ img.id|tojson }}, {{ img.tags|tojson }})'>🗑</button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% else %}<tr><td colspan="6">Aucune image.</td></tr>{% endfor %}
+        </tbody></table></div>
+
+        <div class="docker-images-mobile-list" aria-label="Liste simplifiée des images Docker">
+            {% for img in images %}
+            <button class="docker-images-mobile-item {{ 'is-used' if img.used else 'is-unused' }}" type="button" onclick='dockerOpenImageDetails({{ img.id|tojson }}, {{ img.tags|tojson }}, {{ img.icon|tojson }}, {{ img.used|tojson }}, {{ img.size|tojson }}, {{ img.stack|tojson }})'>
+                <img class="docker-images-mobile-icon" src="{{ img.icon }}" alt="" onerror="this.src='/static/logo/docker1.png'">
+                <span class="docker-images-mobile-text">
+                    <span class="docker-images-mobile-title" title="{{ img.tags }}">{{ img.tags }}</span>
+                    <span class="docker-images-mobile-sub">
+                        {{ img.size }}{% if img.stack %} · {{ img.stack }}{% endif %} · {{ 'utilisée' if img.used else 'inutile' }}{% if img.is_dangling %} · dangling{% endif %}
+                    </span>
+                </span>
+                <span class="docker-images-mobile-state status-pill {{ 'ok' if img.used else 'bad' }}">{{ 'utilisée' if img.used else 'inutile' }}</span>
+                <span class="docker-images-mobile-chevron" aria-hidden="true">›</span>
+            </button>
+            {% else %}
+            <div class="docker-images-mobile-empty empty-state">Aucune image Docker détectée.</div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="modal-backdrop" id="docker-image-detail-modal">
+        <div class="modal">
+            <div class="modal-head">
+                <div class="modal-title">Image Docker</div>
+                <button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="dockerCloseImageModals()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="docker-name-cell"><img class="docker-icon" id="docker-image-detail-icon" src="" alt="" onerror="this.src='/static/logo/docker1.png'"><div><div id="docker-image-detail-name" class="card-title"></div><div id="docker-image-detail-meta" class="hint"></div></div></div>
+                <div class="action-message" id="docker-image-detail-status"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="yoleo-btn yoleo-btn-red" type="button" id="docker-image-detail-delete" onclick="dockerDeleteImageFromDetails()">Supprimer cette image</button>
+                <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="dockerCloseImageModals()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="docker-image-confirm-modal">
+        <form class="modal" method="post" action="/docker/images_docker">
+            <div class="modal-head"><div class="modal-title" id="docker-image-confirm-title">Confirmation Docker</div></div>
+            <div class="modal-body">
+                <div class="modal-danger-text" id="docker-image-confirm-text"></div>
+                <input type="hidden" name="action" id="docker-image-confirm-action">
+                <input type="hidden" name="del_img" id="docker-image-confirm-id">
+                <input type="hidden" name="del_tag" id="docker-image-confirm-tag-hidden">
+                <input type="hidden" name="maintenance_action" id="docker-image-maintenance-action">
+            </div>
+            <div class="modal-actions">
+                <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="dockerCloseImageModals()">Annuler</button>
+                <button class="yoleo-btn yoleo-btn-red" type="submit">Confirmer</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

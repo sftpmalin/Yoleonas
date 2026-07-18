@@ -1,0 +1,354 @@
+/* Services > Archive : progression générale et mini-barres par profil. */
+.archive-page #tab-general .topbar {
+    grid-template-columns: minmax(250px, .85fr) minmax(540px, 1.15fr);
+}
+
+.archive-page .archive-v4-card-subtitle {
+    max-width: 430px;
+}
+
+.archive-page .archive-v4-toolbar {
+    display: grid;
+    grid-template-columns: minmax(420px, 1fr) auto;
+    align-items: center;
+    justify-content: stretch;
+    justify-items: end;
+    gap: 8px 10px;
+    min-width: min(100%, 560px);
+}
+
+.archive-page .archive-v4-toolbar > .yoleo-btn {
+    white-space: nowrap;
+}
+
+.archive-page .archive-v4-toolbar-icons {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    justify-self: end;
+    min-width: 0;
+}
+
+.archive-page .archive-v4-icon-btn {
+    width: 34px;
+    min-width: 34px;
+    height: 30px;
+    padding: 0 !important;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.archive-page .archive-v4-run-all-group {
+    display: grid;
+    grid-template-columns: auto minmax(240px, 1fr);
+    align-items: center;
+    justify-self: stretch;
+    gap: 9px;
+    min-width: 0;
+    width: 100%;
+}
+
+.archive-page .archive-v4-progress-cell {
+    min-width: 185px;
+}
+
+.archive-page .archive-v4-progress {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+}
+
+.archive-page .archive-v4-progress-track {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, .18);
+    border: 1px solid rgba(148, 163, 184, .24);
+}
+
+.archive-page .archive-v4-progress-track span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: rgba(148, 163, 184, .72);
+    transition: width .25s ease;
+}
+
+.archive-page .archive-v4-progress-label {
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 800;
+    font-size: 11px;
+    line-height: 1.25;
+    text-align: left;
+    white-space: nowrap;
+    color: var(--yoleo-muted);
+}
+
+.archive-page #archiveAllProgress .archive-v4-progress-label {
+    max-width: 160px;
+}
+
+.archive-page #generalTable .actions-cell {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+.archive-page #generalTable .yoleo-btn {
+    white-space: nowrap;
+}
+
+.archive-page .archive-v4-progress-running .archive-v4-progress-track span {
+    background: linear-gradient(90deg, rgba(34, 211, 238, .35), rgba(34, 211, 238, .95), rgba(34, 211, 238, .35));
+    background-size: 180% 100%;
+    animation: none;
+}
+
+.archive-page .archive-v4-progress-running.archive-v4-progress-indeterminate .archive-v4-progress-track span {
+    animation: archive-v4-progress-flow 1s linear infinite;
+}
+
+.archive-page .archive-v4-progress-running.archive-v4-progress-determinate .archive-v4-progress-track span {
+    background-size: 100% 100%;
+}
+
+.archive-page .archive-v4-progress-running .archive-v4-progress-label {
+    color: #22d3ee;
+}
+
+.archive-page .archive-v4-progress-success .archive-v4-progress-track span {
+    background: rgba(34, 197, 94, .95);
+}
+
+.archive-page .archive-v4-progress-success .archive-v4-progress-label {
+    color: #86efac;
+}
+
+.archive-page .archive-v4-progress-error .archive-v4-progress-track span {
+    background: rgba(244, 63, 94, .96);
+}
+
+.archive-page .archive-v4-progress-error .archive-v4-progress-label {
+    color: #fda4af;
+}
+
+.archive-page .archive-v4-button-loading {
+    position: relative;
+    pointer-events: auto;
+    cursor: not-allowed;
+    opacity: .9;
+    color: transparent !important;
+}
+
+.archive-page .archive-v4-button-loading::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 17px;
+    height: 17px;
+    margin-left: -8.5px;
+    margin-top: -8.5px;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, .36);
+    border-top-color: #fff;
+    animation: archive-v4-button-spin .75s linear infinite;
+}
+
+.archive-page .archive-v4-inline-status {
+    margin: 10px 0 12px;
+    padding: 9px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 800;
+    border: 1px solid rgba(148, 163, 184, .2);
+    background: rgba(15, 23, 42, .82);
+}
+
+.archive-page .archive-v4-inline-info {
+    color: #67e8f9;
+    border-color: rgba(34, 211, 238, .35);
+    background: rgba(8, 47, 73, .32);
+}
+
+.archive-page .archive-v4-inline-success {
+    color: #86efac;
+    border-color: rgba(34, 197, 94, .38);
+    background: rgba(20, 83, 45, .28);
+}
+
+.archive-page .archive-v4-inline-error {
+    color: #fda4af;
+    border-color: rgba(244, 63, 94, .45);
+    background: rgba(127, 29, 29, .32);
+}
+
+@keyframes archive-v4-button-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes archive-v4-progress-flow {
+    from { background-position: 0 0; }
+    to { background-position: 180% 0; }
+}
+
+@media (max-width: 1350px) {
+    .archive-page #tab-general .topbar {
+        grid-template-columns: 1fr;
+    }
+
+    .archive-page .archive-v4-toolbar {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 900px) {
+    .archive-page .archive-v4-toolbar,
+    .archive-page .archive-v4-run-all-group,
+    .archive-page .archive-v4-progress {
+        grid-template-columns: 1fr;
+    }
+
+    .archive-page .archive-v4-toolbar > .yoleo-btn,
+    .archive-page .archive-v4-toolbar-icons {
+        grid-column: auto;
+        justify-self: stretch;
+        width: 100%;
+    }
+
+    .archive-page .archive-v4-toolbar-icons {
+        justify-content: flex-start;
+    }
+
+    .archive-page .archive-v4-progress-label {
+        max-width: none;
+        font-size: 10px;
+    }
+}
+
+
+/* Archive : les messages longs restent dans la carte, pas en bulle flottante. */
+.archive-page .archive-v4-inline-status:not([hidden]) {
+    position: static !important;
+    width: 100%;
+    box-shadow: none;
+}
+
+.archive-page .archive-v4-row-stop[hidden] {
+    display: none !important;
+}
+
+
+/* Archive général : tableau de bord compact en une seule ligne.
+   Les actions secondaires sont dans le menu cranté du haut. */
+.archive-page .archive-general-control-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: stretch;
+    margin-bottom: 12px;
+}
+
+.archive-page .archive-summary-inline {
+    margin: 0 !important;
+    grid-template-columns: repeat(4, minmax(105px, 1fr));
+    align-self: stretch;
+}
+
+.archive-page .archive-summary-inline .summary-card {
+    min-height: 58px;
+}
+
+.archive-page .archive-run-all-right {
+    justify-self: end;
+    align-self: center;
+    min-width: min(100%, 460px);
+    margin: 0;
+}
+
+.archive-page .archive-table-tools-compact {
+    margin-top: 0;
+}
+
+.archive-page .archive-table-tools-compact .search-input {
+    width: 100%;
+    min-width: 0;
+}
+
+@media (max-width: 1180px) {
+    .archive-page .archive-general-control-row {
+        grid-template-columns: 1fr;
+    }
+    .archive-page .archive-run-all-right {
+        justify-self: stretch;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 760px) {
+    .archive-page .archive-summary-inline {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Archive : le mode tient vraiment sur deux lignes et ne mange plus la source.
+   La règle globale des badges force nowrap avec !important ; on l'annule ici. */
+.archive-page .archive-mode-badge {
+    display: inline-block !important;
+    white-space: normal !important;
+    line-height: 1.18;
+    text-align: center;
+    width: 128px;
+    max-width: 132px;
+    min-width: 118px;
+    overflow-wrap: normal;
+    word-break: normal;
+    vertical-align: middle;
+}
+
+.archive-page .archive-mode-badge br {
+    display: block;
+    content: "";
+}
+
+.archive-page #generalTable th:nth-child(2),
+.archive-page #generalTable td:nth-child(2) {
+    width: 13% !important;
+    min-width: 128px;
+    max-width: 148px;
+}
+
+.archive-page #generalTable td:nth-child(2) {
+    text-align: left;
+}
+
+.archive-page #generalTable th:nth-child(1),
+.archive-page #generalTable td:nth-child(1) {
+    width: 17% !important;
+}
+
+.archive-page #generalTable th:nth-child(4),
+.archive-page #generalTable td:nth-child(4) {
+    width: 16% !important;
+}
+
+.archive-page #generalTable th:nth-child(5),
+.archive-page #generalTable td:nth-child(5) {
+    width: 8% !important;
+}
+
+.archive-page #generalTable td:nth-child(3) .tag-val {
+    max-width: 100%;
+}
+
+.archive-page .archive-mode-badge .archive-mode-line {
+    display: block;
+}

@@ -1,0 +1,214 @@
+{% extends "dockers_base.html" %}
+
+{% block route_content %}
+<nav class="yoleo-subnav yoleo-subnav-keep-with-settings docker-run-subnav-creation" aria-label="Docker Run">
+        <a class="yoleo-subnav-link {{ 'is-active' if active_subtab == 'main' else '' }}" href="/docker/run/main">📚 Bibliothèque</a>
+        <span id="docker-run-open-edit-tabs"
+              class="docker-run-open-edit-tabs"
+              data-active-subtab="{{ active_subtab }}"
+              data-active-filename="{{ docker_run_edit_filename }}"
+              data-active-icon="{{ docker_run_edit_icon }}"></span>
+        {% if active_subtab == 'edit' and not docker_run_edit_filename %}
+        <span class="yoleo-subnav-link is-active docker-run-temp-edit-tab docker-run-unsaved-edit-tab">✍️ Nouveau fichier</span>
+        {% endif %}
+    </nav>
+
+    {% if active_subtab == 'main' %}
+    <section class="yoleo-card docker-section docker-run-library">
+        <div class="docker-run-library-search-actions">
+            <input class="yoleo-input" id="docker-run-search" placeholder="🔍 Rechercher un fichier, une image ou un aperçu..." oninput="dockerFilterRuns()">
+            {% if not (_menu_top_active|default(false)) %}
+            <a class="yoleo-btn yoleo-btn-primary docker-run-new-inline-btn" href="/docker/run/edit">＋ Nouveau</a>
+            {% endif %}
+            <span class="status-pill" id="docker-run-count">{{ docker_run_count }} fichier(s)</span>
+        </div>
+
+        {% if not docker_run_runs %}
+        <div class="empty-state" data-yoleo-context-zone="docker-run-empty">Aucun fichier <b>.conf</b> trouvé dans <b>{{ docker_run_dir }}</b>.</div>
+        {% else %}
+        <div class="table-wrap docker-run-desktop-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" data-yoleo-context-zone="docker-run-table">
+            <table class="yoleo-table docker-run-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" id="docker-run-table">
+                <thead>
+                    <tr>
+                        <th class="docker-run-icon-col">Icône</th>
+                        <th>Fichier</th>
+                        <th>Image</th>
+                        <th>Maj</th>
+                        <th>Progression</th>
+                        <th class="docker-run-actions-col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in docker_run_runs %}
+                    <tr class="docker-run-row" data-run-name="{{ r.filename }}" data-run-icon="{{ r.icon }}" data-run-status="{{ r.run_status }}" data-filter="{{ (r.filename ~ ' ' ~ r.preview ~ ' ' ~ r.image)|lower }}">
+                        <td><img src="{{ r.icon }}" class="docker-run-icon" alt="" onerror="this.src='{{ default_icon }}'"></td>
+                        <td>
+                            <div class="docker-run-file-name">{{ r.filename }}</div>
+                            <div class="hint">{{ r.line_count }} ligne(s) • {{ r.size_kb }} Ko</div>
+                        </td>
+                        <td><div class="docker-run-preview">{{ r.image }}</div></td>
+                        <td><span class="hint">{{ r.modified_at }}</span></td>
+                        <td class="docker-run-progress-cell">
+                            <div class="docker-run-progress docker-run-progress-{{ r.run_status_class }}" data-filename="{{ r.filename }}">
+                                <div class="docker-run-progress-track"><span style="width: {{ r.run_progress }}%"></span></div>
+                                <span class="docker-run-progress-label">{{ r.run_status_label }}</span>
+                            </div>
+                        </td>
+                        <td class="docker-run-actions-col">
+                            <div class="actions-line docker-run-actions-line">
+                                <a class="yoleo-btn yoleo-btn-green yoleo-btn-icon docker-run-action-btn docker-run-play-btn {{ 'docker-run-play-spinning' if r.run_running else '' }}" title="Exécuter" data-filename="{{ r.filename }}" href="/docker/run/log?filename={{ r.filename|urlencode }}{{ '' if r.run_running else '&run=1' }}" aria-disabled="{{ 'true' if r.run_running else 'false' }}">▶</a>
+                                <a class="yoleo-btn yoleo-btn-orange yoleo-btn-icon docker-run-action-btn" title="Éditer" href="/docker/run/edit?filename={{ r.filename|urlencode }}" onclick="dockerRunRememberEditor({{ r.filename|tojson }}, {{ r.icon|tojson }})">✎</a>
+                                <form method="post" action="{{ url_for('dockers_bp.stacks_docker_run') }}" class="docker-run-delete-inline" style="display:inline-flex;margin:0;" onsubmit="return confirm('Supprimer définitivement ' + {{ r.filename|tojson }} + ' ?');">
+                                    <input type="hidden" name="active_subtab" value="main">
+                                    <input type="hidden" name="filename" value="{{ r.filename }}">
+                                    <button class="yoleo-btn yoleo-btn-red yoleo-btn-icon docker-run-action-btn" type="submit" name="delete_run" value="1" title="Supprimer">🗑</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="folder-files-grid docker-yml-files-grid docker-run-mobile-yml-list" id="docker-run-mobile-list" aria-label="Liste mobile Docker Run">
+            {% for r in docker_run_runs %}
+            <button type="button"
+                    class="file-card docker-yml-file-card docker-run-mobile-file-card"
+                    data-name="{{ r.filename|lower }}"
+                    data-filter="{{ (r.filename ~ ' ' ~ r.preview ~ ' ' ~ r.image)|lower }}"
+                    data-filename="{{ r.filename }}"
+                    data-icon="{{ r.icon }}"
+                    data-image="{{ r.image }}"
+                    data-preview="{{ r.preview }}"
+                    data-lines="{{ r.line_count }}"
+                    data-size="{{ r.size_kb }}"
+                    data-modified="{{ r.modified_at }}"
+                    data-status="{{ r.run_status_label }}"
+                    data-status-class="{{ r.run_status_class }}"
+                    data-run-running="{{ '1' if r.run_running else '0' }}"
+                    data-log-url="/docker/run/log?filename={{ r.filename|urlencode }}{{ '' if r.run_running else '&run=1' }}"
+                    data-edit-url="/docker/run/edit?filename={{ r.filename|urlencode }}"
+                    onclick="dockerOpenRunMobileDetail(this)">
+                <img src="{{ r.icon }}" class="docker-run-mobile-file-icon" alt="" onerror="this.src='{{ default_icon }}'">
+                <div class="docker-run-mobile-file-text">
+                    <div class="file-name">{{ r.filename }}</div>
+                    <div class="file-path">{{ r.image or r.preview or docker_run_dir }}{% if r.size_kb is defined %} · {{ r.size_kb }} Ko{% endif %}</div>
+                </div>
+                <span class="docker-run-mobile-chevron" aria-hidden="true">›</span>
+            </button>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    {% elif active_subtab == 'log' %}
+    <section class="yoleo-card docker-section docker-run-terminal-section">
+        <div class="topbar">
+            <div>
+                <div class="card-title" id="docker-run-terminal-title">{{ 'Log : ' ~ docker_run_log_filename if docker_run_log_filename else 'Log Docker Run' }}</div>
+                <div class="subtitle">Commande exécutée : <span class="mono" id="docker-run-terminal-file">{{ docker_run_log_filename or 'Aucune' }}</span></div>
+            </div>
+            <div class="toolbar">
+                <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="dockerClearRunTerminal()">🧹 Vider</button>
+                <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="dockerCloseRunTerminal()">✖ Fermer</button>
+            </div>
+        </div>
+        <textarea id="docker-run-terminal" class="docker-log-box docker-run-terminal" readonly>{% if docker_run_log_filename %}{{ docker_run_log_content or 'Chargement du log…' }}{% else %}Choisis un fichier dans Bibliothèque puis clique sur ▶.{% endif %}</textarea>
+    </section>
+
+    {% elif active_subtab == 'edit' %}
+    <section class="docker-run-editor-grid docker-run-editor-grid-expanded">
+        <form method="post" action="{{ url_for('dockers_bp.stacks_docker_run') }}" class="yoleo-card docker-section docker-run-editor-card docker-run-editor-card-expanded" id="docker-run-editor-form">
+            <input type="hidden" name="active_subtab" value="edit">
+            <input type="hidden" id="docker-run-original-filename" name="original_filename" value="{{ docker_run_edit_filename }}">
+            {% if not (_menu_top_active|default(false)) %}
+            <div class="topbar docker-run-editor-topbar-clean docker-run-editor-actions-fallback">
+                <div>
+                    <div class="card-title">Éditeur Docker Run</div>
+                </div>
+                <div class="docker-run-editor-save-actions">
+                    <button class="yoleo-btn yoleo-btn-primary" name="save_run" value="1" onclick="dockerRunRememberEditorFromForm()">💾 Sauvegarder</button>
+                    <button class="yoleo-btn yoleo-btn-muted" name="save_run_close" value="1" onclick="dockerRunCloseEditorTabBeforeSubmit()">💾 Sauvegarder + fermer</button>
+                    <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="dockerRunCloseCurrentEditor()">✖ Fermer</button>
+                </div>
+            </div>
+            {% endif %}
+            <div class="docker-run-editor-head docker-run-editor-head-clean">
+                <label class="form-row">
+                    <span>Nom du fichier</span>
+                    <input class="yoleo-input mono" id="docker-run-existing-filename" name="existing_filename" placeholder="ex: plex.conf" value="{{ docker_run_edit_filename }}">
+                </label>
+            </div>
+            <textarea class="docker-textarea docker-run-command-textarea docker-run-command-textarea-expanded" id="docker-run-command" name="command" spellcheck="false" placeholder="Colle ici ta commande Docker Run brute...">{{ docker_run_edit_command }}</textarea>
+        </form>
+    </section>
+
+    {% elif active_subtab == 'info' %}
+    <section class="yoleo-card docker-section docker-run-info-page">
+        <div class="topbar">
+            <div>
+                <div class="card-title">Info Docker Run</div>
+                <div class="subtitle">Résumé et paramètres utilisés par les commandes Docker Run.</div>
+            </div>
+            <a class="yoleo-btn yoleo-btn-muted" href="/docker/run/main">📚 Bibliothèque</a>
+        </div>
+        <div class="summary-grid">
+            <div class="summary-card"><div class="summary-label">Fichiers .conf</div><div class="summary-value cyan">{{ docker_run_count }}</div></div>
+            <div class="summary-card"><div class="summary-label">Dossier Docker Run</div><div class="summary-value docker-ellipsis" title="{{ docker_run_dir }}">{{ docker_run_dir }}</div></div>
+            <div class="summary-card"><div class="summary-label">Shell</div><div class="summary-value docker-ellipsis" title="{{ docker_run_config['SHELL_BIN'] }}">{{ docker_run_config['SHELL_BIN'] }}</div></div>
+            <div class="summary-card"><div class="summary-label">Workdir</div><div class="summary-value docker-ellipsis" title="{{ docker_run_config['WORKDIR'] }}">{{ docker_run_config['WORKDIR'] }}</div></div>
+        </div>
+        <div class="docker-yml-help">
+            Le module garde le contenu brut : il sauvegarde, rouvre, supprime et exécute les commandes sur l’hôte local sans transformer ta commande.
+        </div>
+    </section>
+    {% endif %}
+
+    <div class="modal-backdrop docker-run-mobile-detail-modal" id="docker-run-mobile-detail-modal">
+        <div class="modal docker-run-mobile-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="docker-run-mobile-detail-title">
+            <div class="modal-head docker-run-mobile-detail-head">
+                <div class="docker-run-mobile-detail-titleline">
+                    <img id="docker-run-mobile-detail-icon" class="docker-run-mobile-detail-icon" src="{{ default_icon }}" alt="">
+                    <div>
+                        <div class="modal-title" id="docker-run-mobile-detail-title">Docker Run</div>
+                        <div class="subtitle" id="docker-run-mobile-detail-image"></div>
+                    </div>
+                </div>
+                <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon" type="button" onclick="dockerCloseRunMobileDetail()" aria-label="Fermer">×</button>
+            </div>
+            <div class="modal-body docker-run-mobile-detail-body">
+                <div class="docker-run-mobile-detail-grid">
+                    <div><span>État</span><b id="docker-run-mobile-detail-status">—</b></div>
+                    <div><span>Taille</span><b id="docker-run-mobile-detail-size">—</b></div>
+                    <div><span>Lignes</span><b id="docker-run-mobile-detail-lines">—</b></div>
+                    <div><span>Maj</span><b id="docker-run-mobile-detail-modified">—</b></div>
+                </div>
+                <div class="docker-run-mobile-detail-preview" id="docker-run-mobile-detail-preview"></div>
+            </div>
+            <div class="modal-actions docker-run-mobile-detail-actions">
+                <a class="yoleo-btn yoleo-btn-green" id="docker-run-mobile-detail-run" href="#">▶ Exécuter</a>
+                <a class="yoleo-btn yoleo-btn-orange" id="docker-run-mobile-detail-edit" href="#">✎ Éditer</a>
+                <form method="post" action="{{ url_for('dockers_bp.stacks_docker_run') }}" class="docker-run-mobile-detail-delete" onsubmit="return confirm('Supprimer définitivement ' + document.getElementById('docker-run-mobile-detail-delete-name').value + ' ?');">
+                    <input type="hidden" name="active_subtab" value="main">
+                    <input type="hidden" name="filename" id="docker-run-mobile-detail-delete-name">
+                    <button class="yoleo-btn yoleo-btn-red" type="submit" name="delete_run" value="1">🗑 Supprimer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="docker-run-delete-modal">
+        <form class="modal" method="post" action="{{ url_for('dockers_bp.stacks_docker_run') }}">
+            <div class="modal-head"><div class="modal-title">Supprimer ce fichier Docker Run ?</div></div>
+            <div class="modal-body">
+                <div class="modal-danger-text">Tu vas supprimer définitivement : <span class="mono" id="docker-run-delete-name-display"></span></div>
+                <input type="hidden" name="active_subtab" value="main">
+                <input type="hidden" name="filename" id="docker-run-delete-name">
+            </div>
+            <div class="modal-actions">
+                <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="dockerCloseRunDeleteModal()">Annuler</button>
+                <button class="yoleo-btn yoleo-btn-red" type="submit" name="delete_run" value="1">🗑 Supprimer</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

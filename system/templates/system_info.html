@@ -1,0 +1,563 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<style>
+    .system-info-card.system-info-gpu-card,
+    .system-info-card.system-info-inventory-card {
+        grid-column: 1 / -1;
+    }
+
+    .system-info-gpu-card .system-table-wrap,
+    .system-info-inventory-card .system-table-wrap {
+        overflow-x: auto;
+    }
+
+    .system-info-gpu-card .system-info-table,
+    .system-info-inventory-card .system-info-table {
+        min-width: 920px;
+    }
+
+    .system-info-gpu-card .system-info-table th,
+    .system-info-gpu-card .system-info-table td,
+    .system-info-inventory-card .system-info-table th,
+    .system-info-inventory-card .system-info-table td {
+        white-space: normal;
+    }
+
+    .system-info-gpu-card .system-info-table th:nth-child(2),
+    .system-info-gpu-card .system-info-table td:nth-child(2),
+    .system-info-inventory-card .system-info-table th:nth-child(3),
+    .system-info-inventory-card .system-info-table td:nth-child(3),
+    .system-info-usb-table th:nth-child(4),
+    .system-info-usb-table td:nth-child(4) {
+        min-width: 220px;
+    }
+
+    @media (max-width: 980px) {
+        .system-info-card.system-info-gpu-card,
+        .system-info-card.system-info-inventory-card {
+            grid-column: 1 / -1;
+        }
+
+        .system-info-gpu-card .system-info-table,
+        .system-info-inventory-card .system-info-table {
+            min-width: 760px;
+        }
+    }
+</style>
+<section class="system-info-page">
+    <div class="system-info-grid">
+        {% if home_config.show_host|default('1')|int or home_config.show_uptime|default('1')|int %}
+        <article class="system-info-card system-info-wide">
+            <div class="system-info-card-head">
+                <h2>Hôte</h2>
+                <span id="info-generated">—</span>
+            </div>
+            <div class="system-table-wrap">
+                <table class="system-info-table">
+                    <tbody>
+                        {% if home_config.show_host|default('1')|int %}
+                        <tr><th>Hostname</th><td id="info-hostname">—</td><th>FQDN</th><td id="info-fqdn">—</td></tr>
+                        <tr><th>Système</th><td id="info-os">—</td><th>Debian</th><td id="info-debian">—</td></tr>
+                        <tr><th>Kernel</th><td id="info-kernel">—</td><th>Architecture</th><td id="info-arch">—</td></tr>
+                        <tr><th>Python</th><td id="info-python">—</td><th>Config</th><td id="info-config-path">—</td></tr>
+                        <tr><th>Carte mère</th><td id="info-board">—</td><th>BIOS</th><td id="info-bios">—</td></tr>
+                        {% endif %}
+                        {% if home_config.show_uptime|default('1')|int %}
+                        <tr><th>Démarrage</th><td id="info-boot-time">—</td><th>Uptime</th><td id="info-uptime">—</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+        {% endif %}
+
+        <article class="system-info-card">
+            <div class="system-info-card-head">
+                <h2>Installation système</h2>
+                <span>État admin</span>
+            </div>
+            <div class="system-table-wrap">
+                <table class="system-info-table compact">
+                    <tbody>
+                        <tr><th>Mode Flask</th><td id="info-admin-root">—</td></tr>
+                        <tr><th>Blocs installation</th><td id="info-admin-blocks">—</td></tr>
+                        <tr><th>Installés</th><td id="info-admin-installed">—</td></tr>
+                        <tr><th>Non installés</th><td id="info-admin-missing">—</td></tr>
+                        <tr><th>Paquets à jour</th><td id="info-admin-updates">—</td></tr>
+                        <tr><th>Dernier refresh</th><td id="info-admin-refresh">—</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        {% if home_config.show_cpu|default('1')|int or home_config.show_ram|default('1')|int %}
+        <article class="system-info-card">
+            <div class="system-info-card-head">
+                <h2>Ressources</h2>
+                <span>CPU / RAM</span>
+            </div>
+            <div class="system-table-wrap">
+                <table class="system-info-table compact">
+                    <tbody>
+                        {% if home_config.show_cpu|default('1')|int %}
+                        <tr><th>CPU</th><td id="info-cpu-model">—</td></tr>
+                        <tr><th>Cœurs</th><td id="info-cpu-cores">—</td></tr>
+                        <tr><th>Charge CPU</th><td id="info-cpu-percent">—</td></tr>
+                        <tr><th>Température</th><td id="info-cpu-temp">—</td></tr>
+                        <tr><th>Load average</th><td id="info-load">—</td></tr>
+                        {% endif %}
+                        {% if home_config.show_ram|default('1')|int %}
+                        <tr><th>RAM</th><td id="info-ram">—</td></tr>
+                        <tr><th>Swap</th><td id="info-swap">—</td></tr>
+                        <tr><th>Processus</th><td id="info-processes">—</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+        {% endif %}
+
+        {% if home_config.show_storage|default('1')|int or home_config.show_storage_summary|default('1')|int %}
+        <article class="system-info-card">
+            <div class="system-info-card-head">
+                <h2>Stockage</h2>
+                <span>Résumé</span>
+            </div>
+            <div class="system-table-wrap">
+                <table class="system-info-table compact">
+                    <tbody>
+                        <tr><th>Point surveillé</th><td id="info-disk-mount">—</td></tr>
+                        <tr><th>Occupation</th><td id="info-disk-percent">—</td></tr>
+                        <tr><th>Utilisé</th><td id="info-disk-used">—</td></tr>
+                        <tr><th>Total</th><td id="info-disk-total">—</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </article>
+        {% endif %}
+
+        {% if home_config.show_docker_total|default('1')|int or home_config.show_docker_running|default('1')|int or home_config.show_docker_summary|default('1')|int or home_config.show_services|default('1')|int %}
+        <article class="system-info-card">
+            <div class="system-info-card-head">
+                <h2>Services</h2>
+                <span>État</span>
+            </div>
+            <div class="system-table-wrap">
+                <table class="system-info-table compact">
+                    <tbody>
+                        {% if home_config.show_services|default('1')|int %}
+                        <tr><th>Services actifs</th><td id="info-services-active">—</td></tr>
+                        <tr><th>Services total</th><td id="info-services-total">—</td></tr>
+                        <tr><th>Services failed</th><td id="info-services-failed">—</td></tr>
+                        {% endif %}
+                        {% if home_config.show_docker_total|default('1')|int or home_config.show_docker_running|default('1')|int or home_config.show_docker_summary|default('1')|int %}
+                        <tr><th>Docker disponible</th><td id="info-docker-available">—</td></tr>
+                        {% if home_config.show_docker_running|default('1')|int %}<tr><th>Docker actifs</th><td id="info-docker-running">—</td></tr>{% endif %}
+                        {% if home_config.show_docker_total|default('1')|int %}<tr><th>Docker total</th><td id="info-docker-total">—</td></tr>{% endif %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+        {% endif %}
+
+        {% if home_config.show_network|default('1')|int or home_config.show_local_resolution|default('1')|int %}
+        <article class="system-info-card system-info-wide">
+            <div class="system-info-card-head">
+                <h2>Réseau</h2>
+                <span>Interface par défaut</span>
+            </div>
+            <div class="system-table-wrap">
+                <table class="system-info-table">
+                    <tbody>
+                        <tr><th>Interface</th><td id="info-net-iface">—</td><th>Surveillée</th><td id="info-net-watched">—</td></tr>
+                        <tr><th>État</th><td id="info-net-status">—</td><th>Lien</th><td id="info-net-link">—</td></tr>
+                        <tr><th>IP locale</th><td id="info-ip-local">—</td><th>Gateway</th><td id="info-ip-gateway">—</td></tr>
+                        <tr><th>IP publique</th><td id="info-ip-public">—</td><th>Débit</th><td><span id="info-net-down">—</span> / <span id="info-net-up">—</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </article>
+        {% endif %}
+
+        <article class="system-info-card system-info-wide system-info-gpu-card">
+            <div class="system-info-card-head">
+                <h2>GPU</h2>
+                <span>NVIDIA locale + Intel local / SSH optionnel</span>
+            </div>
+            <div class="system-table-wrap">
+                <table class="system-info-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Nom</th>
+                            <th>Charge</th>
+                            <th>Mémoire / vidéo</th>
+                            <th>Température</th>
+                            <th>Puissance</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody id="info-gpu-rows">
+                        <tr><td colspan="7">Chargement des informations GPU...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+
+        <article class="system-info-card system-info-wide system-info-inventory-card">
+            <div class="system-info-card-head">
+                <h2>Autres cartes PCI</h2>
+                <span id="info-pci-summary">lspci</span>
+            </div>
+            <div class="system-table-wrap">
+                <table class="system-info-table system-info-pci-table">
+                    <thead>
+                        <tr>
+                            <th>Adresse</th>
+                            <th>Classe</th>
+                            <th>Identification</th>
+                            <th>ID</th>
+                        </tr>
+                    </thead>
+                    <tbody id="info-pci-rows">
+                        <tr><td colspan="4">Chargement des cartes PCI...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <article class="system-info-card system-info-wide system-info-inventory-card">
+            <div class="system-info-card-head">
+                <h2>Périphériques USB détectés</h2>
+                <span id="info-usb-summary">lsusb</span>
+            </div>
+            <div class="system-table-wrap">
+                <table class="system-info-table system-info-usb-table">
+                    <thead>
+                        <tr>
+                            <th>Bus</th>
+                            <th>Device</th>
+                            <th>ID</th>
+                            <th>Périphérique</th>
+                        </tr>
+                    </thead>
+                    <tbody id="info-usb-rows">
+                        <tr><td colspan="4">Chargement des périphériques USB...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </article>
+    </div>
+</section>
+
+<script>
+(function () {
+    'use strict';
+
+    const INFO_ENABLED = {
+        time: {{ home_config.show_time|default('1')|int }},
+        cpu: {{ home_config.show_cpu|default('1')|int }},
+        ram: {{ home_config.show_ram|default('1')|int }},
+        storage: {{ home_config.show_storage|default('1')|int or home_config.show_storage_summary|default('1')|int }},
+        services: {{ home_config.show_services|default('1')|int }},
+        dockerTotal: {{ home_config.show_docker_total|default('1')|int }},
+        dockerRunning: {{ home_config.show_docker_running|default('1')|int }},
+        dockerSummary: {{ home_config.show_docker_summary|default('1')|int }},
+        network: {{ home_config.show_network|default('1')|int or home_config.show_local_resolution|default('1')|int }},
+        // Info hôte = inventaire matériel local réel.
+        // Ne dépend pas des tuiles activées/masquées dans index.conf.
+        nvidiaLocal: 1,
+        nvidiaSsh: {{ home_config.show_nvidia_ssh|default('0')|int }},
+        intelGpu: 1
+    };
+
+    function esc(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    function setText(id, value, fallback = '—') {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const txt = (value === undefined || value === null || value === '') ? fallback : value;
+        el.textContent = txt;
+    }
+
+    function numberValue(value, fallback = 0) {
+        const n = parseFloat(value);
+        return Number.isFinite(n) ? n : fallback;
+    }
+
+    function valuePercent(value) {
+        const n = numberValue(value, 0);
+        return Math.round(n) + '%';
+    }
+
+    function formatGpuValue(value, suffix = '') {
+        if (value === undefined || value === null || value === '' || value === '-') return '—';
+        return suffix ? `${value}${suffix}` : String(value);
+    }
+
+    function renderGpuRows(gpus) {
+        const tbody = document.getElementById('info-gpu-rows');
+        if (!tbody) return;
+        const list = Array.isArray(gpus) ? gpus.filter(gpu => {
+            const type = String(gpu.type || '').toLowerCase().replace(/-/g, '_');
+            const source = String(gpu.source || '').toLowerCase();
+            if (type === 'intel') return Boolean(INFO_ENABLED.intelGpu);
+            if (type === 'nvidia_ssh' || (type === 'nvidia' && source === 'ssh')) return Boolean(INFO_ENABLED.nvidiaSsh);
+            if (type === 'nvidia_local' || (type === 'nvidia' && source !== 'ssh')) return Boolean(INFO_ENABLED.nvidiaLocal);
+            return false;
+        }) : [];
+
+        if (!list.length) {
+            tbody.innerHTML = '<tr><td colspan="7">Aucune donnée GPU active ou détectée.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = list.map(gpu => {
+            const rawType = String(gpu.type || 'GPU').toLowerCase().replace(/-/g, '_');
+            const isIntel = rawType === 'intel';
+            const isRemote = gpu.source === 'ssh' || rawType === 'nvidia_ssh';
+            const type = isIntel ? 'INTEL' : (rawType.startsWith('nvidia') ? 'NVIDIA' : String(gpu.type || 'GPU').toUpperCase());
+            const source = isRemote ? 'SSH' : (isIntel ? 'Intel local' : 'NVIDIA local');
+            return `<tr>
+                <td>${esc(type)}</td>
+                <td>${esc(gpu.name || gpu.label || '—')}</td>
+                <td>${esc(formatGpuValue(gpu.load, '%'))}</td>
+                <td>${esc(formatGpuValue(gpu.mem, '%'))}</td>
+                <td>${esc(formatGpuValue(gpu.temp, '°C'))}</td>
+                <td>${esc(formatGpuValue(gpu.power, ' W'))}</td>
+                <td>${esc(source)}</td>
+            </tr>`;
+        }).join('');
+    }
+
+
+    function inventoryRows(payload) {
+        if (Array.isArray(payload)) return payload;
+        if (payload && Array.isArray(payload.rows)) return payload.rows;
+        return [];
+    }
+
+    function updateInventorySummary(id, payload, label) {
+        const rows = inventoryRows(payload);
+        if (payload && payload.available === false) {
+            setText(id, payload.error || `${label} indisponible`);
+            return;
+        }
+        setText(id, `${rows.length} élément(s) · ${label}`);
+    }
+
+    function renderPciRows(payload) {
+        const tbody = document.getElementById('info-pci-rows');
+        if (!tbody) return;
+        updateInventorySummary('info-pci-summary', payload, 'lspci');
+        const rows = inventoryRows(payload);
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="4">Aucune autre carte PCI détectée.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map(row => `<tr>
+            <td>${esc(row.slot || '—')}</td>
+            <td>${esc(row.class || '—')}</td>
+            <td>${esc(row.name || '—')}</td>
+            <td>${esc(row.id || '—')}</td>
+        </tr>`).join('');
+    }
+
+    function renderUsbRows(payload) {
+        const tbody = document.getElementById('info-usb-rows');
+        if (!tbody) return;
+        updateInventorySummary('info-usb-summary', payload, 'lsusb');
+        const rows = inventoryRows(payload);
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="4">Aucun périphérique USB détecté.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map(row => `<tr>
+            <td>${esc(row.bus || '—')}</td>
+            <td>${esc(row.device || '—')}</td>
+            <td>${esc(row.id || '—')}</td>
+            <td>${esc(row.name || '—')}</td>
+        </tr>`).join('');
+    }
+
+    function updateHost(host) {
+        setText('info-generated', host.generated_at || host.time || '—');
+        setText('info-hostname', host.hostname);
+        setText('info-fqdn', host.fqdn);
+        setText('info-os', host.os);
+        setText('info-debian', host.debian_version);
+        setText('info-kernel', host.kernel);
+        setText('info-arch', host.arch);
+        setText('info-python', host.python);
+        setText('info-config-path', host.config_path);
+        setText('info-board', [host.board_vendor, host.board_name].filter(Boolean).join(' '));
+        setText('info-bios', host.bios_version);
+        setText('info-boot-time', host.boot_time);
+        setText('info-uptime', host.uptime);
+        setText('info-cpu-model', host.cpu_model);
+        setText('info-cpu-cores', `${host.cpu_cores_physical ?? '—'} physiques / ${host.cpu_cores_logical ?? '—'} threads`);
+        setText('info-ram', host.ram_total);
+        setText('info-swap', host.swap_total);
+        setText('info-net-iface', host.default_iface);
+        setText('info-ip-local', host.local_ip);
+        setText('info-ip-gateway', host.default_gateway);
+        setText('info-net-status', host.iface_state);
+        setText('info-net-link', host.iface_speed);
+        renderPciRows(host.pci_devices || {});
+        renderUsbRows(host.usb_devices || {});
+    }
+
+    async function loadHostInfo() {
+        try {
+            const response = await fetch('/system/api/host', {cache: 'no-store'});
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            updateHost(data.host || data || {});
+        } catch (err) {
+            setText('info-generated', 'Erreur API hôte : ' + (err.message || err));
+        }
+    }
+
+    async function loadOverview() {
+        try {
+            const response = await fetch('/system/api/overview', {cache: 'no-store'});
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            const cpu = data.cpu || {};
+            const ram = data.ram || {};
+            const disk = data.disk || {};
+            const services = data.services || {};
+            const docker = data.docker || {};
+            const processes = data.processes || {};
+            const network = data.network || {};
+
+            setText('info-last-refresh', data.generated_at || new Date().toLocaleTimeString('fr-FR'));
+            if (INFO_ENABLED.cpu) {
+                setText('info-cpu-percent', cpu.percent !== undefined ? valuePercent(cpu.percent) : '—');
+                setText('info-load', `${cpu.load1 ?? '—'} / ${cpu.load5 ?? '—'} / ${cpu.load15 ?? '—'}`);
+            }
+            if (INFO_ENABLED.ram) {
+                setText('info-ram', ram.percent !== undefined ? `${valuePercent(ram.percent)} · ${ram.used || '—'} / ${ram.total || '—'}` : '—');
+                setText('info-processes', processes.total);
+            }
+            if (INFO_ENABLED.storage) {
+                setText('info-disk-mount', disk.mount);
+                setText('info-disk-percent', disk.percent !== undefined ? valuePercent(disk.percent) : '—');
+                setText('info-disk-used', disk.used);
+                setText('info-disk-total', disk.total);
+            }
+            if (INFO_ENABLED.services) {
+                setText('info-services-active', services.active);
+                setText('info-services-total', services.total);
+                setText('info-services-failed', services.failed);
+            }
+            if (INFO_ENABLED.dockerTotal || INFO_ENABLED.dockerRunning || INFO_ENABLED.dockerSummary) {
+                setText('info-docker-available', docker.available === false ? 'Non' : 'Oui');
+                setText('info-docker-running', docker.running);
+                setText('info-docker-total', docker.total);
+            }
+            if (INFO_ENABLED.network) {
+                setText('info-net-iface', network.iface);
+                setText('info-ip-local', network.ip);
+                setText('info-ip-gateway', network.gateway);
+                setText('info-net-status', network.state);
+                setText('info-net-link', network.speed);
+            }
+        } catch (err) {
+            setText('info-last-refresh', 'Erreur overview : ' + (err.message || err));
+        }
+    }
+
+    async function loadLiveStats() {
+        try {
+            const params = new URLSearchParams({
+                // Toujours lire les GPU locaux de la machine sur la page Info hôte.
+                nvidia_local: '1',
+                nvidia_ssh: INFO_ENABLED.nvidiaSsh ? '1' : '0',
+                intel_gpu: '1'
+            });
+            const response = await fetch('/system/api/sys_stats?' + params.toString(), {cache: 'no-store'});
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            const cpu = data.cpu || {};
+            const ram = data.ram || {};
+            const net = data.net || {};
+            const ips = data.ips || {};
+            const direct = data.network_direct || {};
+
+            if (INFO_ENABLED.cpu) {
+                setText('info-cpu-percent', cpu.load !== undefined ? valuePercent(cpu.load) : '—');
+                setText('info-cpu-temp', cpu.temp !== undefined && cpu.temp !== 'N/A' ? `${cpu.temp}°C` : 'N/A');
+            }
+            if (INFO_ENABLED.ram) {
+                setText('info-ram', ram.pct !== undefined ? `${valuePercent(ram.pct)} · ${ram.txt || '—'}` : '—');
+            }
+            if (INFO_ENABLED.network) {
+                setText('info-net-down', net.down || '0/s');
+                setText('info-net-up', net.up || '0/s');
+                setText('info-ip-local', ips.local || direct.ip || '—');
+                setText('info-ip-gateway', ips.gateway || '—');
+                setText('info-ip-public', ips.public || '—');
+                setText('info-net-iface', direct.iface || '—');
+                setText('info-net-watched', direct.watched || '—');
+                setText('info-net-status', direct.status || '—');
+                setText('info-net-link', direct.speed || '—');
+            }
+            renderGpuRows(data.gpus || []);
+        } catch (err) {
+            const gpuRows = document.getElementById('info-gpu-rows');
+            if (gpuRows) gpuRows.innerHTML = `<tr><td colspan="7">Erreur stats temps réel : ${esc(err.message || err)}</td></tr>`;
+            setText('info-cpu-temp', 'Erreur sys_stats');
+        }
+    }
+
+    async function loadAdminSummary(refreshUpdates) {
+        try {
+            const response = await fetch('/system/api/system/install/status', {cache: 'no-store'});
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            const rows = Array.isArray(data.rows) ? data.rows : [];
+            const installed = rows.filter(row => row && row.installed).length;
+            const missing = rows.length - installed;
+            setText('info-admin-root', data.root ? 'root' : 'non root');
+            setText('info-admin-blocks', rows.length || '—');
+            setText('info-admin-installed', rows.length ? installed : '—');
+            setText('info-admin-missing', rows.length ? missing : '—');
+            setText('info-admin-refresh', data.generated_at || new Date().toLocaleTimeString('fr-FR'));
+        } catch (err) {
+            setText('info-admin-root', 'Erreur API');
+            setText('info-admin-refresh', err.message || err);
+        }
+
+        if (!refreshUpdates) return;
+        try {
+            const response = await fetch('/system/api/system/updates/list', {cache: 'no-store'});
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            setText('info-admin-updates', data.count ?? 0);
+        } catch (err) {
+            setText('info-admin-updates', 'Erreur');
+        }
+    }
+
+    window.systemInfoRefresh = function () {
+        loadHostInfo();
+        loadOverview();
+        loadLiveStats();
+        loadAdminSummary(false);
+    };
+
+    window.systemInfoRefresh();
+    loadAdminSummary(true);
+    setInterval(window.systemInfoRefresh, 5000);
+    setInterval(() => loadAdminSummary(true), 60000);
+})();
+</script>
+{% endblock %}

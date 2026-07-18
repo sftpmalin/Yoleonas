@@ -1,0 +1,100 @@
+    /* ------------------------------------------------------------------
+       Popup globale du browser commun
+       ------------------------------------------------------------------ */
+    .yoleo-browser-modal[hidden],
+    .yoleo-browser-modal[aria-hidden="true"] {
+        display: none !important;
+    }
+
+    .yoleo-browser-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+    }
+
+    .yoleo-browser-modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, .62);
+        backdrop-filter: blur(4px);
+    }
+
+    .yoleo-browser-modal-box {
+        position: relative;
+        z-index: 1;
+        width: min(1120px, calc(100vw - 42px));
+        height: min(790px, calc(100vh - 42px));
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 18px;
+        background: var(--yoleo-panel);
+        box-shadow: 0 24px 90px rgba(0, 0, 0, .48);
+    }
+
+    .yoleo-browser-modal-header {
+        flex: 0 0 auto;
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 5px 10px 5px 14px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        background: linear-gradient(180deg, rgba(17, 26, 38, .98), rgba(11, 17, 25, .98));
+    }
+
+    .yoleo-browser-modal-titlebox {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+    }
+
+    .yoleo-browser-modal-titlebox strong {
+        color: var(--yoleo-text);
+        font-size: 14px;
+        font-weight: 900;
+        line-height: 1.1;
+    }
+
+    .yoleo-browser-modal-titlebox span {
+        display: none !important;
+    }
+
+    .yoleo-browser-modal-close {
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, .06);
+        color: var(--yoleo-text);
+        cursor: pointer;
+        font-size: 22px;
+        line-height: 1;
+    }
+
+    .yoleo-browser-modal-close:hover {
+        border-color: var(--yoleo-accent);
+        background: rgba(124, 92, 255, .20);
+    }
+
+    .yoleo-browser-modal-frame {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 0;
+        border: 0;
+        background: var(--yoleo-bg);
+    }
+
+    .yoleo-browser-modal-open {
+        overflow: hidden;
+    }
+

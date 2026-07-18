@@ -1,0 +1,1559 @@
+<div id="confirmModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'confirmModal')"><div class="modal-box" style="max-width:560px;" onclick="event.stopPropagation()"><h3 class="modal-title" id="confirmTitle">Confirmation</h3><div class="modal-text" id="confirmText"></div><div class="modal-actions"><button class="yoleo-btn yoleo-btn-muted" onclick="closeModal('confirmModal')">Annuler</button><button class="yoleo-btn yoleo-btn-red" id="confirmYesBtn">Confirmer</button></div></div></div>
+
+<div id="xmlModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'xmlModal')"><div class="modal-box" onclick="event.stopPropagation()"><h3 class="modal-title" id="xmlTitle">XML</h3><pre class="xml-box" id="xmlContent">Chargement…</pre><div class="modal-actions"><button class="yoleo-btn yoleo-btn-primary" onclick="copyXml()">📋 Copier</button><button class="yoleo-btn yoleo-btn-muted" onclick="closeModal('xmlModal')">Fermer</button></div></div></div>
+
+
+<div id="importVmModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'importVmModal')">
+    <div class="modal-box vm-xml-transfer-modal" style="max-width:760px;" onclick="event.stopPropagation()">
+        <h3 class="modal-title">📥 Importer une VM</h3>
+        <div class="modal-text">Importe seulement la définition XML libvirt. Les disques, chemins, réseaux et PCI doivent déjà correspondre à la machine.</div>
+        <div class="vm-transfer-grid">
+            <div class="vm-transfer-card">
+                <h4>Depuis le serveur</h4>
+                <div class="field field-full">
+                    <label>Fichier XML serveur</label>
+                    <div class="input-button-row">
+                        <input id="importServerXmlPath" class="text-input" placeholder="/mnt/.../ma_vm.xml">
+                        <button type="button" class="yoleo-btn yoleo-btn-muted vm-browse-btn" title="Parcourir" aria-label="Parcourir" onclick="openYoleoVmBrowser('file','importServerXmlPath')">📁</button>
+                    </div>
+                </div>
+                <button type="button" class="yoleo-btn yoleo-btn-green" onclick="submitImportVmServer(this)">Importer depuis le serveur</button>
+            </div>
+            <div class="vm-transfer-card">
+                <h4>Depuis le PC client</h4>
+                <div class="field field-full">
+                    <label>Fichier XML PC</label>
+                    <input id="importClientXmlFile" class="text-input" type="file" accept=".xml,text/xml,application/xml">
+                </div>
+                <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="submitImportVmUpload(this)">Uploader et importer</button>
+            </div>
+        </div>
+        <div id="importVmError" class="modal-error"></div>
+        <div class="modal-actions"><button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeModal('importVmModal')">Fermer</button></div>
+    </div>
+</div>
+
+<div id="exportVmModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'exportVmModal')">
+    <div class="modal-box vm-xml-transfer-modal" style="max-width:760px;" onclick="event.stopPropagation()">
+        <h3 class="modal-title">📤 Exporter XML</h3>
+        <div class="modal-text">VM sélectionnée : <b id="exportVmNameLabel">aucune</b>. Le fichier exporté s'appelle automatiquement <code id="exportVmFilenameLabel">VM.xml</code>.</div>
+        <div class="vm-transfer-grid">
+            <div class="vm-transfer-card">
+                <h4>Sur le serveur</h4>
+                <div class="field field-full">
+                    <label>Dossier de destination</label>
+                    <div class="input-button-row">
+                        <input id="exportServerFolderPath" class="text-input" placeholder="/mnt/.../sauvegardes_xml">
+                        <button type="button" class="yoleo-btn yoleo-btn-muted vm-browse-btn" title="Parcourir" aria-label="Parcourir" onclick="openYoleoVmBrowser('folder','exportServerFolderPath')">📁</button>
+                    </div>
+                </div>
+                <button type="button" class="yoleo-btn yoleo-btn-green" onclick="submitExportVmServer(this)">Sauvegarder sur le serveur</button>
+            </div>
+            <div class="vm-transfer-card">
+                <h4>Sur mon PC client</h4>
+                <div class="modal-text">Télécharge directement le XML dans le navigateur.</div>
+                <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="downloadExportVmClient()">Télécharger sur mon PC</button>
+            </div>
+        </div>
+        <div id="exportVmError" class="modal-error"></div>
+        <div class="modal-actions"><button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeModal('exportVmModal')">Fermer</button></div>
+    </div>
+</div>
+
+<div id="serialConsoleModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'serialConsoleModal')"><div class="modal-box vm-serial-modal" onclick="event.stopPropagation()"><div class="vm-serial-head"><h3 class="modal-title" id="serialConsoleTitle">Console série VM</h3><div class="modal-actions"><a id="serialConsoleOpenTab" class="yoleo-btn yoleo-btn-primary" href="#" target="_blank" rel="noopener">Ouvrir</a><button class="yoleo-btn yoleo-btn-muted" onclick="closeSerialConsoleModal()">Fermer</button></div></div><iframe id="serialConsoleFrame" class="vm-serial-frame" title="Console série VM"></iframe></div></div>
+
+<div id="deviceModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'deviceModal')"><div class="modal-box" onclick="event.stopPropagation()"><h3 class="modal-title" id="deviceModalTitle">Ajouter périphérique</h3><div class="modal-text" id="deviceModalText"></div><div id="deviceForm" class="form-grid"></div><div id="deviceModalError" class="modal-error"></div><div class="modal-actions"><button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeModal('deviceModal')">Annuler</button><button type="button" class="yoleo-btn yoleo-btn-primary" id="deviceSubmitBtn" onclick="submitDeviceModal(this)">Valider</button></div></div></div>
+
+<div id="poolModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'poolModal')"><div class="modal-box" style="max-width:720px;" onclick="event.stopPropagation()"><h3 class="modal-title">Ajouter une pool libvirt</h3><div class="form-grid"><div class="field"><label>Nom</label><input id="poolName" class="text-input" placeholder="default"></div><div class="field"><label>Chemin</label><div class="input-button-row"><input id="poolPath" class="text-input" value="{{ conf.STORAGE_DEFAULT_DIR }}" placeholder="/var/lib/libvirt/images"><button type="button" class="yoleo-btn yoleo-btn-muted vm-browse-btn" title="Parcourir" aria-label="Parcourir" onclick="openYoleoVmBrowser('folder','poolPath')">📁</button></div></div><div class="field"><label>Créer dossier</label><select id="poolCreate" class="select-input"><option value="1">oui</option><option value="0">non</option></select></div><div class="field"><label>Autostart</label><select id="poolAutostart" class="select-input"><option value="1">oui</option><option value="0">non</option></select></div></div><div class="modal-actions"><button class="yoleo-btn yoleo-btn-muted" onclick="closeModal('poolModal')">Annuler</button><button class="yoleo-btn yoleo-btn-green" onclick="submitPoolModal()">Créer pool</button></div></div></div>
+
+<div id="volumeModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'volumeModal')">
+    <div class="modal-box vm-volume-modal" style="max-width:760px;" onclick="event.stopPropagation()">
+        <h3 class="modal-title">Créer un disque virtuel</h3>
+        <div class="form-grid">
+            <div class="field">
+                <label>Pool</label>
+                <select id="volPool" class="select-input"></select>
+            </div>
+            <div class="field">
+                <label>Nom du disque</label>
+                <input id="volName" class="text-input" placeholder="ma_vm.qcow2">
+            </div>
+            <div class="field">
+                <label>Taille maximale (Gio)</label>
+                <input id="volSizeGb" class="text-input" type="number" min="1" value="100">
+            </div>
+            <div class="field">
+                <label>Format</label>
+                <select id="volFormat" class="select-input" onchange="syncVolumeExtension();">
+                    <option value="qcow2">qcow2 - recommandé / dynamique</option>
+                    <option value="raw">raw - simple / rapide</option>
+                </select>
+            </div>
+            <div class="field field-full">
+                <label>Allocation espace</label>
+                <select id="volAllocation" class="select-input">
+                    <option value="thin">Dynamique / sparse : ne prend pas toute la place au départ</option>
+                    <option value="full">Préalloué / complet : réserve la taille demandée</option>
+                </select>
+            </div>
+        </div>
+        <div id="volumeModalError" class="modal-error"></div>
+        <div class="modal-actions">
+            <button class="yoleo-btn yoleo-btn-muted" onclick="closeModal('volumeModal')">Annuler</button>
+            <button class="yoleo-btn yoleo-btn-green" onclick="submitVolumeModal(this)">Créer le disque</button>
+        </div>
+    </div>
+</div>
+
+<div id="networkModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'networkModal')"><div class="modal-box" style="max-width:760px;" onclick="event.stopPropagation()"><h3 class="modal-title">Ajouter un réseau libvirt</h3><div class="form-grid"><div class="field"><label>Nom</label><input id="netName" class="text-input" placeholder="LAN_VM"></div><div class="field"><label>Mode</label><select id="netMode" class="select-input"><option value="bridge">Bridge hôte existant</option><option value="nat">NAT libvirt</option><option value="isolated">Isolé</option></select></div><div class="field"><label>Bridge</label><input id="netBridge" class="text-input" placeholder="br0 / virbr0"></div><div class="field"><label>Autostart</label><select id="netAutostart" class="select-input"><option value="1">oui</option><option value="0">non</option></select></div></div><div class="modal-actions"><button class="yoleo-btn yoleo-btn-muted" onclick="closeModal('networkModal')">Annuler</button><button class="yoleo-btn yoleo-btn-green" onclick="submitNetworkModal()">Créer réseau</button></div></div></div>
+
+<div id="createVmModal" class="modal-overlay vm-modal" onclick="overlayClose(event,'createVmModal')">
+    <div class="modal-box vm-create-modal" style="max-width:620px;" onclick="event.stopPropagation()">
+        <h3 class="modal-title">➕ Nouvelle VM</h3>
+        <div class="form-grid vm-create-grid vm-create-minimal-grid">
+            <div class="field vm-create-name-field">
+                <label>Nom VM</label>
+                <input id="createName" class="text-input" placeholder="windows-test">
+                <div class="help">Lettres, chiffres, tirets, underscores, points. Pas d’espace.</div>
+            </div>
+            <div class="field vm-create-machine-field">
+                <label>Machine</label>
+                <select id="createMachineType" class="select-input">
+                    <option value="q35">Q35</option>
+                    <option value="pc">i440FX</option>
+                </select>
+                <div class="help">Création seulement.</div>
+            </div>
+            <div class="field vm-create-firmware-field">
+                <label>BIOS / UEFI</label>
+                <select id="createFirmware" class="select-input">
+                    <option value="uefi">UEFI auto</option>
+                    <option value="bios">BIOS</option>
+                </select>
+                <div class="help">Création seulement.</div>
+            </div>
+            <div class="field">
+                <label>Mémoire vive (RAM) Go</label>
+                <input id="createMemoryGb" class="text-input" type="number" min="1" value="{{ conf.VM_CREATE_DEFAULT_MEMORY_GB|default('4') }}">
+            </div>
+            <div class="field">
+                <label>vCPU</label>
+                <input id="createVcpus" class="text-input" type="number" min="1" value="{{ conf.VM_CREATE_DEFAULT_VCPUS|default('2') }}">
+            </div>
+        </div>
+        <div id="createVmError" class="modal-error"></div>
+        <div class="modal-actions">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeModal('createVmModal')">Annuler</button>
+            <button type="button" class="yoleo-btn yoleo-btn-green" onclick="submitCreateVm(this)">Créer la VM</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let state = {
+    vms: {{ vms|tojson }},
+    summary: {{ summary|tojson }},
+    pools: {{ pools|default([])|tojson }},
+    networks: {{ networks|default([])|tojson }},
+    host_disks: {{ host_disks|default([])|tojson }},
+    host_interfaces: {{ host_interfaces|default([])|tojson }},
+    host_bridges: {{ host_bridges|default([])|tojson }},
+    pci_devices: {{ pci_devices|default([])|tojson }},
+    usb_devices: {{ usb_devices|default([])|tojson }},
+    isos: {{ isos|default([])|tojson }},
+    firmware_options: {{ firmware_options|default([])|tojson }},
+};
+let selectedVm = new URLSearchParams(window.location.search).get('name') || '';
+let currentTab = {{ active_section|default('general')|tojson }};
+let expandedPools = new Set();
+let volumeEditKey = '';
+let deviceModalState = {mode:'add', type:'disk', old:null};
+let autoRefreshBusy = false;
+let hostStatsBusy = false;
+let runtimeStateBusy = false;
+const singleVmStateBusy = new Set();
+const vmRealityTimers = new Map();
+const vmPendingActions = new Map();
+let lastUserEditAt = 0;
+const refreshSeconds = {{ refresh_seconds|tojson }};
+const dataUrl = {{ url_for('vm_bp.data')|tojson }};
+const runtimeStateUrl = {{ url_for('vm_bp.vm_runtime_api')|tojson }};
+const vmStateUrl = {{ url_for('vm_bp.vm_state_api')|tojson }};
+const hostStatsUrl = {{ url_for('vm_bp.vm_host_stats_api')|tojson }};
+const actionUrl = {{ url_for('vm_bp.action')|tojson }};
+const xmlUrl = {{ url_for('vm_bp.xml')|tojson }};
+const exportXmlUrl = {{ url_for('vm_bp.export_xml')|tojson }};
+const importXmlServerUrl = {{ url_for('vm_bp.vm_import_xml_server')|tojson }};
+const importXmlUploadUrl = {{ url_for('vm_bp.vm_import_xml_upload')|tojson }};
+const exportXmlServerUrl = {{ url_for('vm_bp.vm_export_xml_server')|tojson }};
+const exportXmlDownloadUrl = {{ url_for('vm_bp.vm_export_xml_download')|tojson }};
+const deviceActionUrl = {{ url_for('vm_bp.vm_device_action')|tojson }};
+const updateUrl = {{ url_for('vm_bp.vm_update')|tojson }};
+const storageActionUrl = {{ url_for('vm_bp.vm_storage_action')|tojson }};
+const networkActionUrl = {{ url_for('vm_bp.vm_network_action')|tojson }};
+const createVmUrl = {{ url_for('vm_bp.vm_gestion_create')|tojson }};
+const serialTtydUrl = {{ url_for('vm_bp.vm_serial_ttyd')|tojson }};
+const logsUrl = {{ url_for('vm_bp.vm_logs_api')|tojson }};
+const createVmDefaults = {
+    storageDir: {{ conf.STORAGE_DEFAULT_DIR|default('/var/lib/libvirt/images')|tojson }},
+    storageMode: {{ conf.VM_CREATE_DEFAULT_STORAGE_MODE|default('pool')|tojson }},
+    storagePool: {{ conf.VM_CREATE_DEFAULT_STORAGE_POOL|default('default')|tojson }},
+    networkKind: {{ conf.VM_CREATE_DEFAULT_NETWORK_KIND|default('bridge')|tojson }},
+    networkSource: {{ conf.VM_CREATE_DEFAULT_NETWORK_SOURCE|default('br0')|tojson }},
+    diskFormat: {{ conf.VM_CREATE_DEFAULT_DISK_FORMAT|default('qcow2')|tojson }},
+    diskBus: {{ conf.VM_CREATE_DEFAULT_DISK_BUS|default('virtio')|tojson }},
+    graphics: {{ conf.VM_CREATE_DEFAULT_GRAPHICS|default('spice')|tojson }},
+    video: {{ conf.VM_CREATE_DEFAULT_VIDEO|default('bochs')|tojson }},
+    firmware: {{ conf.VM_CREATE_DEFAULT_FIRMWARE|default('uefi')|tojson }}
+};
+
+function $(id){ return document.getElementById(id); }
+function esc(v){ return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function jsArg(v){ return esc(JSON.stringify(String(v ?? ''))); }
+function dataToken(o){ return encodeURIComponent(JSON.stringify(o || {})); }
+function fromToken(t){ return JSON.parse(decodeURIComponent(String(t || '%7B%7D'))); }
+function vmMobileState(vm){
+    const raw = String((vm && (vm.state_class || vm.state)) || '').toLowerCase();
+    const state = String((vm && vm.state) || '').toLowerCase();
+    const text = (raw + ' ' + state).trim();
+    if (/running|actif|active|d[ée]marr|en cours|ex[ée]cution|lanc[ée]e/.test(text)) return 'running';
+    if (/paused|pause|pmsuspended|suspend|suspended|veille/.test(text)) return 'paused';
+    if (/shut[ -]?off|stopped|arr[êe]t|stop|destroyed|crashed|éteint|eteint|off/.test(text)) return 'stopped';
+    return raw || 'unknown';
+}
+function badgeClassState(cls){
+    const st = String(cls || '').toLowerCase();
+    if (/running|actif|active|d[ée]marr|en cours|ex[ée]cution/.test(st)) return 'badge-running';
+    if (/paused|pause|pmsuspended|suspend|veille/.test(st)) return 'badge-paused';
+    if (/shut[ -]?off|stopped|arr[êe]t|stop|destroyed|crashed|éteint|eteint|off/.test(st)) return 'badge-stopped';
+    return 'badge-unknown';
+}
+function pendingActionLabel(action){
+    action = String(action || '').toLowerCase();
+    return ({
+        start: 'commande démarrage envoyée',
+        resume: 'commande reprise envoyée',
+        suspend: 'commande pause envoyée',
+        shutdown: 'commande arrêt propre envoyée',
+        destroy: 'commande arrêt forcé envoyée',
+        delete: 'suppression en cours',
+    })[action] || 'commande envoyée';
+}
+function showStatus(msg, kind='ok'){
+    const b=$('statusBox');
+    if(!b) return;
+    const isError = kind === 'error';
+    b.className = 'status-box ' + (isError ? 'error' : 'ok');
+    b.textContent = msg || '';
+    b.style.display = 'block';
+    clearTimeout(showStatus.t);
+    if(!isError){
+        showStatus.t = setTimeout(() => { b.style.display = 'none'; }, 850);
+    }
+}
+function setBusy(btn, busy=true){ if(!btn)return; if(!btn.dataset.old) btn.dataset.old=btn.innerHTML; btn.disabled=busy; btn.innerHTML=busy?'<span class="spinner"></span> En cours…':btn.dataset.old; }
+function closeModal(id){ $(id).style.display='none'; }
+function overlayClose(e,id){ if(e.target.id===id) closeModal(id); }
+
+function activateCurrentTab(updateUrl=true){
+    // Les onglets de pools sont recréés à chaque inventaire Ajax.
+    // On réapplique donc l'onglet actif après rendu, sinon la pool semble "s'effacer".
+    let panel = $('tab-' + currentTab);
+    if(!panel && String(currentTab).startsWith('pool::')){
+        currentTab = 'storage';
+        panel = $('tab-storage');
+    }
+    if(!panel){
+        currentTab = 'general';
+        panel = $('tab-general');
+    }
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id==='tab-'+currentTab));
+    // Les sections principales VM sont de vraies routes Flask.
+    if(currentTab==='logs') loadLogs();
+}
+
+function switchTab(target){
+    const t = String(target||'general');
+    if(t.startsWith('pool::')){
+        currentTab = t;
+        activateCurrentTab(false);
+        return;
+    }
+    const routes = {general:'/vms/main', storage:'/vms/storage', network:'/vms/networks', networks:'/vms/networks', logs:'/vms/logs'};
+    window.location.href = routes[t] || '/vms/main';
+}
+
+function selectVm(name, focusRow=false){
+    selectedVm=String(name||'');
+    const label = $('selectedVmLabel');
+    if(label) label.textContent=selectedVm||'aucune';
+    renderGeneral();
+    renderConsole();
+    renderXmlPage();
+    renderDetails();
+    if(focusRow) focusSelectedVmRow();
+}
+function selected(){ return state.vms.find(v=>v.name===selectedVm) || null; }
+function vmRows(){ return Array.from(document.querySelectorAll('#vmTableBody tr[data-vm-name]')); }
+function focusSelectedVmRow(){
+    const row = vmRows().find(item => item.dataset.vmName === selectedVm);
+    if(!row) return;
+    try { row.focus({preventScroll:true}); } catch(e) { row.focus(); }
+    row.scrollIntoView({block:'nearest', inline:'nearest'});
+}
+function moveVmSelection(delta){
+    const rows = vmRows();
+    if(!rows.length) return false;
+    let index = rows.findIndex(row => row.dataset.vmName === selectedVm);
+    if(index < 0) index = delta > 0 ? -1 : rows.length;
+    const nextIndex = Math.max(0, Math.min(rows.length - 1, index + delta));
+    selectVm(rows[nextIndex].dataset.vmName, true);
+    return true;
+}
+function jumpVmSelection(toEnd=false){
+    const rows = vmRows();
+    if(!rows.length) return false;
+    selectVm(rows[toEnd ? rows.length - 1 : 0].dataset.vmName, true);
+    return true;
+}
+function keyboardTargetIsTyping(target){
+    if(!target) return false;
+    if(target.isContentEditable) return true;
+    return ['INPUT','SELECT','TEXTAREA'].includes(String(target.tagName || '').toUpperCase());
+}
+function handleVmKeyboard(event){
+    if(currentTab !== 'general') return;
+    if(modalIsOpen() || keyboardTargetIsTyping(event.target)) return;
+    if(event.key === 'ArrowDown'){ event.preventDefault(); moveVmSelection(1); return; }
+    if(event.key === 'ArrowUp'){ event.preventDefault(); moveVmSelection(-1); return; }
+    if(event.key === 'Home'){ event.preventDefault(); jumpVmSelection(false); return; }
+    if(event.key === 'End'){ event.preventDefault(); jumpVmSelection(true); return; }
+    if(event.key === 'Enter' && selectedVm && !event.target.closest('button,a')){
+        event.preventDefault();
+        openSelectedDetails();
+    }
+}
+function openSelectedDetails(){ if(!selectedVm){ showStatus('Sélectionne une VM avant.', 'error'); return; } const url='/vm/gestion/vm/'+encodeURIComponent(selectedVm); const win=window.open(url,'yoleo_vm_gestion_'+String(selectedVm).replace(/[^A-Za-z0-9_.-]+/g,'_'),'width=1420,height=920,resizable=yes,scrollbars=yes'); if(!win) window.location.href=url; }
+function vmText(vm){ return [vm.name, vm.state, vm.uuid, vm.machine, ...(vm.disks||[]).flatMap(d=>[d.source,d.target,d.bus,d.format]), ...(vm.nics||[]).flatMap(n=>[n.mac,n.source,n.model]), ...(vm.hostdevs||[]).flatMap(p=>[p.address,p.label])].join(' ').toLowerCase(); }
+function memoryGbFrom(value){
+    const raw = String(value || '').toLowerCase().replace(',', '.');
+    const match = raw.match(/([0-9.]+)/);
+    if(!match) return '';
+    const n = parseFloat(match[1]);
+    if(!Number.isFinite(n)) return '';
+    if(raw.includes('tib') || raw.includes('tb') || raw.includes('to')) return (n * 1024).toFixed(2).replace(/\.00$/,'');
+    if(raw.includes('mib') || raw.includes('mb') || raw.includes('mo')) return (n / 1024).toFixed(2).replace(/\.00$/,'');
+    if(raw.includes('kib') || raw.includes('kb') || raw.includes('ko')) return (n / 1024 / 1024).toFixed(2).replace(/\.00$/,'');
+    return String(n).replace(/\.00$/,'');
+}
+function vmRamLabel(vm){
+    const min = String(vm?.current_memory || vm?.memory || '');
+    const max = String(vm?.memory || '');
+    if(min && max && min !== max) return min + ' / ' + max;
+    return min || max || '—';
+}
+
+function renderSummary(){
+    const grid = $('summaryGrid');
+    if(!grid) return;
+    const s=state.summary||{};
+    const ramValue = `${s.host_ram_used_label || '—'} / ${s.host_ram_total_label || '—'}`;
+    const ramNote = s.host_ram_available_label ? `${s.host_ram_available_label} dispo` : `${s.host_ram_percent_label || '—'} utilisée`;
+    const cards=[
+        ['Total',s.total||0,'VM connues'],
+        ['Running',s.running||0,'démarrées'],
+        ['Arrêtées',s.stopped||0,'shut off'],
+        ['Pause',s.paused||0,'paused'],
+        ['PCI',s.pci||0,'passthrough'],
+        ['Agent',s.qemu_agent||0,'qemu-agent'],
+        ['CPU hôte',s.host_cpu_label || '—','temps réel'],
+        ['RAM hôte',ramValue,ramNote],
+    ];
+    grid.innerHTML=cards.map(c=>`<div class="summary-card"><div class="summary-label">${esc(c[0])}</div><div class="summary-value">${esc(c[1])}</div><div class="summary-note">${esc(c[2])}</div></div>`).join('');
+}
+function isVmRunning(vm){
+    return vmMobileState(vm) === 'running';
+}
+
+function renderGeneral(){
+    renderSummary();
+    const body = $('vmTableBody');
+    if(!body) return;
+    const list = Array.isArray(state.vms) ? state.vms : [];
+    const q=String($('vmSearch')?.value||'').toLowerCase().trim();
+    let rows=list.filter(vm=>!q || vmText(vm).includes(q));
+    if(!rows.length){
+        body.innerHTML='<tr><td colspan="4" class="empty-state">Aucune VM détectée.</td></tr>';
+        return;
+    }
+    body.innerHTML=rows.map(vm=>{
+        const vmState = vmMobileState(vm);
+        const running = vmState === 'running', stopped = vmState === 'stopped', paused = vmState === 'paused';
+        const pendingAction = vmPendingActions.get(vm.name) || '';
+        const pending = Boolean(pendingAction);
+        const startAction = paused ? 'resume' : 'start';
+        const startTitle = paused ? 'Reprendre la VM' : 'Démarrer la VM';
+        return `<tr tabindex="0" data-vm-name="${esc(vm.name)}" data-mobile-state="${esc(vmState)}" onclick="selectVm(${jsArg(vm.name)})" class="vm-mobile-state-${esc(vmState)} ${vm.name===selectedVm?'selected-row':''}">
+            <td><span class="badge ${badgeClassState(vmState)}">${esc(vm.state||vm.state_class||'unknown')}</span>${pending?`<div class="name-sub">${esc(pendingActionLabel(pendingAction))}</div>`:''}</td>
+            <td><div class="name-main">${esc(vm.name)}</div></td>
+            <td><span class="badge badge-info">CPU ${esc(vm.vcpu_current||vm.vcpu||'—')}</span> <span class="badge badge-muted">RAM ${esc(vmRamLabel(vm))}</span></td>
+            <td><div class="actions-cell" onclick="event.stopPropagation()">
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-green vm-icon-btn" title="${esc(startTitle)}" aria-label="${esc(startTitle)}" ${(running||pending)?'disabled':''} onclick="vmAction(${jsArg(vm.name)},'${startAction}',this)">▶</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary vm-icon-btn" title="Mettre en pause" aria-label="Mettre en pause" ${(running&&!pending)?'':'disabled'} onclick="vmAction(${jsArg(vm.name)},'suspend',this)">⏸</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted vm-icon-btn" title="Arrêt propre" aria-label="Arrêt propre" ${((running||paused)&&!pending)?'':'disabled'} onclick="vmAction(${jsArg(vm.name)},'shutdown',this)">⏹</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-red vm-icon-btn" title="Arrêt kill" aria-label="Arrêt kill" ${((running||paused)&&!pending)?'':'disabled'} onclick="confirmVmAction(${jsArg(vm.name)},'destroy')">✖</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary vm-icon-btn" title="Console vidéo" aria-label="Console vidéo" ${running?'':'disabled'} onclick="openConsole(${jsArg(vm.name)})">▣</button>
+                ${vm.has_virtio_serial ? `<button class="yoleo-btn yoleo-btn-mini yoleo-btn-orange vm-icon-btn" title="Terminal série virtio" aria-label="Terminal série virtio" ${running?'':'disabled'} onclick="openSerialConsole(${jsArg(vm.name)}, this)">▤</button>` : ''}
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-orange vm-icon-btn" title="Modifier la VM" aria-label="Modifier la VM" onclick="selectVm(${jsArg(vm.name)}); openSelectedDetails();">✎</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-red vm-icon-btn" title="Supprimer la VM arrêtée" aria-label="Supprimer la VM" ${(stopped&&!pending)?'':'disabled'} onclick="confirmVmAction(${jsArg(vm.name)},'delete')">🗑</button>
+            </div></td>
+        </tr>`;
+    }).join('');
+}
+
+function line(k,v){ if(!v)return ''; return `<div class="mini-line"><div class="mini-key">${esc(k)}</div><div class="mini-val">${esc(v)}</div></div>`; }
+function deviceBlock(title, body, actions=''){ return `<div class="device-card"><div class="device-head"><b>${esc(title)}</b><div class="actions-cell">${actions}</div></div>${body}</div>`; }
+
+function renderConsole(){
+    const body = $('consoleTableBody');
+    if(!body) return;
+    body.innerHTML = (state.vms||[]).map(vm=>{
+        const vmState = vmMobileState(vm);
+        return `<tr data-mobile-state="${esc(vmState)}" onclick="selectVm(${jsArg(vm.name)})" class="vm-mobile-state-${esc(vmState)} ${vm.name===selectedVm?'selected-row':''}"><td><span class="badge ${badgeClassState(vmState)}">${esc(vm.state||vm.state_class||'unknown')}</span></td><td><div class="name-main">${esc(vm.name)}</div></td><td><div class="name-sub">${(vm.nics||[]).map(n=>esc([n.source,n.mac].filter(Boolean).join(' '))).join('<br>') || '—'}</div></td><td><div class="actions-cell"><button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" onclick="event.stopPropagation(); openConsole(${jsArg(vm.name)})">📺 Ouvrir</button></div></td></tr>`;
+    }).join('') || '<tr><td colspan="4" class="empty-state">Aucune VM.</td></tr>';
+    const label=$('consoleSelectedVmLabel'); if(label) label.textContent=selectedVm||'aucune';
+}
+function openConsoleSelected(){ if(!selectedVm){ showStatus('Sélectionne une VM avant.', 'error'); return; } openConsole(selectedVm); }
+function renderXmlPage(){
+    const body = $('xmlTableBody');
+    if(!body) return;
+    body.innerHTML = (state.vms||[]).map(vm=>{
+        const vmState = vmMobileState(vm);
+        return `<tr data-mobile-state="${esc(vmState)}" onclick="selectVm(${jsArg(vm.name)})" class="vm-mobile-state-${esc(vmState)} ${vm.name===selectedVm?'selected-row':''}"><td><div class="name-main">${esc(vm.name)}</div></td><td><span class="badge ${badgeClassState(vmState)}">${esc(vm.state||vm.state_class||'unknown')}</span></td><td><div class="name-sub">${esc(vm.uuid||'—')}</div></td><td><div class="actions-cell"><button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" onclick="event.stopPropagation(); openXml(${jsArg(vm.name)})">XML</button></div></td></tr>`;
+    }).join('') || '<tr><td colspan="4" class="empty-state">Aucune VM.</td></tr>';
+    const label=$('xmlSelectedVmLabel'); if(label) label.textContent=selectedVm||'aucune';
+}
+
+function canEditHardware(vm){
+    const cls = String(vm?.state_class || '').toLowerCase();
+    const st = String(vm?.state || '').toLowerCase();
+    if(cls === 'running' || cls === 'paused') return false;
+    if(st.includes('running') || st.includes('paused') || st.includes('pmsuspended')) return false;
+    // État "unknown" mais VM non running : on laisse l'édition s'ouvrir.
+    // Le backend/libvirt reste la sécurité finale.
+    return true;
+}
+
+function renderDetails(){
+    const box = $('detailsBox');
+    if(!box) return;
+    const vm=selected();
+    if(!vm){ box.innerHTML='<div class="empty-state">Aucune VM sélectionnée.</div>'; return; }
+    const stopped=canEditHardware(vm);
+    const disks=(vm.disks||[]).map(d=>{ const kind=d.device==='cdrom'?'iso':(String(d.source||'').startsWith('/dev/')?'physical_disk':'disk'); const tok=dataToken(d); const del=dataToken({target:d.target,source:d.source}); return deviceBlock(`${d.device||'disk'} ${d.target||''}`, `${line('source',d.source)}${line('bus',d.bus)}${line('format',[d.format,d.driver,d.cache?'cache='+d.cache:'',d.discard?'discard='+d.discard:''].filter(Boolean).join(' • '))}${line('taille',d.size)}${line('readonly',d.readonly)}`, `<button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" ${stopped?'':'disabled'} onclick="openDeviceModal('${kind}', 'edit', fromToken('${tok}'))">Modifier</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-red" ${stopped?'':'disabled'} onclick="removeDevice('${kind}', fromToken('${del}'))">Supprimer</button>`); }).join('') || '<div class="empty-state">Aucun disque.</div>';
+    const nics=(vm.nics||[]).map(n=>{ const tok=dataToken(n); const del=dataToken({mac:n.mac,target:n.target}); return deviceBlock(`NIC ${n.mac||''}`, `${line('type',n.type)}${line('source',n.source)}${line('model',n.model)}${line('target',n.target)}`, `<button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" ${stopped?'':'disabled'} onclick="openDeviceModal('nic', 'edit', fromToken('${tok}'))">Modifier</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-red" ${stopped?'':'disabled'} onclick="removeDevice('nic', fromToken('${del}'))">Supprimer</button>`); }).join('') || '<div class="empty-state">Aucune carte réseau.</div>';
+    const pcis=(vm.hostdevs||[]).map(p=>{ const del=dataToken({address:p.address}); return deviceBlock(`PCI ${p.address||''}`, `${line('label',p.label)}${line('managed',p.managed)}`, `<button class="yoleo-btn yoleo-btn-mini yoleo-btn-red" ${stopped?'':'disabled'} onclick="removeDevice('pci', fromToken('${del}'))">Supprimer</button>`); }).join('') || '<div class="empty-state">Aucun PCI passthrough.</div>';
+    box.innerHTML=`
+        <div class="status-box ${stopped?'ok':'error'}">VM : ${esc(vm.name)} — état : ${esc(vm.state)}${stopped?'':'\nArrête la VM pour modifier le matériel proprement.'}</div>
+        <div class="card" style="margin-bottom:10px;"><div class="form-grid">
+            <div class="field"><label>vCPU</label><input id="editVcpu" class="text-input" value="${esc(vm.vcpu_current||vm.vcpu||'')}"></div>
+            <div class="field"><label>RAM min Go</label><input id="editMemMin" class="text-input" value="${esc(memoryGbFrom(vm.current_memory||vm.memory))}" placeholder="ex : 4"></div>
+            <div class="field"><label>RAM max Go</label><input id="editMemMax" class="text-input" value="${esc(memoryGbFrom(vm.memory))}" placeholder="ex : 12"></div>
+            <div class="field"><label>Autostart</label><select id="editAutostart" class="select-input"><option value="">ne pas changer</option><option value="on">activer</option><option value="off">désactiver</option></select></div>
+            <div class="field"><label>Action</label><button class="yoleo-btn yoleo-btn-primary" onclick="saveVmResources(this)">💾 Appliquer CPU/RAM</button></div>
+        </div></div>
+        <div class="details-grid">
+            <div class="detail-card"><div class="detail-title">Résumé</div>${line('UUID',vm.uuid)}${line('machine',vm.machine)}${line('arch',vm.arch)}${line('loader',vm.loader)}${line('nvram',vm.nvram)}${line('autostart',vm.autostart)}${line('persistent',vm.persistent)}</div>
+            <div class="detail-card"><div class="detail-title">Ajouter périphérique</div><div class="toolbar" style="justify-content:flex-start;"><button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" ${stopped?'':'disabled'} onclick="openDeviceModal('disk')">➕ Disque image</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" ${stopped?'':'disabled'} onclick="openDeviceModal('physical_disk')">➕ Disque physique</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" ${stopped?'':'disabled'} onclick="openDeviceModal('iso')">➕ ISO</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" ${stopped?'':'disabled'} onclick="openDeviceModal('nic')">➕ Réseau</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" ${stopped?'':'disabled'} onclick="openDeviceModal('pci')">➕ PCI</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" ${stopped?'':'disabled'} onclick="openDeviceModal('usb')">➕ USB</button></div><div class="help">Pour les trucs ultra spéciaux, garde le panneau XML et virt-manager à côté.</div></div>
+        </div>
+        <h3>Disques / ISO</h3>${disks}
+        <h3>Réseau</h3>${nics}
+        <h3>PCI / USB passthrough</h3>${pcis}
+    `;
+}
+
+async function apiPost(url, body, btn=null){
+    setBusy(btn,true);
+    try{
+        const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(body)});
+        const p=await r.json().catch(()=>({}));
+        if(!r.ok||p.ok===false){
+            if(p.vm) {
+                mergeVmPatch(p.vm);
+                renderRuntimeViews();
+            }
+            throw new Error(p.message||`HTTP ${r.status}`);
+        }
+        showStatus(p.message||'OK','ok');
+        await refreshAll(false);
+        if(currentTab === 'devices') renderDetails();
+        return p;
+    } catch(e){
+        showStatus(String(e.message||e),'error');
+        throw e;
+    } finally{
+        setBusy(btn,false);
+    }
+}
+async function refreshAll(noisy=false){
+    if(autoRefreshBusy) return;
+    autoRefreshBusy = true;
+    try {
+        const r=await fetch(dataUrl,{cache:'no-store',credentials:'same-origin'});
+        const p=await r.json().catch(()=>({ok:false,message:'Réponse inventaire VM illisible.'}));
+        if(!r.ok) throw new Error(p.message || p.error || `HTTP ${r.status}`);
+        Object.assign(state,{vms:Array.isArray(p.vms)?p.vms:[],summary:p.summary||{},pools:p.pools||[],networks:p.networks||[],host_disks:p.host_disks||[],host_interfaces:p.host_interfaces||[],host_bridges:p.host_bridges||[],pci_devices:p.pci_devices||[],usb_devices:p.usb_devices||[],isos:p.isos||[]});
+        if(selectedVm && !state.vms.find(v=>v.name===selectedVm)) selectedVm='';
+        renderAll();
+        if(p.error){ showStatus('Inventaire VM : '+p.error,'error'); }
+        else if(noisy) showStatus('Inventaire VM relu.');
+    } catch(e) {
+        const msg = String(e.message || e || 'Erreur inventaire VM.');
+        const body = $('vmTableBody');
+        if(body) body.innerHTML='<tr><td colspan="5" class="empty-state">Erreur inventaire libvirt : '+esc(msg)+'</td></tr>';
+        showStatus('Erreur inventaire VM : '+msg,'error');
+    } finally {
+        autoRefreshBusy = false;
+    }
+}
+
+function mergeVmPatch(vm){
+    if(!vm || !vm.name) return null;
+    if(!Array.isArray(state.vms)) state.vms = [];
+    const idx = state.vms.findIndex(item => item && item.name === vm.name);
+    if(idx >= 0) state.vms[idx] = Object.assign({}, state.vms[idx] || {}, vm);
+    else state.vms.push(vm);
+    state.vms.sort((a,b) => String(a.name||'').localeCompare(String(b.name||''), undefined, {sensitivity:'base'}));
+    return state.vms.find(item => item && item.name === vm.name) || null;
+}
+
+function recomputeRuntimeSummary(){
+    const list = Array.isArray(state.vms) ? state.vms : [];
+    const counts = {total:list.length, running:0, stopped:0, paused:0};
+    list.forEach(vm => {
+        const cls = vmMobileState(vm);
+        if(cls === 'running') counts.running += 1;
+        else if(cls === 'paused') counts.paused += 1;
+        else if(cls === 'stopped') counts.stopped += 1;
+    });
+    state.summary = Object.assign({}, state.summary || {}, counts);
+}
+
+function renderRuntimeViews(){
+    recomputeRuntimeSummary();
+    renderSummary();
+    renderGeneral();
+    renderConsole();
+    renderXmlPage();
+    if(currentTab === 'devices' && !userIsEditing()) renderDetails();
+    const label = $('selectedVmLabel');
+    if(label) label.textContent = selectedVm || 'aucune';
+}
+
+function mergeRuntimeStates(items, summaryPatch){
+    (Array.isArray(items) ? items : []).forEach(mergeVmPatch);
+    if(summaryPatch && typeof summaryPatch === 'object'){
+        state.summary = Object.assign({}, state.summary || {}, summaryPatch);
+    } else {
+        recomputeRuntimeSummary();
+    }
+    renderRuntimeViews();
+}
+
+async function refreshRuntimeStates(){
+    if(currentTab !== 'general') return;
+    if(runtimeStateBusy) return;
+    if(modalIsOpen() || userIsEditing()) return;
+    runtimeStateBusy = true;
+    try{
+        const r = await fetch(runtimeStateUrl,{cache:'no-store',credentials:'same-origin'});
+        const p = await r.json().catch(()=>({ok:false}));
+        if(!r.ok || p.ok === false) throw new Error(p.message || `HTTP ${r.status}`);
+        mergeRuntimeStates(p.vms || [], p.summary || {});
+    } catch(e) {
+        // Silencieux : l'inventaire complet et les actions affichent déjà les erreurs.
+    } finally {
+        runtimeStateBusy = false;
+    }
+}
+
+async function refreshOneVmState(name){
+    name = String(name || '').trim();
+    if(!name || singleVmStateBusy.has(name)) return null;
+    singleVmStateBusy.add(name);
+    try{
+        const r = await fetch(vmStateUrl + '?name=' + encodeURIComponent(name),{cache:'no-store',credentials:'same-origin'});
+        const p = await r.json().catch(()=>({ok:false}));
+        if(!r.ok || (p.ok === false && !p.vm)) throw new Error(p.message || `HTTP ${r.status}`);
+        const vm = mergeVmPatch(p.vm || {});
+        renderRuntimeViews();
+        return vm;
+    } catch(e) {
+        return null;
+    } finally {
+        singleVmStateBusy.delete(name);
+    }
+}
+
+function expectedStateForAction(action){
+    action = String(action || '').toLowerCase();
+    if(action === 'start' || action === 'resume') return 'running';
+    if(action === 'suspend') return 'paused';
+    if(action === 'shutdown' || action === 'destroy') return 'stopped';
+    return '';
+}
+
+function watchDurationForAction(action){
+    action = String(action || '').toLowerCase();
+    if(action === 'start' || action === 'resume') return 65000;
+    if(action === 'shutdown') return 45000;
+    if(action === 'destroy' || action === 'suspend') return 25000;
+    return 20000;
+}
+
+function startVmRealityWatch(name, action, options={}){
+    name = String(name || '').trim();
+    action = String(action || '').toLowerCase();
+    if(!name || action === 'delete') return;
+    const existing = vmRealityTimers.get(name);
+    if(existing) window.clearTimeout(existing);
+    const expected = expectedStateForAction(action);
+    const intervalMs = Math.max(700, Number(options.intervalMs || 1000));
+    const deadline = Date.now() + Math.max(3000, Number(options.durationMs || watchDurationForAction(action)));
+    const tick = async () => {
+        const vm = await refreshOneVmState(name);
+        const reached = expected && vm && vmMobileState(vm) === expected;
+        if(Date.now() < deadline && !reached){
+            vmRealityTimers.set(name, window.setTimeout(tick, intervalMs));
+        } else {
+            vmRealityTimers.delete(name);
+        }
+    };
+    tick();
+}
+
+function applyHostStats(payload){
+    const host = (payload && payload.host) ? payload.host : payload;
+    if(!host) return;
+    state.summary = Object.assign({}, state.summary || {}, host);
+    renderSummary();
+}
+async function refreshHostStats(){
+    if(currentTab !== 'general') return;
+    if(hostStatsBusy) return;
+    if(modalIsOpen() || userIsEditing()) return;
+    hostStatsBusy = true;
+    try {
+        const r = await fetch(hostStatsUrl,{cache:'no-store',credentials:'same-origin'});
+        const p = await r.json().catch(()=>({ok:false}));
+        if(r.ok && p.ok !== false) applyHostStats(p);
+    } catch(e) {
+        // Silencieux : l'inventaire complet affichera les erreurs importantes.
+    } finally {
+        hostStatsBusy = false;
+    }
+}
+
+function renderAll(){
+    renderPoolTabs();
+    renderGeneral();
+    renderConsole();
+    renderXmlPage();
+    // Ne détruis pas les champs pendant que l'utilisateur édite l'onglet Modifier,
+    // mais rends quand même la VM passée par ?name=... au premier chargement.
+    if(currentTab !== 'devices' || !userIsEditing()) renderDetails();
+    renderStorage();
+    renderNetworks();
+    const label = $('selectedVmLabel');
+    if(label) label.textContent=selectedVm||'aucune';
+    activateCurrentTab(false);
+}
+
+function confirmVmAction(name, action){
+    if(action === 'shutdown' || action === 'suspend'){
+        return vmAction(name, action);
+    }
+    const labels={destroy:'arrêt forcé',delete:'suppression de la VM'};
+    $('confirmTitle').textContent='Confirmation VM';
+    if(action === 'delete'){
+        $('confirmText').textContent=`Supprimer la VM ${name} de libvirt ? Les disques ne sont pas effacés par cette action.`;
+    } else {
+        $('confirmText').textContent=`Confirmer ${labels[action]||action} sur ${name} ?`;
+    }
+    $('confirmYesBtn').onclick=()=>{ closeModal('confirmModal'); vmAction(name,action); };
+    $('confirmModal').style.display='flex';
+}
+async function vmAction(name, action, btn=null){
+    name = String(name || '').trim();
+    action = String(action || '').toLowerCase();
+    if(name){
+        vmPendingActions.set(name, action);
+        renderRuntimeViews();
+    }
+    startVmRealityWatch(name, action);
+    try{
+        const p = await apiPost(actionUrl,{name,action},btn);
+        startVmRealityWatch(name, action, {durationMs: 15000, intervalMs: 1000});
+        return p;
+    } catch(e) {
+        startVmRealityWatch(name, action, {durationMs: 12000, intervalMs: 1000});
+        throw e;
+    } finally {
+        if(name){
+            vmPendingActions.delete(name);
+            renderRuntimeViews();
+        }
+    }
+}
+function vmPopupFeatures(width=1280, height=820){
+    const sw = Number(window.screen?.availWidth || window.screen?.width || width);
+    const sh = Number(window.screen?.availHeight || window.screen?.height || height);
+    const w = Math.min(width, Math.max(760, sw - 40));
+    const h = Math.min(height, Math.max(560, sh - 60));
+    const left = Math.max(0, Math.round((sw - w) / 2 + (window.screen?.availLeft || 0)));
+    const top = Math.max(0, Math.round((sh - h) / 2 + (window.screen?.availTop || 0)));
+    return [
+        'popup=yes',
+        'width=' + w,
+        'height=' + h,
+        'left=' + left,
+        'top=' + top,
+        'resizable=yes',
+        'scrollbars=no',
+        'menubar=no',
+        'toolbar=no',
+        'location=no',
+        'status=no'
+    ].join(',');
+}
+function openConsole(name){
+    const vm = (state.vms || []).find(v => v.name === name);
+    if(vm && !isVmRunning(vm)){
+        showStatus(`Attention : état VM détecté côté interface : ${vm.state || vm.state_class || 'unknown'}. J'ouvre quand même la console, le serveur vérifiera libvirt.`, 'error');
+    }
+    const url = `/vm/novnc/open/${encodeURIComponent(name)}`;
+    const popupName = 'yoleo_vm_vnc_' + String(name || 'vm').replace(/[^A-Za-z0-9_.-]+/g, '_').slice(0, 80);
+    const popup = window.open('', popupName, vmPopupFeatures(1280, 820));
+    if(!popup){
+        window.location.href = url;
+        return;
+    }
+    try{
+        popup.document.open();
+        popup.document.write('<!doctype html><html><head><title>Console VNC - '+esc(name)+'</title><style>html,body{margin:0;height:100%;background:#05080d;color:#e8eefc;font-family:system-ui,Segoe UI,sans-serif}body{display:flex;align-items:center;justify-content:center}.box{padding:18px 22px;border:1px solid #26364b;border-radius:14px;background:#0f1724;box-shadow:0 18px 60px rgba(0,0,0,.45)}.title{font-weight:900}.muted{margin-top:7px;color:#91a6bd;font-size:13px}</style></head><body><div class="box"><div class="title">Ouverture console VNC...</div><div class="muted">VM : '+esc(name)+'</div></div></body></html>');
+        popup.document.close();
+        if(popup.focus) popup.focus();
+        popup.location.href = url;
+    } catch(_e){
+        popup.location.href = url;
+        if(popup.focus) popup.focus();
+    }
+}
+async function openXml(name){ $('xmlTitle').textContent='XML - '+name; $('xmlContent').textContent='Chargement…'; $('xmlModal').style.display='flex'; const r=await fetch(xmlUrl+'?name='+encodeURIComponent(name),{cache:'no-store'}); const p=await r.json(); $('xmlContent').textContent=p.xml || p.message || 'Erreur'; }
+function openXmlSelected(){ if(!selectedVm){ showStatus('Sélectionne une VM.', 'error'); return; } openXml(selectedVm); }
+
+async function copyXml(){ await navigator.clipboard.writeText($('xmlContent').textContent||''); showStatus('XML copié.'); }
+
+function vmSafeXmlFilename(name){
+    const cleaned = String(name || 'vm').trim().replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+|[._]+$/g, '');
+    return (cleaned || 'vm') + '.xml';
+}
+function showTransferError(id, message){
+    const box=$(id);
+    if(!box){ showStatus(message, 'error'); return; }
+    box.textContent=String(message||'Erreur inconnue');
+    box.style.display='block';
+}
+function clearTransferError(id){
+    const box=$(id);
+    if(!box) return;
+    box.textContent='';
+    box.style.display='none';
+}
+function openImportVmModal(){
+    clearTransferError('importVmError');
+    const p=$('importServerXmlPath'); if(p) p.value='';
+    const f=$('importClientXmlFile'); if(f) f.value='';
+    $('importVmModal').style.display='flex';
+    return false;
+}
+async function submitImportVmServer(btn=null){
+    clearTransferError('importVmError');
+    const path=String($('importServerXmlPath')?.value||'').trim();
+    if(!path){ showTransferError('importVmError', 'Choisis un fichier XML sur le serveur.'); return false; }
+    try{
+        const p=await apiPost(importXmlServerUrl,{path},btn);
+        if(p && p.name) selectedVm=p.name;
+        closeModal('importVmModal');
+        await refreshAll(false);
+    } catch(e){
+        showTransferError('importVmError', e && (e.message || e) || 'Import impossible.');
+    }
+    return false;
+}
+async function submitImportVmUpload(btn=null){
+    clearTransferError('importVmError');
+    const input=$('importClientXmlFile');
+    const file=input && input.files && input.files[0];
+    if(!file){ showTransferError('importVmError', 'Choisis un fichier XML sur ton PC.'); return false; }
+    setBusy(btn,true);
+    try{
+        const fd=new FormData();
+        fd.append('xml_file', file);
+        const r=await fetch(importXmlUploadUrl,{method:'POST',credentials:'same-origin',body:fd});
+        const p=await r.json().catch(()=>({}));
+        if(!r.ok || p.ok===false) throw new Error(p.message || `HTTP ${r.status}`);
+        showStatus(p.message || 'VM importée.');
+        if(p.name) selectedVm=p.name;
+        closeModal('importVmModal');
+        await refreshAll(false);
+    } catch(e){
+        const msg=String(e && (e.message || e) || 'Import impossible.');
+        showStatus(msg,'error');
+        showTransferError('importVmError', msg);
+    } finally {
+        setBusy(btn,false);
+    }
+    return false;
+}
+function openExportVmModal(){
+    clearTransferError('exportVmError');
+    if(!selectedVm){
+        showStatus('Sélectionne une VM avant d’exporter son XML.', 'error');
+        return false;
+    }
+    const nameLabel=$('exportVmNameLabel'); if(nameLabel) nameLabel.textContent=selectedVm;
+    const fileLabel=$('exportVmFilenameLabel'); if(fileLabel) fileLabel.textContent=vmSafeXmlFilename(selectedVm);
+    const folder=$('exportServerFolderPath'); if(folder && !folder.value) folder.value='/var/lib/libvirt/images';
+    $('exportVmModal').style.display='flex';
+    return false;
+}
+async function submitExportVmServer(btn=null){
+    clearTransferError('exportVmError');
+    if(!selectedVm){ showTransferError('exportVmError', 'Aucune VM sélectionnée.'); return false; }
+    const folder=String($('exportServerFolderPath')?.value||'').trim();
+    if(!folder){ showTransferError('exportVmError', 'Choisis un dossier sur le serveur.'); return false; }
+    try{
+        await apiPost(exportXmlServerUrl,{name:selectedVm,folder},btn);
+        closeModal('exportVmModal');
+    } catch(e){
+        showTransferError('exportVmError', e && (e.message || e) || 'Export impossible.');
+    }
+    return false;
+}
+function downloadExportVmClient(){
+    clearTransferError('exportVmError');
+    if(!selectedVm){ showTransferError('exportVmError', 'Aucune VM sélectionnée.'); return false; }
+    const a=document.createElement('a');
+    a.href=exportXmlDownloadUrl + '?name=' + encodeURIComponent(selectedVm);
+    a.download=vmSafeXmlFilename(selectedVm);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return false;
+}
+function bindVmContextSelection(){
+    document.addEventListener('contextmenu', function(event){
+        const row = event.target && event.target.closest ? event.target.closest('tr[data-vm-name]') : null;
+        if(!row) return;
+        const name = row.dataset.vmName || '';
+        if(name) selectVm(name);
+    }, true);
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindVmContextSelection);
+else bindVmContextSelection();
+function yoleoVmContextMenu(event){
+    const row = event && event.target && event.target.closest ? event.target.closest('tr[data-vm-name]') : null;
+    if(row && row.dataset && row.dataset.vmName) selectVm(row.dataset.vmName);
+    if(window.yoleoOpenPageContextMenu && window.yoleoOpenPageContextMenu(event, {force:true})) return false;
+    if(event){
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    return false;
+}
+window.yoleoVmContextMenu = yoleoVmContextMenu;
+async function saveVmResources(btn){ if(!selectedVm){ showStatus('Aucune VM sélectionnée.','error'); return; } await apiPost(updateUrl,{name:selectedVm,vcpu:$('editVcpu').value,memory_min_gb:$('editMemMin').value,memory_max_gb:$('editMemMax').value,autostart:$('editAutostart').value},btn); }
+function closeSerialConsoleModal(){
+    const frame=$('serialConsoleFrame');
+    if(frame) frame.src='about:blank';
+    closeModal('serialConsoleModal');
+}
+async function openSerialConsole(name, btn=null){
+    const popupName='yoleo_vm_serial_'+String(name||'vm').replace(/[^A-Za-z0-9_.-]+/g,'_').slice(0,80);
+    const popup=window.open('', popupName, 'width=1100,height=760,resizable=yes,scrollbars=yes');
+    if(popup){
+        try{
+            popup.document.open();
+            popup.document.write('<!doctype html><html><head><title>Console série VM</title><style>body{margin:0;background:#0b0f17;color:#e8eefc;font-family:system-ui,Segoe UI,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh}.box{padding:22px 26px;border:1px solid #334155;border-radius:14px;background:#111827;box-shadow:0 18px 60px rgba(0,0,0,.45)}.muted{color:#94a3b8;margin-top:8px;font-size:13px}</style></head><body><div class="box"><b>Démarrage de la console série...</b><div class="muted">VM : '+esc(name)+'</div></div></body></html>');
+            popup.document.close();
+            if(popup.focus) popup.focus();
+        } catch(_e){}
+    }
+    setBusy(btn,true);
+    try{
+        const r=await fetch(serialTtydUrl,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({name})});
+        const p=await r.json().catch(()=>({}));
+        if(!r.ok || p.ok === false) throw new Error(p.message || `HTTP ${r.status}`);
+        if(!p.url) throw new Error('URL ttyd VM absente.');
+        if(popup && !popup.closed){
+            popup.location.href=p.url;
+            showStatus('Console série ouverte dans une fenêtre ttyd.');
+        } else {
+            window.open(p.url, popupName, 'width=1100,height=760,resizable=yes,scrollbars=yes') || (window.location.href=p.url);
+        }
+    } catch(e){
+        const msg=String(e.message || e);
+        if(popup && !popup.closed){
+            try{
+                popup.document.open();
+                popup.document.write('<!doctype html><html><head><title>Erreur console série</title><style>body{margin:0;background:#1b0b13;color:#ffe4e6;font-family:system-ui,Segoe UI,sans-serif;padding:24px}.box{border:1px solid #be123c;border-radius:14px;background:#2a111a;padding:18px 20px;white-space:pre-wrap}.muted{color:#fda4af;margin-top:12px;font-size:13px}</style></head><body><div class="box"><b>Erreur console série VM</b><div class="muted">'+esc(msg)+'</div></div></body></html>');
+                popup.document.close();
+            } catch(_e){}
+        }
+        showStatus(msg, 'error');
+    } finally {
+        setBusy(btn,false);
+    }
+}
+
+function optionSelected(value,current){ return String(value||'') === String(current||'') ? ' selected' : ''; }
+function options(list, valueKey, labelFn, current=''){
+    const rows=[];
+    const seen=new Set();
+    const cur=String(current||'');
+    if(cur){ rows.push(`<option value="${esc(cur)}" selected>${esc(cur)}</option>`); seen.add(cur); }
+    (list||[]).forEach(x=>{
+        const val=String(x[valueKey]||'');
+        if(!val || seen.has(val)) return;
+        seen.add(val);
+        rows.push(`<option value="${esc(val)}"${optionSelected(val,cur)}>${esc(labelFn(x))}</option>`);
+    });
+    return rows.join('');
+}
+function field(id,label,html,help='',extraClass=''){
+    return `<div class="field ${extraClass||''}"><label for="${id}">${esc(label)}</label>${html}${help?`<div class="help">${esc(help)}</div>`:''}</div>`;
+}
+function fieldFull(id,label,html,help=''){ return field(id,label,html,help,'field-full'); }
+function inputBrowse(id,value,kind,placeholder=''){
+    return `<div class="input-button-row"><input id="${id}" class="text-input" value="${esc(value||'')}" placeholder="${esc(placeholder)}"><button type="button" class="yoleo-btn yoleo-btn-muted vm-browse-btn" title="Parcourir" aria-label="Parcourir" onclick="openYoleoVmBrowser('${kind}','${id}')">📁</button></div>`;
+}
+function yoleoVmBrowserStartPath(targetId){
+    const value = String($(targetId)?.value || '').trim();
+    if(!value) return '/';
+    if(value.includes('.') || value.startsWith('/dev/')){
+        const i = value.lastIndexOf('/');
+        return i > 0 ? value.slice(0, i) : '/';
+    }
+    return value;
+}
+function openYoleoVmBrowser(kind,targetId){
+    const params = new URLSearchParams();
+    params.set('target', targetId || '');
+    params.set('path', yoleoVmBrowserStartPath(targetId));
+    const mode = String(kind || 'file') === 'folder' ? 'folder' : 'file';
+    const url = '/browser/' + mode + '?' + params.toString();
+    const popup = window.open(url, 'yoleo_browser_' + String(targetId || mode), 'width=1100,height=760,resizable=yes,scrollbars=yes');
+    if(popup && popup.focus) popup.focus();
+    if(!popup) window.location.href = url;
+}
+window.addEventListener('message', function(event){
+    const data = event.data || {};
+    if(data.type !== 'yoleo-browser-select' || !['file','folder'].includes(data.mode) || !data.target) return;
+    const target = $(data.target);
+    if(target){
+        target.value = data.path || '';
+        target.dispatchEvent(new Event('input', {bubbles:true}));
+        target.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+});
+function fileExt(path){ const m=String(path||'').toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ''; }
+function allPoolVolumes(){
+    const out=[];
+    (state.pools||[]).forEach(p => (p.volumes||[]).forEach(v => out.push({name:v.name||'', path:v.path||'', size:v.capacity||v.allocation||'', pool:p.name||''})));
+    return out.filter(x=>x.path);
+}
+function diskImageChoices(){
+    const exts=new Set(['qcow2','raw','img','vmdk','vdi','vhd','vhdx']);
+    const rows=allPoolVolumes().filter(v => exts.has(fileExt(v.path)) || !fileExt(v.path));
+    const seen=new Set();
+    return rows.filter(v=>{ if(seen.has(v.path)) return false; seen.add(v.path); return true; });
+}
+function isoChoices(){
+    const rows=[...(state.isos||[]).map(i=>({name:i.name||'', path:i.path||'', size:i.size||'', pool:'ISO'})), ...allPoolVolumes().filter(v => ['iso','img'].includes(fileExt(v.path)))];
+    const seen=new Set();
+    return rows.filter(v=>{ if(!v.path || seen.has(v.path)) return false; seen.add(v.path); return true; });
+}
+function uniqueValues(values){
+    const out=[]; const seen=new Set();
+    values.map(v=>String(v||'').trim()).filter(Boolean).forEach(v=>{ if(!seen.has(v)){ seen.add(v); out.push(v); } });
+    return out;
+}
+function hostBridgeNames(){
+    return uniqueValues([
+        ...(state.host_bridges||[]).map(b=>b.name),
+        ...(state.networks||[]).map(n=>n.bridge),
+        ...((state.vms||[]).flatMap(vm => (vm.nics||[]).filter(n=>n.source_kind==='bridge' || n.type==='bridge').map(n=>n.source)))
+    ]);
+}
+function libvirtNetworkNames(){ return uniqueValues([...(state.networks||[]).map(n=>n.name), ...((state.vms||[]).flatMap(vm => (vm.nics||[]).filter(n=>n.source_kind==='network' || n.type==='network').map(n=>n.source)))]); }
+function directInterfaceNames(){ return uniqueValues([...(state.host_interfaces||[]).map(i=>i.name).filter(n=>n && n!=='lo'), ...((state.vms||[]).flatMap(vm => (vm.nics||[]).filter(n=>n.source_kind==='dev' || n.type==='direct').map(n=>n.source)))]); }
+function nicKindFromOld(old){
+    const sk=String(old?.source_kind||'').toLowerCase();
+    const typ=String(old?.type||'').toLowerCase();
+    if(sk==='network' || typ==='network') return 'network';
+    if(sk==='dev' || typ==='direct') return 'direct';
+    return 'bridge';
+}
+function nicSourceValues(kind){
+    if(kind==='network') return libvirtNetworkNames();
+    if(kind==='direct') return directInterfaceNames();
+    return hostBridgeNames();
+}
+function selectOptionsFromValues(values,current){
+    const rows=[]; const seen=new Set(); const cur=String(current||'');
+    if(cur){ rows.push(`<option value="${esc(cur)}" selected>${esc(cur)}</option>`); seen.add(cur); }
+    values.forEach(v=>{ if(!v || seen.has(v)) return; seen.add(v); rows.push(`<option value="${esc(v)}">${esc(v)}</option>`); });
+    return rows.join('') || '<option value="">aucune source détectée</option>';
+}
+function updateNicSourceOptions(current=''){
+    const kind=$('devKind')?.value || 'bridge';
+    const src=$('devSource');
+    if(!src) return;
+    const values=nicSourceValues(kind);
+    const keep=current || src.value || values[0] || '';
+    src.innerHTML=selectOptionsFromValues(nicSourceValues(kind), keep);
+}
+function openDeviceModal(type, mode='add', old=null){
+    if(!selectedVm){ showStatus('Sélectionne une VM avant.', 'error'); return; }
+    deviceModalState={type,mode,old};
+    $('deviceModalTitle').textContent=(mode==='edit'?'Modifier ':'Ajouter ')+type+' — '+selectedVm;
+    $('deviceModalText').textContent='La modification est écrite dans le XML persistant libvirt. Un backup XML est créé avant.';
+    let html='';
+    if(type==='disk') html = fieldFull('devSource','Fichier disque', inputBrowse('devSource', old?.source||'', 'disk', '/mnt/.../disk.qcow2'), 'Image existante seulement : qcow2/raw/img/vmdk…') + field('devBus','Bus',`<select id="devBus" class="select-input"><option value="virtio"${optionSelected('virtio',old?.bus||'virtio')}>virtio</option><option value="sata"${optionSelected('sata',old?.bus)}>sata</option><option value="scsi"${optionSelected('scsi',old?.bus)}>scsi</option></select>`) + field('devTarget','Target',`<input id="devTarget" class="text-input" value="${esc(old?.target||'')}" placeholder="auto : vdb/sdb">`) + field('devFormat','Format',`<select id="devFormat" class="select-input"><option value="qcow2"${optionSelected('qcow2',old?.format||'qcow2')}>qcow2</option><option value="raw"${optionSelected('raw',old?.format)}>raw</option></select>`);
+    if(type==='physical_disk') html = fieldFull('devSource','Disque physique /dev/disk/by-id',`<select id="devSource" class="select-input wide-select">${options(state.host_disks,'path',d=>`${d.id} ${d.size}${d.alias_count ? ' · alias x' + d.alias_count : ''}`, old?.source||'')}</select>`, 'Choisis un chemin stable by-id. La liste est dédoublonnée : si ata- et wwn- pointent vers le même /dev/sdX, une seule ligne est affichée.') + field('devBus','Bus',`<select id="devBus" class="select-input"><option value="sata"${optionSelected('sata',old?.bus||'sata')}>sata</option><option value="virtio"${optionSelected('virtio',old?.bus)}>virtio</option><option value="scsi"${optionSelected('scsi',old?.bus)}>scsi</option></select>`) + field('devTarget','Target',`<input id="devTarget" class="text-input" value="${esc(old?.target||'')}" placeholder="auto">`) + field('devFormat','Format',`<select id="devFormat" class="select-input"><option value="raw">raw</option></select>`);
+    if(type==='iso') html = fieldFull('devSource','Fichier ISO', inputBrowse('devSource', old?.source||'', 'iso', '/mnt/.../install.iso'), 'ISO existant seulement. Utilise Parcourir pour éviter les erreurs de chemin.') + field('devBus','Bus',`<select id="devBus" class="select-input"><option value="sata"${optionSelected('sata',old?.bus||'sata')}>sata</option><option value="ide"${optionSelected('ide',old?.bus)}>ide</option></select>`) + field('devTarget','Target',`<input id="devTarget" class="text-input" value="${esc(old?.target||'')}" placeholder="auto">`) + field('devFormat','Format',`<select id="devFormat" class="select-input"><option value="raw">raw</option></select>`);
+    if(type==='nic'){
+        const kind=nicKindFromOld(old); const values=nicSourceValues(kind); const source=old?.source || values[0] || '';
+        html = field('devKind','Type',`<select id="devKind" class="select-input" onchange="updateNicSourceOptions()"><option value="bridge"${optionSelected('bridge',kind)}>bridge hôte</option><option value="network"${optionSelected('network',kind)}>réseau libvirt</option><option value="direct"${optionSelected('direct',kind)}>direct</option></select>`) + field('devSource','Source existante',`<select id="devSource" class="select-input wide-select">${selectOptionsFromValues(nicSourceValues(kind), source)}</select>`, 'Bridge = br0/virbr0. Réseau libvirt = réseau créé dans l’onglet Réseau.') + field('devModel','Modèle',`<select id="devModel" class="select-input"><option value="virtio"${optionSelected('virtio',old?.model||'virtio')}>virtio</option><option value="e1000e"${optionSelected('e1000e',old?.model)}>e1000e</option><option value="e1000"${optionSelected('e1000',old?.model)}>e1000</option><option value="rtl8139"${optionSelected('rtl8139',old?.model)}>rtl8139</option></select>`) + field('devMac','MAC',`<input id="devMac" class="text-input" value="${esc(old?.mac||'')}" placeholder="vide = auto">`);
+    }
+    if(type==='pci') html = fieldFull('devAddress','Périphérique PCI',`<select id="devAddress" class="select-input wide-select">${options(state.pci_devices,'address',p=>`${p.address} ${p.label}`, old?.address||'')}</select>`) + field('devManaged','Managed',`<select id="devManaged" class="select-input"><option value="yes"${optionSelected('yes',old?.managed||'yes')}>yes</option><option value="no"${optionSelected('no',old?.managed)}>no</option></select>`);
+    if(type==='usb') html = fieldFull('devUsb','Périphérique USB',`<select id="devUsb" class="select-input wide-select">${state.usb_devices.map(u=>{const val=u.vendor+':'+u.product; const cur=(old?.vendor&&old?.product)?old.vendor+':'+old.product:''; return `<option value="${esc(val)}"${optionSelected(val,cur)}>${esc(val+' '+u.label)}</option>`;}).join('')}</select>`) + field('devManaged','Managed',`<select id="devManaged" class="select-input"><option value="yes"${optionSelected('yes',old?.managed||'yes')}>yes</option><option value="no"${optionSelected('no',old?.managed)}>no</option></select>`);
+    $('deviceForm').innerHTML=html || '<div class="empty-state">Type non géré.</div>';
+    clearDeviceModalError();
+    $('deviceModal').style.display='flex';
+}
+function clearDeviceModalError(){
+    const box=$('deviceModalError');
+    if(!box) return;
+    box.textContent='';
+    box.style.display='none';
+}
+function showDeviceModalError(message){
+    const box=$('deviceModalError');
+    if(!box) { showStatus(message, 'error'); return; }
+    box.textContent=String(message||'Erreur inconnue');
+    box.style.display='block';
+}
+async function submitDeviceModal(btn=null){
+    clearDeviceModalError();
+    try{
+        const {type,mode,old}=deviceModalState;
+        let body={name:selectedVm,type,action:mode==='edit'?'edit':'add',old:old||{}};
+        if(['disk','physical_disk','iso'].includes(type)){
+            body.source=String($('devSource')?.value||'').trim();
+            body.bus=String($('devBus')?.value||'').trim();
+            body.target=String($('devTarget')?.value||'').trim();
+            body.format=$('devFormat')?.value || (type==='iso'?'raw':'qcow2');
+            if(type==='iso') body.type='iso';
+            if(!body.source){
+                showDeviceModalError(type==='physical_disk' ? 'Sélectionne un disque physique avant de valider.' : 'Indique un fichier source avant de valider.');
+                return;
+            }
+        }
+        if(type==='nic'){ body.kind=$('devKind').value; body.source=$('devSource').value; body.model=$('devModel').value; body.mac=$('devMac').value; }
+        if(type==='pci'){ body.address=$('devAddress').value; body.managed=$('devManaged').value; }
+        if(type==='usb'){ const [vendor,product]=($('devUsb').value||':').split(':'); body.vendor=vendor; body.product=product; body.managed=$('devManaged').value; }
+        await apiPost(deviceActionUrl,body,btn);
+        closeModal('deviceModal');
+    } catch(e){
+        showDeviceModalError(e && (e.message || e) || 'Erreur pendant la modification du matériel.');
+    }
+}
+function removeDevice(type, old){ if(!selectedVm)return; $('confirmTitle').textContent='Supprimer périphérique'; $('confirmText').textContent=`Retirer ${type} de ${selectedVm} ?`; $('confirmYesBtn').onclick=async()=>{ closeModal('confirmModal'); await apiPost(deviceActionUrl,{name:selectedVm,type,action:'remove',...old}); }; $('confirmModal').style.display='flex'; }
+
+function volumeExtForFormat(fmt){ return String(fmt||'qcow2').toLowerCase()==='raw' ? '.raw' : '.qcow2'; }
+function normalizeVolumeBaseName(value){
+    return String(value||'').trim().replace(/[^A-Za-z0-9_.:+-]+/g,'_').replace(/^_+|_+$/g,'') || 'disk';
+}
+function stripVolumeExtension(value){ return String(value||'').replace(/\.(qcow2|raw|img)$/i,''); }
+function suggestedVolumeName(poolName=''){
+    const d=new Date();
+    const pad=n=>String(n).padStart(2,'0');
+    const stamp=`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+    return normalizeVolumeBaseName(`disk_${stamp}`) + volumeExtForFormat($('volFormat')?.value || 'qcow2');
+}
+function populateVolumePoolOptions(selected=''){
+    const sel=$('volPool');
+    if(!sel) return;
+    const pools=state.pools||[];
+    sel.innerHTML=pools.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}${p.path?' — '+esc(p.path):''}</option>`).join('');
+    if(selected && pools.some(p=>String(p.name||'')===String(selected))) sel.value=selected;
+}
+function syncVolumeExtension(){
+    const input=$('volName');
+    if(!input) return;
+    const base=stripVolumeExtension(input.value || '').trim();
+    if(base) input.value=normalizeVolumeBaseName(base) + volumeExtForFormat($('volFormat')?.value || 'qcow2');
+}
+function clearVolumeModalError(){ const box=$('volumeModalError'); if(box){ box.textContent=''; box.style.display='none'; } }
+function showVolumeModalError(message){ const box=$('volumeModalError'); if(!box){ showStatus(message,'error'); return; } box.textContent=String(message||'Erreur inconnue'); box.style.display='block'; }
+function openVolumeModal(poolName=''){
+    const pools=state.pools||[];
+    if(!pools.length){ showStatus('Crée ou démarre une pool libvirt avant de créer un disque virtuel.', 'error'); return; }
+    populateVolumePoolOptions(poolName || (pools[0] && pools[0].name) || '');
+    if($('volFormat')) $('volFormat').value='qcow2';
+    if($('volAllocation')) $('volAllocation').value='thin';
+    if($('volSizeGb')) $('volSizeGb').value='100';
+    if($('volName')) $('volName').value=suggestedVolumeName(poolName);
+    clearVolumeModalError();
+    $('volumeModal').style.display='flex';
+}
+async function submitVolumeModal(btn=null){
+    clearVolumeModalError();
+    const pool=String($('volPool')?.value||'').trim();
+    const volume=String($('volName')?.value||'').trim();
+    const size_gb=String($('volSizeGb')?.value||'').trim();
+    const format=String($('volFormat')?.value||'qcow2').trim();
+    const allocation=String($('volAllocation')?.value||'thin').trim();
+    if(!pool){ showVolumeModalError('Sélectionne une pool.'); return; }
+    if(!volume){ showVolumeModalError('Indique un nom de disque.'); return; }
+    if(!size_gb || Number(size_gb) < 1){ showVolumeModalError('Indique une taille en Gio valide.'); return; }
+    try{
+        await apiPost(storageActionUrl,{action:'volume_create',pool,volume,size_gb,format,allocation},btn);
+        closeModal('volumeModal');
+    } catch(e){ showVolumeModalError(e && (e.message || e) || 'Erreur pendant la création du disque.'); }
+}
+function confirmVolumeDelete(poolName, volumeName, volumePath=''){
+    $('confirmTitle').textContent='Supprimer disque virtuel';
+    $('confirmText').textContent=`Supprimer définitivement le disque virtuel ${volumeName} dans la pool ${poolName} ?${volumePath ? ' Fichier : '+volumePath : ''}`;
+    $('confirmYesBtn').onclick=async()=>{ closeModal('confirmModal'); await apiPost(storageActionUrl,{action:'volume_delete',pool:poolName,volume:volumeName}); };
+    $('confirmModal').style.display='flex';
+}
+function decimalText(value){ return String(value ?? '').trim().replace(',', '.'); }
+function formatGioInput(value){
+    const n=Number(value);
+    if(!Number.isFinite(n) || n <= 0) return '';
+    if(Math.abs(n - Math.round(n)) < 0.005) return String(Math.round(n));
+    return n.toFixed(2);
+}
+function sizeLabelToGio(value){
+    const text=String(value||'').trim().replace(',', '.');
+    const m=text.match(/^([0-9]+(?:\.[0-9]+)?)\s*([KMGTPE]?i?B|[KMGTPE]B|[KMGTPE]?io|[KMGTPE]?o|B|[KMGTPE])?$/i);
+    if(!m) return 0;
+    const n=Number(m[1]||0);
+    if(!Number.isFinite(n) || n <= 0) return 0;
+    let unit=String(m[2]||'gio').toLowerCase();
+    // Dans le champ d'édition, un nombre seul veut dire Gio.
+    if(unit === 'g') unit = 'gio';
+    if(unit === 't') unit = 'tio';
+    if(unit === 'm') unit = 'mio';
+    if(unit === 'k') unit = 'kio';
+    const factors={
+        b:1,o:1,
+        kb:1000,kib:1024,ko:1000,kio:1024,
+        mb:1000**2,mib:1024**2,mo:1000**2,mio:1024**2,
+        gb:1024**3,gib:1024**3,go:1024**3,gio:1024**3,
+        tb:1024**4,tib:1024**4,to:1024**4,tio:1024**4,
+        pb:1024**5,pib:1024**5,po:1024**5,pio:1024**5,
+        eb:1024**6,eib:1024**6,eo:1024**6,eio:1024**6
+    };
+    const bytes=n*(factors[unit]||1024**3);
+    return bytes > 0 ? bytes/(1024**3) : 0;
+}
+function bytesToGio(value){
+    const n=Number(String(value||'').trim().replace(',', '.'));
+    return Number.isFinite(n) && n > 0 ? n/(1024**3) : 0;
+}
+function volumeKey(poolName, volumeName){ return String(poolName||'')+'::'+String(volumeName||''); }
+function domIdToken(value){ return String(value||'').replace(/[^A-Za-z0-9_-]+/g,'_'); }
+function volumeCapacityGio(v){
+    // Priorité aux octets renvoyés par le backend : pas d'ambiguïté Mio/Gio.
+    const fromBytes=bytesToGio(v.capacity_bytes);
+    if(fromBytes > 0) return fromBytes;
+    const fromExplicit=sizeLabelToGio(v.capacity_gio || v.capacity_gio_text || v.capacity_gib_text);
+    if(fromExplicit > 0) return fromExplicit;
+    const fromLabel=sizeLabelToGio(v.capacity || v.capacity_raw);
+    if(fromLabel > 0) return fromLabel;
+    const legacy=sizeLabelToGio(v.capacity_gib);
+    return legacy > 0 ? legacy : 0;
+}
+function volumeCapacityGioInput(v){
+    return formatGioInput(volumeCapacityGio(v));
+}
+function startVolumeResize(poolName, volumeName){
+    volumeEditKey=volumeKey(poolName, volumeName);
+    renderStorage();
+    setTimeout(()=>{
+        const el=$('volumeResize_'+domIdToken(volumeEditKey));
+        if(el){ el.focus(); el.select(); }
+    }, 0);
+}
+function cancelVolumeResize(){
+    volumeEditKey='';
+    renderStorage();
+}
+async function submitVolumeResize(poolName, volumeName, currentGio, btn=null){
+    const el=$('volumeResize_'+domIdToken(volumeKey(poolName, volumeName)));
+    const raw=String(el?.value||'').trim();
+    const requestedGio=sizeLabelToGio(raw);
+    if(!requestedGio || requestedGio <= 0){ showStatus('Indique une taille en Gio valide.','error'); return; }
+    if(!currentGio || currentGio <= 0){ showStatus('Capacité actuelle illisible : impossible de redimensionner ce volume.', 'error'); return; }
+    if(requestedGio <= currentGio + 0.000001){
+        showStatus(`Nouvelle taille trop petite : ${formatGioInput(requestedGio)} Gio demandé, ${formatGioInput(currentGio)} Gio actuel.`, 'error');
+        return;
+    }
+    volumeEditKey='';
+    await apiPost(storageActionUrl,{action:'volume_resize',pool:poolName,volume:volumeName,size_gio:formatGioInput(requestedGio)},btn);
+}
+
+function isIsoVolume(v){
+    const name=String(v?.name||'').toLowerCase();
+    const path=String(v?.path||'').toLowerCase();
+    return name.endsWith('.iso') || path.endsWith('.iso');
+}
+function canResizeVolume(v){
+    if(isIsoVolume(v)) return false;
+    const name=String(v?.name||'').toLowerCase();
+    const path=String(v?.path||'').toLowerCase();
+    // Redimensionnement uniquement pour les vrais disques virtuels.
+    return /\.(qcow2|raw|img|vmdk)$/i.test(name) || /\.(qcow2|raw|img|vmdk)$/i.test(path);
+}
+
+function volumeRowsForPool(p){
+    const volumes=p.volumes||[];
+    return volumes.map(v=>{
+        const key=volumeKey(p.name, v.name);
+        const editing=volumeEditKey===key;
+        const currentGio=volumeCapacityGio(v);
+        const currentGioValue=formatGioInput(currentGio);
+        const inputId='volumeResize_'+domIdToken(key);
+        const capacityCell=editing
+            ? `<div class="vm-volume-resize-box"><input id="${esc(inputId)}" class="text-input vm-volume-size-input" type="text" value="${esc(currentGioValue)}" placeholder="125.10" inputmode="decimal" onkeydown="if(event.key==='Enter') submitVolumeResize(${jsArg(p.name)},${jsArg(v.name)},${currentGio},this); if(event.key==='Escape') cancelVolumeResize();"><span class="vm-volume-unit">Gio</span><button class="yoleo-btn yoleo-btn-mini yoleo-btn-green vm-icon-btn" title="Valider la nouvelle capacité" aria-label="Valider la nouvelle capacité" onclick="submitVolumeResize(${jsArg(p.name)},${jsArg(v.name)},${currentGio},this)">✓</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted vm-icon-btn" title="Annuler" aria-label="Annuler" onclick="cancelVolumeResize()">↩</button></div>`
+            : `${esc(v.capacity||'—')}`;
+        const resizable=canResizeVolume(v);
+        const editBtn=editing ? '' : (resizable
+            ? `<button class="yoleo-btn yoleo-btn-mini yoleo-btn-orange vm-icon-btn" title="Agrandir la capacité" aria-label="Agrandir la capacité" onclick="startVolumeResize(${jsArg(p.name)},${jsArg(v.name)})">✎</button>`
+            : `<button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted vm-icon-btn" title="Volume non redimensionnable" aria-label="Volume non redimensionnable" disabled>🔒</button>`);
+        return `<tr><td>${esc(v.name)}</td><td><div class="code">${esc(v.path)}</div></td><td>${esc(v.type)}</td><td>${capacityCell}</td><td>${esc(v.allocation||'—')}</td><td>${esc(v.remaining||'—')}</td><td>${esc(v.disk_usage||v.allocation||'—')}</td><td><div class="actions-cell">${editBtn}<button class="yoleo-btn yoleo-btn-mini yoleo-btn-red vm-icon-btn" title="Supprimer le volume" aria-label="Supprimer le volume" onclick="confirmVolumeDelete(${jsArg(p.name)},${jsArg(v.name)},${jsArg(v.path)})">🗑</button></div></td></tr>`;
+    }).join('') || '<tr><td colspan="8" class="empty-state">Aucun volume.</td></tr>';
+}
+
+function renderStorage(){
+    const pools=state.pools||[], disks=state.host_disks||[], isos=state.isos||[];
+    const livePoolNames = new Set(pools.map(p => String(p.name || '')));
+    expandedPools = new Set([...expandedPools].filter(name => livePoolNames.has(name)));
+    $('storageOverview').innerHTML=`<div class="summary-grid"><div class="summary-card"><div class="summary-label">Pools</div><div class="summary-value">${pools.length}</div></div><div class="summary-card"><div class="summary-label">ISO</div><div class="summary-value">${isos.length}</div></div><div class="summary-card"><div class="summary-label">Disques by-id non montés</div><div class="summary-value">${disks.length}</div></div></div>
+    <h3>Pools</h3><div class="table-wrap"><table><thead><tr><th>Pool</th><th>État</th><th>Chemin</th><th>Capacité</th><th>Volumes</th><th style="text-align:right;">Actions</th></tr></thead><tbody>${pools.map(poolRow).join('')||'<tr><td colspan="6" class="empty-state">Aucune pool.</td></tr>'}</tbody></table></div>
+    <h3>ISO détectés</h3><div class="table-wrap"><table><thead><tr><th>Nom</th><th>Chemin</th><th>Taille</th></tr></thead><tbody>${isos.slice(0,200).map(i=>`<tr><td>${esc(i.name)}</td><td><div class="code">${esc(i.path)}</div></td><td>${esc(i.size)}</td></tr>`).join('')||'<tr><td colspan="3" class="empty-state">Aucun ISO.</td></tr>'}</tbody></table></div>
+    <h3>Disques physiques by-id <span class="name-sub">(non montés)</span></h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>Chemin stable</th><th>Réel</th><th>Taille</th></tr></thead><tbody>${disks.map(d=>`<tr><td>${esc(d.id)}</td><td><div class="code">${esc(d.path)}</div></td><td>${esc(d.real)}</td><td>${esc(d.size)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty-state">Aucun disque by-id non monté.</td></tr>'}</tbody></table></div>`;
+}
+function togglePoolVolumes(name){
+    const key=String(name||'');
+    if(!key) return;
+    if(expandedPools.has(key)) expandedPools.delete(key);
+    else expandedPools.add(key);
+    renderStorage();
+}
+function poolRow(p){
+    const name=String(p.name||'');
+    const opened=expandedPools.has(name);
+    const count=(p.volumes||[]).length;
+    const main=`<tr class="vm-pool-row"><td><div class="vm-pool-name-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted vm-pool-toggle" title="${opened?'Replier':'Afficher'} les volumes" aria-label="${opened?'Replier':'Afficher'} les volumes" onclick="togglePoolVolumes(${jsArg(name)})">${opened?'▴':'▾'}</button><div><div class="name-main">${esc(name)}</div><div class="name-sub">${esc(p.persistent)}</div></div></div></td><td><span class="badge ${String(p.state).toLowerCase().includes('running')?'badge-ok':'badge-no'}">${esc(p.state||'—')}</span></td><td><div class="code">${esc(p.path||'—')}</div></td><td>${esc(p.capacity||'—')}<div class="name-sub">libre ${esc(p.available||'—')}</div></td><td>${count}</td><td><div class="actions-cell"><button class="yoleo-btn yoleo-btn-mini yoleo-btn-green vm-icon-btn" title="Démarrer la pool" aria-label="Démarrer la pool" onclick="poolAction(${jsArg(name)},'start')">▶</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-orange vm-icon-btn" title="Arrêter la pool" aria-label="Arrêter la pool" onclick="poolAction(${jsArg(name)},'stop')">⏹</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-red vm-icon-btn" title="Supprimer la pool" aria-label="Supprimer la pool" onclick="confirmPoolDelete(${jsArg(name)})">✖</button></div></td></tr>`;
+    const details=opened ? `<tr class="vm-pool-volume-row"><td colspan="6"><div class="vm-pool-volume-panel"><div class="vm-pool-volume-title">Volumes de ${esc(name)}</div><div class="table-wrap vm-inner-table-wrap"><table class="vm-inner-table"><thead><tr><th>Nom</th><th>Chemin</th><th>Type</th><th>Capacité</th><th>Utilisée</th><th>Restante</th><th>Taille disque</th><th style="text-align:right;">Actions</th></tr></thead><tbody>${volumeRowsForPool(p)}</tbody></table></div></div></td></tr>` : '';
+    return main + details;
+}
+function renderPoolTabs(){
+    // Les anciennes pseudo-pages de pools sont supprimées : les volumes
+    // s'affichent maintenant directement dans le tableau principal.
+    const tabSlot = $('poolTabsSlot');
+    if(tabSlot) tabSlot.innerHTML='';
+    const panels = $('dynamicPoolPanels');
+    if(panels) panels.innerHTML='';
+    if(String(currentTab).startsWith('pool::')) currentTab='storage';
+}
+function openPoolModal(){ $('poolModal').style.display='flex'; }
+async function submitPoolModal(){ await apiPost(storageActionUrl,{action:'add',name:$('poolName').value,path:$('poolPath').value,create_dir:$('poolCreate').value,autostart:$('poolAutostart').value}); closeModal('poolModal'); }
+function poolAction(name,action){ return apiPost(storageActionUrl,{name,action}); }
+function confirmPoolDelete(name){ $('confirmTitle').textContent='Supprimer pool'; $('confirmText').textContent=`Supprimer la déclaration libvirt de la pool ${name} ? Les fichiers ne sont pas effacés.`; $('confirmYesBtn').onclick=()=>{ closeModal('confirmModal'); poolAction(name,'delete'); }; $('confirmModal').style.display='flex'; }
+
+function renderNetworks(){ const rows=(state.networks||[]).map(n=>`<tr><td><div class="name-main">${esc(n.name)}</div><div class="name-sub">${esc(n.persistent)}</div></td><td><span class="badge ${String(n.active).toLowerCase()==='yes'?'badge-ok':'badge-no'}">${esc(n.active||'—')}</span></td><td>${esc(n.bridge||'—')}</td><td>${esc(n.forward||'—')}</td><td>${esc(n.autostart||'—')}</td><td><div class="actions-cell"><button class="yoleo-btn yoleo-btn-mini yoleo-btn-green" onclick="netAction('${esc(n.name)}','start')">▶</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-orange" onclick="netAction('${esc(n.name)}','stop')">■</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" onclick="netAction('${esc(n.name)}','autostart')">auto</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" onclick="netAction('${esc(n.name)}','noautostart')">noauto</button><button class="yoleo-btn yoleo-btn-mini yoleo-btn-red" onclick="confirmNetDelete('${esc(n.name)}')">Supprimer</button></div></td></tr>`).join(''); $('netTableBody').innerHTML=rows||'<tr><td colspan="6" class="empty-state">Aucun réseau.</td></tr>'; }
+function openNetworkModal(){ $('networkModal').style.display='flex'; }
+async function submitNetworkModal(){ await apiPost(networkActionUrl,{action:'add',name:$('netName').value,mode:$('netMode').value,bridge:$('netBridge').value,autostart:$('netAutostart').value}); closeModal('networkModal'); }
+function netAction(name,action){ return apiPost(networkActionUrl,{name,action}); }
+function confirmNetDelete(name){ $('confirmTitle').textContent='Supprimer réseau'; $('confirmText').textContent=`Supprimer la déclaration libvirt du réseau ${name} ?`; $('confirmYesBtn').onclick=()=>{ closeModal('confirmModal'); netAction(name,'delete'); }; $('confirmModal').style.display='flex'; }
+
+function setSelectValue(id, value){
+    const el=$(id);
+    if(!el) return;
+    const wanted=String(value||'');
+    if(wanted && Array.from(el.options || []).some(o => o.value === wanted)) el.value=wanted;
+}
+function safeVmNameForPath(name){
+    return String(name||'vm').trim().replace(/[^A-Za-z0-9_.:-]+/g,'_').replace(/^_+|_+$/g,'') || 'vm';
+}
+function extensionForCreateDisk(){
+    return ($('createDiskFormat')?.value || createVmDefaults.diskFormat || 'qcow2').toLowerCase() === 'raw' ? 'raw' : 'qcow2';
+}
+function createDiskVolumeNameForVm(name){
+    return safeVmNameForPath(name) + '.' + extensionForCreateDisk();
+}
+function poolByName(name){
+    return (state.pools || []).find(p => String(p.name || '') === String(name || '')) || null;
+}
+function activeStoragePools(){
+    return (state.pools || []).filter(p => String(p.name || '').trim());
+}
+function defaultCreatePoolName(){
+    const pools=activeStoragePools();
+    const configured=String(createVmDefaults.storagePool || '').trim();
+    if(configured && pools.some(p => p.name === configured)) return configured;
+    const def=pools.find(p => p.name === 'default');
+    return (def || pools[0] || {}).name || '';
+}
+function poolSelectOptions(current=''){
+    const pools=activeStoragePools();
+    const wanted=current || defaultCreatePoolName();
+    if(!pools.length) return '<option value="">aucune pool détectée</option>';
+    return pools.map(p=>{
+        const label = `${p.name || ''}${p.path ? ' — ' + p.path : ''}${p.available ? ' — libre ' + p.available : ''}`;
+        return `<option value="${esc(p.name||'')}"${optionSelected(p.name,wanted)}>${esc(label)}</option>`;
+    }).join('');
+}
+function refreshCreateDiskPoolOptions(){
+    const select=$('createDiskPool');
+    if(!select) return;
+    const current=select.value || defaultCreatePoolName();
+    select.innerHTML=poolSelectOptions(current);
+    if(current && Array.from(select.options||[]).some(o=>o.value===current)) select.value=current;
+}
+function refreshCreateDiskVolumeOptions(){
+    const select=$('createDiskVolume');
+    if(!select) return;
+    const pool=poolByName($('createDiskPool')?.value || defaultCreatePoolName());
+    const vols=(pool?.volumes || []).filter(v => {
+        const ext=fileExt(v.path || v.name || '');
+        return ['qcow2','raw','img','vmdk','vdi','vhd','vhdx'].includes(ext) || !ext;
+    });
+    select.innerHTML=vols.map(v=>{
+        const value=v.name || '';
+        const label=`${v.name || v.path || ''}${v.capacity ? ' — ' + v.capacity : ''}`;
+        return `<option value="${esc(value)}">${esc(label)}</option>`;
+    }).join('') || '<option value="">aucun volume disque dans cette pool</option>';
+}
+function createDiskPathForName(name){
+    const pool=poolByName($('createDiskPool')?.value || defaultCreatePoolName());
+    const base=String((pool && pool.path) || createVmDefaults.storageDir || '/var/lib/libvirt/images').replace(/\/+$/,'');
+    return base + '/' + createDiskVolumeNameForVm(name);
+}
+function updateCreateVmDiskPath(){
+    const disk=$('createDiskPath');
+    const name=$('createName');
+    const volume=$('createDiskVolumeName');
+    if(volume && !(volume.dataset.manual === '1' && volume.value.trim())) volume.value=createDiskVolumeNameForVm(name?.value || 'nouvelle-vm');
+    if(!disk || !name) return;
+    if(disk.dataset.manual === '1' && disk.value.trim()) return;
+    disk.value=createDiskPathForName(name.value || 'nouvelle-vm');
+}
+function createStorageModeChanged(){
+    refreshCreateDiskPoolOptions();
+    refreshCreateDiskVolumeOptions();
+    updateCreateVmDiskPath();
+    const mode=$('createMode')?.value || 'iso';
+    const storageMode=$('createDiskStorageMode')?.value || 'pool';
+    document.querySelectorAll('.vm-create-pool-only').forEach(el => el.style.display = storageMode === 'pool' ? '' : 'none');
+    document.querySelectorAll('.vm-create-path-field').forEach(el => el.style.display = storageMode === 'path' ? '' : 'none');
+    document.querySelectorAll('.vm-create-pool-volume-only').forEach(el => el.style.display = (storageMode === 'pool' && mode === 'iso') ? '' : 'none');
+    document.querySelectorAll('.vm-create-pool-import-only').forEach(el => el.style.display = (storageMode === 'pool' && mode === 'import') ? '' : 'none');
+}
+function createVmModeChanged(){
+    const mode=$('createMode')?.value || 'iso';
+    document.querySelectorAll('.vm-create-iso-only').forEach(el => el.style.display = mode === 'iso' ? '' : 'none');
+    const diskGb=$('createDiskGb');
+    if(diskGb) diskGb.disabled = mode === 'import';
+    const label=$('createDiskPathLabel');
+    const help=$('createDiskPathHelp');
+    if(label) label.textContent = mode === 'import' ? 'Disque existant à importer' : 'Chemin manuel du disque VM';
+    if(help) help.textContent = mode === 'import'
+        ? 'En mode import manuel, le fichier doit déjà exister. La VM bootera directement dessus.'
+        : 'En mode chemin manuel, ce disque ne doit pas déjà exister : virt-install le créera.';
+    createStorageModeChanged();
+}
+function fillCreateIsoChoices(){
+    const list=$('createIsoChoices');
+    if(!list) return;
+    const rows=isoChoices();
+    list.innerHTML=rows.map(i=>`<option value="${esc(i.path||'')}">${esc(i.name||i.path||'ISO')}</option>`).join('');
+    const iso=$('createIsoPath');
+    if(iso && !iso.value && rows.length) iso.value = rows[0].path || '';
+}
+function updateCreateNetworkSources(current=''){
+    const kind=$('createNetworkKind')?.value || 'bridge';
+    const src=$('createNetworkSource');
+    if(!src) return;
+    if(kind === 'none'){
+        src.innerHTML='<option value="">aucun</option>';
+        src.disabled=true;
+        return;
+    }
+    src.disabled=false;
+    let values=[];
+    if(kind === 'network') values=libvirtNetworkNames();
+    else if(kind === 'direct') values=directInterfaceNames();
+    else values=hostBridgeNames();
+    const preferred = current || createVmDefaults.networkSource || values[0] || (kind==='network' ? 'default' : 'br0');
+    src.innerHTML=selectOptionsFromValues(values, preferred);
+}
+function refreshCreatePhysicalDiskOptions(){
+    const select=$('createPhysicalDiskPath');
+    if(!select) return;
+    const rows=Array.isArray(state.host_disks) ? state.host_disks : [];
+    select.innerHTML='<option value="">aucun disque physique</option>' + rows.map(d=>{
+        const path=d.path || '';
+        const label=`${d.id || path} ${d.size || ''}${d.alias_count ? ' · alias x' + d.alias_count : ''}`;
+        return `<option value="${esc(path)}">${esc(label)}</option>`;
+    }).join('');
+}
+function refreshCreatePciOptions(){
+    const select=$('createPciDevices');
+    if(!select) return;
+    const rows=Array.isArray(state.pci_devices) ? state.pci_devices : [];
+    select.innerHTML=rows.map(p=>`<option value="${esc(p.address || '')}">${esc([p.address, p.label].filter(Boolean).join(' '))}</option>`).join('') || '<option value="" disabled>aucun périphérique PCI détecté</option>';
+}
+function createFirmwareRows(){
+    const rows=Array.isArray(state.firmware_options) ? state.firmware_options : [];
+    return rows.length ? rows : [{id:'bios', mode:'bios', label:'BIOS legacy / SeaBIOS', arch:'x86_64', loader:'', nvram:''}, {id:'uefi', mode:'uefi', label:'UEFI auto libvirt', arch:'auto', loader:'', nvram:''}];
+}
+function refreshCreateFirmwareOptions(){
+    const select=$('createFirmware');
+    if(!select) return;
+    const rows=createFirmwareRows();
+    select.innerHTML=rows.map(row=>`<option value="${esc(row.id || '')}">${esc(row.label || row.id || '')}</option>`).join('');
+    const wanted=createVmDefaults.firmware || 'bios';
+    if(rows.some(row => row.id === wanted)) setSelectValue('createFirmware', wanted);
+    else if(wanted === 'uefi' && rows.some(row => row.mode === 'uefi')) setSelectValue('createFirmware', 'uefi');
+    else setSelectValue('createFirmware', rows[0]?.id || 'bios');
+    updateCreateFirmwareDetails();
+}
+function selectedCreateFirmware(){
+    const value=$('createFirmware')?.value || 'bios';
+    return createFirmwareRows().find(row => row.id === value) || {id:value, mode:value, label:value, arch:'', loader:'', nvram:''};
+}
+function updateCreateFirmwareDetails(){
+    const box=$('createFirmwareDetails');
+    if(!box) return;
+    const fw=selectedCreateFirmware();
+    const lines=[];
+    if(fw.arch) lines.push('arch: ' + fw.arch);
+    if(fw.loader) lines.push('CODE: ' + fw.loader);
+    if(fw.nvram) lines.push('VARS: ' + fw.nvram);
+    if(!lines.length) lines.push(fw.mode === 'uefi' ? 'UEFI auto libvirt' : 'BIOS legacy / SeaBIOS');
+    box.textContent=lines.join(' · ');
+}
+function openCreateVmModal(){
+    clearCreateVmError();
+    const name=$('createName');
+    if(name && !name.value) name.value='nouvelle-vm';
+    $('createVmModal').style.display='flex';
+    setTimeout(()=>{ try { $('createName').focus(); $('createName').select(); } catch(e){} }, 50);
+}
+function clearCreateVmError(){
+    const box=$('createVmError');
+    if(!box) return;
+    box.textContent='';
+    box.style.display='none';
+}
+function showCreateVmError(message){
+    const box=$('createVmError');
+    if(!box){ showStatus(message,'error'); return; }
+    box.textContent=String(message||'Erreur inconnue');
+    box.style.display='block';
+}
+async function submitCreateVm(btn=null){
+    clearCreateVmError();
+    const body={
+        name: $('createName')?.value || '',
+        memory_gb: $('createMemoryGb')?.value || '',
+        vcpus: $('createVcpus')?.value || '',
+        machine_type: $('createMachineType')?.value || 'q35',
+        firmware: $('createFirmware')?.value || 'uefi'
+    };
+    if(!String(body.name || '').trim()) { showCreateVmError('Indique un nom de VM.'); return; }
+    if(!String(body.memory_gb || '').trim()) { showCreateVmError('Indique la RAM.'); return; }
+    if(!String(body.vcpus || '').trim()) { showCreateVmError('Indique le nombre de vCPU.'); return; }
+    setBusy(btn,true);
+    try{
+        const r=await fetch(createVmUrl,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(body)});
+        const p=await r.json().catch(()=>({}));
+        if(!r.ok || p.ok === false) throw new Error(p.message || `HTTP ${r.status}`);
+        selectedVm = p.name || body.name;
+        closeModal('createVmModal');
+        showStatus(p.message || `VM ${selectedVm} créée.`);
+        await refreshAll(false);
+        if(selectedVm) selectVm(selectedVm, true);
+        const redirect = p.redirect || ('/vm/gestion/vm/' + encodeURIComponent(selectedVm));
+        const win = window.open(redirect, 'yoleo_vm_gestion_' + String(selectedVm || 'vm').replace(/[^A-Za-z0-9_.-]+/g,'_'), 'width=1420,height=920,resizable=yes,scrollbars=yes');
+        if(!win) window.location.href = redirect;
+    } catch(e){
+        showCreateVmError(e && (e.message || e) || 'Erreur pendant la création VM.');
+        showStatus(String(e.message || e), 'error');
+    } finally {
+        setBusy(btn,false);
+    }
+}
+
+
+
+
+async function loadLogs(){ const r=await fetch(logsUrl,{cache:'no-store'}); const p=await r.json(); const logs=p.logs||{}; $('logsBox').innerHTML=Object.entries(logs).map(([k,v])=>`<div><div class="detail-title">${esc(k)}</div><pre class="log-box">${esc(v)}</pre></div>`).join(''); }
+
+function modalIsOpen(){
+    return Array.from(document.querySelectorAll('.modal-overlay')).some(m => getComputedStyle(m).display !== 'none');
+}
+function userIsEditing(){
+    const el = document.activeElement;
+    if(!el) return false;
+    if(['INPUT','SELECT','TEXTAREA'].includes(el.tagName)) return true;
+    return (Date.now() - lastUserEditAt) < 3000;
+}
+function shouldAutoRefresh(){
+    if(modalIsOpen()) return false;
+    if(userIsEditing()) return false;
+    // La page principale a son heartbeat libvirt léger ; pas besoin de relire
+    // tout l'inventaire lourd en boucle.
+    if(currentTab === 'general') return false;
+    // Le stockage contient des tableaux déroulants et de l'édition inline :
+    // on actualise au chargement et après les actions Ajax, pas par faux F5 périodique.
+    if(currentTab === 'storage') return false;
+    // Le réseau libvirt suit la même logique : chargement Ajax initial + refresh après action,
+    // pas de bouton Rafraîchir et pas de faux F5 périodique.
+    if(currentTab === 'network' || currentTab === 'networks') return false;
+    // L'onglet Modifier contient des formulaires : on ne le redessine pas automatiquement.
+    if(currentTab === 'devices') return false;
+    return true;
+}
+
+document.addEventListener('input', () => { lastUserEditAt = Date.now(); }, true);
+document.addEventListener('change', () => { lastUserEditAt = Date.now(); }, true);
+
+document.addEventListener('DOMContentLoaded',()=>{
+    document.addEventListener('keydown', handleVmKeyboard);
+    renderAll();
+    activateCurrentTab(false);
+    // Premier vrai inventaire Ajax dès l'ouverture : si libvirt répond vide, on affiche "Aucune VM" ; s'il échoue, on affiche l'erreur au lieu de rester sur "Chargement".
+    refreshAll(false).then(()=>refreshHostStats()).catch(()=>{});
+    window.setInterval(()=>{ if(shouldAutoRefresh()) refreshAll(false); }, Math.max(5,Number(refreshSeconds)||8)*1000);
+    window.setInterval(()=>{ refreshRuntimeStates(); }, 2000);
+    window.setInterval(()=>{ refreshHostStats(); }, 2000);
+});
+</script>

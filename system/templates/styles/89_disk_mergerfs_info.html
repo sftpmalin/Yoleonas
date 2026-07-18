@@ -1,0 +1,76 @@
+/* Info MergerFS : détails techniques déplacés hors de la page principale */
+.disk-mergerfs-info-page {
+    display: grid;
+    gap: 14px;
+}
+
+.disk-mergerfs-info-card {
+    padding: 14px 14px 12px;
+}
+
+.mergerfs-info-head {
+    margin-bottom: 10px;
+}
+
+.mergerfs-info-table-wrap {
+    margin-top: 8px;
+}
+
+.mergerfs-info-code {
+    max-width: 520px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.mergerfs-info-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+}
+
+.mergerfs-info-block h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+}
+
+.mergerfs-info-pre {
+    display: block !important;
+    min-height: 120px;
+    max-height: 340px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+    .mergerfs-info-split {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* MergerFS Info : retour au rythme vertical commun.
+   Le titre de carte ne doit pas garder la marge h3 navigateur par défaut. */
+.disk-mergerfs-info-page {
+    margin-top: 0 !important;
+}
+
+.disk-mergerfs-info-card {
+    padding: 16px 18px 14px !important;
+}
+
+.mergerfs-info-head {
+    margin: 0 0 10px !important;
+}
+
+.mergerfs-info-head h3 {
+    margin: 0 0 6px !important;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.15;
+}
+
+.mergerfs-info-head .hint {
+    margin: 0 !important;
+    line-height: 1.35;
+}

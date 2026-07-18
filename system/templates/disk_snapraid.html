@@ -1,0 +1,347 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-snapraid" class="disk-section disk-snapraid-page">
+    <section class="yoleo-card disk-card snapraid-card">
+        <div class="disk-card-head compact-head snapraid-head">
+            <div>
+                <h3>Choisir le disque de parité SnapRAID</h3>
+                <div class="snapraid-note">Seuls les disques physiques vraiment vides sont proposés ici : non montés, non partitionnés, non formatés et sans signature. Les disques montés non-système servent de disques de données.</div>
+            </div>
+            <div class="actions-line snapraid-actions">
+                <span class="snapraid-counter" id="snapraid-disk-count">0 disque</span>
+                <button type="button" class="yoleo-btn yoleo-btn-small" onclick="loadSnapraid(true)" title="Actualiser">↻</button>
+                <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-green" id="snapraid-configure-btn" onclick="configureSnapraid()" disabled title="Choisir la parité / finaliser la configuration SnapRAID">✅</button>
+            </div>
+        </div>
+        <div id="snapraid-flash" class="snapraid-flash" hidden></div>
+        <div class="table-wrap disk-table-compact snapraid-table-wrap">
+            <table class="yoleo-table snapraid-table">
+                <thead>
+                    <tr>
+                        <th class="snapraid-select-col">Parité</th>
+                        <th>Disque</th>
+                        <th>Montage</th>
+                        <th>Modèle</th>
+                        <th>Taille</th>
+                        <th>Éligible</th>
+                    </tr>
+                </thead>
+                <tbody id="snapraid-disks-tbody">
+                    <tr><td colspan="6" class="empty-state">Chargement SnapRAID...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="yoleo-card disk-card snapraid-card">
+        <div class="disk-card-head compact-head snapraid-head">
+            <div>
+                <h3>État SnapRAID</h3>
+                <div class="snapraid-note">SnapRAID n'est pas un service permanent : l'état indique surtout si la configuration existe et si les points de montage sont présents.</div>
+            </div>
+            <div class="actions-line snapraid-actions snapraid-task-actions">
+                <button type="button" class="yoleo-btn yoleo-btn-small" id="snapraid-manual-task-btn" onclick="openSnapraidTask(false)" disabled title="Préparer une tâche de synchronisation manuelle" data-ready-title="Préparer une tâche de synchronisation manuelle">🔁</button>
+                <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-green" id="snapraid-schedule-task-btn" onclick="openSnapraidTask(true)" disabled title="Préparer une tâche programmée de synchronisation" data-ready-title="Préparer une tâche programmée de synchronisation">⏰</button>
+                <button type="button" class="yoleo-btn yoleo-btn-small" id="snapraid-check-task-btn" onclick="openSnapraidSpecialTask('check')" disabled title="Préparer une tâche de vérification SnapRAID" data-ready-title="Préparer une tâche de vérification SnapRAID">🔎</button>
+                <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-orange" id="snapraid-fix-task-btn" onclick="openSnapraidSpecialTask('fix')" disabled title="Préparer une tâche de récupération/réparation SnapRAID" data-ready-title="Préparer une tâche de récupération/réparation SnapRAID">🛟</button>
+                <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="clearSnapraidState()" title="Supprimer seulement l'état UI SnapRAID">🧹</button>
+            </div>
+        </div>
+        <div class="snapraid-status-grid">
+            <div class="snapraid-status-box"><div class="snapraid-status-label">État</div><div id="snapraid-status-main" class="snapraid-status-value">—</div></div>
+            <div class="snapraid-status-box"><div class="snapraid-status-label">Tâche</div><div id="snapraid-task-state" class="snapraid-status-value">—</div></div>
+            <div class="snapraid-status-box"><div class="snapraid-status-label">Dernière sync</div><div id="snapraid-last-sync" class="snapraid-status-value">—</div></div>
+            <div class="snapraid-status-box"><div class="snapraid-status-label">Config</div><div id="snapraid-config-file" class="snapraid-status-value mount-path">—</div></div>
+            <div class="snapraid-status-box"><div class="snapraid-status-label">Commande sync</div><div id="snapraid-sync-command" class="snapraid-status-value mount-path">—</div></div>
+        </div>
+        <div class="table-wrap disk-table-compact snapraid-table-wrap">
+            <table class="yoleo-table snapraid-table">
+                <thead>
+                    <tr>
+                        <th>Rôle</th>
+                        <th>Périphérique</th>
+                        <th>Montage</th>
+                        <th>Nom SnapRAID</th>
+                        <th>Taille</th>
+                        <th>État</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="snapraid-state-tbody">
+                    <tr><td colspan="7" class="empty-state">Aucune configuration SnapRAID chargée.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<script>
+let snapraidData = null;
+let selectedSnapraidParity = '';
+
+function snapraidBadge(text, kind) {
+    const cls = kind === 'ok' ? 'badge-temp-ok' : (kind === 'bad' ? 'badge-temp-crit' : (kind === 'warn' ? 'badge-temp-warn' : 'badge-muted'));
+    return `<span class="badge ${cls}">${esc(text || '—')}</span>`;
+}
+
+function showSnapraidFlash(message, ok = true, sticky = false) {
+    const box = $('snapraid-flash');
+    if (!box) return;
+    box.hidden = false;
+    box.className = 'snapraid-flash ' + (ok ? 'ok' : 'bad');
+    box.textContent = message || '';
+    if (ok && !sticky) {
+        window.clearTimeout(box._hideTimer);
+        box._hideTimer = window.setTimeout(() => { box.hidden = true; box.textContent = ''; }, 5000);
+    }
+}
+
+function snapraidJsArg(value) {
+    return JSON.stringify(String(value || ''));
+}
+
+
+function updateSnapraidSelection() {
+    const checked = document.querySelector('input[name="snapraid-parity"]:checked');
+    const pending = snapraidData?.state?.pending ? String(snapraidData?.state?.parity_device || '') : '';
+    selectedSnapraidParity = checked ? String(checked.value || '') : pending;
+    const btn = $('snapraid-configure-btn');
+    if (btn) btn.disabled = !selectedSnapraidParity;
+}
+
+function renderSnapraidDisks(disks) {
+    const tbody = $('snapraid-disks-tbody');
+    if (!tbody) return;
+    const list = Array.isArray(disks) ? disks : [];
+    const count = $('snapraid-disk-count');
+    if (count) count.textContent = String(list.length) + ' disque' + (list.length > 1 ? 's' : '');
+    if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Aucun disque vierge assez grand disponible. Pour réutiliser un disque monté, démonte-le puis efface-le depuis Maintenance.</td></tr>';
+        selectedSnapraidParity = '';
+        updateSnapraidSelection();
+        return;
+    }
+    const configuredParity = String(snapraidData?.state?.parity_device || '');
+    const canKeepSelection = list.some(d => String(d.device || '') === selectedSnapraidParity && d.eligible_parity);
+    if (!canKeepSelection) selectedSnapraidParity = list.some(d => String(d.device || '') === configuredParity && d.eligible_parity) ? configuredParity : '';
+    tbody.innerHTML = list.map(d => {
+        const device = String(d.device || '');
+        const eligible = !!d.eligible_parity;
+        const checked = eligible && device === selectedSnapraidParity ? 'checked' : '';
+        const disabled = eligible ? '' : 'disabled';
+        const serial = d.serial ? `<div class="model-sub">serial=${esc(d.serial)}</div>` : '';
+        return `<tr>
+            <td class="snapraid-select-col"><input type="radio" name="snapraid-parity" value="${esc(device)}" onchange="updateSnapraidSelection()" ${checked} ${disabled}></td>
+            <td><div class="disk-name">${esc(d.display_device || device || '—')}</div>${serial}</td>
+            <td><span class="mount-path">${esc(d.mountpoint || '—')}</span></td>
+            <td><div class="model-main" title="${esc(d.model || '—')}">${esc(d.model || '—')}</div></td>
+            <td>${escNoWrap(d.size || '—')}</td>
+            <td>${eligible ? snapraidBadge('OK', 'ok') : snapraidBadge(d.parity_note || 'refusé', 'warn')}</td>
+        </tr>`;
+    }).join('');
+    updateSnapraidSelection();
+}
+
+function renderSnapraidStatus(data) {
+    const status = data?.status || {};
+    const state = data?.state || {};
+    const statusMain = $('snapraid-status-main');
+    if (statusMain) statusMain.innerHTML = snapraidBadge(status.label || '—', status.badge || 'gray');
+    const configFile = $('snapraid-config-file');
+    if (configFile) configFile.textContent = status.config_file || '—';
+    const commandBox = $('snapraid-sync-command');
+    if (commandBox) commandBox.textContent = data?.sync_command || '—';
+
+    const manualBtn = $('snapraid-manual-task-btn');
+    const scheduleBtn = $('snapraid-schedule-task-btn');
+    const checkBtn = $('snapraid-check-task-btn');
+    const fixBtn = $('snapraid-fix-task-btn');
+    const taskReady = !!status.task_ready;
+    const taskBlockReason = status.task_block_reason || (status.configured ? 'SnapRAID n’est pas prêt.' : 'Configure SnapRAID avant de créer une tâche.');
+    [manualBtn, scheduleBtn, checkBtn, fixBtn].forEach(btn => {
+        if (!btn) return;
+        btn.disabled = !taskReady;
+        btn.title = taskReady ? (btn.dataset.readyTitle || btn.title || 'Préparer une tâche SnapRAID') : taskBlockReason;
+    });
+
+    const tbody = $('snapraid-state-tbody');
+    if (!tbody) return;
+    if (!status.configured && !status.pending) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Aucune configuration SnapRAID chargée.</td></tr>';
+        return;
+    }
+    const rows = [];
+    if (state.parity_device) {
+        const parityKind = status.pending ? 'warn' : (status.missing_mounts?.includes(state.parity_mountpoint) ? 'bad' : 'ok');
+        rows.push({role:'Parité', device:state.parity_device || '—', mountpoint:state.parity_mountpoint || '—', snapname:'—', size:'—', kind: parityKind, text: status.pending ? 'à préparer' : (parityKind === 'ok' ? 'présent' : 'manquant'), action:''});
+    }
+    (Array.isArray(state.data_disks) ? state.data_disks : []).forEach(d => {
+        const missing = status.missing_mounts?.includes(d.mountpoint);
+        const snapname = String(d.snapraid_name || '');
+        const url = snapraidData?.recovery_task_urls?.[snapname] || '';
+        rows.push({
+            role:'Données',
+            device:d.device || '—',
+            mountpoint:d.mountpoint || '—',
+            snapname:snapname || '—',
+            size:d.size || '—',
+            kind: missing ? 'bad' : 'ok',
+            text: missing ? 'manquant' : 'présent',
+            action: missing && url ? `<button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-orange" ${taskReady ? '' : 'disabled'} onclick='openSnapraidRecovery(${snapraidJsArg(snapname)})' title="${esc(taskReady ? 'Préparer une récupération SnapRAID pour ce disque' : taskBlockReason)}">🛟</button>` : ''
+        });
+    });
+    tbody.innerHTML = rows.map(row => `<tr>
+        <td>${esc(row.role)}</td>
+        <td><span class="mount-path">${esc(row.device)}</span></td>
+        <td><span class="mount-path">${esc(row.mountpoint)}</span></td>
+        <td><span class="mount-path">${esc(row.snapname || '—')}</span></td>
+        <td>${escNoWrap(row.size || '—')}</td>
+        <td>${snapraidBadge(row.text || '—', row.kind)}</td>
+        <td>${row.action || ''}</td>
+    </tr>`).join('');
+}
+
+async function configureSnapraid() {
+    updateSnapraidSelection();
+    if (!selectedSnapraidParity) {
+        showSnapraidFlash('Choisis un disque de parité valide.', false, true);
+        return;
+    }
+    const ok = await showConfirm(
+        'Valider SnapRAID',
+        'Valider ' + selectedSnapraidParity + ' comme disque de parité ? Si le disque est encore vierge/non monté, il sera seulement mémorisé. Une fois formaté et monté dans Maintenance, ce même bouton écrira la vraie configuration SnapRAID.',
+        'VALIDER',
+        false
+    );
+    if (!ok) return;
+    showSnapraidFlash('Validation SnapRAID...', true, true);
+    try {
+        const response = await fetch('/disk/api/action/snapraid/configure', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({parity_device: selectedSnapraidParity})
+        });
+        const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+        showSnapraidFlash(data.message || (data.ok ? 'Configuration écrite.' : 'Erreur configuration SnapRAID.'), !!data.ok, !data.ok);
+        await loadSnapraid(true);
+    } catch (err) {
+        showSnapraidFlash('Erreur Ajax SnapRAID : ' + err.message, false, true);
+    }
+}
+
+async function clearSnapraidState() {
+    const ok = await showConfirm('Nettoyer SnapRAID', 'Supprimer seulement l’état UI SnapRAID ? Le fichier /etc/snapraid.conf ne sera pas effacé automatiquement.', 'NETTOYER', true);
+    if (!ok) return;
+    try {
+        const response = await fetch('/disk/api/action/snapraid/clear', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+        const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+        showSnapraidFlash(data.message || 'État nettoyé.', !!data.ok, !data.ok);
+        await loadSnapraid(true);
+    } catch (err) {
+        showSnapraidFlash('Erreur nettoyage SnapRAID : ' + err.message, false, true);
+    }
+}
+
+function openSnapraidTask(schedule) {
+    if (!snapraidData?.status?.task_ready) {
+        showSnapraidFlash(snapraidData?.status?.task_block_reason || 'SnapRAID n’est pas prêt pour créer une tâche.', false, true);
+        return;
+    }
+    const url = schedule ? snapraidData?.schedule_task_url : snapraidData?.manual_task_url;
+    if (!url) {
+        showSnapraidFlash('Configure SnapRAID avant de créer la tâche.', false, true);
+        return;
+    }
+    window.location.href = url;
+}
+
+function openSnapraidSpecialTask(kind) {
+    if (!snapraidData?.status?.task_ready) {
+        showSnapraidFlash(snapraidData?.status?.task_block_reason || 'SnapRAID n’est pas prêt pour préparer cette tâche.', false, true);
+        return;
+    }
+    const url = kind === 'check' ? snapraidData?.check_task_url : snapraidData?.fix_task_url;
+    if (!url) {
+        showSnapraidFlash('Configure SnapRAID avant de préparer cette tâche.', false, true);
+        return;
+    }
+    window.location.href = url;
+}
+
+function openSnapraidRecovery(snapname) {
+    if (!snapraidData?.status?.task_ready) {
+        showSnapraidFlash(snapraidData?.status?.task_block_reason || 'SnapRAID n’est pas prêt pour préparer une récupération.', false, true);
+        return;
+    }
+    const url = snapraidData?.recovery_task_urls?.[snapname] || '';
+    if (!url) {
+        showSnapraidFlash('Aucune URL de récupération pour ce disque.', false, true);
+        return;
+    }
+    window.location.href = url;
+}
+
+function renderSnapraidTaskState(tasks) {
+    const taskBox = $('snapraid-task-state');
+    const lastBox = $('snapraid-last-sync');
+    const list = Array.isArray(tasks) ? tasks.filter(t => String(t.title || '').toLowerCase().includes('snapraid')) : [];
+    const syncTasks = list.filter(t => String(t.title || '').toLowerCase().includes('synchronisation'));
+    const running = syncTasks.find(t => Number(t.running || 0) === 1) || list.find(t => Number(t.running || 0) === 1);
+    const latestSync = syncTasks[0] || null;
+    if (running) {
+        if (taskBox) taskBox.innerHTML = snapraidBadge('en cours', 'warn') + ' <span class="mount-path">#' + esc(running.id) + '</span>';
+    } else if (latestSync) {
+        const result = String(latestSync.result || '').toLowerCase();
+        const kind = result === 'succès' ? 'ok' : (result === 'erreur' ? 'bad' : 'warn');
+        const label = result === 'succès' ? 'succès' : (result === 'erreur' ? 'erreur' : (latestSync.status || 'terminé'));
+        if (taskBox) taskBox.innerHTML = snapraidBadge(label, kind) + ' <a class="mount-path" href="/system/task/progress?log_task=' + encodeURIComponent(latestSync.id) + '">logs</a>';
+    } else {
+        if (taskBox) taskBox.textContent = '—';
+    }
+    if (lastBox) {
+        if (latestSync) {
+            const when = latestSync.last_end && latestSync.last_end !== '—' ? latestSync.last_end : (latestSync.last_run || '—');
+            lastBox.textContent = when || '—';
+        } else {
+            lastBox.textContent = 'aucune tâche';
+        }
+    }
+}
+
+async function loadSnapraidTaskState() {
+    try {
+        const response = await fetch('/system/task/api/status', {cache:'no-store'});
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+        renderSnapraidTaskState(data.tasks || []);
+    } catch (err) {
+        const taskBox = $('snapraid-task-state');
+        if (taskBox) taskBox.textContent = 'Task API indisponible';
+    }
+}
+
+async function loadSnapraid(force = false) {
+    try {
+        const response = await fetch('/disk/api/snapraid', {cache:'no-store'});
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+        snapraidData = data;
+        renderSnapraidDisks(data.disks || []);
+        renderSnapraidStatus(data);
+        await loadSnapraidTaskState();
+    } catch (err) {
+        const tbody = $('snapraid-disks-tbody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Erreur API /disk/api/snapraid</td></tr>';
+        showSnapraidFlash('Erreur SnapRAID : ' + err.message, false, true);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadSnapraid(false);
+    window.setInterval(() => {
+        loadSnapraidTaskState();
+    }, 5000);
+});
+</script>
+{% endblock %}

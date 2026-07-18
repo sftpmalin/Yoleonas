@@ -1,0 +1,25 @@
+{% extends "menu.html" %}
+
+{% set disk_section = disk_section|default('general', true) %}
+{% set disk_titles = {
+    'general': ['Disques', 'Inventaire, état veille, température, montage et usage'],
+    'maintenance': ['Maintenance disques', 'Démonter, monter, vérifier et préparer les volumes. Le disque système/boot reste verrouillé : pour formater, démonte d’abord le volume, puis formate la partition.'],
+    'mergerfs': ['MergerFS', 'Configuration MergerFS : sources, destination, persistance fstab et montage à chaud'],
+    'mergerfs_info': ['Info MergerFS', 'Détails techniques : fstab, commandes de montage, profils et montages actifs'],
+    'spindown': ['Veille disques', 'Réglage hd-idle, état Linux du service et état réel des HDD'],
+    'raid': ['RAID - ZFS - BTRFS', 'Gestion des volumes logiques RAID et des disques vides disponibles. Le montage et le formatage restent dans Maintenance.'],
+    'snapraid': ['SnapRAID', 'Parité SnapRAID, synchronisation manuelle et création de tâche planifiée'],
+    'ramdrive': ['RAMDrive', 'Disques temporaires en mémoire vive : tmpfs, montage à chaud et option fstab'],
+    'virtual_disk': ['Virtual Disk', 'Montage ponctuel de fichiers disque VM : QCOW2, RAW, VDI, VMDK, VHD/VHDX'],
+    'logs': ['Logs disque', 'Logs disque et journal du service de veille']
+} %}
+{% set disk_title = disk_titles.get(disk_section, disk_titles['general']) %}
+{% block title %}{{ disk_title[0] }} - Yoleo{% endblock %}
+{% block page_title %}{{ disk_title[0] }}{% endblock %}
+{% block page_subtitle %}{{ disk_title[1] }}{% endblock %}
+
+{% block content %}
+<main class="disk-page">
+    {% block route_content %}{% endblock %}
+{% include "disk/common_after.html" %}
+{% endblock %}

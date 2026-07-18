@@ -1,0 +1,83 @@
+/* Docker Images : barre de maintenance sur une seule ligne avec boutons icônes. */
+.docker-images-icon-toolbar {
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 7px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.docker-images-icon-toolbar .docker-images-icon-btn,
+.docker-images-actions-compact .docker-images-icon-btn {
+    flex: 0 0 36px;
+    width: 36px;
+    min-width: 36px;
+    max-width: 36px;
+    min-height: 32px;
+    padding: 0;
+    font-size: 15px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.docker-images-icon-toolbar .docker-images-icon-btn:disabled {
+    opacity: .45;
+}
+
+@media (max-width: 900px) {
+    .docker-images-actions-compact.docker-images-icon-toolbar .docker-images-icon-btn {
+        flex: 0 0 36px;
+        max-width: 36px;
+    }
+}
+
+/* Docker Images : icônes réelles + navigation clavier comme Conteneurs/LAN. */
+.docker-images-table .docker-image-keyboard-row {
+    cursor: default;
+}
+
+.docker-images-table .docker-image-keyboard-row.keyboard-selected-row td {
+    background: #24125c !important;
+    color: #fff;
+    border-top: 1px solid #8e6dff;
+    border-bottom: 1px solid #8e6dff;
+}
+
+.docker-images-table .docker-image-keyboard-row.keyboard-selected-row td:first-child {
+    box-shadow: inset 4px 0 0 #b394ff;
+}
+
+.docker-images-table .docker-image-keyboard-row.keyboard-selected-row .docker-icon {
+    border: 2px solid var(--yoleo-accent-2);
+    box-shadow: 0 0 10px rgba(26, 235, 255, .35);
+}
+
+.docker-images-actions-cell {
+    text-align: center;
+}
+
+.docker-images-row-actions {
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+}
+
+.docker-images-row-actions .yoleo-btn-icon {
+    width: 30px;
+    min-width: 30px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+}
+
+.docker-images-table .keyboard-action-focus {
+    outline: 2px solid var(--yoleo-accent-2);
+    outline-offset: 1px;
+    box-shadow: 0 0 0 3px rgba(26, 235, 255, .18), 0 0 12px rgba(26, 235, 255, .34);
+}
+
+@media (max-width: 900px) {
+    .docker-images-row-actions {
+        flex-wrap: wrap;
+    }
+}

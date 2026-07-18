@@ -1,0 +1,85 @@
+/* Personnalisation > Disque + carte accueil montages */
+.disk-top-card .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.disk-top-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.disk-top-title {
+    margin: 0 0 4px;
+    font-size: 18px;
+    color: #f8fafc;
+}
+.disk-top-subtitle {
+    margin: 0;
+    color: #b6c3d6;
+    font-size: 13px;
+    line-height: 1.35;
+}
+.disk-top-conf {
+    color: #8ea1ba;
+    font-size: 12px;
+    text-align: right;
+}
+.disk-top-table-wrap {
+    overflow-x: auto;
+}
+.disk-top-table td,
+.disk-top-table th {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.disk-top-table td:first-child,
+.disk-top-table th:first-child {
+    width: 74px;
+    text-align: center;
+}
+.disk-top-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    border: 1px solid rgba(148, 163, 184, .25);
+    background: rgba(15, 23, 42, .75);
+    color: #dbeafe;
+}
+.disk-top-badge-ok {
+    background: rgba(16, 185, 129, .16);
+    color: #86efac;
+    border-color: rgba(16, 185, 129, .45);
+}
+.disk-top-badge-folder,
+.disk-top-badge-folder_with_data {
+    background: rgba(245, 158, 11, .14);
+    color: #facc15;
+    border-color: rgba(245, 158, 11, .45);
+}
+.disk-top-badge-missing {
+    background: rgba(244, 63, 94, .14);
+    color: #fb7185;
+    border-color: rgba(244, 63, 94, .45);
+}
+.disk-top-custom-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+}
+@media (max-width: 720px) {
+    .disk-top-custom-row {
+        grid-template-columns: 1fr;
+    }
+    .disk-top-conf {
+        text-align: left;
+    }
+}

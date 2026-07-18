@@ -1,0 +1,182 @@
+{% extends "services_base.html" %}
+
+{% macro pro_status_badge(value) -%}
+  {%- set raw = (value|string)|trim -%}
+  {%- set norm = raw|lower -%}
+  {%- set ok_values = ['active', 'enabled', 'enable', 'oui', 'yes', 'true', 'running', 'ok', 'source ok', 'prêt', 'pret'] -%}
+  {%- set ko_values = ['inactive', 'disabled', 'disable', 'non', 'no', 'false', 'failed', 'dead', 'not-found', 'not found', 'missing', 'absent', 'error', 'erreur'] -%}
+  <span class="pro-status-pill {{ 'pro-status-ok' if norm in ok_values else ('pro-status-ko' if norm in ko_values else 'pro-status-neutral') }}">{{ raw }}</span>
+{%- endmacro %}
+
+{% block route_content %}
+<div class="proftpd-wrap">
+  <div class="proftpd-panel">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-stack yoleo-page-flash">
+      {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="service-section-shell">
+      <section class="card pro-service-card">
+        <div class="summary-grid pro-summary-grid-compact">
+          <div class="summary-card"><div class="summary-label">Service</div><div class="summary-value small">{{ pro_status_badge(status.service) }}</div></div>
+          <div class="summary-card"><div class="summary-label">État</div><div class="summary-value">{{ pro_status_badge(status.active) }}</div></div>
+          <div class="summary-card"><div class="summary-label">Boot</div><div class="summary-value">{{ pro_status_badge(status.enabled) }}</div></div>
+          <div class="summary-card"><div class="summary-label">Binaire</div><div class="summary-value">{{ pro_status_badge(status.binary_exists) }}</div></div>
+          <div class="summary-card"><div class="summary-label">Conf</div><div class="summary-value">{{ pro_status_badge(status.conf_exists) }}</div></div>
+          <div class="summary-card"><div class="summary-label">Port</div><div class="summary-value">{{ pro_status_badge(status.port) }}</div></div>
+          <div class="summary-card"><div class="summary-label">Passif</div><div class="summary-value small">{{ pro_status_badge(status.passive_ports) }}</div></div>
+          <div class="summary-card"><div class="summary-label">Racine</div><div class="summary-value small">{{ pro_status_badge('home Linux') }}</div></div>
+        </div>
+      </section>
+
+      <section class="card pro-settings-card">
+        <div class="pro-settings-row">
+          <div class="pro-settings-title">
+            <h2 class="card-title">🛠️ Réglages ProFTPD</h2>
+            <div class="hint">Ports du service FTP.</div>
+          </div>
+          <form method="post" action="{{ url_for('services_bp.pro_proftpd_config_save') }}" class="pro-settings-form" onsubmit="return proftpdSubmitSettings(this);">
+            <div class="pro-edit-field" data-proftpd-edit-field>
+              <label>Port FTP</label>
+              <button type="button" class="pro-field-view" onclick="openProftpdField(this)" title="Cliquer pour modifier">{{ conf.PORT }}</button>
+              <input class="pro-field-input" name="PORT" value="{{ conf.PORT }}" placeholder="21" inputmode="numeric" autocomplete="off" hidden>
+            </div>
+            <div class="pro-edit-field pro-edit-field-wide" data-proftpd-edit-field>
+              <label>Ports passifs</label>
+              <button type="button" class="pro-field-view" onclick="openProftpdField(this)" title="Cliquer pour modifier">{{ conf.PASSIVE_PORTS }}</button>
+              <input class="pro-field-input" name="PASSIVE_PORTS" value="{{ conf.PASSIVE_PORTS }}" placeholder="30000 30100" autocomplete="off" hidden>
+            </div>
+            <button class="yoleo-btn yoleo-btn-primary pro-settings-save" type="submit">💾 Enregistrer</button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROFTPD_SERVICE_ACTION_URL = "{{ url_for('services_bp.pro_proftpd_service_action') }}";
+const PROFTPD_SYSTEM_ACTION_URL = "{{ url_for('services_bp.pro_proftpd_system_action') }}";
+
+function proSubmitAction(url, action) {
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.action = url;
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'action';
+  input.value = action;
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function serviceAction(action, btn) {
+  const actions = {
+    proftpd_start: [PROFTPD_SERVICE_ACTION_URL, 'start'],
+    proftpd_stop: [PROFTPD_SERVICE_ACTION_URL, 'stop'],
+    proftpd_restart: [PROFTPD_SERVICE_ACTION_URL, 'restart'],
+    proftpd_enable: [PROFTPD_SERVICE_ACTION_URL, 'enable'],
+    proftpd_disable: [PROFTPD_SERVICE_ACTION_URL, 'disable'],
+    proftpd_install: [PROFTPD_SYSTEM_ACTION_URL, 'install'],
+    proftpd_apply: [PROFTPD_SYSTEM_ACTION_URL, 'apply'],
+    proftpd_reload: [PROFTPD_SYSTEM_ACTION_URL, 'apply'],
+    proftpd_status: [PROFTPD_SYSTEM_ACTION_URL, 'check']
+  };
+  const target = actions[action];
+  if (!target) { return false; }
+  if (btn) { btn.disabled = true; }
+  proSubmitAction(target[0], target[1]);
+  return false;
+}
+
+function saveProftpdSettings(btn) {
+  const form = document.querySelector('form[action*="/services/proftpd/config"]');
+  if (!form) { return false; }
+  if (btn) { btn.disabled = true; }
+  form.submit();
+  return false;
+}
+
+
+function openProftpdField(btn) {
+  const field = btn.closest('[data-proftpd-edit-field]');
+  if (!field) { return false; }
+  const input = field.querySelector('.pro-field-input');
+  if (!input) { return false; }
+
+  btn.hidden = true;
+  input.hidden = false;
+  input.focus();
+  input.select();
+
+  return false;
+}
+
+function closeProftpdField(input) {
+  const field = input.closest('[data-proftpd-edit-field]');
+  if (!field) { return false; }
+  const btn = field.querySelector('.pro-field-view');
+  if (!btn) { return false; }
+
+  input.hidden = true;
+  btn.textContent = input.value || input.getAttribute('placeholder') || '';
+  btn.hidden = false;
+
+  return false;
+}
+
+function proftpdSubmitSettings(form) {
+  const btn = form.querySelector('.pro-settings-save');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Enregistrement...';
+  }
+  return true;
+}
+
+document.addEventListener('keydown', function (event) {
+  const input = event.target && event.target.closest ? event.target.closest('.pro-field-input') : null;
+  if (!input) { return; }
+
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const form = input.closest('form');
+    if (form) { form.requestSubmit ? form.requestSubmit() : form.submit(); }
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeProftpdField(input);
+  }
+});
+
+
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.flash-stack .flash.success, .flash-stack .flash.ok, .flash-stack .flash.info').forEach(function (flash) {
+    setTimeout(function () {
+      flash.style.transition = 'opacity .25s ease, transform .25s ease, max-height .25s ease, margin .25s ease, padding .25s ease';
+      flash.style.opacity = '0';
+      flash.style.transform = 'translateY(-4px)';
+      flash.style.maxHeight = '0';
+      flash.style.margin = '0';
+      flash.style.paddingTop = '0';
+      flash.style.paddingBottom = '0';
+      setTimeout(function () {
+        const stack = flash.closest('.flash-stack');
+        flash.remove();
+        if (stack && !stack.querySelector('.flash')) {
+          stack.remove();
+        }
+      }, 300);
+    }, 1200);
+  });
+});
+</script>
+{% endblock %}

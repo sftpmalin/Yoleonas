@@ -1,0 +1,194 @@
+    /* Docker / ENV : page pleine largeur, champs centrés en paire clé — valeur */
+    .docker-env-form,
+    .docker-env-section {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .docker-env-wrap {
+        overflow-x: visible;
+    }
+
+    .docker-env-wrap .yoleo-table,
+    .docker-env-table {
+        width: 100%;
+        min-width: 0;
+        table-layout: fixed;
+    }
+
+    .docker-env-table th:first-child,
+    .docker-env-table td:first-child {
+        width: auto;
+    }
+
+    .docker-env-table th:last-child,
+    .docker-env-table td:last-child {
+        width: 140px;
+        min-width: 140px;
+        text-align: center;
+    }
+
+    .docker-env-table th,
+    .docker-env-table td {
+        padding: 6px 8px;
+        vertical-align: middle;
+    }
+
+    .docker-env-pair-head {
+        text-align: center;
+    }
+
+    .docker-env-pair-head span,
+    .docker-env-separator {
+        color: var(--yoleo-muted);
+        font-weight: 900;
+    }
+
+    .docker-env-pair {
+        width: min(560px, 100%);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 240px 18px 260px;
+        gap: 7px;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .docker-env-separator {
+        text-align: center;
+        line-height: 32px;
+        user-select: none;
+    }
+
+    .docker-env-input {
+        width: 100%;
+        height: 32px;
+        min-width: 0;
+        max-width: none;
+        margin: 0;
+        padding: 6px 9px;
+        font-size: 12px;
+    }
+
+    .docker-env-action-cell .yoleo-btn {
+        margin: 0;
+    }
+
+    .docker-page .docker-env-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .docker-env-comment-line {
+        width: min(560px, 100%);
+        margin: 0 auto;
+    }
+
+    .docker-env-comment-input {
+        width: 100%;
+        height: 32px;
+        min-width: 0;
+        margin: 0;
+        padding: 6px 9px;
+        font-size: 12px;
+        color: var(--yoleo-accent-2);
+        font-weight: 800;
+    }
+
+    .docker-env-comment-row td,
+    .docker-env-raw-row td {
+        background: rgba(26, 235, 255, .035);
+    }
+
+    .docker-env-comment-actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+    }
+
+    .docker-env-comment-actions .yoleo-btn-mini {
+        min-width: 28px;
+        height: 28px;
+        padding: 4px 7px;
+    }
+
+    /* Docker / ENV : rapprocher les boutons ↑ ↓ ✕ du champ commentaire */
+    .docker-env-table tbody tr.docker-env-comment-row {
+        position: relative;
+    }
+
+    .docker-env-table tbody tr.docker-env-comment-row > td:first-child {
+        text-align: center;
+    }
+
+    .docker-env-table tbody tr.docker-env-comment-row .docker-env-comment-actions {
+        position: absolute;
+        left: calc(50% + 288px);
+        top: 50%;
+        width: auto;
+        min-width: 0;
+        padding: 0 !important;
+        transform: translateY(-50%);
+        z-index: 2;
+    }
+
+
+    /* Docker / ENV : conserver les champs centrés et rapprocher seulement le bouton supprimer */
+    .docker-env-table tbody tr.docker-env-kv-row {
+        position: relative;
+    }
+
+    .docker-env-table tbody tr.docker-env-kv-row > td:first-child {
+        text-align: center;
+    }
+
+    .docker-env-table tbody tr.docker-env-kv-row .docker-env-action-cell {
+        position: static;
+        padding-left: 0;
+        padding-right: 0;
+        text-align: left;
+        width: 140px;
+        min-width: 140px;
+    }
+
+    .docker-env-table tbody tr.docker-env-kv-row .docker-env-action-cell .yoleo-btn {
+        position: absolute;
+        left: calc(50% + 246px);
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 2;
+    }
+
+    @media (max-width: 760px) {
+        .docker-env-table tbody tr.docker-env-kv-row .docker-env-action-cell .yoleo-btn,
+        .docker-env-table tbody tr.docker-env-comment-row .docker-env-comment-actions {
+            position: static;
+            transform: none;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .docker-env-pair {
+            width: 100%;
+            grid-template-columns: minmax(120px, 1fr) 16px minmax(140px, 1fr);
+            gap: 6px;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .docker-env-wrap {
+            overflow-x: auto;
+        }
+
+        .docker-env-wrap .yoleo-table,
+        .docker-env-table {
+            min-width: 620px;
+        }
+    }
+

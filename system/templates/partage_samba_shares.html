@@ -1,0 +1,118 @@
+{% extends "partage_samba_base.html" %}
+
+{% block samba_content %}
+<div id="tab-samba-shares" class="tab-panel active partage-samba-shares-auto-v5">
+    <section class="card">
+        <div class="table-wrap partage-samba-shares-table-wrap" data-mobile-mosaic="off" data-yoleo-context-zone="samba-shares-table">
+            <table class="share-table partage-samba-shares-table" id="sambaSharesTable" data-mobile-mosaic="off">
+                <colgroup>
+                    <col class="samba-share-col-name">
+                    <col class="samba-share-col-path">
+                    <col class="samba-share-col-access">
+                    <col class="samba-share-col-users">
+                    <col class="samba-share-col-small">
+                    <col class="samba-share-col-small">
+                    <col class="samba-share-col-state">
+                    <col class="samba-share-col-actions">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Chemin</th>
+                        <th>Acces</th>
+                        <th>Utilisateurs</th>
+                        <th>Browsable</th>
+                        <th>Corbeille</th>
+                        <th>Etat</th>
+                        <th style="width:76px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for share in state.samba.shares %}
+                    <tr tabindex="0" data-existing-share="1" data-share-status="{% if share.exists %}ok{% else %}missing{% endif %}">
+                        <td><span class="readonly-cell">{{ share.name }}</span><input type="hidden" data-share="name" value="{{ share.name }}"></td>
+                        <td><span class="path-pill" title="{{ share.path }}"><span>{{ share.path }}</span></span><input type="hidden" data-share="path" value="{{ share.path }}"></td>
+                        <td>
+                            <select class="select-input samba-access-mode-select" data-share="access_mode" disabled title="Clique sur le stylo pour modifier ce partage.">
+                                <option value="public" {% if share.access_mode == 'public' %}selected{% endif %}>Public</option>
+                                <option value="secure" {% if share.access_mode == 'secure' %}selected{% endif %}>Securise</option>
+                                <option value="private" {% if share.access_mode == 'private' %}selected{% endif %}>Prive</option>
+                            </select>
+                        </td>
+                        <td>
+                            <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted samba-access-users-btn" onclick="openSambaAccessModal(this)" disabled title="Clique sur le stylo pour modifier les accès Samba.">Acces</button>
+                            <span class="samba-access-summary" data-samba-access-summary></span>
+                            <input type="hidden" data-share="type" value="{{ share.type or 'normal' }}">
+                            <input type="hidden" data-share="read_users" value="{{ (share.read_users or [])|join(',') }}">
+                            <input type="hidden" data-share="write_users" value="{{ (share.write_users or [])|join(',') }}">
+                        </td>
+                        <td>
+                            <select class="select-input" data-share="browsable" disabled title="Clique sur le stylo pour modifier ce partage.">
+                                <option value="yes" {% if share.browsable == 'yes' %}selected{% endif %}>yes</option>
+                                <option value="no" {% if share.browsable != 'yes' %}selected{% endif %}>no</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select class="select-input" data-share="recycle_bin" disabled title="Clique sur le stylo pour modifier ce partage.">
+                                <option value="no" {% if share.recycle_bin != 'yes' %}selected{% endif %}>no</option>
+                                <option value="yes" {% if share.recycle_bin == 'yes' %}selected{% endif %}>yes</option>
+                            </select>
+                        </td>
+                        <td>{% if share.exists %}<span class="badge badge-ok">dossier OK</span>{% else %}<span class="badge badge-warn">manquant</span>{% endif %}</td>
+                        <td>
+                            <div class="actions-cell">
+                                <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Modifier" onclick="editSambaShareRow(this)">✏️</button>
+                                <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="openSambaDeleteConfirmModal(this)">❌</button>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+
+
+    <div class="modal-backdrop" id="sambaDeleteConfirmModal">
+        <div class="modal samba-delete-confirm-modal">
+            <div class="modal-head">
+                <span class="modal-title">Supprimer le partage</span>
+                <button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="closeSambaDeleteConfirmModal()">x</button>
+            </div>
+            <div class="modal-body">
+                <p class="samba-delete-confirm-text">Êtes-vous sûr de vouloir bien supprimer ce partage ?</p>
+            </div>
+            <div class="modal-actions">
+                <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="closeSambaDeleteConfirmModal()">Annuler</button>
+                <button class="yoleo-btn yoleo-btn-red" type="button" onclick="confirmSambaDeleteModal(this)">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="sambaAccessModal">
+        <div class="modal samba-access-modal">
+            <div class="modal-head">
+                <div class="samba-access-modal-title-line"><span class="modal-title">Acces Samba</span><span class="hint samba-access-modal-subtitle" id="sambaAccessModalSubtitle"> - Lecture / ecriture</span></div>
+                <button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="closeSambaAccessModal()">x</button>
+            </div>
+            <div class="modal-body">
+                <div class="table-wrap samba-access-modal-table-wrap">
+                    <table class="share-table samba-access-modal-table">
+                        <thead><tr><th>Utilisateur</th><th>Droit SMB</th></tr></thead>
+                        <tbody id="sambaAccessModalBody"></tbody>
+                    </table>
+                </div>
+                <label class="samba-root-option" id="sambaRootOption">
+                    <input type="checkbox" id="sambaRootEnabled">
+                    <span>Root Samba</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="closeSambaAccessModal()">Annuler</button>
+                <button class="yoleo-btn yoleo-btn-primary" type="button" onclick="saveSambaAccessModal(this)">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

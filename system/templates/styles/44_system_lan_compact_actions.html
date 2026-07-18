@@ -1,0 +1,111 @@
+/* Patch ciblé : Système > LAN > Réseau Linux.
+   Objectif : remonter le tableau, rapprocher les actions du filtre,
+   et remplacer les gros boutons de ligne par des boutons icônes. */
+
+.lan-route-page .lan-iface-card-head {
+    align-items: center;
+    gap: 14px;
+}
+
+.lan-route-page .lan-iface-head-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: nowrap;
+    min-width: min(100%, 680px);
+}
+
+.lan-route-page .lan-iface-filter {
+    width: min(360px, 42vw);
+    max-width: 360px;
+    min-width: 230px;
+}
+
+.lan-route-page .lan-head-btn {
+    min-height: 32px;
+    padding: 7px 12px;
+    white-space: nowrap;
+}
+
+.lan-route-page #ifaceTable {
+    min-width: 930px;
+}
+
+/* Compression ciblée des petites colonnes pour garder les 4 actions sur une seule ligne. */
+.lan-route-page #ifaceTable th:nth-child(1),
+.lan-route-page #ifaceTable td:nth-child(1) {
+    width: 118px;
+}
+
+.lan-route-page #ifaceTable th:nth-child(2),
+.lan-route-page #ifaceTable td:nth-child(2) {
+    width: 108px;
+}
+
+.lan-route-page #ifaceTable th:nth-child(3),
+.lan-route-page #ifaceTable td:nth-child(3) {
+    width: 66px;
+    text-align: center;
+}
+
+.lan-route-page #ifaceTable th.sys-inline-040,
+.lan-route-page #ifaceTable td:nth-child(8) {
+    width: 132px !important;
+    min-width: 132px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+
+.lan-route-page #ifaceTable td {
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.lan-route-page #ifaceTable .actions-cell {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    width: 126px;
+    max-width: 126px;
+    white-space: nowrap !important;
+}
+
+.lan-route-page #ifaceTable .lan-icon-action {
+    box-sizing: border-box;
+    width: 28px;
+    min-width: 28px;
+    flex: 0 0 28px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.lan-route-page #ifaceTable .lan-icon-action[disabled] {
+    opacity: .45;
+    cursor: not-allowed;
+    filter: grayscale(.25);
+}
+
+@media (max-width: 1050px) {
+    .lan-route-page .lan-iface-card-head {
+        align-items: stretch;
+    }
+    .lan-route-page .lan-iface-head-actions {
+        width: 100%;
+        min-width: 0;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+    .lan-route-page .lan-iface-filter {
+        width: 100%;
+        max-width: none;
+        flex: 1 1 260px;
+    }
+}

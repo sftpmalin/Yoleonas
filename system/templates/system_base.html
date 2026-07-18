@@ -1,0 +1,81 @@
+{% extends "menu.html" %}
+
+{#
+    Socle commun du module Système.
+    Les routes Flask rendent des fichiers system_*.html separes.
+    Ce fichier garde seulement le titre, le sous-titre et le contexte commun.
+    Règle : aucun CSS local, aucun sub-tab JavaScript caché.
+#}
+
+{% set current_tab = active_system_tab|default('monitor', true) %}
+{% if current_tab in ['info', 'host'] %}{% set current_tab = 'monitor' %}{% endif %}
+{% if current_tab in ['processus'] %}{% set current_tab = 'processes' %}{% endif %}
+{% if current_tab in ['conf', 'settings', 'gestionnaire_conf', 'gestionnaire-conf'] %}{% set current_tab = 'confmgr' %}{% endif %}
+{% if current_tab in ['personnalisation'] %}{% set current_tab = 'personalization' %}{% endif %}
+
+{% set current_lan_subtab = active_lan_subtab|default(request.args.get('subtab', 'overview'), true) %}
+{% if current_lan_subtab in ['apply', 'appliquer'] %}{% set current_lan_subtab = 'apply' %}{% else %}{% set current_lan_subtab = 'overview' %}{% endif %}
+
+{% set current_mdns_subtab = active_mdns_subtab|default(request.args.get('subtab', 'dashboard'), true) %}
+{% if current_mdns_subtab in ['config', 'noms', 'names', 'local', 'locals'] %}{% set current_mdns_subtab = 'config' %}{% elif current_mdns_subtab in ['logs', 'log', 'journal'] %}{% set current_mdns_subtab = 'logs' %}{% else %}{% set current_mdns_subtab = 'dashboard' %}{% endif %}
+
+{% set current_system_subtab = active_system_subtab|default(request.args.get('subtab', 'install'), true) %}
+{% set current_system_subtab_raw = current_system_subtab|string|lower|replace('-', '_') %}
+{% if current_system_subtab_raw in ['updates', 'update', 'maj', 'mise_a_jour'] %}{% set current_system_subtab = 'updates' %}{% elif current_system_subtab_raw in ['troubleshooting', 'depannage', 'dépannage', 'reset', 'defaults', 'defaut', 'défaut'] %}{% set current_system_subtab = 'troubleshooting' %}{% elif current_system_subtab_raw in ['logs', 'log', 'sorties', 'output'] %}{% set current_system_subtab = 'logs' %}{% else %}{% set current_system_subtab = 'install' %}{% endif %}
+
+{% set pers_subtab = active_personalization_subtab|default(request.args.get('subtab', 'menu'), true) %}
+{% set pers_subtab_raw = pers_subtab|string|lower|replace('-', '_') %}
+{% if pers_subtab_raw in ['accueil', 'index', 'home'] %}
+    {% set pers_subtab = 'home' %}
+{% elif pers_subtab_raw in ['top', 'topbar', 'bandeau', 'bandeau_haut'] %}
+    {% set pers_subtab = 'top' %}
+{% elif pers_subtab_raw in ['top_menu', 'menu_top', 'haut_menu', 'menu_haut'] %}
+    {% set pers_subtab = 'top_menu' %}
+{% elif pers_subtab_raw in ['disk', 'disque', 'montage', 'montages', 'mount', 'mounts'] %}
+    {% set pers_subtab = 'disk' %}
+{% elif pers_subtab_raw in ['mobile', 'pwa', 'telephone', 'téléphone', 'app', 'application'] %}
+    {% set pers_subtab = 'mobile' %}
+{% elif pers_subtab_raw in ['menu_cli', 'cli_menu', 'cli', 'terminal_menu'] %}
+    {% set pers_subtab = 'menu_cli' %}
+{% elif pers_subtab_raw in ['meteo', 'météo', 'weather'] %}
+    {% set pers_subtab = 'meteo' %}
+{% elif pers_subtab_raw in ['info', 'infos', 'information', 'informations'] %}
+    {% set pers_subtab = 'info' %}
+{% else %}
+    {% set pers_subtab = 'menu' %}
+{% endif %}
+
+{% set active_confmgr_subtab = request.args.get('confmgr_tab', request.args.get('subtab', '')) %}
+{% set show_options = (mode == 'options') or (active_confmgr_subtab in ['option', 'options']) %}
+
+{% block title %}Système - Yoleo{% endblock %}
+
+{% block page_title %}
+{% if current_tab == 'services' %}Services systemd
+{% elif current_tab == 'processes' %}Processus Linux
+{% elif current_tab == 'logs' %}Logs système
+{% elif current_tab == 'lan' %}{% if current_lan_subtab == 'apply' %}Appliquer réseau{% else %}Réseau Linux{% endif %}
+{% elif current_tab == 'nftables' %}Pare-feu nftables
+{% elif current_tab == 'mdns' %}{% if current_mdns_subtab == 'config' %}Noms .local{% elif current_mdns_subtab == 'logs' %}Logs mDNS{% else %}mDNS local{% endif %}
+{% elif current_tab == 'admin' %}{% if current_system_subtab == 'updates' %}Mise à jour{% elif current_system_subtab == 'troubleshooting' %}Dépannage{% elif current_system_subtab == 'logs' %}Log système{% else %}Installation{% endif %}
+{% elif current_tab == 'personalization' %}{% if pers_subtab == 'home' %}Personnalisation accueil{% elif pers_subtab == 'top' %}Bandeau du haut{% elif pers_subtab == 'top_menu' %}Menu haut{% elif pers_subtab == 'disk' %}Personnalisation disque{% elif pers_subtab == 'mobile' %}Personnalisation mobile{% elif pers_subtab == 'menu_cli' %}Menu CLI{% elif pers_subtab == 'meteo' %}Personnalisation météo{% elif pers_subtab == 'info' %}Info personnalisation{% else %}Menu personnalisé{% endif %}
+{% elif current_tab == 'confmgr' %}{% if mode == 'edit' %}{{ filename }}{% elif show_options %}Options du gestionnaire conf{% else %}Gestionnaire de configuration{% endif %}
+{% else %}Info host{% endif %}
+{% endblock %}
+
+{% block page_subtitle %}
+{% if current_tab == 'services' %}État réel, démarrage, arrêt, redémarrage et activation au boot
+{% elif current_tab == 'processes' %}Liste des processus Linux · tri CPU/RAM/PID
+{% elif current_tab == 'logs' %}journalctl système, kernel, boot ou service
+{% elif current_tab == 'lan' %}{% if current_lan_subtab == 'apply' %}Aperçu des commandes puis application contrôlée{% else %}Interfaces, plans en attente, bridges, IP, route par défaut et DNS{% endif %}
+{% elif current_tab == 'nftables' %}Entrée refusée par défaut · sortie autorisée · ports NAS en liste blanche
+{% elif current_tab == 'mdns' %}{% if current_mdns_subtab == 'config' %}Entrées IP=nom.local dans {{ mdns_conf.SERVICE_CONF }}{% elif current_mdns_subtab == 'logs' %}Dernières lignes de {{ mdns_conf.SERVICE_LOG }}{% else %}{{ mdns_conf.SUBTITLE }} · contrôle Avahi et publication réseau{% endif %}
+{% elif current_tab == 'admin' %}{% if current_system_subtab == 'updates' %}Liste des paquets APT disponibles{% elif current_system_subtab == 'troubleshooting' %}Supprimer un fichier de configuration ou remettre tout le dossier conf par défaut{% elif current_system_subtab == 'logs' %}Retours bruts des commandes système{% else %}Blocs système : installer, réinstaller ou désactiver{% endif %}
+{% elif current_tab == 'personalization' %}{% if pers_subtab == 'home' %}Accueil du NAS dans index.conf{% elif pers_subtab == 'top' %}Affichage du bandeau supérieur dans top.conf{% elif pers_subtab == 'top_menu' %}Configuration de la roue crantée dans menu_top.conf{% elif pers_subtab == 'disk' %}Choisis les points de montage affichés sur l’accueil. Yoleo vérifie seulement qu’ils sont bien montés, sans monter de disque ni modifier fstab.{% elif pers_subtab == 'mobile' %}Manifest PWA, nom, icône, couleurs et URL de démarrage.{% elif pers_subtab == 'menu_cli' %}Configuration du menu terminal/CLI{% elif pers_subtab == 'meteo' %}Prévisions, villes et affichage météo du bandeau haut{% elif pers_subtab == 'info' %}Notes et explications déplacées ici{% else %}Organisation de la sidebar globale dans system.conf{% endif %}
+{% elif current_tab == 'confmgr' %}{% if mode == 'edit' %}Fichier ouvert : {{ filepath }}{% elif show_options %}Dossiers parcourus de [WATCH_DIRS] dans system.conf{% else %}Fichiers .conf centralisés{% endif %}
+{% else %}Informations techniques · affichage aligné sur index.conf{% endif %}
+{% endblock %}
+
+{% block content %}
+{% block system_content %}{% endblock %}
+{% endblock %}

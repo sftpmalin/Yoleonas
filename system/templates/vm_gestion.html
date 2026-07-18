@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% if current_vm %}VM Gestion - {{ current_vm.name }}{% else %}VM Gestion{% endif %} - Yoleo</title>
+    {% include "style.html" %}
+    {% include "vm/gestion_style.html" %}
+</head>
+<body class="vmg-window-body">
+<div class="vmg-window-page">
+{% set is_uefi = current_vm and (current_vm.loader or ((current_vm.firmware|string|lower) == 'efi')) %}
+<div class="vmg-shell">
+    <aside class="vmg-left" aria-label="Menu gestion VM">
+        {% if current_vm %}
+        <nav class="vmg-menu">
+            <button type="button" class="vmg-menu-item is-active" data-vmg-menu="general" onclick="vmgShowDevice('general')">
+                <span class="vmg-menu-icon">🖥️</span>
+                <span class="vmg-menu-text">
+                    <span class="vmg-menu-label">Informations</span>
+                    <span class="vmg-menu-sub">CPU, RAM, boot, autostart</span>
+                </span>
+            </button>
+
+            <button type="button" class="vmg-menu-item" data-vmg-menu="xml" onclick="vmgShowDevice('xml')">
+                <span class="vmg-menu-icon">&lt;/&gt;</span>
+                <span class="vmg-menu-text">
+                    <span class="vmg-menu-label">XML</span>
+                    <span class="vmg-menu-sub">XML libvirt complet</span>
+                </span>
+            </button>
+
+            <button type="button" class="vmg-menu-item vmg-add-menu" onclick="vmgOpenAddDeviceModal()">
+                <span class="vmg-menu-icon">➕</span>
+                <span class="vmg-menu-text">
+                    <span class="vmg-menu-label">Ajouter un peripherique</span>
+                    <span class="vmg-menu-sub">Disque, ISO, reseau, PCI, USB</span>
+                </span>
+            </button>
+
+            <button type="button" class="vmg-menu-item" data-vmg-menu="boot" onclick="vmgShowDevice('boot')">
+                <span class="vmg-menu-icon">🚀</span>
+                <span class="vmg-menu-text">
+                    <span class="vmg-menu-label">Boot</span>
+                    <span class="vmg-menu-sub">Ordre de demarrage</span>
+                </span>
+            </button>
+
+            <button type="button" class="vmg-menu-item" data-vmg-menu="bios" onclick="vmgShowDevice('bios')">
+                <span class="vmg-menu-icon">🧬</span>
+                <span class="vmg-menu-text">
+                    <span class="vmg-menu-label">BIOS</span>
+                    <span class="vmg-menu-sub">SeaBIOS, UEFI, firmware</span>
+                </span>
+            </button>
+
+            <div class="vmg-left-title">Materiel de la VM</div>
+            {% if devices %}
+                {% for dev in devices %}
+                <button type="button" class="vmg-menu-item" data-vmg-menu="{{ dev.key }}" onclick="vmgShowDevice('{{ dev.key }}')">
+                    <span class="vmg-menu-icon">{{ dev.icon }}</span>
+                    <span class="vmg-menu-text">
+                        <span class="vmg-menu-label">{{ dev.label }}</span>
+                        <span class="vmg-menu-sub">{{ dev.subtitle or dev.kind }}</span>
+                    </span>
+                </button>
+                {% endfor %}
+            {% else %}
+                <div class="vmg-empty">Aucun peripherique ajoute.</div>
+            {% endif %}
+        </nav>
+        {% else %}
+        <div class="vmg-empty">Ouvre une VM depuis la liste principale /vms/main.</div>
+        {% endif %}
+    </aside>
+
+    <main class="vmg-right">
+        <div id="vmgStatus" class="status-box vmg-status"></div>
+        {% if error %}<div class="status-box error">{{ error }}</div>{% endif %}
+
+        {% if not current_vm %}
+        <section class="card">
+            <div class="vmg-title-line"><h2>Gestion VM</h2></div>
+            <p class="vmg-muted">Cette fenetre modifie une VM existante. Selectionne une VM dans /vms/main puis clique sur le bouton modifier.</p>
+        </section>
+        {% else %}
+        <section class="card vmg-device-detail is-active" data-vmg-panel="general">
+            <div class="vmg-title-line vmg-title-compact">
+                <div id="vmgTitleBox" class="vmg-inline-title">
+                    <h2 id="vmgTitleText">{{ current_vm.name }}</h2>
+                    <button type="button" class="vmg-title-edit-btn" title="Renommer" aria-label="Renommer la VM" onclick="vmgStartTitleRename()">&#9998;</button>
+                    <input id="vmgTitleInput" class="text-input vmg-title-input" value="{{ current_vm.name }}" maxlength="80" autocomplete="off" aria-label="Nom de la VM">
+                </div>
+                <span class="badge {% if current_vm.state_class == 'running' %}badge-running{% elif current_vm.state_class == 'stopped' %}badge-stopped{% elif current_vm.state_class == 'paused' %}badge-paused{% else %}badge-unknown{% endif %}">{{ current_vm.state }}</span>
+            </div>
+
+            <div class="vmg-tab-panel is-active" data-vmg-tab-panel="general:visual">
+                <form id="vmgGeneralForm" class="vmg-form" onsubmit="vmgSubmitGeneral(event)">
+                    <div class="vmg-form-grid vmg-general-grid">
+                        <label class="vmg-field vmg-field-small">RAM min (Go)
+                            <input id="vmgMemoryMinGb" class="text-input" type="number" min="0.25" step="0.25">
+                        </label>
+                        <label class="vmg-field vmg-field-small">RAM max (Go)
+                            <input id="vmgMemoryMaxGb" class="text-input" type="number" min="0.25" step="0.25">
+                        </label>
+                        <label class="vmg-field vmg-field-check vmg-field-autostart">Autostart
+                            <span class="vmg-check-line"><input id="vmgAutostart" type="checkbox" {% if (current_vm.autostart|string|lower) in ['enable','enabled','yes','on','true','1','active','activé'] %}checked{% endif %}> <span>demarrer avec l'hote</span></span>
+                        </label>
+                        <label class="vmg-field vmg-field-machine">Machine
+                            <select id="vmgMachineType" class="select-input">
+                                <option value="pc">i440FX / pc</option>
+                                <option value="q35">Q35</option>
+                            </select>
+                        </label>
+                        <label class="vmg-field vmg-field-check vmg-field-hyperv">Hyper-V
+                            <span class="vmg-check-line"><input id="vmgHyperv" type="checkbox" {% if current_vm.hyperv_enabled %}checked{% endif %}> <span>activer</span></span>
+                        </label>
+                    </div>
+
+                    <div class="vmg-cpu-panel">
+                        <div class="vmg-cpu-panel-head">
+                            <div>
+                                <div class="vmg-section-title">CPU / vCPU</div>
+                                <div id="vmgCpuSelectedCount" class="vmg-muted">Aucun CPU hote epingle</div>
+                            </div>
+                            <div class="vmg-cpu-counts">
+                                <label class="vmg-field vmg-field-small">vCPU actifs
+                                    <input id="vmgCpuCurrent" class="text-input" type="number" min="1" max="256" value="{{ current_vm.vcpu_current or current_vm.vcpu or '' }}">
+                                </label>
+                                <label class="vmg-field vmg-field-small">vCPU max
+                                    <input id="vmgCpuMax" class="text-input" type="number" min="1" max="256" value="{{ current_vm.vcpu or current_vm.vcpu_current or '' }}">
+                                </label>
+                                {% set _cpu_choice = current_vm.cpu_choice or '' %}
+                                <label class="vmg-field vmg-field-cpu-mode">Mode CPU
+                                    <select id="vmgCpuMode" class="select-input">
+                                        <option value="" {% if _cpu_choice not in ['emulated','host-passthrough','host-model'] %}selected{% endif %}>Conserver le CPU XML actuel</option>
+                                        <option value="emulated" {% if _cpu_choice == 'emulated' %}selected{% endif %}>CPU logiciel emule</option>
+                                        <option value="host-passthrough" {% if _cpu_choice == 'host-passthrough' %}selected{% endif %}>CPU hote direct</option>
+                                        <option value="host-model" {% if _cpu_choice == 'host-model' %}selected{% endif %}>CPU hote compatible</option>
+                                    </select>
+                                </label>
+                                <input id="vmgCpuModeOriginal" type="hidden" value="{{ _cpu_choice }}">
+                                {% set _topology_mode = current_vm.cpu_topology_mode or 'cores' %}
+                                {% set _topology_sockets = current_vm.cpu_topology_sockets or '1' %}
+                                <label class="vmg-field vmg-field-cpu-topology">Topologie
+                                    <select id="vmgCpuTopologyMode" class="select-input">
+                                        <option value="cores" {% if _topology_mode == 'cores' %}selected{% endif %}>1 socket, N coeurs</option>
+                                        <option value="sockets" {% if _topology_mode == 'sockets' %}selected{% endif %}>N sockets, 1 coeur</option>
+                                        <option value="custom" {% if _topology_mode == 'custom' %}selected{% endif %}>Sockets personnalises</option>
+                                        <option value="keep">Conserver XML</option>
+                                    </select>
+                                </label>
+                                <label class="vmg-field vmg-field-small vmg-field-cpu-sockets">Sockets
+                                    <input id="vmgCpuTopologySockets" class="text-input" type="number" min="1" max="256" value="{{ _topology_sockets or '1' }}">
+                                </label>
+                                <input id="vmgCpuPinset" type="hidden" value="{{ current_vm.cpu_pinset or '' }}">
+                            </div>
+                        </div>
+                        <div class="vmg-cpu-actions">
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="vmgSelectFirstActiveCpus()">Premiers vCPU actuels</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="vmgSelectLastPhysicalCores()">Derniers coeurs</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="vmgSelectAllCpus()">Tous</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="vmgClearCpuSelection()">Aucun</button>
+                        </div>
+                        <div id="vmgCpuGrid" class="vmg-cpu-grid"></div>
+                    </div>
+
+                    <div class="vmg-grid">
+                        <div class="vmg-info-card"><b>Machine</b><span>{{ current_vm.machine or '-' }}</span></div>
+                        <div class="vmg-info-card"><b>Architecture</b><span>{{ current_vm.arch or '-' }}</span></div>
+                        <div class="vmg-info-card"><b>Mode CPU</b><span>{{ current_vm.cpu_label or current_vm.cpu_mode or 'CPU logiciel emule' }}</span></div>
+                        <div class="vmg-info-card"><b>Topologie CPU</b><span>{{ current_vm.cpu_topology_label or '1 socket / vCPU en coeurs' }}</span></div>
+                        <div class="vmg-info-card"><b>CPU pinning</b><span>{{ current_vm.cpu_pinset or 'non epingle' }}</span></div>
+                        <div class="vmg-info-card"><b>RAM min</b><span>{{ current_vm.current_memory or current_vm.memory or '-' }}</span></div>
+                        <div class="vmg-info-card"><b>RAM max</b><span>{{ current_vm.memory or '-' }}</span></div>
+                        <div class="vmg-info-card"><b>BIOS / UEFI</b><span>{% if is_uefi %}UEFI auto{% else %}BIOS legacy{% endif %}</span></div>
+                        <div class="vmg-info-card"><b>Loader</b><span>{{ current_vm.loader or '-' }}</span></div>
+                        <div class="vmg-info-card"><b>NVRAM</b><span>{{ current_vm.nvram or '-' }}</span></div>
+                        <div class="vmg-info-card"><b>UUID</b><span>{{ current_vm.uuid or '-' }}</span></div>
+                    </div>
+
+                    <div class="vmg-actions-row">
+                        <button type="submit" class="yoleo-btn yoleo-btn-primary">Enregistrer informations</button>
+                    </div>
+                </form>
+
+                {% if devices %}
+                <div class="vmg-device-strip">
+                    {% for dev in devices %}
+                    <button type="button" class="vmg-device-chip" onclick="vmgShowDevice('{{ dev.key }}')">
+                        <span>{{ dev.icon }}</span><b>{{ dev.label }}</b>
+                    </button>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="vmg-empty">La VM est minimale. Ajoute un disque, une ISO ou une carte reseau depuis le bouton de gauche.</div>
+                {% endif %}
+            </div>
+
+        </section>
+
+        <section class="card vmg-device-detail" data-vmg-panel="xml">
+            <div class="vmg-title-line vmg-title-compact">
+                <h2>&lt;/&gt; XML libvirt</h2>
+                <span class="badge badge-muted">{{ current_vm.name }}</span>
+            </div>
+            <pre class="vmg-pre" data-vmg-xml></pre>
+        </section>
+
+        <section class="card vmg-device-detail" data-vmg-panel="boot">
+            <div class="vmg-title-line vmg-title-compact">
+                <h2>🚀 Ordre de boot</h2>
+                <span class="badge badge-muted">boot</span>
+            </div>
+            <p class="vmg-muted">Place les peripheriques dans l'ordre voulu puis enregistre. Les fleches changent l'ordre sans modifier le reste du materiel.</p>
+            <div id="vmgBootList" class="vmg-boot-list"></div>
+            <div class="vmg-actions-row">
+                <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="vmgSaveBootOrder(this)">Enregistrer le boot</button>
+            </div>
+        </section>
+
+        <section class="card vmg-device-detail" data-vmg-panel="bios">
+            <div class="vmg-title-line vmg-title-compact">
+                <h2>🧬 BIOS / Firmware</h2>
+                <span class="badge badge-muted">{% if is_uefi %}UEFI{% else %}BIOS{% endif %}</span>
+            </div>
+            <div class="vmg-grid">
+                <div class="vmg-info-card"><b>Actuel</b><span>{% if is_uefi %}{% if current_vm.loader %}UEFI / pflash{% else %}UEFI auto libvirt{% endif %}{% else %}BIOS legacy / SeaBIOS{% endif %}</span></div>
+                <div class="vmg-info-card"><b>Loader</b><span>{{ current_vm.loader or '-' }}</span></div>
+                <div class="vmg-info-card"><b>NVRAM</b><span>{{ current_vm.nvram or '-' }}</span></div>
+            </div>
+            <div class="vmg-form-section">
+                <div class="vmg-section-title">Firmware</div>
+                <div class="vmg-form-grid">
+                    <label class="vmg-field vmg-field-wide">BIOS / UEFI
+                        <select id="vmgFirmwareSelect" class="select-input"></select>
+                        <small>Arrete la VM avant de changer le firmware. Pour un firmware specifique, choisis une entree OVMF/loader dans la liste.</small>
+                    </label>
+                    <label class="vmg-field vmg-field-check vmg-field-wide vmg-secure-boot-field">Secure Boot
+                        <span class="vmg-check-line"><input id="vmgSecureBoot" type="checkbox"> <span>activer Secure Boot</span></span>
+                    </label>
+                </div>
+                <div class="vmg-actions-row">
+                    <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="vmgSaveFirmware(this)">Enregistrer BIOS</button>
+                </div>
+                <div class="vmg-muted">BIOS / UEFI se choisit maintenant à la création de la VM. Cette page affiche seulement l'état actuel pour éviter les conversions XML bancales après coup.</div>
+            </div>
+        </section>
+
+        {% for dev in devices %}
+        <section class="card vmg-device-detail" data-vmg-panel="{{ dev.key }}">
+            <div class="vmg-title-line vmg-title-compact">
+                <h2>{{ dev.icon }} {{ dev.label }}</h2>
+                <span class="badge badge-muted">{{ dev.kind }}</span>
+            </div>
+            <p class="vmg-muted">{{ dev.subtitle }}</p>
+
+            <div class="vmg-tabs">
+                <button type="button" class="vmg-tab is-active" data-vmg-tab="{{ dev.key }}:visual" onclick="vmgSwitchTab('{{ dev.key }}','visual')">Graphique</button>
+                <button type="button" class="vmg-tab" data-vmg-tab="{{ dev.key }}:expert" onclick="vmgSwitchTab('{{ dev.key }}','expert')">Expert</button>
+            </div>
+
+            <div class="vmg-tab-panel is-active" data-vmg-tab-panel="{{ dev.key }}:visual">
+                <div class="vmg-device-visual" data-vmg-visual="{{ dev.key }}"></div>
+                <div class="vmg-actions-row" data-vmg-actions="{{ dev.key }}"></div>
+            </div>
+            <div class="vmg-tab-panel" data-vmg-tab-panel="{{ dev.key }}:expert">
+                <pre class="vmg-pre" data-vmg-json='{{ dev.data|tojson }}'></pre>
+            </div>
+        </section>
+        {% endfor %}
+        {% endif %}
+    </main>
+</div>
+
+{% if current_vm %}
+<div id="vmgAddDeviceModal" class="modal-overlay vm-modal" onclick="vmgOverlayClose(event,'vmgAddDeviceModal')">
+    <div class="modal-box vmg-device-modal" onclick="event.stopPropagation()">
+        <div class="vmg-title-line vmg-title-compact">
+            <h3 id="vmgDeviceModalTitle" class="modal-title">Ajouter un peripherique - {{ current_vm.name }}</h3>
+        </div>
+        <div id="vmgDeviceModalError" class="status-box error vmg-modal-error"></div>
+        <div id="vmgDeviceChoices" class="vmg-device-choice-grid">
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('disk')"><b><span class="vmg-choice-emoji">💽</span> Disque image</b><span>qcow2, raw, volume de pool ou chemin direct</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('physical_disk')"><b><span class="vmg-choice-emoji">🧱</span> Disque physique</b><span>/dev/disk/by-id detecte sur l'hote</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('iso')"><b><span class="vmg-choice-emoji">💿</span> Lecteur CD / ISO</b><span>ISO detectee ou chemin absolu</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('nic')"><b><span class="vmg-choice-emoji">🌐</span> Carte reseau</b><span>bridge, reseau libvirt ou direct</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('graphics')"><b><span class="vmg-choice-emoji">🖥️</span> Affichage VNC/SPICE</b><span>console video accessible au demarrage</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('video')"><b><span class="vmg-choice-emoji">🎞️</span> Video virtuelle</b><span>virtio, qxl, vga, bochs</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('console')"><b><span class="vmg-choice-emoji">⌨️</span> Console</b><span>console serie virtio pour acces sans reseau</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('channel')"><b><span class="vmg-choice-emoji">🔗</span> Channel</b><span>qemu guest agent / canal virtio</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('tpm')"><b><span class="vmg-choice-emoji">🔐</span> TPM</b><span>TPM 2.0 emule pour Windows 11</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('controller')"><b><span class="vmg-choice-emoji">🧬</span> Controleur</b><span>USB, SATA, SCSI, virtio-serial</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('usb')"><b><span class="vmg-choice-emoji">🔌</span> Hote USB</b><span>peripherique USB de l'hote</span></button>
+            <button type="button" class="vmg-choice" onclick="vmgOpenDeviceForm('pci')"><b><span class="vmg-choice-emoji">🧩</span> PCI passthrough</b><span>GPU, HBA, carte reseau, controleur USB</span></button>
+        </div>
+        <div id="vmgDeviceForm" class="vmg-device-form"></div>
+        <div class="modal-actions">
+            <button id="vmgDeviceBackBtn" type="button" class="yoleo-btn yoleo-btn-muted" style="display:none" onclick="vmgShowDeviceChoices()">Retour</button>
+            <button id="vmgDeviceSaveBtn" type="button" class="yoleo-btn yoleo-btn-primary" style="display:none" onclick="vmgSubmitDevice(this)">Enregistrer</button>
+            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="vmgCloseModal('vmgAddDeviceModal')">Fermer</button>
+        </div>
+    </div>
+</div>
+
+<div id="vmgConfirmModal" class="modal-overlay vm-modal" onclick="vmgOverlayClose(event,'vmgConfirmModal')">
+    <div class="modal-box vmg-confirm-modal" onclick="event.stopPropagation()">
+        <h3 id="vmgConfirmTitle" class="modal-title">Confirmer</h3>
+        <p id="vmgConfirmText" class="vmg-muted"></p>
+        <div id="vmgConfirmError" class="status-box error vmg-modal-error"></div>
+        <div class="modal-actions">
+            <button id="vmgConfirmYesBtn" type="button" class="yoleo-btn yoleo-btn-red" onclick="vmgConfirmRemoveDevice(this)">Supprimer</button>
+            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="vmgCloseModal('vmgConfirmModal')">Annuler</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% include "vm/gestion_scripts.html" %}
+</div>
+</body>
+</html>

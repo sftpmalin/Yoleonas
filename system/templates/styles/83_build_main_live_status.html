@@ -1,0 +1,183 @@
+/* Build Main : états vivants par ligne pendant Build -> TAR -> Registre */
+.builds-page #tab-builds_tar tr.build-main-row-running td {
+    background: rgba(0, 188, 255, .075) !important;
+    border-top: 1px solid rgba(0, 188, 255, .20);
+    border-bottom: 1px solid rgba(0, 188, 255, .16);
+}
+.builds-page #tab-builds_tar tr.build-main-row-running td:first-child {
+    box-shadow: inset 4px 0 0 rgba(0, 188, 255, .82);
+}
+.builds-page #tab-builds_tar tr.build-main-row-registry td {
+    background: rgba(255, 171, 64, .08) !important;
+    border-top: 1px solid rgba(255, 171, 64, .22);
+    border-bottom: 1px solid rgba(255, 171, 64, .16);
+}
+.builds-page #tab-builds_tar tr.build-main-row-registry td:first-child {
+    box-shadow: inset 4px 0 0 rgba(255, 171, 64, .85);
+}
+.builds-page #tab-builds_tar tr.build-main-row-error td {
+    background: rgba(244, 67, 54, .11) !important;
+    border-top: 1px solid rgba(244, 67, 54, .35);
+    border-bottom: 1px solid rgba(244, 67, 54, .22);
+}
+.builds-page #tab-builds_tar tr.build-main-row-error td:first-child {
+    box-shadow: inset 4px 0 0 rgba(255, 82, 82, .95);
+}
+.builds-page #tab-builds_tar tr.build-main-row-ok td {
+    background: rgba(76, 175, 80, .08) !important;
+    border-top: 1px solid rgba(76, 175, 80, .24);
+    border-bottom: 1px solid rgba(76, 175, 80, .16);
+}
+.builds-page #tab-builds_tar tr.build-main-row-ok td:first-child {
+    box-shadow: inset 4px 0 0 rgba(76, 175, 80, .80);
+}
+.builds-page #tab-builds_tar .build-row-actions .smart-status.badge-no,
+.builds-page #tab-builds_tar .build-row-actions .smart-status.badge-ok,
+.builds-page #tab-builds_tar .build-row-actions .smart-status.badge-warn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+}
+
+.builds-page #tab-builds_tar tr.build-main-row-registry-error td {
+    background: rgba(244, 67, 54, .075) !important;
+    border-top: 1px solid rgba(244, 67, 54, .26);
+    border-bottom: 1px solid rgba(244, 67, 54, .18);
+}
+.builds-page #tab-builds_tar tr.build-main-row-registry-error td:first-child {
+    box-shadow: inset 4px 0 0 rgba(255, 126, 74, .95);
+}
+.builds-page #tab-builds_tar .build-main-tar-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+.builds-page #tab-builds_tar .build-main-registry-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 22px;
+    white-space: nowrap;
+}
+.builds-page #tab-builds_tar .build-main-registry-status .mini-spinner {
+    width: 10px;
+    height: 10px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    display: inline-block;
+    animation: yoleoSpin .75s linear infinite;
+}
+
+
+/* Build Main : progression globale du lot Build -> Registre */
+.builds-page #tab-builds_tar .topbar {
+    display: flex !important;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+}
+.builds-page #tab-builds_tar .build-title-row {
+    flex: 0 0 auto;
+}
+.builds-page #tab-builds_tar .build-tar-toolbar {
+    order: 2;
+    flex: 0 0 auto;
+    margin-left: auto;
+    align-items: center;
+}
+
+.builds-page #tab-builds_tar .build-main-ttyd-btn {
+    width: 2.05rem;
+    min-width: 2.05rem;
+    height: 2.05rem;
+    padding: 0;
+    line-height: 1;
+}
+
+.builds-page #tab-builds_tar .build-main-overall-progress {
+    order: 3;
+    flex: 0 1 340px;
+    min-width: 240px;
+    max-width: 360px;
+    align-self: center;
+    padding: 7px 10px;
+    border: 1px solid rgba(0, 188, 255, .20);
+    background: rgba(8, 17, 31, .55);
+    border-radius: 10px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.025);
+}
+.builds-page #tab-builds_tar .build-main-overall-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+    font-size: 11px;
+    line-height: 1.1;
+}
+.builds-page #tab-builds_tar .build-main-overall-head span {
+    color: var(--muted, #b6c5d5);
+    font-weight: 700;
+}
+.builds-page #tab-builds_tar .build-main-overall-head b {
+    color: var(--accent, #00e5ff);
+    font-size: 12px;
+}
+.builds-page #tab-builds_tar .build-main-overall-track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.08);
+}
+.builds-page #tab-builds_tar .build-main-overall-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, rgba(0,188,255,.80), rgba(0,229,255,.95));
+    transition: width .35s ease;
+}
+.builds-page #tab-builds_tar .build-main-overall-detail {
+    margin-top: 4px;
+    font-size: 10px;
+    color: var(--muted, #8ea1b5);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.builds-page #tab-builds_tar .build-main-overall-progress.is-running .build-main-overall-fill {
+    background: linear-gradient(90deg, rgba(255,171,64,.85), rgba(0,229,255,.95));
+}
+.builds-page #tab-builds_tar .build-main-overall-progress.is-ok .build-main-overall-fill {
+    background: linear-gradient(90deg, rgba(76,175,80,.75), rgba(0,229,255,.90));
+}
+.builds-page #tab-builds_tar .build-main-overall-progress.is-error {
+    border-color: rgba(244,67,54,.35);
+}
+.builds-page #tab-builds_tar .build-main-overall-progress.is-error .build-main-overall-fill {
+    background: linear-gradient(90deg, rgba(244,67,54,.85), rgba(255,171,64,.85));
+}
+@media (max-width: 900px) {
+    .builds-page #tab-builds_tar .topbar {
+        flex-wrap: wrap;
+        align-items: stretch;
+    }
+    .builds-page #tab-builds_tar .build-title-row {
+        flex: 1 1 100%;
+    }
+    .builds-page #tab-builds_tar .build-tar-toolbar {
+        order: 2;
+        flex: 1 1 100%;
+        margin-left: 0;
+        justify-content: flex-end;
+    }
+    .builds-page #tab-builds_tar .build-main-overall-progress {
+        order: 3;
+        flex: 1 1 100%;
+        min-width: 0;
+        max-width: none;
+    }
+}

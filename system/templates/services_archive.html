@@ -1,0 +1,1034 @@
+{% extends "services_base.html" %}
+
+{% block route_content %}
+<div class="archive-page archive-mobile-simple-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+              <div class="archive-panel">
+                  {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                  <div class="flash-stack">
+                      {% for category, message in messages %}
+                      <div class="flash {{ category }}">{{ message }}</div>
+                      {% endfor %}
+                  </div>
+                  {% endif %}
+                  {% endwith %}
+
+                  {% if error %}
+                      <div class="error-box">{{ error }}</div>
+                  {% else %}
+                  <form method="post" action="{{ url_for('services_bp.archive_config_save') }}" id="moduleConfigForm"></form>
+                  <form method="post" action="{{ url_for('services_bp.archive_save') }}" id="archiveForm">
+                      <div class="service-section-shell">
+                          <div id="tab-general" class="tab-panel {{ 'active' if active_subtab == 'general' else '' }}">
+                              <section class="card">
+                                  <div class="archive-general-control-row">
+                                      <div class="summary-grid archive-summary-inline">
+                                          <div class="summary-card"><div class="summary-label">Profils</div><div class="summary-value">{{ blocks|length }}</div></div>
+                                          <div class="summary-card"><div class="summary-label">Actifs</div><div class="summary-value">{{ active_count }}</div></div>
+                                          <div class="summary-card"><div class="summary-label">Dans --all</div><div class="summary-value">{{ all_count }}</div></div>
+                                          <div class="summary-card"><div class="summary-label">Archives</div><div class="summary-value">{{ archive_count }}</div></div>
+                                      </div>
+                                      <div class="archive-v4-run-all-group archive-run-all-right">
+                                          <button id="archiveRunAllButton" data-archive-run-button="__all__" type="button" class="yoleo-btn yoleo-btn-green" title="Lancer tous les profils inclus" onclick="runArchive('__all__', 'start', this)">▶️ Lancer les backups</button>
+                                          <div id="archiveAllProgress" class="archive-v4-progress archive-v4-progress-idle" aria-live="polite">
+                                              <div class="archive-v4-progress-track"><span></span></div>
+                                              <div class="archive-v4-progress-label">Prêt</div>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  <div id="archiveInlineStatus" class="archive-v4-inline-status" hidden></div>
+
+                                  <div class="table-tools archive-table-tools-compact">
+                                      <input class="search-input" id="generalSearch" type="text" placeholder="Filtrer : profil, source, destination, mode…" oninput="filterTable('generalTable', this.value)">
+                                  </div>
+
+                                  <div class="table-wrap archive-mobile-simple-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" id="generalTableWrap" data-yoleo-service-context-zone="archive">
+                                      <table class="archive-table archive-mobile-simple-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" id="generalTable">
+                                          <thead>
+                                              <tr>
+                                                  <th style="width:17%;">Profil</th>
+                                                  <th style="width:13%;">Mode</th>
+                                                  <th style="width:18%;">Source</th>
+                                                  <th style="width:16%;">Destination</th>
+                                                  <th style="width:8%;">État</th>
+                                                  <th style="width:16%;">Progression</th>
+                                                  <th style="width:12%; text-align:right;">Action</th>
+                                              </tr>
+                                          </thead>
+                                          <tbody id="profileRows">
+                                              {% if not blocks %}
+                                              <tr id="emptyProfiles"><td colspan="7"><div class="empty-state">Aucun profil archive configuré.</div></td></tr>
+                                              {% endif %}
+                                              {% for block in blocks %}
+                                              <tr data-profile-row data-archive-row-key="{{ block.key|e }}" data-block-index="{{ loop.index0 }}" data-filter="{{ block.key|lower }} {{ block.title|lower }} {{ block.mode_label|lower }} {{ block.source|lower }} {{ block.destination|lower }} {{ block.aliases|lower }}">
+                                                  <td><div class="name-main" data-row-field="title">{{ block.title or block.key }}</div><div class="name-sub mono" data-row-field="key">[{{ block.key }}]{% if block.aliases %} · {{ block.aliases }}{% endif %}</div></td>
+                                                  <td>
+                                                      {% set mode_text = block.mode_label|string %}
+                                                      {% if ' / ' in mode_text %}
+                                                          {% set mode_parts = mode_text.split(' / ', 1) %}
+                                                          <span class="badge badge-info archive-mode-badge" data-row-field="mode"><span class="archive-mode-line">{{ mode_parts[0]|e }}</span><span class="archive-mode-line">{{ mode_parts[1]|e }}</span></span>
+                                                      {% elif ' · ' in mode_text %}
+                                                          {% set mode_parts = mode_text.split(' · ', 1) %}
+                                                          <span class="badge badge-info archive-mode-badge" data-row-field="mode"><span class="archive-mode-line">{{ mode_parts[0]|e }}</span><span class="archive-mode-line">{{ mode_parts[1]|e }}</span></span>
+                                                      {% else %}
+                                                          <span class="badge badge-info archive-mode-badge" data-row-field="mode"><span class="archive-mode-line">{{ mode_text|e }}</span></span>
+                                                      {% endif %}
+                                                  </td>
+                                                  <td><span class="tag-val" data-row-field="source">{{ block.source or '—' }}</span></td>
+                                                  <td><span class="tag-val" data-row-field="destination">{{ block.destination or '—' }}</span></td>
+                                                  <td>
+                                                      <span class="badge {{ 'badge-ok' if block.is_enabled else 'badge-no' }}" data-row-field="enabled">{{ 'actif' if block.is_enabled else 'désactivé' }}</span>
+                                                      <div class="name-sub"><span class="badge {{ 'badge-info' if block.is_all else 'badge-muted' }}" data-row-field="include_in_all">{{ '--all' if block.is_all else 'manuel' }}</span></div>
+                                                  </td>
+                                                  <td class="archive-v4-progress-cell">
+                                                      <div class="archive-v4-progress archive-v4-progress-idle" data-archive-row-progress="{{ block.key|e }}" aria-live="polite">
+                                                          <div class="archive-v4-progress-track"><span></span></div>
+                                                          <div class="archive-v4-progress-label">Prêt</div>
+                                                      </div>
+                                                  </td>
+                                                  <td><div class="actions-cell">
+                                                      <button type="button" data-archive-run-button="{{ block.key|e }}" class="yoleo-btn yoleo-btn-mini yoleo-btn-green" onclick='runArchive({{ block.key|tojson }}, "start", this)'>▶ Lancer</button>
+                                                      <button type="button" data-archive-stop-button="{{ block.key|e }}" class="yoleo-btn yoleo-btn-mini yoleo-btn-red archive-v4-row-stop" title="Arrêter cette archive" aria-label="Arrêter cette archive" hidden onclick='stopArchiveJobForTarget({{ block.key|tojson }}, this)'>⏹</button>
+                                                      <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" title="Modifier" aria-label="Modifier" onclick="openProfileModal('{{ loop.index0 }}')">✏️</button>
+                                                      <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red" title="Supprimer" aria-label="Supprimer" onclick="deleteProfile('{{ loop.index0 }}')">✕</button>
+                                                  </div></td>
+                                              </tr>
+                                              {% endfor %}
+                                          </tbody>
+                                      </table>
+                                  </div>
+                              </section>
+                          </div>
+
+
+                              <div id="profileStores">
+                              {% for block in blocks %}
+                                  <div class="profile-store" data-block-card data-block-index="{{ loop.index0 }}">
+                                      <input type="hidden" name="block_original[]" value="{{ block.key }}" data-field="original">
+                                      <input type="hidden" name="block_key[]" value="{{ block.key }}" data-field="key">
+                                      <input type="hidden" name="block_title[]" value="{{ block.title }}" data-field="title">
+                                      <input type="hidden" name="block_enabled[]" value="{{ 'true' if block.is_enabled else 'false' }}" data-field="enabled">
+                                      <input type="hidden" name="block_include_in_all[]" value="{{ 'true' if block.is_all else 'false' }}" data-field="include_in_all">
+                                      <input type="hidden" name="block_source[]" value="{{ block.source }}" data-field="source">
+                                      <input type="hidden" name="block_destination[]" value="{{ block.destination }}" data-field="destination">
+                                      <input type="hidden" name="block_archive[]" value="{{ block.archive }}" data-field="archive">
+                                      <input type="hidden" name="block_archive_format[]" value="{{ block.archive_format }}" data-field="archive_format">
+                                      <input type="hidden" name="block_archive_children[]" value="{{ block.archive_children }}" data-field="archive_children">
+                                      <input type="hidden" name="block_archive_name[]" value="{{ block.archive_name }}" data-field="archive_name">
+                                      <input type="hidden" name="block_compression_level[]" value="{{ block.compression_level }}" data-field="compression_level">
+                                      <input type="hidden" name="block_replace_existing[]" value="{{ block.replace_existing }}" data-field="replace_existing">
+                                      <input type="hidden" name="block_date_suffix[]" value="{{ block.date_suffix }}" data-field="date_suffix">
+                                      <input type="hidden" name="block_delete_extra[]" value="{{ block.delete_extra }}" data-field="delete_extra">
+                                      <input type="hidden" name="block_excludes[]" value="{{ block.excludes }}" data-field="excludes">
+                                      <input type="hidden" name="block_command_start[]" value="{{ block.command_start }}" data-field="command_start">
+                                      <input type="hidden" name="block_command_end[]" value="{{ block.command_end }}" data-field="command_end">
+                                      <input type="hidden" name="block_docker_exclude[]" value="{{ block.docker_exclude }}" data-field="docker_exclude">
+                                      <input type="hidden" name="block_wait_start_docker_stopped[]" value="{{ block.wait_start_docker_stopped }}" data-field="wait_start_docker_stopped">
+                                      <input type="hidden" name="block_wait_end_docker_running[]" value="{{ block.wait_end_docker_running }}" data-field="wait_end_docker_running">
+                                      <input type="hidden" name="block_docker_wait_timeout[]" value="{{ block.docker_wait_timeout }}" data-field="docker_wait_timeout">
+                                      <input type="hidden" name="block_docker_wait_interval[]" value="{{ block.docker_wait_interval }}" data-field="docker_wait_interval">
+                                      <input type="hidden" name="block_aliases[]" value="{{ block.aliases }}" data-field="aliases">
+                                      <input type="hidden" name="block_allow_dangerous_source[]" value="{{ block.allow_dangerous_source }}" data-field="allow_dangerous_source">
+                                      <input type="hidden" name="block_allow_destination_inside_source[]" value="{{ block.allow_destination_inside_source }}" data-field="allow_destination_inside_source">
+                                      <input type="hidden" name="block_delete[]" value="{{ block.key }}" data-field="delete" disabled>
+                                  </div>
+                              {% endfor %}
+                              </div>
+
+                          <div id="tab-system" class="tab-panel {{ 'active' if active_subtab == 'system' else '' }}">
+                              <section class="card">
+                                  <div class="topbar">
+                                      <div class="title-block">
+                                          <h2>Info archive</h2>
+                                          <div class="subtitle">Le module Archive reste presque automatique : on affiche les chemins importants, mais on ne modifie plus les réglages techniques depuis l'interface.</div>
+                                      </div>
+                                  </div>
+
+                                  <div class="path-grid">
+                                      <div class="path-pill"><b>archive.conf</b><span>{{ real_conf }}</span></div>
+                                      <div class="path-pill"><b>logs</b><span>{{ settings.log_dir }}</span></div>
+                                      <div class="path-pill"><b>lock</b><span>{{ settings.lock_file }}</span></div>
+                                      <div class="path-pill"><b>racines parcourir</b><span>{{ conf.BROWSE_ROOTS }}</span></div>
+                                  </div>
+                                  <div class="hint">Le fichier <span class="mono">archive.conf</span> est créé automatiquement par le module si absent. Par défaut, il ne contient aucun profil.</div>
+                              </section>
+                          </div>
+
+                          <div id="tab-logs" class="tab-panel {{ 'active' if active_subtab == 'logs' else '' }}">
+                              <section class="card">
+                                  <div class="topbar">
+                                      <div class="title-block">
+                                          <h2>Logs archive</h2>
+                                          <div class="subtitle">Le moteur Flask écrit dans un vrai fichier log. Tu peux fermer la popup, changer d’onglet ou fermer le navigateur : le job continue côté serveur.</div>
+                                      </div>
+                                      <div class="toolbar">
+                                          <button type="button" class="yoleo-btn yoleo-btn-orange" onclick="checkArchiveFromButton(this)">🧪 Vérifier archive.conf</button>
+                                          <button type="button" class="yoleo-btn yoleo-btn-red" onclick="stopCurrentArchive()">⏹ Stopper le job actif</button>
+                                          <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="clearLogOutput()">🧹 Nettoyer</button>
+                                      </div>
+                                  </div>
+                                  <pre id="liveLogOutput" class="terminal">Aucun log lancé pour le moment.</pre>
+                              </section>
+                          </div>
+                      </div>
+                  </form>
+
+
+                  {% endif %}
+              </div>
+          </div>
+
+          <div class="modal-overlay" id="profileModal">
+              <div class="modal-box">
+                  <div class="modal-head">
+                      <div>
+                          <h3 class="modal-title" id="profileModalTitle">Modifier le profil</h3>
+                          <div class="hint">Le bouton Enregistrer sauvegarde directement le profil dans archive.conf.</div>
+                      </div>
+                      <button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="closeProfileModal()">✕</button>
+                  </div>
+                  <div class="modal-body">
+                      <input type="hidden" id="profile_index">
+                      <div class="modal-grid-4">
+                          <div><label>Nom du bloc</label><input id="profile_key" data-modal-field="key" placeholder="appdata_7z"></div>
+                          <div><label>Titre</label><input id="profile_title" data-modal-field="title" placeholder="AppData -> tar.7z par dossier"></div>
+                          <div><label>enabled</label><select id="profile_enabled" data-modal-field="enabled"><option value="true">true</option><option value="false">false</option></select></div>
+                          <div><label>include_in_all</label><select id="profile_include_in_all" data-modal-field="include_in_all"><option value="true">true</option><option value="false">false</option></select></div>
+                      </div>
+                      <div class="section-line"></div>
+                      <div class="modal-grid">
+                          <div><label>source</label><div class="inline"><input id="profile_source" data-modal-field="source" placeholder="/mnt/user/appdata"><button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" type="button" onclick="openArchiveStandardBrowser('profile_source')">📁</button></div></div>
+                          <div><label>destination</label><div class="inline"><input id="profile_destination" data-modal-field="destination" placeholder="/mnt/user/dockers/appdata"><button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" type="button" onclick="openArchiveStandardBrowser('profile_destination')">📁</button></div></div>
+                      </div>
+                      <div class="section-line"></div>
+                      <div class="modal-grid-4">
+                          <div><label>archive</label><select id="profile_archive" data-modal-field="archive"><option value="1">1 / archive</option><option value="0">0 / rsync</option></select></div>
+                          <div><label>archive_format</label><select id="profile_archive_format" data-modal-field="archive_format"><option value="tar.7z">tar.7z</option><option value="7z">7z</option><option value="tar.gz">tar.gz</option><option value="tgz">tgz</option><option value="gz">gz</option></select></div>
+                          <div><label>archive_children</label><select id="profile_archive_children" data-modal-field="archive_children"><option value="1">1</option><option value="0">0</option></select></div>
+                          <div><label>compression</label><input id="profile_compression_level" data-modal-field="compression_level" placeholder="7"></div>
+                          <div><label>replace_existing</label><select id="profile_replace_existing" data-modal-field="replace_existing"><option value="1">1</option><option value="0">0</option></select></div>
+                          <div><label>date_suffix</label><select id="profile_date_suffix" data-modal-field="date_suffix"><option value="0">0</option><option value="1">1</option></select></div>
+                          <div><label>delete_extra</label><select id="profile_delete_extra" data-modal-field="delete_extra"><option value="0">0</option><option value="1">1</option></select></div>
+                          <div><label>archive_name</label><input id="profile_archive_name" data-modal-field="archive_name" placeholder="config"></div>
+                      </div>
+                      <div class="section-line"></div>
+                      <div class="modal-grid">
+                          <div><label>command_start</label><textarea id="profile_command_start" data-modal-field="command_start" placeholder="@docker_stop_running"></textarea></div>
+                          <div><label>command_end</label><textarea id="profile_command_end" data-modal-field="command_end" placeholder="@docker_start_stopped"></textarea></div>
+                      </div>
+                      <div class="section-line"></div>
+                      <div class="modal-grid-4">
+                          <div><label>docker_exclude</label><input id="profile_docker_exclude" data-modal-field="docker_exclude" placeholder="Tasks_Manager, Archive, System"></div>
+                          <div><label>wait_start_docker_stopped</label><input id="profile_wait_start_docker_stopped" data-modal-field="wait_start_docker_stopped" placeholder="stopped_by_archive"></div>
+                          <div><label>wait_end_docker_running</label><input id="profile_wait_end_docker_running" data-modal-field="wait_end_docker_running" placeholder="stopped_by_archive"></div>
+                          <div><label>aliases</label><input id="profile_aliases" data-modal-field="aliases" placeholder="appdata, ppdata"></div>
+                          <div><label>docker_wait_timeout</label><input id="profile_docker_wait_timeout" data-modal-field="docker_wait_timeout" placeholder="0"></div>
+                          <div><label>docker_wait_interval</label><input id="profile_docker_wait_interval" data-modal-field="docker_wait_interval" placeholder="2"></div>
+                          <div style="grid-column: span 2;"><label>excludes</label><input id="profile_excludes" data-modal-field="excludes" placeholder="cache,tmp,node_modules"></div>
+                      </div>
+                      <div class="section-line"></div>
+                      <div class="danger-line">
+                          <div><div class="name-main">Garde-fous</div><div class="hint">À activer seulement volontairement.</div></div>
+                          <div class="toolbar toolbar-left">
+                              <div><label>allow_dangerous_source</label><select id="profile_allow_dangerous_source" data-modal-field="allow_dangerous_source"><option value="0">0</option><option value="1">1</option></select></div>
+                              <div><label>allow_destination_inside_source</label><select id="profile_allow_destination_inside_source" data-modal-field="allow_destination_inside_source"><option value="0">0</option><option value="1">1</option></select></div>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="modal-footer">
+                      <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="closeProfileModal()">Annuler</button>
+                      <button class="yoleo-btn yoleo-btn-primary" type="button" onclick="saveProfileModal()">💾 Enregistrer</button>
+                  </div>
+              </div>
+          </div>
+
+          <div class="modal-overlay" id="runModal">
+              <div class="modal-box">
+                  <div class="modal-head">
+                      <div>
+                          <h3 class="modal-title" id="runModalTitle">Archive</h3>
+                          <div class="hint">Tu peux fermer cette popup : le job continue côté serveur et le log reste visible dans l’onglet Logs.</div>
+                      </div>
+                      <button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="closeRunModal()">✕</button>
+                  </div>
+                  <div class="modal-body">
+                      <pre id="runModalLog" class="modal-log">Aucun log.</pre>
+                  </div>
+                  <div class="modal-footer">
+                      <button class="yoleo-btn yoleo-btn-red" type="button" id="runStopBtn" onclick="stopCurrentArchive()">⏹ Stopper</button>
+                      <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="window.location.href='{{ url_for('services_bp.services_section', service='archive', subtab='logs') }}';">Voir l’onglet Logs</button>
+                      <button class="yoleo-btn yoleo-btn-primary" type="button" onclick="closeRunModal()">Fermer</button>
+                  </div>
+              </div>
+          </div>
+
+          <div class="toast" id="toast"></div>
+
+          <script>
+          let archiveBrowseTargetId = '';
+          let newBlockCounter = {{ blocks|length if blocks else 0 }};
+          let pendingNewProfileIndex = '';
+          let keyboardState = {};
+
+          const profileFields = [
+              'key','title','enabled','include_in_all','source','destination','archive','archive_format','archive_children','archive_name','compression_level','replace_existing','date_suffix','delete_extra','excludes','command_start','command_end','docker_exclude','wait_start_docker_stopped','wait_end_docker_running','docker_wait_timeout','docker_wait_interval','aliases','allow_dangerous_source','allow_destination_inside_source'
+          ];
+
+          function toast(message) {
+              const box = document.getElementById('toast');
+              box.textContent = message;
+              box.style.display = 'block';
+              setTimeout(() => { box.style.display = 'none'; }, 780);
+          }
+
+          function archiveAutoHideGreenMessages() {
+              document.querySelectorAll('.flash.success, .flash.message').forEach(el => {
+                  setTimeout(() => { el.style.display = 'none'; }, 780);
+              });
+          }
+
+          function escapeHtml(text) {
+              return String(text || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+          }
+
+          function filterTable(tableId, value) {
+              const needle = String(value || '').trim().toLowerCase();
+              const table = document.getElementById(tableId);
+              if (!table) return;
+              table.querySelectorAll('tbody tr').forEach(row => {
+                  if (row.dataset.deleted === '1') return;
+                  const hay = (row.dataset.filter || row.textContent || '').toLowerCase();
+                  row.style.display = hay.includes(needle) ? '' : 'none';
+              });
+          }
+
+          function getStore(index) {
+              return document.querySelector(`.profile-store[data-block-index="${CSS.escape(String(index))}"]`);
+          }
+
+          function getStoreValue(store, field) {
+              const input = store ? store.querySelector(`[data-field="${field}"]`) : null;
+              return input ? input.value : '';
+          }
+
+          function setStoreValue(store, field, value) {
+              const input = store ? store.querySelector(`[data-field="${field}"]`) : null;
+              if (input) input.value = value == null ? '' : String(value);
+          }
+
+          function openProfileModal(index) {
+              const store = getStore(index);
+              if (!store) return;
+              document.getElementById('profile_index').value = index;
+              profileFields.forEach(field => {
+                  const modal = document.querySelector(`[data-modal-field="${field}"]`);
+                  if (modal) modal.value = getStoreValue(store, field);
+              });
+              document.getElementById('profileModalTitle').textContent = 'Modifier le profil [' + (getStoreValue(store, 'key') || 'nouveau') + ']';
+              document.getElementById('profileModal').style.display = 'flex';
+          }
+
+          function closeProfileModal() {
+              const indexEl = document.getElementById('profile_index');
+              const index = indexEl ? indexEl.value : '';
+              document.getElementById('profileModal').style.display = 'none';
+              const store = index ? getStore(index) : null;
+              if (store && store.dataset.pendingNew === '1') {
+                  discardPendingProfile(index);
+              }
+          }
+
+          function restoreArchiveEmptyRowIfNeeded() {
+              const rows = document.getElementById('profileRows');
+              if (!rows) return;
+              if (!rows.querySelector('tr[data-profile-row]')) {
+                  rows.innerHTML = '<tr id="emptyProfiles"><td colspan="7"><div class="empty-state">Aucun profil archive configuré.</div></td></tr>';
+              }
+          }
+
+          function discardPendingProfile(index) {
+              const store = getStore(index);
+              if (store && store.dataset.pendingNew === '1') store.remove();
+              document.querySelectorAll(`tr[data-profile-row][data-block-index="${CSS.escape(String(index))}"]`).forEach(row => {
+                  if (row.dataset.pendingNew === '1') row.remove();
+              });
+              if (String(pendingNewProfileIndex) === String(index)) pendingNewProfileIndex = '';
+              restoreArchiveEmptyRowIfNeeded();
+          }
+
+          function submitArchiveProfilesForm() {
+              const form = document.getElementById('archiveForm');
+              if (!form) return;
+              if (form.requestSubmit) form.requestSubmit();
+              else form.submit();
+          }
+
+          function modeLabelFromStore(store) {
+              const source = getStoreValue(store, 'source');
+              const destination = getStoreValue(store, 'destination');
+              const archive = getStoreValue(store, 'archive') === '1';
+              const format = getStoreValue(store, 'archive_format') || 'tar.7z';
+              const children = getStoreValue(store, 'archive_children') === '1';
+              if (!source && !destination) return 'commande';
+              if (archive) return 'archive ' + format + ' / ' + (children ? 'par dossier' : 'source complète');
+              return 'copie rsync';
+          }
+
+          function updateRowsForIndex(index) {
+              const store = getStore(index);
+              if (!store) return;
+              const key = getStoreValue(store, 'key') || 'nouveau_archive';
+              const title = getStoreValue(store, 'title') || key;
+              const source = getStoreValue(store, 'source') || '—';
+              const destination = getStoreValue(store, 'destination') || '—';
+              const enabled = getStoreValue(store, 'enabled') !== 'false';
+              const inAll = getStoreValue(store, 'include_in_all') !== 'false';
+              const mode = modeLabelFromStore(store);
+              const aliases = getStoreValue(store, 'aliases');
+              document.querySelectorAll(`tr[data-profile-row][data-block-index="${CSS.escape(String(index))}"]`).forEach(row => {
+                  row.dataset.filter = [key, title, source, destination, mode, aliases].join(' ').toLowerCase();
+                  const titleEl = row.querySelector('[data-row-field="title"]');
+                  if (titleEl) titleEl.textContent = title;
+                  const keyEl = row.querySelector('[data-row-field="key"]');
+                  if (keyEl) keyEl.textContent = '[' + key + ']';
+                  const modeEl = row.querySelector('[data-row-field="mode"]');
+                  if (modeEl) modeEl.innerHTML = archiveFormatModeHtml(mode);
+                  const sourceEl = row.querySelector('[data-row-field="source"]');
+                  if (sourceEl) sourceEl.textContent = source;
+                  const destEl = row.querySelector('[data-row-field="destination"]');
+                  if (destEl) destEl.textContent = destination;
+                  const enabledEl = row.querySelector('[data-row-field="enabled"]');
+                  if (enabledEl) {
+                      enabledEl.textContent = enabled ? 'actif' : 'désactivé';
+                      enabledEl.className = 'badge ' + (enabled ? 'badge-ok' : 'badge-no');
+                  }
+                  const allEl = row.querySelector('[data-row-field="include_in_all"]');
+                  if (allEl) {
+                      allEl.textContent = inAll ? '--all' : 'manuel';
+                      allEl.className = 'badge ' + (inAll ? 'badge-info' : 'badge-muted');
+                  }
+              });
+          }
+
+          function saveProfileModal() {
+              const index = document.getElementById('profile_index').value;
+              const store = getStore(index);
+              if (!store) return;
+              profileFields.forEach(field => {
+                  const modal = document.querySelector(`[data-modal-field="${field}"]`);
+                  if (modal) setStoreValue(store, field, modal.value);
+              });
+              if (store.dataset.pendingNew === '1') {
+                  delete store.dataset.pendingNew;
+                  document.querySelectorAll(`tr[data-profile-row][data-block-index="${CSS.escape(String(index))}"]`).forEach(row => delete row.dataset.pendingNew);
+                  if (String(pendingNewProfileIndex) === String(index)) pendingNewProfileIndex = '';
+              }
+              updateRowsForIndex(index);
+              closeProfileModal();
+              submitArchiveProfilesForm();
+          }
+
+          function archiveFormatModeHtml(mode) {
+              const parts = String(mode || '').split(/\s(?:\/|·)\s/).filter(Boolean);
+              if (!parts.length) return '';
+              return parts.map(part => '<span class="archive-mode-line">' + escapeHtml(part) + '</span>').join('');
+          }
+
+          function rowHtml(index, key, title, mode, source, destination) {
+              const safeKey = escapeHtml(key || '');
+              const safeIndex = escapeHtml(index);
+              const jsKey = escapeHtml(JSON.stringify(String(key || '')));
+              return `
+              <tr data-profile-row data-archive-row-key="${safeKey}" data-block-index="${safeIndex}" data-filter="${escapeHtml([key,title,mode,source,destination].join(' ').toLowerCase())}">
+                  <td><div class="name-main" data-row-field="title">${escapeHtml(title || key)}</div><div class="name-sub mono" data-row-field="key">[${safeKey}]</div></td>
+                  <td><span class="badge badge-info archive-mode-badge" data-row-field="mode">${archiveFormatModeHtml(mode)}</span></td>
+                  <td><span class="tag-val" data-row-field="source">${escapeHtml(source || '—')}</span></td>
+                  <td><span class="tag-val" data-row-field="destination">${escapeHtml(destination || '—')}</span></td>
+                  <td><span class="badge badge-ok" data-row-field="enabled">actif</span> <div class="name-sub"><span class="badge badge-info" data-row-field="include_in_all">--all</span></div></td>
+                  <td class="archive-v4-progress-cell"><div class="archive-v4-progress archive-v4-progress-idle" data-archive-row-progress="${safeKey}" aria-live="polite"><div class="archive-v4-progress-track"><span></span></div><div class="archive-v4-progress-label">Prêt</div></div></td>
+                  <td><div class="actions-cell"><button type="button" data-archive-run-button="${safeKey}" class="yoleo-btn yoleo-btn-mini yoleo-btn-green" onclick='runArchive(${jsKey}, "start", this)'>▶ Lancer</button><button type="button" data-archive-stop-button="${safeKey}" class="yoleo-btn yoleo-btn-mini yoleo-btn-red archive-v4-row-stop" title="Arrêter cette archive" aria-label="Arrêter cette archive" hidden onclick='stopArchiveJobForTarget(${jsKey}, this)'>⏹</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" title="Modifier" aria-label="Modifier" onclick="openProfileModal('${safeIndex}')">✏️</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red" title="Supprimer" aria-label="Supprimer" onclick="deleteProfile('${safeIndex}')">✕</button></div></td>
+              </tr>`;
+          }
+
+          function storeHtml(index) {
+              const defaults = {
+                  key:'nouveau_archive_' + index,
+                  title:'Nouveau archive',
+                  enabled:'true', include_in_all:'true', source:'', destination:'', archive:'1', archive_format:'tar.7z', archive_children:'1', archive_name:'', compression_level:'7', replace_existing:'1', date_suffix:'0', delete_extra:'0', excludes:'', command_start:'', command_end:'', docker_exclude:'Tasks_Manager, Archive, System', wait_start_docker_stopped:'stopped_by_archive', wait_end_docker_running:'stopped_by_archive', docker_wait_timeout:'0', docker_wait_interval:'2', aliases:'', allow_dangerous_source:'0', allow_destination_inside_source:'0'
+              };
+              let html = `<div class="profile-store" data-block-card data-block-index="${escapeHtml(index)}"><input type="hidden" name="block_original[]" value="" data-field="original">`;
+              profileFields.forEach(field => {
+                  const name = 'block_' + field + '[]';
+                  html += `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(defaults[field] || '')}" data-field="${escapeHtml(field)}">`;
+              });
+              html += `<input type="hidden" name="block_delete[]" value="" data-field="delete" disabled></div>`;
+              return html;
+          }
+
+          function addProfile() {
+              newBlockCounter += 1;
+              const index = 'new_' + newBlockCounter;
+              document.getElementById('profileStores').insertAdjacentHTML('beforeend', storeHtml(index));
+              const empty = document.getElementById('emptyProfiles');
+              if (empty) empty.remove();
+              document.getElementById('profileRows').insertAdjacentHTML('beforeend', rowHtml(index, 'nouveau_archive_' + newBlockCounter, 'Nouveau archive', 'archive tar.7z / par dossier', '—', '—'));
+              const store = getStore(index);
+              if (store) store.dataset.pendingNew = '1';
+              document.querySelectorAll(`tr[data-profile-row][data-block-index="${CSS.escape(String(index))}"]`).forEach(row => row.dataset.pendingNew = '1');
+              pendingNewProfileIndex = index;
+              document.getElementById('generalTableWrap').style.display = '';
+              initKeyboardTable('generalTable');
+              openProfileModal(index);
+          }
+
+          function deleteProfile(index) {
+              const store = getStore(index);
+              if (!store) return;
+              const original = getStoreValue(store, 'original');
+              if (original) {
+                  const del = store.querySelector('[data-field="delete"]');
+                  del.value = original;
+                  del.disabled = false;
+                  store.dataset.deleted = '1';
+              } else {
+                  store.remove();
+              }
+              document.querySelectorAll(`tr[data-profile-row][data-block-index="${CSS.escape(String(index))}"]`).forEach(row => {
+                  row.dataset.deleted = '1';
+                  row.style.display = 'none';
+              });
+              submitArchiveProfilesForm();
+          }
+
+          let currentJobId = null;
+          let archivePollTimer = null;
+          let pendingRestartTarget = null;
+
+          function archiveStatusLabel(status) {
+              const labels = {
+                  queued: 'en file',
+                  running: 'en cours',
+                  stopping: 'arrêt demandé',
+                  stopped: 'arrêté',
+                  success: 'terminé OK',
+                  error: 'erreur'
+              };
+              return labels[status] || status || 'inconnu';
+          }
+
+          function isArchiveRunning(status) {
+              return ['queued', 'running', 'stopping'].includes(status || '');
+          }
+
+          function archiveNormalizeTarget(target) {
+              const raw = String(target || '').trim();
+              if (!raw || raw === '--all' || raw === 'all') return '__all__';
+              return raw;
+          }
+
+          function archiveHumanTarget(target) {
+              const key = archiveNormalizeTarget(target);
+              return key === '__all__' ? 'tous les backups' : key;
+          }
+
+          function archiveFilterProgressMarkers(text) {
+              return String(text || '').split('\n').filter(line => !line.startsWith('YOLEO_ARCHIVE_PROGRESS ')).join('\n');
+          }
+
+          function archiveSetButtonLoading(button, loading) {
+              if (!button) return;
+              if (!button.dataset.archiveOriginalText) button.dataset.archiveOriginalText = button.textContent;
+              button.disabled = !!loading;
+              button.classList.toggle('archive-v4-button-loading', !!loading);
+              if (!loading) button.textContent = button.dataset.archiveOriginalText || button.textContent;
+          }
+
+          function archiveSetRunButtonsDisabled(disabled, activeTarget) {
+              const activeKey = archiveNormalizeTarget(activeTarget || '');
+              document.querySelectorAll('[data-archive-run-button]').forEach(button => {
+                  const key = archiveNormalizeTarget(button.dataset.archiveRunButton || '');
+                  button.disabled = !!disabled;
+                  button.classList.toggle('archive-v4-button-loading', !!disabled && key === activeKey);
+              });
+          }
+
+          function archiveStopButtonForTarget(target) {
+              const key = archiveNormalizeTarget(target);
+              if (!key || key === '__all__') return null;
+              return document.querySelector('[data-archive-stop-button="' + CSS.escape(key) + '"]');
+          }
+
+          function archiveHideRowStopButtons() {
+              document.querySelectorAll('[data-archive-stop-button]').forEach(button => {
+                  button.hidden = true;
+                  button.disabled = false;
+                  button.classList.remove('archive-v4-button-loading');
+              });
+          }
+
+          function archiveShowRowStopButton(target, visible) {
+              const button = archiveStopButtonForTarget(target);
+              if (!button) return;
+              button.hidden = !visible;
+              button.disabled = false;
+          }
+
+          function archiveUpdateRowStopButtons(job) {
+              archiveHideRowStopButtons();
+              if (!job || !isArchiveRunning(job.status)) return;
+              const target = archiveNormalizeTarget(job.target || '');
+              const progressTarget = archiveNormalizeTarget(job.progress_target || '');
+              const rows = job.progress_rows || {};
+              Object.keys(rows).forEach(key => {
+                  const item = rows[key] || {};
+                  if ((item.state || '') === 'running') archiveShowRowStopButton(key, true);
+              });
+              if (target && target !== '__all__') archiveShowRowStopButton(target, true);
+              if (progressTarget && progressTarget !== '__all__') archiveShowRowStopButton(progressTarget, true);
+          }
+
+          let archiveUiMessageTimer = null;
+
+          function archiveShowStatus(type, text, autoHide) {
+              const box = document.getElementById('archiveInlineStatus');
+              if (!box) return;
+              if (archiveUiMessageTimer) {
+                  clearTimeout(archiveUiMessageTimer);
+                  archiveUiMessageTimer = null;
+              }
+              box.hidden = false;
+              box.className = 'archive-v4-inline-status archive-v4-inline-' + (type || 'info');
+              box.textContent = text || '';
+              if ((autoHide || type === 'success') && type !== 'error') {
+                  archiveUiMessageTimer = setTimeout(() => { box.hidden = true; }, 780);
+              }
+          }
+
+          function archiveProgressElements(target) {
+              const key = archiveNormalizeTarget(target);
+              if (key === '__all__') {
+                  const all = document.getElementById('archiveAllProgress');
+                  return all ? [all] : [];
+              }
+              const row = document.querySelector('[data-archive-row-progress="' + CSS.escape(key) + '"]');
+              return row ? [row] : [];
+          }
+
+          function archiveSetProgress(el, state, percent, label, phase) {
+              if (!el) return;
+              const pct = Number.isFinite(Number(percent)) ? Math.max(0, Math.min(100, Number(percent))) : null;
+              const isRunning = state === 'running';
+              const isIndeterminate = isRunning && pct === null;
+              el.classList.remove(
+                  'archive-v4-progress-idle', 'archive-v4-progress-running', 'archive-v4-progress-success', 'archive-v4-progress-error',
+                  'archive-v4-progress-indeterminate', 'archive-v4-progress-determinate'
+              );
+              Array.from(el.classList).forEach(cls => {
+                  if (cls.indexOf('archive-v4-progress-phase-') === 0) el.classList.remove(cls);
+              });
+              el.classList.add('archive-v4-progress-' + (state || 'idle'));
+              el.classList.add(isIndeterminate ? 'archive-v4-progress-indeterminate' : 'archive-v4-progress-determinate');
+              if (phase) el.classList.add('archive-v4-progress-phase-' + String(phase).replace(/[^a-zA-Z0-9_-]/g, '_'));
+              const bar = el.querySelector('.archive-v4-progress-track span');
+              const text = el.querySelector('.archive-v4-progress-label');
+              if (bar) bar.style.width = isIndeterminate ? '55%' : ((pct === null ? 0 : pct) + '%');
+              if (text) {
+                  if (label) text.textContent = label;
+                  else if (isRunning) text.textContent = pct === null ? 'En cours…' : Math.round(pct) + ' %';
+                  else if (state === 'success') text.textContent = 'Terminé';
+                  else if (state === 'error') text.textContent = 'Erreur';
+                  else text.textContent = 'Prêt';
+                  text.title = text.textContent || '';
+              }
+          }
+
+          function archiveSetTargetProgress(target, state, percent, label, phase) {
+              archiveProgressElements(target).forEach(el => archiveSetProgress(el, state, percent, label, phase));
+          }
+
+          function archiveResetIdleProgress() {
+              const all = document.getElementById('archiveAllProgress');
+              if (all) archiveSetProgress(all, 'idle', 0, 'Prêt', 'idle');
+              document.querySelectorAll('[data-archive-row-progress]').forEach(el => archiveSetProgress(el, 'idle', 0, 'Prêt', 'idle'));
+              archiveHideRowStopButtons();
+          }
+
+          function archiveJobProgress(job) {
+              if (job && ['success', 'stopped', 'error'].includes(job.status || '')) return 100;
+              if (job && job.progress_percent !== null && job.progress_percent !== undefined && job.progress_percent !== '') {
+                  const n = Number(job.progress_percent);
+                  if (Number.isFinite(n)) return n;
+              }
+              if (job && isArchiveRunning(job.status)) return null;
+              return 0;
+          }
+
+          function archiveProgressStateFromPayload(payload, fallbackStatus) {
+              const state = payload && payload.state ? payload.state : '';
+              const phase = payload && payload.phase ? payload.phase : '';
+              if (state === 'success') return 'success';
+              if (state === 'error' || state === 'stopped' || phase === 'stopped') return 'error';
+              if ((fallbackStatus || '') === 'success') return 'success';
+              if (['error', 'stopped'].includes(fallbackStatus || '')) return 'error';
+              if (isArchiveRunning(fallbackStatus)) return 'running';
+              return 'idle';
+          }
+
+          function archiveApplyJobUi(job) {
+              if (!job) return;
+              const running = isArchiveRunning(job.status);
+              const percent = archiveJobProgress(job);
+              const phase = job.progress_phase || '';
+              let state = running ? 'running' : 'idle';
+              let label = job.progress_label || '';
+              if (!label && running) label = percent === null ? 'En cours…' : Math.round(percent) + ' %';
+              if (job.status === 'success') { state = 'success'; label = 'Terminé'; }
+              else if (job.status === 'stopped') { state = 'error'; label = 'Arrêté'; }
+              else if (job.status === 'error') { state = 'error'; label = 'Erreur'; }
+
+              archiveSetTargetProgress('__all__', state, percent, label, phase);
+
+              const rows = job.progress_rows || {};
+              Object.keys(rows).forEach(key => {
+                  const item = rows[key] || {};
+                  const p = item.percent !== null && item.percent !== undefined && item.percent !== '' ? Number(item.percent) : null;
+                  const rowState = archiveProgressStateFromPayload(item, job.status);
+                  archiveSetTargetProgress(key, rowState, Number.isFinite(p) ? p : null, item.label || '', item.phase || phase);
+              });
+
+              if (!running && (job.target || '') !== '__all__' && (job.target || '') !== '--all') {
+                  const key = archiveNormalizeTarget(job.target);
+                  archiveSetTargetProgress(key, state, 100, label, phase);
+              }
+              if (job.status === 'success' && archiveNormalizeTarget(job.target) === '__all__') {
+                  document.querySelectorAll('[data-archive-row-progress]').forEach(el => {
+                      if (!el.classList.contains('archive-v4-progress-error')) archiveSetProgress(el, 'success', 100, 'Terminé', 'done');
+                  });
+              }
+
+              const displayTarget = archiveHumanTarget(job.label || job.target || '');
+              if (running) {
+                  archiveShowStatus('info', 'Archive en cours : ' + (label || displayTarget), false);
+                  archiveSetRunButtonsDisabled(true, job.target || '__all__');
+              } else if (job.status === 'success' || job.status === 'stopped') {
+                  archiveShowStatus(job.status === 'stopped' ? 'error' : 'success', (job.status === 'stopped' ? 'Arrêté' : 'Terminé') + ' : ' + displayTarget, job.status !== 'stopped');
+                  archiveSetRunButtonsDisabled(false, '');
+                  archiveSetButtonLoading(document.getElementById('archiveStopButton'), false);
+              } else if (job.status === 'error') {
+                  archiveShowStatus('error', 'Erreur Archive. Le détail est disponible dans l’onglet Logs.', false);
+                  archiveSetRunButtonsDisabled(false, '');
+                  archiveSetButtonLoading(document.getElementById('archiveStopButton'), false);
+              }
+              archiveUpdateRowStopButtons(job);
+          }
+
+          function formatArchiveJobLog(job) {
+              if (!job) return 'Aucun log lancé pour le moment.';
+              const base = archiveFilterProgressMarkers(job.log || '');
+              return base + '\n\n---\nStatut : ' + archiveStatusLabel(job.status) +
+                  (job.returncode !== null && job.returncode !== undefined ? ' · code ' + job.returncode : '') +
+                  (job.log_file ? '\nLog : ' + job.log_file : '');
+          }
+
+          async function refreshArchiveLogFromServer() {
+              const out = document.getElementById('liveLogOutput');
+              if (!out) return;
+              try {
+                  const res = await fetch('{{ url_for('services_bp.archive_api_status') }}', {cache: 'no-store'});
+                  const data = await res.json();
+                  if (!data.ok) return;
+                  const job = data.active || data.latest;
+                  if (!job || !job.id) return;
+                  currentJobId = job.id;
+                  setLogOutput(formatArchiveJobLog(job));
+                  archiveApplyJobUi(job);
+                  const stopBtn = document.getElementById('runStopBtn');
+                  if (stopBtn) stopBtn.disabled = !isArchiveRunning(job.status);
+                  if (isArchiveRunning(job.status)) {
+                      startArchivePolling(currentJobId);
+                  }
+              } catch (e) {
+                  setLogOutput('❌ Erreur lecture log archive : ' + e);
+              }
+          }
+
+          function showRunModal(title, text) {
+              document.getElementById('runModalTitle').textContent = title;
+              document.getElementById('runModalLog').textContent = text || '';
+              setLogOutput(text || '');
+              document.getElementById('runModal').style.display = 'flex';
+          }
+
+          async function runArchive(profileKey, action, button) {
+              const key = archiveNormalizeTarget(profileKey);
+              const targetLabel = archiveHumanTarget(key);
+              if (action === 'stop') {
+                  await stopCurrentArchive(button, profileKey);
+                  return;
+              }
+              archiveResetIdleProgress();
+              archiveSetTargetProgress(key, 'running', null, 'Démarrage…', 'start');
+              archiveSetRunButtonsDisabled(true, key);
+              archiveShowStatus('info', 'Démarrage Archive : ' + targetLabel, false);
+              setLogOutput('Démarrage du job Archive côté Flask/tmux...\nCible : ' + targetLabel);
+              try {
+                  const res = await fetch('{{ url_for('services_bp.archive_api_run') }}', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({target: profileKey, action: action || 'start'})
+                  });
+                  const data = await res.json();
+                  if (!res.ok || !data.ok) {
+                      const isRestartWait = action === 'restart' && data.job && data.job.id;
+                      const text = (data.error || data.message || 'Erreur lancement archive') + '\n\n' + (data.job && data.job.log ? archiveFilterProgressMarkers(data.job.log) : '');
+                      setLogOutput(text);
+                      archiveShowStatus(isRestartWait ? 'info' : 'error', isRestartWait ? 'Arrêt demandé avant relance…' : 'Erreur Archive. Le détail est disponible dans l’onglet Logs.', false);
+                      if (!isRestartWait) archiveSetTargetProgress(key, 'error', 100, 'Erreur', 'error');
+                      archiveSetRunButtonsDisabled(false, '');
+                      if (data.job && data.job.id) {
+                          currentJobId = data.job.id;
+                          if (isRestartWait) pendingRestartTarget = profileKey;
+                          archiveApplyJobUi(data.job);
+                          startArchivePolling(currentJobId);
+                      }
+                      return;
+                  }
+                  currentJobId = data.job.id;
+                  setLogOutput(formatArchiveJobLog(data.job));
+                  archiveApplyJobUi(data.job);
+                  startArchivePolling(currentJobId);
+              } catch (e) {
+                  setLogOutput('❌ Erreur Archive : ' + e);
+                  archiveSetTargetProgress(key, 'error', 100, 'Erreur', 'error');
+                  archiveShowStatus('error', 'Erreur Archive : ' + e, false);
+                  archiveSetRunButtonsDisabled(false, '');
+              }
+          }
+
+          async function openRunModal(profileKey, action) {
+              const labels = {start:'Lancement', stop:'Arrêt', restart:'Redémarrage'};
+              const target = profileKey === '__all__' ? '--all' : profileKey;
+              const title = (labels[action] || 'Archive') + ' - ' + target;
+
+              if (action === 'stop') {
+                  showRunModal(title, '⏹ Demande d’arrêt du job actif...');
+                  await stopCurrentArchive(null, profileKey);
+                  return;
+              }
+
+              showRunModal(title, '🚀 Démarrage du job Archive...\nCible : ' + target + '\n');
+              try {
+                  const res = await fetch('{{ url_for('services_bp.archive_api_run') }}', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({target: profileKey, action: action || 'start'})
+                  });
+                  const data = await res.json();
+                  if (!res.ok || !data.ok) {
+                      const isRestartWait = action === 'restart' && data.job && data.job.id;
+                      const prefix = isRestartWait ? '↻ ' : '❌ ';
+                      const text = prefix + (data.error || data.message || 'Erreur lancement archive') + '\n\n' + (data.job && data.job.log ? data.job.log : '');
+                      showRunModal(title, text);
+                      if (data.job && data.job.id) {
+                          currentJobId = data.job.id;
+                          if (isRestartWait) pendingRestartTarget = profileKey;
+                          startArchivePolling(currentJobId);
+                      }
+                      return;
+                  }
+                  currentJobId = data.job.id;
+                  const text = (data.job.log || '') || ('✅ Job Archive lancé : ' + currentJobId);
+                  showRunModal(title + ' · ' + archiveStatusLabel(data.job.status), text);
+                  startArchivePolling(currentJobId);
+              } catch (e) {
+                  showRunModal(title, '❌ ' + e);
+              }
+          }
+
+          function closeRunModal() {
+              document.getElementById('runModal').style.display = 'none';
+          }
+
+
+          function startArchivePolling(jobId) {
+              if (archivePollTimer) clearInterval(archivePollTimer);
+              pollArchiveJob(jobId);
+              archivePollTimer = setInterval(() => pollArchiveJob(jobId), 1200);
+          }
+
+          async function pollArchiveJob(jobId) {
+              if (!jobId) return;
+              try {
+                  const url = '{{ url_for('services_bp.archive_api_log') }}?job_id=' + encodeURIComponent(jobId);
+                  const res = await fetch(url);
+                  const data = await res.json();
+                  if (!data.ok || !data.job) return;
+                  const job = data.job;
+                  const text = formatArchiveJobLog(job);
+                  document.getElementById('runModalLog').textContent = text;
+                  setLogOutput(text);
+                  archiveApplyJobUi(job);
+                  document.getElementById('runModalTitle').textContent = 'Archive - ' + (job.label || job.target || '') + ' · ' + archiveStatusLabel(job.status);
+                  const stopBtn = document.getElementById('runStopBtn');
+                  if (stopBtn) stopBtn.disabled = !isArchiveRunning(job.status);
+                  if (!isArchiveRunning(job.status) && archivePollTimer) {
+                      clearInterval(archivePollTimer);
+                      archivePollTimer = null;
+                      if (pendingRestartTarget && job.id === currentJobId) {
+                          const restartTarget = pendingRestartTarget;
+                          pendingRestartTarget = null;
+                          setTimeout(() => runArchive(restartTarget, 'start'), 700);
+                      }
+                  }
+              } catch (e) {
+                  setLogOutput('❌ Erreur lecture log : ' + e);
+              }
+          }
+
+          async function stopCurrentArchive(button, target) {
+              const stopTarget = archiveNormalizeTarget(target || '');
+              const payload = currentJobId ? {job_id: currentJobId, target: stopTarget} : {target: stopTarget};
+              archiveSetButtonLoading(button || document.getElementById('archiveStopButton'), true);
+              const stopLabel = stopTarget && stopTarget !== '__all__' ? stopTarget : 'archive';
+              archiveShowStatus('info', 'Demande d’arrêt : ' + stopLabel + '…', false);
+              if (stopTarget && stopTarget !== '__all__') {
+                  archiveSetTargetProgress(stopTarget, 'running', null, 'Arrêt demandé…', 'stopping');
+              }
+              try {
+                  const res = await fetch('{{ url_for('services_bp.archive_api_stop') }}', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify(payload)
+                  });
+                  const data = await res.json();
+                  if (!res.ok || !data.ok) {
+                      const text = '❌ ' + (data.error || 'Aucune archive en cours.');
+                      document.getElementById('runModalLog').textContent = text;
+                      setLogOutput(text);
+                      archiveShowStatus('error', data.error || 'Aucune archive en cours.', false);
+                      archiveSetButtonLoading(button || document.getElementById('archiveStopButton'), false);
+                      return;
+                  }
+                  currentJobId = data.job.id;
+                  const text = archiveFilterProgressMarkers(data.job.log || '⏹ Arrêt demandé.');
+                  document.getElementById('runModalTitle').textContent = 'Arrêt archive - ' + (data.job.label || data.job.target || '');
+                  document.getElementById('runModalLog').textContent = text;
+                  setLogOutput(text);
+                  archiveApplyJobUi(data.job);
+                  startArchivePolling(currentJobId);
+              } catch (e) {
+                  const text = '❌ ' + e;
+                  document.getElementById('runModalLog').textContent = text;
+                  setLogOutput(text);
+                  archiveShowStatus('error', 'Erreur arrêt Archive : ' + e, false);
+                  archiveSetButtonLoading(button || document.getElementById('archiveStopButton'), false);
+              }
+          }
+
+          function stopArchiveJobForTarget(target, button) {
+              return stopCurrentArchive(button, archiveNormalizeTarget(target || ''));
+          }
+
+          function setLogOutput(text) {
+              const out = document.getElementById('liveLogOutput');
+              if (out) {
+                  out.style.display = 'block';
+                  out.textContent = text || '';
+              }
+          }
+
+          function clearLogOutput() {
+              setLogOutput('Aucun log lancé pour le moment.');
+          }
+
+          async function checkArchiveFromButton(button) {
+              const old = button ? button.textContent : '';
+              if (button) archiveSetButtonLoading(button, true);
+              const startText = '🧪 Vérification archive.conf en cours...';
+              archiveShowStatus('info', startText, false);
+              setLogOutput(startText);
+              try {
+                  const res = await fetch('{{ url_for('services_bp.archive_check') }}', { method:'POST' });
+                  const data = await res.json();
+                  const text = (data.ok ? '✅ archive.conf OK\n\n' : '❌ archive.conf en erreur · code ' + data.code + '\n\n') + (data.output || '');
+                  setLogOutput(text);
+                  archiveShowStatus(data.ok ? 'success' : 'error', data.ok ? 'archive.conf OK' : 'archive.conf en erreur', data.ok);
+              } catch (e) {
+                  const text = '❌ Erreur vérification archive.conf : ' + e;
+                  setLogOutput(text);
+                  archiveShowStatus('error', text, false);
+              } finally {
+                  if (button) {
+                      archiveSetButtonLoading(button, false);
+                      button.textContent = old || button.textContent;
+                  }
+              }
+          }
+
+          document.addEventListener('DOMContentLoaded', function() {
+              archiveAutoHideGreenMessages();
+              refreshArchiveLogFromServer();
+          });
+
+          function openArchiveStandardBrowser(targetId) {
+              archiveBrowseTargetId = targetId;
+              const input = document.getElementById(targetId);
+              const start = input && input.value ? input.value : '{{ allowed_roots[0] if allowed_roots else "/mnt" }}';
+              const params = new URLSearchParams({path: start || '/', target: ''});
+              window.open('/browser/folder?' + params.toString(), 'yoleo_services_archive_browser', 'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+          }
+
+          window.addEventListener('message', function(event) {
+              const data = event.data || {};
+              if (data.type !== 'yoleo-browser-select' || data.mode !== 'folder') return;
+              if (!archiveBrowseTargetId) return;
+              const input = document.getElementById(archiveBrowseTargetId);
+              if (!input) return;
+              input.value = data.path || '';
+              input.dispatchEvent(new Event('input', {bubbles:true}));
+              input.dispatchEvent(new Event('change', {bubbles:true}));
+          });
+
+          function initKeyboardTable(tableId) {
+              const table = document.getElementById(tableId);
+              if (!table) return;
+              keyboardState[tableId] = keyboardState[tableId] || { row: -1, action: 0 };
+          }
+
+          function visibleRows(table) {
+              return Array.from(table.querySelectorAll('tbody tr')).filter(row => row.style.display !== 'none' && row.dataset.deleted !== '1');
+          }
+
+          document.addEventListener('keydown', function(e) {
+              const activePanel = document.querySelector('.tab-panel.active');
+              if (!activePanel) return;
+              const table = activePanel.querySelector('.archive-table');
+              if (!table) return;
+              if (!['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Enter'].includes(e.key)) return;
+              if (['INPUT','TEXTAREA','SELECT','BUTTON'].includes((document.activeElement || {}).tagName)) return;
+              const id = table.id;
+              initKeyboardTable(id);
+              const state = keyboardState[id];
+              const rows = visibleRows(table);
+              if (!rows.length) return;
+              e.preventDefault();
+              if (e.key === 'ArrowDown') state.row = Math.min(rows.length - 1, state.row + 1);
+              if (e.key === 'ArrowUp') state.row = Math.max(0, state.row <= 0 ? 0 : state.row - 1);
+              if (state.row < 0) state.row = 0;
+              const buttons = Array.from(rows[state.row].querySelectorAll('button:not(:disabled)'));
+              if (e.key === 'ArrowLeft') state.action = Math.max(0, state.action - 1);
+              if (e.key === 'ArrowRight') state.action = Math.min(Math.max(0, buttons.length - 1), state.action + 1);
+              if (state.action >= buttons.length) state.action = Math.max(0, buttons.length - 1);
+              document.querySelectorAll('.keyboard-selected-row').forEach(r => r.classList.remove('keyboard-selected-row'));
+              document.querySelectorAll('.keyboard-action-focus').forEach(b => b.classList.remove('keyboard-action-focus'));
+              rows[state.row].classList.add('keyboard-selected-row');
+              if (buttons[state.action]) buttons[state.action].classList.add('keyboard-action-focus');
+              if (e.key === 'Enter' && buttons[state.action]) buttons[state.action].click();
+          });
+
+          document.addEventListener('DOMContentLoaded', function() {
+              initKeyboardTable('generalTable');
+          });
+          </script>
+{% endblock %}

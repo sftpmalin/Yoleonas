@@ -1,0 +1,47 @@
+{% extends "partage_samba_base.html" %}
+
+{% block samba_content %}
+<div id="tab-samba-user" class="tab-panel active">
+                <section class="card">
+                    <div class="table-tools">
+                        <div class="title-block">
+                            <h1>Utilisateurs SMB</h1>
+                            <div class="subtitle">Ces lignes activent Samba pour des utilisateurs Linux existants. Le nom vient de <b>/etc/passwd</b> : on ne l'invente pas ici.</div>
+                        </div>
+                        <div class="partage-table-actions-v4">
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="addSambaUserRow()">➕ Ajouter utilisateur existant</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="saveSamba(this, 'Utilisateurs enregistrés.')">💾 Enregistrer les utilisateurs</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="share-table" id="sambaUsersTable">
+                            <thead>
+                                <tr>
+                                    <th>Nom</th><th>Mot de passe</th><th>UID</th><th>GID</th><th>Shell</th><th>Home</th><th style="width:90px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for user in state.samba.users %}
+                                <tr>
+                                    <td>
+                                        <select class="select-input" data-user="name" onchange="syncLinuxUserRow(this)">
+                                            {% for lu in state.linux_users %}
+                                                <option value="{{ lu.name }}" data-uid="{{ lu.uid }}" data-gid="{{ lu.gid }}" data-shell="{{ lu.shell }}" data-home="{{ lu.home }}" {{ 'selected' if lu.name == user.name else '' }}>{{ lu.display }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% if not user.exists %}<div class="hint">⚠ inexistant dans /etc/passwd</div>{% endif %}
+                                    </td>
+                                    <td><input class="text-input" data-user="password" value="{{ user.password }}" autocomplete="new-password"></td>
+                                    <td><input class="text-input" data-user="uid" value="{{ user.uid }}" readonly></td>
+                                    <td><input class="text-input" data-user="gid" value="{{ user.gid }}" readonly></td>
+                                    <td><input class="text-input" data-user="shell" value="{{ user.shell }}" readonly></td>
+                                    <td><input class="text-input" data-user="home" value="{{ user.home }}" readonly></td>
+                                    <td><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red" onclick="removeRow(this)">🗑</button></td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+{% endblock %}

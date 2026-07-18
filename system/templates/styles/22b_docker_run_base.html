@@ -1,0 +1,73 @@
+    /* Docker Run : bibliothèque complète récupérée sans CSS local */
+    .docker-run-library { overflow: hidden; }
+    .docker-run-search-row {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+    }
+    .docker-run-table { min-width: 980px; }
+    .docker-run-icon-col { width: 72px; }
+    .docker-run-actions-col { width: 132px; text-align: center; justify-content: center; }
+    .docker-run-icon {
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+        border-radius: 10px;
+        padding: 4px;
+        background: rgba(255,255,255,.92);
+        box-shadow: 0 4px 10px rgba(0,0,0,.20);
+    }
+    .docker-run-file-name { color: #fff; font-weight: 900; word-break: break-word; }
+    .docker-run-preview {
+        color: #dce6ef;
+        font-size: 12px;
+        line-height: 1.35;
+        max-width: 520px;
+        word-break: break-word;
+    }
+    .docker-run-row.keyboard-selected-row td,
+    .docker-lan-row.keyboard-selected-row td {
+        background: #24125c !important;
+        color: #fff;
+        border-top: 1px solid #8e6dff;
+        border-bottom: 1px solid #8e6dff;
+    }
+    .docker-run-row.keyboard-selected-row td:first-child,
+    .docker-lan-row.keyboard-selected-row td:first-child { box-shadow: inset 4px 0 0 #b394ff; }
+    .docker-run-row.keyboard-selected-row .docker-run-icon { border: 2px solid var(--yoleo-accent-2); box-shadow: 0 0 10px rgba(26,235,255,.35); }
+    .docker-run-editor-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+        gap: 12px;
+        align-items: start;
+    }
+    .docker-run-editor-card { min-width: 0; overflow: hidden; }
+    .docker-run-editor-head {
+        display: grid;
+        grid-template-columns: minmax(220px, 360px) auto auto auto;
+        gap: 10px;
+        align-items: end;
+        padding: 12px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+    }
+    .docker-run-editor-head .form-row { margin: 0; }
+    .docker-run-command-textarea { min-height: 58vh; }
+    .docker-run-info-card { overflow: hidden; }
+    .docker-run-info-list { display: grid; gap: 10px; padding: 12px; }
+    .docker-run-terminal-section { overflow: hidden; }
+    .docker-run-terminal {
+        width: calc(100% - 24px);
+        min-height: 58vh;
+        resize: vertical;
+    }
+    @media (max-width: 1050px) {
+        .docker-run-editor-grid,
+        .docker-run-editor-head,
+        .docker-run-search-row { grid-template-columns: 1fr; }
+        .docker-run-actions-col { width: auto; }
+    }
+
+

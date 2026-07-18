@@ -1,0 +1,501 @@
+
+    .home-config-groups {
+        margin-top: 0;
+        display: grid;
+        gap: 22px;
+    }
+
+    .home-config-group {
+        display: grid;
+        gap: 12px;
+    }
+
+    .home-group-head {
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+        min-height: 40px;
+    }
+
+    .home-group-head .home-group-icon {
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        line-height: 1;
+        border-radius: 10px;
+        background: rgba(26,235,255,.08);
+        border: 1px solid rgba(26,235,255,.16);
+        flex: 0 0 30px;
+    }
+
+    .home-group-head .home-group-title,
+    .home-group-head > div:not(.home-group-title) {
+        min-width: 0;
+    }
+
+    .home-group-head h3,
+    .home-group-head p {
+        margin: 0;
+        padding: 0;
+    }
+
+    .home-group-head h3 {
+        color: #fff;
+        font-size: 18px;
+        font-weight: 900;
+        line-height: 1.15;
+    }
+
+    .home-group-head p {
+        margin-top: 4px;
+        color: #c6d4e4;
+        font-size: 13px;
+        line-height: 1.25;
+    }
+
+    .home-save-btn {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: end;
+        align-self: center;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 760px) {
+        .home-group-head {
+            grid-template-columns: 30px minmax(0, 1fr);
+        }
+
+        .home-save-btn {
+            grid-column: 1 / -1;
+            justify-self: start;
+            margin-top: 2px;
+        }
+    }
+
+
+    .pers-home-identity-group {
+        gap: 10px;
+    }
+
+    .pers-home-identity-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(220px, 1fr));
+        gap: 10px;
+        align-items: end;
+    }
+
+    .pers-home-identity-field {
+        min-width: 0;
+        padding: 9px;
+        border-radius: 12px;
+    }
+
+    .pers-home-identity-row {
+        gap: 6px;
+        align-items: center;
+    }
+
+    .pers-home-identity-row .input {
+        min-width: 0;
+    }
+
+    .pers-home-identity-status:empty {
+        display: none;
+    }
+
+    @media (max-width: 980px) {
+        .pers-home-identity-grid {
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+    }
+
+    @media (max-width: 560px) {
+        .pers-home-identity-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Système > Personnalisation > Accueil : refonte visuelle des blocs dynamiques. */
+    .pers-home-editor-card {
+        border-color: rgba(80, 122, 170, .24);
+        background:
+            linear-gradient(180deg, rgba(17, 29, 44, .86), rgba(11, 19, 30, .88)),
+            #101822;
+    }
+
+    .pers-home-editor-card > .card-body {
+        padding: 20px 24px;
+    }
+
+    .pers-home-editor-card .home-config-groups {
+        gap: 0;
+    }
+
+    .pers-home-editor-card .home-config-group {
+        padding: 16px 0;
+        border-top: 1px solid rgba(123, 158, 196, .14);
+    }
+
+    .pers-home-editor-card .home-config-group:first-child,
+    .pers-home-editor-card .pers-home-identity-card {
+        padding-top: 0;
+        border-top: 0;
+    }
+
+    .pers-home-editor-card .home-group-head {
+        grid-template-columns: 34px minmax(0, 1fr);
+        margin-bottom: 4px;
+    }
+
+    .pers-home-editor-card .home-group-head .home-group-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: rgba(24, 188, 214, .10);
+        border-color: rgba(24, 188, 214, .22);
+        box-shadow: inset 0 0 16px rgba(24, 188, 214, .05);
+    }
+
+    .pers-home-editor-card .home-group-head h3 {
+        font-size: 17px;
+        line-height: 1.15;
+    }
+
+    .pers-home-editor-card .home-group-head p {
+        color: #9fb3c9;
+        font-size: 12px;
+        max-width: 920px;
+    }
+
+    .pers-home-editor-card .home-group-head code {
+        color: #7de9ff;
+        font-size: 11px;
+        background: rgba(0, 0, 0, .22);
+        border: 1px solid rgba(120, 170, 220, .14);
+        border-radius: 6px;
+        padding: 1px 5px;
+    }
+
+    .pers-home-editor-card .home-toggle-grid {
+        grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .pers-home-editor-card .pers-home-gpu-card .home-toggle-grid,
+    .pers-home-editor-card .pers-home-docker-card .home-toggle-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .pers-home-editor-card .pers-home-resources-card .home-toggle-grid {
+        grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+    }
+
+    .pers-home-editor-card .home-toggle {
+        position: relative;
+        grid-template-columns: 32px minmax(0, 1fr);
+        min-height: 54px;
+        gap: 9px;
+        padding: 8px 42px 8px 9px;
+        border-radius: 8px;
+        background: rgba(7, 14, 24, .46);
+        border: 1px solid rgba(120, 170, 220, .18);
+        box-shadow: none;
+        overflow: hidden;
+    }
+
+    .pers-home-editor-card .home-toggle::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 3px;
+        background: rgba(24, 188, 214, .72);
+        opacity: .22;
+    }
+
+    .pers-home-editor-card .home-toggle:hover {
+        transform: none;
+        border-color: rgba(24, 188, 214, .34);
+        background: rgba(10, 21, 34, .76);
+    }
+
+    .pers-home-editor-card .home-toggle-icon {
+        grid-column: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        font-family: "Segoe UI Symbol", "Segoe UI Emoji", "Segoe UI", Arial, sans-serif;
+        font-size: 15px;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: 0;
+        background: rgba(24, 188, 214, .10);
+        border-color: rgba(24, 188, 214, .22);
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: clip;
+    }
+
+    .pers-home-editor-card .home-toggle-show-build .home-toggle-icon {
+        font-size: 14px;
+    }
+
+    .pers-home-editor-card .home-toggle > span:not(.home-toggle-icon) {
+        grid-column: 2;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .pers-home-editor-card .home-toggle input {
+        appearance: none;
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        width: 1px !important;
+        min-width: 1px;
+        height: 1px !important;
+        min-height: 1px;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+        pointer-events: none;
+    }
+
+    .pers-home-editor-card .home-toggle input::before {
+        display: none;
+    }
+
+    .pers-home-editor-card .home-toggle::after {
+        content: "";
+        position: absolute;
+        right: 9px;
+        top: 50%;
+        width: 24px;
+        height: 13px;
+        border-radius: 999px;
+        border: 1px solid rgba(142, 163, 186, .34);
+        background: rgba(60, 74, 92, .66);
+        transform: translateY(-50%);
+        transition: background .16s ease, border-color .16s ease;
+        z-index: 1;
+    }
+
+    .pers-home-editor-card .home-toggle input + span::before {
+        content: "";
+        position: absolute;
+        right: 21px;
+        top: 50%;
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: #d9e6f2;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, .34);
+        transform: translateY(-50%);
+        transition: transform .16s ease, background .16s ease;
+        z-index: 2;
+    }
+
+    .pers-home-editor-card .home-toggle:has(input:checked)::after {
+        background: #12c9d9;
+        border-color: rgba(125, 233, 255, .78);
+    }
+
+    .pers-home-editor-card .home-toggle input:checked + span::before {
+        transform: translate(11px, -50%);
+        background: #041118;
+    }
+
+    .pers-home-editor-card .home-toggle-title {
+        display: block;
+        font-size: 11.5px;
+        line-height: 1.15;
+        color: #f7fbff;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .pers-home-editor-card .home-toggle-desc {
+        display: block;
+        margin-top: 3px;
+        color: #8ca1b8;
+        font-size: 10.5px;
+        line-height: 1.22;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .pers-home-editor-card .pers-home-gpu-card .home-toggle::before,
+    .pers-home-editor-card .pers-home-gpu-card .home-group-icon {
+        background-color: rgba(34, 197, 94, .20);
+        border-color: rgba(34, 197, 94, .26);
+    }
+
+    .pers-home-editor-card .pers-home-system-card .home-toggle::before,
+    .pers-home-editor-card .pers-home-system-card .home-group-icon {
+        background-color: rgba(245, 158, 11, .18);
+        border-color: rgba(245, 158, 11, .25);
+    }
+
+    .pers-home-editor-card .pers-home-docker-card .home-toggle::before,
+    .pers-home-editor-card .pers-home-docker-card .home-group-icon {
+        background-color: rgba(56, 189, 248, .18);
+        border-color: rgba(56, 189, 248, .25);
+    }
+
+    .pers-home-editor-card .pers-home-resources-card .home-toggle::before,
+    .pers-home-editor-card .pers-home-resources-card .home-group-icon {
+        background-color: rgba(168, 85, 247, .16);
+        border-color: rgba(168, 85, 247, .24);
+    }
+
+    .pers-home-order-section {
+        margin-top: 2px;
+    }
+
+    .pers-home-order-list {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-top: 10px;
+        max-width: 430px;
+    }
+
+    .pers-home-order-item {
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        min-height: 46px;
+        padding: 7px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(120, 170, 220, .18);
+        background: rgba(7, 14, 24, .42);
+        transition: border-color .15s ease, background .15s ease;
+        cursor: grab;
+    }
+
+    .pers-home-order-item:hover {
+        border-color: rgba(24, 188, 214, .34);
+        background: rgba(10, 21, 34, .72);
+    }
+
+    .pers-home-order-item:active {
+        cursor: grabbing;
+    }
+
+    .pers-home-order-item.is-dragging {
+        opacity: .56;
+        border-color: rgba(125, 233, 255, .60);
+        background: rgba(12, 35, 50, .82);
+        box-shadow: inset 0 0 0 1px rgba(125, 233, 255, .18);
+    }
+
+    .pers-home-order-item.is-drop-before {
+        box-shadow: 0 -3px 0 rgba(125, 233, 255, .92);
+    }
+
+    .pers-home-order-item.is-drop-after {
+        box-shadow: 0 3px 0 rgba(125, 233, 255, .92);
+    }
+
+    .pers-home-order-rank {
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        color: #7de9ff;
+        background: rgba(24, 188, 214, .10);
+        border: 1px solid rgba(24, 188, 214, .22);
+        font-weight: 900;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .pers-home-order-text {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .pers-home-order-text strong {
+        color: #f7fbff;
+        font-size: 12.5px;
+        line-height: 1.15;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .pers-home-order-text code {
+        width: fit-content;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #91a7bd;
+        background: rgba(0, 0, 0, .20);
+        border: 1px solid rgba(120, 170, 220, .12);
+        border-radius: 6px;
+        padding: 1px 5px;
+        font-size: 9.5px;
+    }
+
+    .pers-home-order-actions {
+        display: inline-flex;
+        gap: 5px;
+        justify-content: flex-end;
+    }
+
+    .pers-home-order-actions .yoleo-btn {
+        min-width: 26px;
+        width: 26px;
+        min-height: 26px;
+        padding: 0;
+        border-radius: 7px;
+        font-size: 14px;
+        line-height: 1;
+    }
+
+    .pers-home-order-actions .yoleo-btn {
+        cursor: pointer;
+    }
+
+    @media (max-width: 900px) {
+        .pers-home-editor-card > .card-body {
+            padding: 16px;
+        }
+
+        .pers-home-editor-card .home-toggle-grid,
+        .pers-home-editor-card .pers-home-gpu-card .home-toggle-grid,
+        .pers-home-editor-card .pers-home-docker-card .home-toggle-grid,
+        .pers-home-editor-card .pers-home-resources-card .home-toggle-grid,
+        .pers-home-order-list {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 760px) {
+        .pers-home-editor-card .home-toggle {
+            grid-template-columns: 32px minmax(0, 1fr);
+        }
+
+        .pers-home-order-item {
+            grid-template-columns: 30px minmax(0, 1fr);
+        }
+
+        .pers-home-order-actions {
+            grid-column: 2;
+            justify-content: flex-start;
+        }
+    }

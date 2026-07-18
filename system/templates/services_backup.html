@@ -1,0 +1,1089 @@
+{% extends "services_base.html" %}
+
+{% block route_content %}
+{% macro backup_option_badges(s) -%}
+    {% set mode_label = 'Cache' if s.mode == 'cache' else ('Archive' if s.mode == 'archive' else ('Miroir' if s.mode == 'mirror' else 'Backup')) %}
+    {% set mode_badge = 'badge-mode-cache' if s.mode == 'cache' else ('badge-mode-archive' if s.mode == 'archive' else 'badge-mode-backup') %}
+    <span class="badge {{ mode_badge }}">{{ mode_label }}</span>
+    {% if s.mode == 'cache' %}
+        <span class="badge badge-mode-cache-soft">delete source</span>
+        <span class="badge {{ s.cache_status_class }}" data-cache-status="{{ s.name }}">{{ s.cache_status_label }}</span>
+        {% if s.command_start %}<span class="badge badge-yellow">start</span>{% endif %}
+        {% if s.command_end %}<span class="badge badge-yellow">stop</span>{% endif %}
+    {% elif s.mode == 'archive' %}
+        <span class="badge badge-blue">{{ s.archive_format_label }}</span>
+        {% if s.archive_date_suffix %}<span class="badge badge-yellow">date</span>{% endif %}
+        <span class="badge badge-blue">{{ 'par dossier' if s.archive_children else 'source' }}</span>
+        <span class="badge {{ 'badge-green' if s.archive_replace_existing else 'badge-gray' }}">{{ 'remplace' if s.archive_replace_existing else 'conserve' }}</span>
+        {% if s.command_start %}<span class="badge badge-yellow">start</span>{% endif %}
+        {% if s.command_end %}<span class="badge badge-yellow">stop</span>{% endif %}
+        {% if s.excludes %}<span class="badge badge-yellow">exclusions</span>{% endif %}
+    {% else %}
+        {% if s.delete %}<span class="badge badge-red">--delete</span>{% endif %}
+        {% if s.delete_excluded %}<span class="badge badge-red">delete-excluded</span>{% endif %}
+        {% if s.excludes %}<span class="badge badge-yellow">exclusions</span>{% endif %}
+        {% if s.dry_run %}<span class="badge badge-yellow">dry-run</span>{% endif %}
+        {% if s.no_owner %}<span class="badge badge-blue">no-owner</span>{% endif %}
+        {% if s.no_group %}<span class="badge badge-blue">no-group</span>{% endif %}
+        {% if s.no_perms %}<span class="badge badge-blue">no-perms</span>{% endif %}
+    {% endif %}
+{%- endmacro %}
+<div class="backup-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+<div class="wrapper">
+    <div class="max-w">
+<div class="tabs-shell">
+            <section id="tab-scripts" class="tab-panel {{ 'active' if active_tab == 'scripts' else '' }}">
+                <div class="stat-grid">
+                    <div class="mini-stat"><div class="label">Scripts</div><div class="value" id="statTotal">{{ stats.total }}</div></div>
+                    <div class="mini-stat"><div class="label">En cours</div><div class="value" id="statRunning">{{ stats.running }}</div></div>
+                    <div class="mini-stat"><div class="label">Simulations</div><div class="value">{{ stats.dry_run }}</div></div>
+                    <div class="mini-stat stat-backup"><div class="label">Backups</div><div class="value">{{ stats.backup }}</div></div>
+                    <div class="mini-stat"><div class="label">Miroirs</div><div class="value">{{ stats.mirror }}</div></div>
+                    <div class="mini-stat stat-archive"><div class="label">Archives</div><div class="value">{{ stats.archive }}</div></div>
+                    <div class="mini-stat stat-cache"><div class="label">Cache</div><div class="value">{{ stats.cache }}</div></div>
+                </div>
+
+                <div class="card card-accent">
+                    <div class="section-title backup-table-toolbar">
+                        <div class="backup-table-filter-title">
+                            <span>📋 Tableau des scripts</span>
+                            <span class="title-meta">Chaque ligne correspond à un fichier Python autonome.</span>
+                        </div>
+                        <div class="backup-table-filters" role="group" aria-label="Filtrer les scripts">
+                            <button type="button" class="backup-filter-btn is-active" data-backup-filter="all" aria-pressed="true">Tout</button>
+                            <button type="button" class="backup-filter-btn" data-backup-filter="backup" aria-pressed="false">Backups</button>
+                            <button type="button" class="backup-filter-btn" data-backup-filter="archive" aria-pressed="false">Archives</button>
+                            <button type="button" class="backup-filter-btn" data-backup-filter="cache" aria-pressed="false">Cache</button>
+                        </div>
+                    </div>
+                    {% if not scripts %}
+                        <div class="empty-state" data-yoleo-service-context-zone="backup">{% if scripts_configured %}Aucun script pour le moment. Utilisez “Créer”.{% else %}Aucun script affiché : veuillez configurer d’abord le dossier scripts dans Réglages.{% endif %}</div>
+                    {% else %}
+                        <div class="desktop-table-wrap backup-wrap-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" data-yoleo-service-context-zone="backup">
+                            <table class="backup-normal-mobile-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                <thead>
+                                    <tr>
+                                        <th>Script</th><th>Source</th><th>Cible</th><th>Options</th><th>Dernier état</th><th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for s in scripts %}
+                                    {% set st = s.status %}
+                                    <tr data-backup-script-row data-backup-kind="{{ 'cache' if s.mode == 'cache' else ('archive' if s.mode == 'archive' else 'backup') }}">
+                                        <td><div class="script-title">{{ s.title }}</div><div class="tiny">{{ s.name }}</div></td>
+                                        <td><div class="code-text">{{ s.source }}</div></td>
+                                        <td><div class="code-text">{{ s.target }}</div></td>
+                                        <td>
+                                            {{ backup_option_badges(s) }}
+                                        </td>
+                                        <td data-script-status="{{ s.name }}">
+                                            {% set pg = st.progress or {} %}
+                                            {% if st.running %}
+                                                {% if st.result == 'En attente' or st.phase == 'waiting' %}<span class="badge badge-blue">En attente</span>
+                                                {% else %}<span class="badge badge-yellow">En cours</span>{% if pg.percent_label %} <span class="badge badge-cyan">{{ pg.percent_label }}</span>{% endif %}{% endif %}
+                                            {% elif st.result == 'Succès' %}<span class="badge badge-green">Succès</span>
+                                            {% elif st.result == 'Erreur' %}<span class="badge badge-red">Erreur</span>
+                                            {% else %}<span class="badge badge-gray">{{ st.result }}</span>{% endif %}
+                                            {% if pg.percent_label or pg.copied_label %}
+                                            <div class="progress-widget">
+                                                <div class="progress-head"><strong>{{ pg.percent_label or '—' }}</strong><span>{{ pg.copied_total_label or ((pg.copied_label ~ ' copiés') if pg.copied_label else '—') }}</span></div>
+                                                <div class="progress-track"><div class="progress-fill {% if st.result == 'Succès' or st.phase == 'done' or (pg.percent|default(0)|int) >= 100 %}progress-fill-done{% endif %}" style="width:{{ pg.percent or 0 }}%;"></div></div>
+                                                <div class="progress-small">{{ pg.speed or '' }}{% if pg.speed and pg.eta %} · {% endif %}{% if pg.eta %}reste {{ pg.eta }}{% endif %}</div>
+                                            </div>
+                                            {% endif %}
+                                            <div class="tiny">Début : {{ st.started_at or '—' }}</div>
+                                            <div class="tiny">Fin : {{ st.ended_at or '—' }}</div>
+                                            <div class="tiny">{{ st.message or '—' }}{% if pg.file_total_label %} - {{ pg.file_total_label }}{% endif %}</div>
+                                        </td>
+                                        <td>
+                                            <div class="action-row">
+                                                <a href="{{ url_for('backup_bp.edit_script', filename=s.name) }}" class="btn btn-outline icon-btn" title="Modifier">✏️</a>
+                                                <a href="{{ url_for('backup_bp.run_script', filename=s.name) }}" class="btn btn-glow icon-btn" title="Lancer" data-backup-launch="1" data-filename="{{ s.name|e }}">▶</a>
+                                                <a href="{{ url_for('backup_bp.stop_script', filename=s.name) }}" class="btn btn-warning icon-btn" title="Stop" data-backup-stop="1" data-filename="{{ s.name|e }}">⛔</a>
+                                                <a href="{{ url_for('backup_bp.home_log', file=s.name) }}" class="btn btn-outline icon-btn" title="Logs">🧾</a>
+                                                <form action="{{ url_for('backup_bp.delete_script') }}" method="POST" style="display:inline; margin:0;" data-confirm data-confirm-kind="danger" data-confirm-title="Supprimer le script ?" data-confirm-message="Supprimer {{ s.name }} ? Le fichier Python du backup sera effacé." data-confirm-note="Le contenu source et la cible rsync ne sont pas supprimés par cette action." data-confirm-ok="Supprimer">
+                                                    <input type="hidden" name="filename" value="{{ s.name }}">
+                                                    <button type="submit" class="btn btn-danger icon-btn" title="Supprimer">🗑️</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mobile-cards">
+                        {% for s in scripts %}
+                            {% set st = s.status %}
+                            <div class="mobile-card" data-backup-script-row data-backup-kind="{{ 'cache' if s.mode == 'cache' else ('archive' if s.mode == 'archive' else 'backup') }}">
+                                <div><div class="script-title">{{ s.title }}</div><div class="tiny">{{ s.name }}</div></div>
+                                <div class="code-text">Source : {{ s.source }}</div>
+                                <div class="code-text">Cible : {{ s.target }}</div>
+                                <div class="backup-mobile-options">{{ backup_option_badges(s) }}</div>
+                                <div data-script-status="{{ s.name }}">
+                                    {% set pg = st.progress or {} %}
+                                    {% if st.running %}
+                                        {% if st.result == 'En attente' or st.phase == 'waiting' %}<span class="badge badge-blue">En attente</span>
+                                        {% else %}<span class="badge badge-yellow">En cours</span>{% if pg.percent_label %} <span class="badge badge-cyan">{{ pg.percent_label }}</span>{% endif %}{% endif %}
+                                    {% else %}<span class="badge badge-gray">{{ st.result }}</span>{% endif %}
+                                    {% if pg.percent_label or pg.copied_label %}
+                                    <div class="progress-widget">
+                                        <div class="progress-head"><strong>{{ pg.percent_label or '—' }}</strong><span>{{ pg.copied_total_label or ((pg.copied_label ~ ' copiés') if pg.copied_label else '—') }}</span></div>
+                                        <div class="progress-track"><div class="progress-fill {% if st.result == 'Succès' or st.phase == 'done' or (pg.percent|default(0)|int) >= 100 %}progress-fill-done{% endif %}" style="width:{{ pg.percent or 0 }}%;"></div></div>
+                                        <div class="progress-small">{{ pg.speed or '' }}{% if pg.speed and pg.eta %} · {% endif %}{% if pg.eta %}reste {{ pg.eta }}{% endif %}</div>
+                                    </div>
+                                    {% endif %}
+                                    <div class="tiny">{{ st.message or '—' }}{% if pg.file_total_label %} - {{ pg.file_total_label }}{% endif %}</div>
+                                </div>
+                                <div class="action-row" style="justify-content:flex-start;">
+                                    <a href="{{ url_for('backup_bp.edit_script', filename=s.name) }}" class="btn btn-outline icon-btn">✏️</a>
+                                    <a href="{{ url_for('backup_bp.run_script', filename=s.name) }}" class="btn btn-glow icon-btn" data-backup-launch="1" data-filename="{{ s.name|e }}">▶</a>
+                                    <a href="{{ url_for('backup_bp.stop_script', filename=s.name) }}" class="btn btn-warning icon-btn" data-backup-stop="1" data-filename="{{ s.name|e }}">⛔</a>
+                                    <a href="{{ url_for('backup_bp.home_log', file=s.name) }}" class="btn btn-outline icon-btn">🧾</a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section id="tab-create" class="tab-panel {{ 'active' if active_tab == 'create' else '' }}">
+                {% if not scripts_configured %}
+                <div class="card card-danger backup-create-blocked">
+                    <div class="section-title">⚠️ Dossier scripts absent</div>
+                    <div class="page-subtitle">Veuillez ouvrir les <strong>Réglages</strong> et définir le dossier dans lequel le module pourra enregistrer les scripts Python. Une fois ce dossier configuré, la création de backups sera disponible.</div>
+                    <a class="btn btn-glow" href="{{ url_for('backup_bp.home_setting') }}">⚙️ Ouvrir les réglages</a>
+                </div>
+                {% else %}
+                <div class="card card-success backup-create-card">
+                    <div class="section-title">
+                        <span>{{ '✏️ Modifier' if is_edit else '➕ Créer' }}</span>
+                        <span class="title-meta">Validation = génération d’un script indépendant.</span>
+                    </div>
+                    <form method="POST" action="{{ url_for('backup_bp.save_script') }}">
+                        <input type="hidden" name="old_filename" value="{{ edit_file if is_edit else '' }}">
+                        <div class="grid-form">
+                            <div class="form-group col-2 compact-field">
+                                <label>Nom du fichier Python</label>
+                                <input class="form-control" type="text" name="filename" value="{{ edit_file if is_edit else '' }}" placeholder="ex: backup_nextcloud.py" required>
+                                <div class="form-help">Le fichier sera créé dans <code>{{ conf.SCRIPTS_DIR or 'à configurer dans Réglages' }}</code>.</div>
+                            </div>
+                            <div class="form-group col-2 compact-field">
+                                <label>Titre affiché</label>
+                                <input class="form-control" type="text" name="title" value="{{ edit_data.TITLE }}" placeholder="Backup Nextcloud" required>
+                            </div>
+
+                            <div class="form-group col-2 compact-field">
+                                <label>Source</label>
+                                <div class="path-input-row">
+                                    <input class="form-control" type="text" id="source_input" name="source" value="{{ edit_data.SOURCE }}" required>
+                                    <button type="button" class="btn btn-outline backup-folder-btn" onclick="openYoleoFolderBrowser('source_input')" title="Parcourir">📂</button>
+                                </div>
+                                <div class="form-help">Conservez le slash final pour copier le contenu du dossier : <code>/source/</code>.</div>
+                            </div>
+                            <div class="form-group col-2 compact-field">
+                                <label>Cible</label>
+                                <div class="path-input-row">
+                                    <input class="form-control" type="text" id="target_input" name="target" value="{{ edit_data.TARGET }}" required>
+                                    <button type="button" class="btn btn-outline backup-folder-btn" onclick="openYoleoFolderBrowser('target_input')" title="Parcourir">📂</button>
+                                </div>
+                                <div class="form-help">La cible peut être locale ou distante rsync/SSH.</div>
+                            </div>
+
+                            <div class="form-group col-4 mode-field">
+                                <label>Mode</label>
+                                <div class="mode-choice-grid" id="mode_select" role="radiogroup" aria-label="Mode de backup">
+                                    <label class="mode-choice {% if edit_data.MODE not in ['mirror', 'archive', 'cache'] %}is-active{% endif %}">
+                                        <input type="radio" name="mode" value="backup" {% if edit_data.MODE not in ['mirror', 'archive', 'cache'] %}checked{% endif %}>
+                                        <span class="mode-choice-main">
+                                            <span class="mode-choice-title">Backup normal</span>
+                                            <span class="mode-choice-text">Copie et met à jour la cible. Rien n’est supprimé côté cible.</span>
+                                        </span>
+                                    </label>
+                                    <label class="mode-choice mode-choice-danger {% if edit_data.MODE == 'mirror' %}is-active{% endif %}">
+                                        <input type="radio" name="mode" value="mirror" {% if edit_data.MODE == 'mirror' %}checked{% endif %}>
+                                        <span class="mode-choice-main">
+                                            <span class="mode-choice-title">Miroir exact</span>
+                                            <span class="mode-choice-text">La cible devient identique à la source. Les fichiers en trop sont supprimés côté cible uniquement.</span>
+                                        </span>
+                                        <span class="mode-choice-flag">force --delete</span>
+                                    </label>
+                                    <label class="mode-choice mode-choice-archive {% if edit_data.MODE == 'archive' %}is-active{% endif %}">
+                                        <input type="radio" name="mode" value="archive" {% if edit_data.MODE == 'archive' %}checked{% endif %}>
+                                        <span class="mode-choice-main">
+                                            <span class="mode-choice-title">Archive</span>
+                                            <span class="mode-choice-text">Crée des archives tar, tar.7z ou tar.gz dans la cible, avec commandes début/fin possibles.</span>
+                                        </span>
+                                        <span class="mode-choice-flag">tar / 7z</span>
+                                    </label>
+                                    <label class="mode-choice mode-choice-cache {% if edit_data.MODE == 'cache' %}is-active{% endif %}">
+                                        <input type="radio" name="mode" value="cache" {% if edit_data.MODE == 'cache' %}checked{% endif %}>
+                                        <span class="mode-choice-main">
+                                            <span class="mode-choice-title">Cache</span>
+                                            <span class="mode-choice-text">Déplace les fichiers vers la cible puis supprime les fichiers source déplacés.</span>
+                                        </span>
+                                        <span class="mode-choice-flag">delete source</span>
+                                    </label>
+                                </div>
+                                <div class="form-help mode-help" id="mode_help">Backup normal : rsync ajoute/met à jour sans supprimer la cible.</div>
+                            </div>
+                            <input type="hidden" name="logo" value="{{ edit_data.LOGO }}">
+
+                            <div class="archive-options-panel col-4" id="archive_options_panel">
+                                <div class="section-title options-title">
+                                    <span>🗜️ Options archive</span>
+                                    <span class="title-meta">Options reprises du module Archive. Le lancement, le stop et les logs restent ceux du module Backup.</span>
+                                </div>
+
+                                <input type="hidden" name="archive_name" value="">
+
+                                <div class="archive-options-layout">
+                                    <div class="archive-option-group archive-option-group-format">
+                                        <div class="option-group-title">Format et compression</div>
+                                        <div class="archive-field-grid archive-field-grid-two">
+                                            <div class="form-group compact-field">
+                                                <label>Format archive</label>
+                                                <select class="form-control" name="archive_format">
+                                                    {% for fmt in ['tar','tar.7z','7z','tar.gz','tgz','gz'] %}
+                                                    <option value="{{ fmt }}" {% if edit_data.ARCHIVE_FORMAT == fmt %}selected{% endif %}>{{ fmt }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="form-group compact-field">
+                                                <label>Compression</label>
+                                                <select class="form-control" name="compression_level">
+                                                    {% set selected_level = edit_data.COMPRESSION_LEVEL or '7' %}
+                                                    {% for level in ['0','1','2','3','4','5','6','7','8','9'] %}
+                                                    <option value="{{ level }}" {% if selected_level == level %}selected{% endif %}>{{ level }}{% if level == '0' %} - aucune{% elif level == '1' %} - rapide{% elif level == '7' %} - défaut{% elif level == '9' %} - maximum{% endif %}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="archive-option-group archive-option-group-naming">
+                                        <div class="option-group-title">Découpage et nommage</div>
+                                        <div class="option-list">
+                                            <label class="option-check option-switch backup-inline-switch">
+                                                <input type="checkbox" name="archive_children" value="1" {% if edit_data.ARCHIVE_CHILDREN == '1' %}checked{% endif %}>
+                                                <span class="switch-ui" aria-hidden="true"></span>
+                                                <span class="option-label">Créer une archive par dossier enfant</span>
+                                            </label>
+                                            <label class="option-check option-switch backup-inline-switch">
+                                                <input type="checkbox" name="replace_existing" value="1" {% if edit_data.REPLACE_EXISTING == '1' %}checked{% endif %}>
+                                                <span class="switch-ui" aria-hidden="true"></span>
+                                                <span class="option-label">Remplacer l’archive existante</span>
+                                            </label>
+                                            <label class="option-check option-switch backup-inline-switch">
+                                                <input type="checkbox" name="date_suffix" value="1" {% if edit_data.DATE_SUFFIX == '1' %}checked{% endif %}>
+                                                <span class="switch-ui" aria-hidden="true"></span>
+                                                <span class="option-label">Ajouter la date/heure au nom</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="archive-option-group archive-option-group-commands">
+                                        <div class="option-group-title">Commandes début / fin</div>
+                                        <div class="archive-field-grid archive-field-grid-two">
+                                            <div class="form-group compact-field">
+                                                <label>Commande début</label>
+                                                <textarea class="form-control" name="command_start" placeholder="docker stop app1 app2 && sleep 5">{{ edit_data.COMMAND_START }}</textarea>
+                                                <div class="form-help">Commande Bash libre lancée avant l’archive.</div>
+                                            </div>
+                                            <div class="form-group compact-field">
+                                                <label>Commande fin</label>
+                                                <textarea class="form-control" name="command_end" placeholder="docker start app1 app2">{{ edit_data.COMMAND_END }}</textarea>
+                                                <div class="form-help">Commande Bash libre lancée même si l’archive échoue.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="cache-options-panel col-4" id="cache_options_panel">
+                                <div class="section-title options-title">
+                                    <span>Options cache</span>
+                                    <span class="title-meta">Le script déplace avec rsync puis nettoie le dossier source vide.</span>
+                                </div>
+                                <div class="cache-options-layout">
+                                    <div class="cache-option-group">
+                                        <div class="option-group-title">Commandes début / fin</div>
+                                        <div class="archive-field-grid archive-field-grid-two">
+                                            <div class="form-group compact-field">
+                                                <label>Commande début</label>
+                                                <textarea class="form-control" name="command_start" placeholder="docker stop app1 app2 && sleep 5">{{ edit_data.COMMAND_START }}</textarea>
+                                                <div class="form-help">Commande Bash libre lancée avant le déplacement cache.</div>
+                                            </div>
+                                            <div class="form-group compact-field">
+                                                <label>Commande fin</label>
+                                                <textarea class="form-control" name="command_end" placeholder="docker start app1 app2">{{ edit_data.COMMAND_END }}</textarea>
+                                                <div class="form-help">Commande Bash libre lancée après le déplacement cache.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% set option_groups = [
+                                ('Base affichage', [
+                                    ('archive','ARCHIVE','Archive -a'),
+                                    ('verbose','VERBOSE','Verbose -v'),
+                                    ('human','HUMAN','Tailles lisibles -h'),
+                                    ('progress','PROGRESS','Progression globale'),
+                                    ('stats','STATS','Statistiques')
+                                ]),
+                                ('Suppression / test', [
+                                    ('delete','DELETE','Supprimer côté cible --delete'),
+                                    ('delete_excluded','DELETE_EXCLUDED','Supprimer aussi les exclus --delete-excluded'),
+                                    ('dry_run','DRY_RUN','Pré-analyse --dry-run'),
+                                    ('auto_mkdir_target','AUTO_MKDIR_TARGET','Créer cible locale')
+                                ]),
+                                ('Droits / compatibilité', [
+                                    ('no_owner','NO_OWNER','Ne pas changer propriétaire --no-owner'),
+                                    ('no_group','NO_GROUP','Ne pas changer groupe --no-group'),
+                                    ('no_perms','NO_PERMS','Ne pas changer permissions --no-perms'),
+                                    ('numeric_ids','NUMERIC_IDS','Numeric IDs')
+                                ]),
+                                ('Transfert / performance', [
+                                    ('compress','COMPRESS','Compression -z'),
+                                    ('checksum','CHECKSUM','Checksum -c'),
+                                    ('partial','PARTIAL','Reprise --partial'),
+                                    ('whole_file','WHOLE_FILE','Whole file -W'),
+                                    ('inplace','INPLACE','Écriture inplace')
+                                ]),
+                                ('Filesystem / liens', [
+                                    ('hard_links','HARD_LINKS','Hard links -H'),
+                                    ('one_file_system','ONE_FILE_SYSTEM','Un seul filesystem -x')
+                                ])
+                            ] %}
+                            <div class="rsync-options-panel rsync-mode-panel" id="rsync_options_panel">
+                                <div class="section-title options-title">
+                                    <span>⚙️ Options rsync</span>
+                                    <span class="title-meta">Regroupées et compactes pour éviter l’effet éparpillé.</span>
+                                </div>
+                                <div class="options-layout">
+                                    {% for group_title, group_options in option_groups %}
+                                    <div class="option-group">
+                                        <div class="option-group-title">{{ group_title }}</div>
+                                        <div class="option-list">
+                                            {% for name, key, label in group_options %}
+                                            <label class="option-check option-switch" for="{{ name }}">
+                                                <input type="checkbox" id="{{ name }}" name="{{ name }}" value="1" {% if edit_data[key] == '1' %}checked{% endif %}>
+                                                <span class="switch-ui" aria-hidden="true"></span>
+                                                <span class="option-label">{{ label }}</span>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="form-group col-2 non-cache-mode-field">
+                                <label>Dossiers / fichiers à exclure</label>
+                                <textarea class="form-control" name="excludes" placeholder="AMELYS/&#10;/AMELYS/&#10;/tower/mnt/user/Antony/AMELYS/&#10;*.tmp&#10;@eaDir/&#10;.Recycle.Bin/">{{ edit_data.EXCLUDES }}</textarea>
+                                <div class="form-help">Une exclusion par ligne. Vous pouvez indiquer un nom relatif (<code>AMELYS/</code>), un motif (<code>*.tmp</code>) ou un chemin absolu situé dans la source. Par défaut, avec <code>--delete</code>, les exclus sont ignorés et protégés côté cible.</div>
+                            </div>
+                            <div class="form-group col-2 rsync-mode-field">
+                                <label>Arguments rsync supplémentaires</label>
+                                <textarea class="form-control" name="extra_args" placeholder="--bwlimit=50000">{{ edit_data.EXTRA_ARGS }}</textarea>
+                                <div class="form-help">Champ libre pour les options avancées. Le script utilise <code>shlex.split</code>.</div>
+                            </div>
+
+                            <div class="form-group col-4">
+                                <div class="action-row" style="justify-content:flex-start;">
+                                    <button type="submit" class="btn btn-glow">💾 Générer le script</button>
+                                    <a href="{{ url_for('backup_bp.home_create') }}" class="btn btn-outline">🧹 Nouveau formulaire</a>
+                                    <a href="{{ url_for('backup_bp.home_main') }}" class="btn btn-outline">📋 Retour tableau</a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+            </section>
+
+
+            <section id="tab-settings" class="tab-panel {{ 'active' if active_tab == 'settings' else '' }}">
+                <div class="card card-accent">
+                    <div class="section-title">
+                        <span>⚙️ Réglages Backup</span>
+                    </div>
+
+                    {% if settings_saved %}
+                    <div class="backup-settings-message is-success" data-auto-hide-success>✅ Réglages sauvegardés.</div>
+                    {% endif %}
+                    {% if settings_error == 'missing_scripts_dir' %}
+                    <div class="backup-settings-message is-error">❌ Veuillez choisir un dossier scripts.</div>
+                    {% endif %}
+
+                    <form method="POST" action="{{ url_for('backup_bp.save_settings') }}" class="backup-settings-form">
+                        <div class="form-group backup-settings-path-group">
+                            <label>Dossier où enregistrer les scripts Python</label>
+                            <div class="backup-browse-line backup-settings-line">
+                                <input class="form-control" type="text" id="scripts_dir_input" name="SCRIPTS_DIR" value="{{ conf.SCRIPTS_DIR }}" placeholder="/mnt/user/scripts/backup ou le chemin souhaité" required>
+                                <button type="button" class="btn btn-outline backup-folder-btn" onclick="openYoleoFolderBrowser('scripts_dir_input')" title="Parcourir">📂</button>
+                                <button type="submit" class="btn btn-glow backup-settings-save">💾 Sauvegarder</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section id="tab-logs" class="tab-panel {{ 'active' if active_tab == 'logs' else '' }}">
+                <div class="split-two">
+                    <div class="card card-accent">
+                        <div class="section-title">🧾 Choix du log</div>
+                        {% if scripts %}
+                            <select class="form-control" onchange="location.href='{{ url_for('backup_bp.home_log') }}?file=' + encodeURIComponent(this.value)">
+                                {% for s in scripts %}
+                                    <option value="{{ s.name }}" {% if selected_log == s.name %}selected{% endif %}>{{ s.title }} — {{ s.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div style="margin-top:14px;" class="action-row">
+                                <a class="btn btn-glow" href="{{ url_for('backup_bp.run_script', filename=selected_log) }}" data-backup-launch="1" data-filename="{{ selected_log|e }}">▶ Lancer</a>
+                                <a class="btn btn-warning" href="{{ url_for('backup_bp.stop_script', filename=selected_log) }}" data-backup-stop="1" data-filename="{{ selected_log|e }}">⛔ Stop</a>
+                                <a class="btn btn-outline" href="{{ url_for('backup_bp.home_log', file=selected_log) }}">🔄 Rafraîchir</a>
+                            </div>
+                            <div class="form-help" style="margin-top:14px;">Fichier log : <code>{{ conf.LOG_DIR }}/{{ selected_log_stem }}.log</code></div>
+                            {% set selected_pg = selected_log_status.progress or {} %}
+                            <div class="log-progress-panel" id="selectedLogProgress" style="display:{{ 'block' if selected_pg.percent_label or selected_pg.copied_label else 'none' }};">
+                                <div class="tiny" style="text-transform:uppercase; font-weight:900; color:var(--text-muted);">Progression</div>
+                                <div class="progress-widget">
+                                    <div class="progress-head"><strong>{{ selected_pg.percent_label or '—' }}</strong><span>{{ selected_pg.copied_total_label or ((selected_pg.copied_label ~ ' copiés') if selected_pg.copied_label else '—') }}</span></div>
+                                    <div class="progress-track"><div class="progress-fill {% if selected_log_status.result == 'Succès' or selected_log_status.phase == 'done' or (selected_pg.percent|default(0)|int) >= 100 %}progress-fill-done{% endif %}" style="width:{{ selected_pg.percent or 0 }}%;"></div></div>
+                                    <div class="progress-small">{{ selected_pg.speed or '' }}{% if selected_pg.speed and selected_pg.eta %} · {% endif %}{% if selected_pg.eta %}reste {{ selected_pg.eta }}{% endif %}</div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="empty-state">Aucun script, donc aucun log.</div>
+                        {% endif %}
+                    </div>
+                    <div class="card card-accent">
+                        <div class="section-title"><span>📜 Log</span><span class="title-meta" id="liveLogStatus">{{ selected_log or '—' }}</span></div>
+                        <pre class="log-box" id="logBox" data-log-file="{{ selected_log }}">{{ log_text or 'Aucun log pour le moment.' }}</pre>
+                    </div>
+                </div>
+            </section>
+<section id="tab-help" class="tab-panel {{ 'active' if active_tab == 'help' else '' }}">
+                <div class="card card-accent">
+                    <div class="section-title">📚 Lexique rsync</div>
+                    <div class="desktop-table-wrap backup-lexique-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                        <table class="backup-lexique-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                            <thead><tr><th>Option</th><th>Sens</th><th>Conseil</th></tr></thead>
+                            <tbody>
+                                <tr><td><code>-a</code></td><td>Archive : récursif + dates + liens + permissions + owner/group.</td><td>Base d’un backup. Avec SMB/NFS, garde souvent <code>--no-owner --no-group --no-perms</code>.</td></tr>
+                                <tr><td><code>/remotes/</code></td><td>Sécurité cible réseau : le script refuse d’écrire sous <code>/remotes</code> si aucun montage actif n’est détecté.</td><td>Évite de remplir l’image Docker quand un partage NFS n’est pas monté.</td></tr>
+                                <tr><td><code>--delete</code></td><td>Supprime côté cible ce qui n’existe plus côté source.</td><td>À tester avec <code>--dry-run</code> avant une première vraie passe.</td></tr>
+                                <tr><td><code>--exclude=PATTERN</code></td><td>Ignore un fichier ou dossier de la source.</td><td>Exemple : <code>AMELYS/</code>, <code>*.tmp</code>, <code>.Recycle.Bin/</code>.</td></tr>
+                                <tr><td><code>--delete-excluded</code></td><td>Supprime aussi côté cible ce qui est exclu.</td><td>Dangereux : décoché par défaut. Sans cette option, les exclus sont protégés côté cible.</td></tr>
+                                <tr><td><code>--dry-run</code></td><td>Pré-analyse : calcule d’abord le volume à copier sans modifier, puis lance la vraie copie.</td><td>Permet d’afficher une progression réelle du type <code>54 Go copiés / 4 To</code>.</td></tr>
+                                <tr><td><code>-W</code></td><td>Whole file : recopie le fichier entier, pas l’algo delta.</td><td>Souvent plus simple/rapide en local ou LAN rapide.</td></tr>
+                                <tr><td><code>--partial</code></td><td>Garde les fichiers partiels en cas de coupure.</td><td>Utile pour gros fichiers.</td></tr>
+                                <tr><td><code>-c</code></td><td>Checksum : compare le contenu réel.</td><td>Très sûr mais très lent.</td></tr>
+                                <tr><td><code>-z</code></td><td>Compression pendant transfert.</td><td>Utile en SSH/VPN lent, inutile localement pour vidéos.</td></tr>
+                                <tr><td><code>--numeric-ids</code></td><td>Garde UID/GID numériques.</td><td>Utile en Docker/Unraid pour éviter les noms utilisateur.</td></tr>
+                                <tr><td><code>-x</code></td><td>Un seul filesystem.</td><td>Empêche de traverser d’autres montages.</td></tr>
+                                <tr><td><code>--inplace</code></td><td>Écrit directement dans le fichier cible.</td><td>À éviter sauf besoin précis.</td></tr>
+                                <tr><td><code>--stats</code></td><td>Résumé final.</td><td>Très utile dans les logs.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-info" class="tab-panel {{ 'active' if active_tab == 'info' else '' }}">
+                <div class="card card-accent">
+                    <div class="section-title">ℹ️ Principe</div>
+                    <div class="page-subtitle">
+                        Ce module Yoleo fonctionne en host : Flask génère des scripts Python indépendants qui appellent <code>rsync</code>. Le tableau ne contient pas la logique de backup ; il lit seulement les métadonnées du script, lance le script dans une session <code>tmux</code> autonome via <code>systemd-run</code> quand disponible, et affiche son log.
+                    </div>
+                    <div class="code-text">SCRIPTS_DIR={{ conf.SCRIPTS_DIR }}</div>
+                    <div class="code-text">LOG_DIR={{ conf.LOG_DIR }}</div>
+                    <div class="code-text">STATUS_DIR={{ conf.STATUS_DIR }}</div>
+                    <div class="code-text">RSYNC_BIN={{ conf.RSYNC_BIN }}</div>
+                    <div class="code-text">PYTHON_BIN={{ conf.PYTHON_BIN }}</div>
+                    <div class="code-text">EXECUTION=systemd-run + tmux</div>
+                </div>
+                <div class="card card-warning">
+                    <div class="section-title">🧱 Exemple Task Manager</div>
+                    <div class="page-subtitle">
+                        Dans le gestionnaire de tâches, vous pouvez lancer un backup avec une commande du genre :<br>
+                        <code>python3 {{ conf.SCRIPTS_DIR }}/backup_nextcloud.py</code>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<div class="modal backup-confirm-modal" id="confirmModal" aria-hidden="true">
+    <div class="modal-box" id="confirmModalBox" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="modal-title-row"><span id="confirmIcon">⚠️</span><span id="confirmTitle">Confirmer l’action</span></div>
+        <div class="modal-message" id="confirmMessage">Confirmer ?</div>
+        <div class="modal-note" id="confirmNote" style="display:none;"></div>
+        <div class="action-row" style="justify-content:flex-end;">
+            <button type="button" class="btn btn-outline" id="confirmCancelBtn">Annuler</button>
+            <button type="button" class="btn btn-danger" id="confirmOkBtn">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function setModeControlsEnabled(container, enabled) {
+    if (!container) return;
+    container.querySelectorAll('input, select, textarea').forEach(function (field) {
+        field.disabled = !enabled;
+    });
+}
+
+function syncModeHelp() {
+    const checkedMode = document.querySelector('input[name="mode"]:checked');
+    const help = document.getElementById('mode_help');
+    if (!checkedMode || !help) return;
+    document.querySelectorAll('.mode-choice').forEach(function (choice) {
+        const input = choice.querySelector('input[name="mode"]');
+        choice.classList.toggle('is-active', !!input && input.checked);
+    });
+    const isArchiveMode = checkedMode.value === 'archive';
+    const isCacheMode = checkedMode.value === 'cache';
+    const archivePanel = document.getElementById('archive_options_panel');
+    if (archivePanel) {
+        archivePanel.classList.toggle('is-visible', isArchiveMode);
+        setModeControlsEnabled(archivePanel, isArchiveMode);
+    }
+    const cachePanel = document.getElementById('cache_options_panel');
+    if (cachePanel) {
+        cachePanel.classList.toggle('is-visible', isCacheMode);
+        setModeControlsEnabled(cachePanel, isCacheMode);
+    }
+    document.querySelectorAll('.rsync-mode-panel, .rsync-mode-field').forEach(function (node) {
+        node.classList.toggle('is-hidden', isArchiveMode || isCacheMode);
+        setModeControlsEnabled(node, !(isArchiveMode || isCacheMode));
+    });
+    document.querySelectorAll('.non-cache-mode-field').forEach(function (node) {
+        node.classList.toggle('is-hidden', isCacheMode);
+        setModeControlsEnabled(node, !isCacheMode);
+    });
+    if (checkedMode.value === 'mirror') {
+        help.textContent = 'Miroir exact : la cible est rendue égale à la source. Le script force --delete et supprime côté cible ce qui n’existe plus côté source. La source n’est pas supprimée.';
+    } else if (checkedMode.value === 'archive') {
+        help.textContent = 'Archive : le script crée des fichiers tar, tar.7z ou tar.gz dans la cible. Les commandes début/fin sont du Bash libre.';
+    } else if (checkedMode.value === 'cache') {
+        help.textContent = 'Cache : rsync déplace les fichiers vers la cible avec --remove-source-files, puis supprime les dossiers source devenus vides.';
+    } else {
+        help.textContent = 'Backup normal : rsync ajoute/met à jour sans supprimer la cible. La cible peut donc garder d’anciens fichiers.';
+    }
+}
+syncModeHelp();
+document.querySelectorAll('input[name="mode"]').forEach(function (input) {
+    input.addEventListener('change', syncModeHelp);
+});
+
+function openYoleoFolderBrowser(inputId) {
+    const field = document.getElementById(inputId);
+    const start = field && field.value ? field.value : '/';
+    const url = '{{ url_for('browser.browser_folder') }}'
+        + '?target=' + encodeURIComponent(inputId)
+        + '&path=' + encodeURIComponent(start);
+    window.open(url, 'yoleo_browser_' + inputId, 'width=1120,height=780,resizable=yes,scrollbars=yes');
+}
+
+window.addEventListener('message', function (event) {
+    const data = event.data || {};
+    if (data.type !== 'yoleo-browser-select' || !data.target || !data.path) return;
+    const field = document.getElementById(data.target);
+    if (!field) return;
+    field.value = data.path;
+    field.dispatchEvent(new Event('input', {bubbles: true}));
+    field.dispatchEvent(new Event('change', {bubbles: true}));
+});
+
+let selectedLogFile = {{ selected_log|tojson }};
+let logPollTimer = null;
+let statusPollTimer = null;
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[ch]));
+}
+
+let confirmCallback = null;
+
+function ensureConfirmModalOnBody() {
+    const modal = document.getElementById('confirmModal');
+    if (modal && modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+}
+
+function openConfirm(options) {
+    options = options || {};
+    ensureConfirmModalOnBody();
+    const modal = document.getElementById('confirmModal');
+    const box = document.getElementById('confirmModalBox');
+    const icon = document.getElementById('confirmIcon');
+    const title = document.getElementById('confirmTitle');
+    const message = document.getElementById('confirmMessage');
+    const note = document.getElementById('confirmNote');
+    const okBtn = document.getElementById('confirmOkBtn');
+    if (!modal || !box || !title || !message || !okBtn) return;
+
+    const kind = options.kind || 'info';
+    box.classList.toggle('modal-box-danger', kind === 'danger');
+    icon.textContent = kind === 'danger' ? '🗑️' : '⚠️';
+    title.textContent = options.title || 'Confirmer l’action';
+    message.textContent = options.message || 'Confirmer ?';
+    okBtn.textContent = options.okText || 'Confirmer';
+    okBtn.className = kind === 'danger' ? 'btn btn-danger' : 'btn btn-glow';
+
+    if (options.note) {
+        note.textContent = options.note;
+        note.style.display = 'block';
+    } else {
+        note.textContent = '';
+        note.style.display = 'none';
+    }
+
+    confirmCallback = typeof options.onConfirm === 'function' ? options.onConfirm : null;
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    okBtn.focus({preventScroll: true});
+}
+
+function closeConfirm() {
+    const modal = document.getElementById('confirmModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    confirmCallback = null;
+}
+
+function bindModernConfirms() {
+    document.querySelectorAll('form[data-confirm]').forEach(form => {
+        form.addEventListener('submit', function (event) {
+            if (form.dataset.confirmBypass === '1') {
+                delete form.dataset.confirmBypass;
+                return;
+            }
+            event.preventDefault();
+            openConfirm({
+                kind: form.dataset.confirmKind || 'info',
+                title: form.dataset.confirmTitle || 'Confirmer l’action',
+                message: form.dataset.confirmMessage || 'Confirmer ?',
+                note: form.dataset.confirmNote || '',
+                okText: form.dataset.confirmOk || 'Confirmer',
+                onConfirm: function () {
+                    form.dataset.confirmBypass = '1';
+                    form.submit();
+                }
+            });
+        });
+    });
+
+    document.querySelectorAll('a[data-confirm]').forEach(link => {
+        link.addEventListener('click', function (event) {
+            event.preventDefault();
+            openConfirm({
+                kind: link.dataset.confirmKind || 'info',
+                title: link.dataset.confirmTitle || 'Confirmer l’action',
+                message: link.dataset.confirmMessage || 'Confirmer ?',
+                note: link.dataset.confirmNote || '',
+                okText: link.dataset.confirmOk || 'Confirmer',
+                onConfirm: function () {
+                    window.location.href = link.href;
+                }
+            });
+        });
+    });
+
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+    const okBtn = document.getElementById('confirmOkBtn');
+    const modal = document.getElementById('confirmModal');
+    if (cancelBtn) cancelBtn.addEventListener('click', closeConfirm);
+    if (okBtn) okBtn.addEventListener('click', function () {
+        const callback = confirmCallback;
+        closeConfirm();
+        if (callback) callback();
+    });
+    if (modal) {
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) closeConfirm();
+        });
+    }
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closeConfirm();
+    });
+}
+
+function progressHtml(st) {
+    const pg = (st && st.progress) ? st.progress : {};
+    const phase = String((st && st.phase) || '').toLowerCase();
+    const hasProgress = pg.percent_label || pg.copied_label || pg.copied_total_label;
+    if (!hasProgress && st && st.running) {
+        let label = 'Travail en cours';
+        if (phase === 'simulation') label = 'Analyse en cours';
+        else if (phase === 'waiting') label = 'En attente';
+        else if (phase === 'starting') label = 'Démarrage';
+        else if (phase === 'command_start') label = 'Commande début';
+        else if (phase === 'command_end') label = 'Commande fin';
+        else if (phase === 'command') label = 'Commande';
+        else if (phase === 'cache') label = 'Cache en cours';
+        return '<div class="progress-widget progress-widget-indeterminate">' +
+            '<div class="progress-head"><strong>' + escapeHtml(label) + '</strong><span>' + escapeHtml(st.message || '—') + '</span></div>' +
+            '<div class="progress-track"><div class="progress-fill progress-fill-indeterminate"></div></div>' +
+            '<div class="progress-small">' + escapeHtml(phase === 'simulation' ? 'Rsync calcule le volume à copier.' : (st.waiting_for ? ('Attend ' + st.waiting_for) : '')) + '</div>' +
+        '</div>';
+    }
+    if (!hasProgress) return '';
+    const pct = Math.max(0, Math.min(100, Number(pg.percent || 0)));
+    const copiedText = pg.copied_total_label || (pg.copied_label ? (pg.copied_label + ' copiés') : '—');
+    const speedEta = [pg.speed || '', pg.eta ? ('reste ' + pg.eta) : ''].filter(Boolean).join(' · ');
+    const done = (!st.running && (st.result === 'Succès' || st.phase === 'done')) || pct >= 100;
+    const fillClass = 'progress-fill' + (done ? ' progress-fill-done' : '');
+    return '<div class="progress-widget">' +
+        '<div class="progress-head"><strong>' + escapeHtml(pg.percent_label || '—') + '</strong><span>' + escapeHtml(copiedText) + '</span></div>' +
+        '<div class="progress-track"><div class="' + fillClass + '" style="width:' + pct + '%;"></div></div>' +
+        '<div class="progress-small">' + escapeHtml(speedEta) + '</div>' +
+    '</div>';
+}
+
+function statusHtml(st) {
+    st = st || {};
+    const pg = st.progress || {};
+    let badge = '';
+    if (st.running) {
+        if (st.result === 'En attente' || st.phase === 'waiting') {
+            badge = '<span class="badge badge-blue">En attente</span>';
+        } else {
+            badge = '<span class="badge badge-yellow">En cours</span>' + (pg.percent_label ? ' <span class="badge badge-cyan">' + escapeHtml(pg.percent_label) + '</span>' : '');
+        }
+    } else if (st.result === 'Succès') {
+        badge = '<span class="badge badge-green">Succès</span>';
+    } else if (st.result === 'Erreur') {
+        badge = '<span class="badge badge-red">Erreur</span>';
+    } else {
+        badge = '<span class="badge badge-gray">' + escapeHtml(st.result || '—') + '</span>';
+    }
+    const messageText = (st.message || '—') + (pg.file_total_label ? (' - ' + pg.file_total_label) : '');
+    return badge + progressHtml(st) +
+        '<div class="tiny">Début : ' + escapeHtml(st.started_at || '—') + '</div>' +
+        '<div class="tiny">Fin : ' + escapeHtml(st.ended_at || '—') + '</div>' +
+        '<div class="tiny">' + escapeHtml(messageText) + '</div>';
+}
+
+function updateBackupStatusCell(filename, status) {
+    document.querySelectorAll('[data-script-status]').forEach(cell => {
+        if (cell.dataset.scriptStatus === filename) {
+            cell.innerHTML = statusHtml(status || {});
+        }
+    });
+    syncBackupActionState(filename, status || {});
+}
+
+function updateBackupCacheBadge(script) {
+    if (!script || script.mode !== 'cache' || !script.name) return;
+    const label = script.cache_status_label || '';
+    const stateClass = script.cache_status_class || 'badge-gray';
+    document.querySelectorAll('[data-cache-status]').forEach(badge => {
+        if (badge.dataset.cacheStatus !== script.name) return;
+        badge.textContent = label || '—';
+        badge.className = 'badge ' + stateClass;
+    });
+}
+
+function setActionDisabled(link, disabled, title) {
+    if (!link) return;
+    if (disabled) {
+        if (!link.dataset.originalTitle) link.dataset.originalTitle = link.getAttribute('title') || '';
+        link.setAttribute('aria-disabled', 'true');
+        link.classList.add('is-disabled');
+        if (title) link.setAttribute('title', title);
+    } else {
+        link.removeAttribute('aria-disabled');
+        link.classList.remove('is-disabled');
+        if (link.dataset.originalTitle) link.setAttribute('title', link.dataset.originalTitle);
+    }
+}
+
+function syncBackupActionState(filename, status) {
+    const safeName = String(filename || '');
+    const isRunning = !!(status && status.running);
+    document.querySelectorAll('[data-backup-launch]').forEach(link => {
+        if ((link.dataset.filename || '') === safeName) {
+            setActionDisabled(link, isRunning, 'Backup déjà actif');
+        }
+    });
+    document.querySelectorAll('[data-backup-stop]').forEach(link => {
+        if ((link.dataset.filename || '') === safeName) {
+            setActionDisabled(link, !isRunning, 'Aucun backup actif à arrêter');
+        }
+    });
+}
+
+async function launchBackup(event, link, filename) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!link || link.dataset.busy === '1' || link.getAttribute('aria-disabled') === 'true') return false;
+
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const safeName = filename || (link.dataset ? (link.dataset.filename || '') : '');
+    const startedAt = new Date().toLocaleString('fr-FR');
+
+    link.dataset.busy = '1';
+    link.style.opacity = '0.65';
+    const optimisticStatus = {
+        running: true,
+        result: 'En cours',
+        message: 'Lancement demandé depuis le tableau',
+        started_at: startedAt,
+        ended_at: '',
+        phase: 'starting',
+        progress: {}
+    };
+    updateBackupStatusCell(safeName, optimisticStatus);
+
+    try {
+        const url = new URL(link.href, window.location.href);
+        url.searchParams.set('ajax', '1');
+        const resp = await fetch(url.toString(), {
+            method: 'POST',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'fetch', 'Accept': 'application/json' }
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (data.status) updateBackupStatusCell(safeName, data.status);
+        if (!resp.ok || data.ok === false) {
+            updateBackupStatusCell(safeName, {
+                running: false,
+                result: 'Erreur',
+                message: data.message || 'Lancement impossible',
+                started_at: startedAt,
+                ended_at: new Date().toLocaleString('fr-FR'),
+                progress: {}
+            });
+        }
+    } catch (err) {
+        updateBackupStatusCell(safeName, {
+            running: false,
+            result: 'Erreur',
+            message: 'Erreur navigateur : ' + err,
+            started_at: startedAt,
+            ended_at: new Date().toLocaleString('fr-FR'),
+            progress: {}
+        });
+    } finally {
+        link.dataset.busy = '0';
+        link.style.opacity = '';
+        window.scrollTo(scrollX, scrollY);
+        setTimeout(refreshScriptStatus, 250);
+        setTimeout(refreshScriptStatus, 1200);
+        if (selectedLogFile && selectedLogFile === safeName) {
+            setTimeout(refreshLiveLog, 350);
+        }
+    }
+    return false;
+}
+
+
+function stopBackup(event, link, filename) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!link || link.dataset.busy === '1') return false;
+
+    const safeName = filename || (link.dataset ? (link.dataset.filename || '') : '');
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+
+    openConfirm({
+        kind: 'danger',
+        title: 'Arrêter la backup ?',
+        message: 'Arrêter cette sauvegarde en cours ?',
+        note: 'L’interface reste sur le tableau. Les logs restent accessibles uniquement avec le bouton 🧾 si vous souhaitez les ouvrir.',
+        okText: 'Oui, arrêter',
+        onConfirm: async function () {
+            link.dataset.busy = '1';
+            link.style.opacity = '0.65';
+            updateBackupStatusCell(safeName, {
+                running: false,
+                result: 'Arrêté',
+                message: 'Arrêt demandé depuis le tableau',
+                started_at: '',
+                ended_at: new Date().toLocaleString('fr-FR'),
+                progress: {}
+            });
+
+            try {
+                const url = new URL(link.href, window.location.href);
+                url.searchParams.set('ajax', '1');
+                const resp = await fetch(url.toString(), {
+                    method: 'POST',
+                    cache: 'no-store',
+                    headers: { 'X-Requested-With': 'fetch', 'Accept': 'application/json' }
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (data.status) updateBackupStatusCell(safeName, data.status);
+                if (!resp.ok || data.ok === false) {
+                    updateBackupStatusCell(safeName, {
+                        running: false,
+                        result: 'Erreur',
+                        message: data.message || 'Arrêt impossible',
+                        started_at: '',
+                        ended_at: new Date().toLocaleString('fr-FR'),
+                        progress: {}
+                    });
+                }
+            } catch (err) {
+                updateBackupStatusCell(safeName, {
+                    running: false,
+                    result: 'Erreur',
+                    message: 'Erreur navigateur : ' + err,
+                    started_at: '',
+                    ended_at: new Date().toLocaleString('fr-FR'),
+                    progress: {}
+                });
+            } finally {
+                link.dataset.busy = '0';
+                link.style.opacity = '';
+                window.scrollTo(scrollX, scrollY);
+                setTimeout(refreshScriptStatus, 250);
+                setTimeout(refreshScriptStatus, 1200);
+                if (selectedLogFile && selectedLogFile === safeName) {
+                    setTimeout(refreshLiveLog, 350);
+                }
+            }
+        }
+    });
+    window.scrollTo(scrollX, scrollY);
+    return false;
+}
+
+function updateSelectedProgress(st) {
+    const panel = document.getElementById('selectedLogProgress');
+    if (!panel) return;
+    const html = progressHtml(st);
+    if (!html) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    panel.innerHTML = '<div class="tiny" style="text-transform:uppercase; font-weight:900; color:var(--text-muted);">Progression</div>' + html;
+}
+
+function applyBackupTableFilter(filterValue) {
+    const value = (filterValue || 'all').toLowerCase();
+    document.querySelectorAll('[data-backup-filter]').forEach(btn => {
+        const active = (btn.dataset.backupFilter || 'all') === value;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-backup-script-row]').forEach(row => {
+        const kind = (row.dataset.backupKind || 'backup').toLowerCase();
+        row.style.display = (value === 'all' || kind === value) ? '' : 'none';
+    });
+    try { localStorage.setItem('yoleo_backup_table_filter', value); } catch (err) {}
+}
+
+function initBackupTableFilters() {
+    const buttons = document.querySelectorAll('[data-backup-filter]');
+    if (!buttons.length) return;
+    let saved = 'all';
+    try { saved = localStorage.getItem('yoleo_backup_table_filter') || 'all'; } catch (err) {}
+    if (!['all', 'backup', 'archive', 'cache'].includes(saved)) saved = 'all';
+    buttons.forEach(btn => {
+        btn.addEventListener('click', function () {
+            applyBackupTableFilter(this.dataset.backupFilter || 'all');
+        });
+    });
+    applyBackupTableFilter(saved);
+}
+
+function refreshScriptStatus() {
+    const cells = document.querySelectorAll('[data-script-status]');
+    if (!cells.length) return;
+    fetch('{{ url_for('backup_bp.api_status') }}?_=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+            const scripts = data.scripts || [];
+            const total = document.getElementById('statTotal');
+            const running = document.getElementById('statRunning');
+            if (total) total.textContent = scripts.length;
+            if (running) running.textContent = scripts.filter(s => s.status && s.status.running).length;
+            scripts.forEach(script => {
+                cells.forEach(cell => {
+                    if (cell.dataset.scriptStatus === script.name) cell.innerHTML = statusHtml(script.status || {});
+                });
+                updateBackupCacheBadge(script);
+                syncBackupActionState(script.name, script.status || {});
+            });
+        })
+        .catch(() => {});
+}
+
+function refreshLiveLog() {
+    const box = document.getElementById('logBox');
+    if (!box || !selectedLogFile) return;
+
+    fetch('{{ backup_base_url }}/api/log/' + encodeURIComponent(selectedLogFile) + '?_=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+            const text = data.log_text || 'Aucun log pour le moment.';
+            const nearBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 120;
+            if (box.textContent !== text) {
+                box.textContent = text;
+                if (nearBottom) box.scrollTop = box.scrollHeight;
+            }
+            const label = document.getElementById('liveLogStatus');
+            if (label) {
+                const st = data.status || {};
+                const state = st.running ? 'EN COURS' : (st.result || '—');
+                const pg = st.progress || {};
+                const prog = pg.percent_label ? (' — ' + pg.percent_label + (pg.copied_label ? ' / ' + pg.copied_label + ' copiés' : '')) : '';
+                label.textContent = (data.filename || selectedLogFile) + ' — ' + state + prog + ' — ' + (data.updated_at || '');
+            }
+            updateSelectedProgress(data.status || {});
+        })
+        .catch(() => {});
+}
+
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-auto-hide-success]').forEach(function (el) {
+        setTimeout(function () {
+            el.style.transition = 'opacity .25s ease, transform .25s ease';
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-4px)';
+            setTimeout(function () { el.remove(); }, 260);
+        }, 780);
+    });
+    bindModernConfirms();
+    initBackupTableFilters();
+    document.querySelectorAll('[data-backup-launch]').forEach(function (link) {
+        if (link.dataset.launchBound === '1') return;
+        link.dataset.launchBound = '1';
+        link.addEventListener('click', function (event) {
+            launchBackup(event, link);
+        });
+    });
+    document.querySelectorAll('[data-backup-stop]').forEach(function (link) {
+        if (link.dataset.stopBound === '1') return;
+        link.dataset.stopBound = '1';
+        link.addEventListener('click', function (event) {
+            stopBackup(event, link);
+        });
+    });
+    if (document.getElementById('logBox')) {
+        refreshLiveLog();
+        logPollTimer = setInterval(refreshLiveLog, 1500);
+    }
+    if (document.querySelector('[data-script-status]')) {
+        refreshScriptStatus();
+        statusPollTimer = setInterval(refreshScriptStatus, 2500);
+    }
+});
+
+</script>
+</div>
+{% endblock %}

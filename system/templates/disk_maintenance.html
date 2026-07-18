@@ -1,0 +1,56 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-maintenance" class="disk-section">
+    <section class="yoleo-card disk-card disk-maintenance-raid-card">
+        <div class="disk-card-head compact-head maintenance-raid-head">
+            <div>
+                <h3>Volumes RAID logiques</h3>
+                <div class="maintenance-raid-note">Volumes virtuels créés dans RAID. Le montage, la vérification et le formatage se font ici, comme pour les volumes non montés.</div>
+            </div>
+            <span class="raid-counter" id="maintenance-raid-count">0 volume</span>
+        </div>
+        <div class="table-wrap disk-table-compact">
+            <table class="yoleo-table">
+                <thead>
+                    <tr>
+                        <th class="state-col">État</th>
+                        <th class="disk-col">Volume RAID</th>
+                        <th class="ident-col">Identification</th>
+                        <th class="label-col">Label</th>
+                        <th class="fs-col">FS</th>
+                        <th class="size-cell">Taille</th>
+                        <th class="mount-col">Montage</th>
+                        <th class="actions-col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="maintenance-raid-tbody">
+                    <tr><td colspan="8" class="empty-state">Chargement volumes RAID...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="yoleo-card disk-card">
+        <div class="table-wrap disk-table-compact">
+            <table class="yoleo-table">
+                <thead>
+                    <tr>
+                        <th class="state-col">État</th>
+                        <th class="disk-col">Disque / partition</th>
+                        <th class="ident-col">Identification</th>
+                        <th class="label-col">Label</th>
+                        <th class="fs-col">FS</th>
+                        <th class="size-cell">Taille</th>
+                        <th class="mount-col">Montage</th>
+                        <th class="actions-col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="maintenance-tbody">
+                    <tr><td colspan="8" class="empty-state">Chargement maintenance...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

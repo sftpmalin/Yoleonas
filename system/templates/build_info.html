@@ -1,0 +1,78 @@
+{% extends "build_base.html" %}
+
+{% block route_content %}
+<div id="tab-info" class="tab-panel active">
+                    <section class="card">
+                        <div class="options-grid build-info-grid">
+                            <div class="options-card">
+                                <div class="options-title">Base de données</div>
+                                <div class="field-grid">
+                                    <div class="path-pill"><b>registre</b><span>{{ conf.DOCKER_REGISTRY_FILE }}</span></div>
+                                    <div class="path-pill"><b>plateformes</b><span>{{ conf.DOCKER_PLATFORMS_FILE }}</span></div>
+                                    <div class="path-pill"><b>mode</b><span>{{ build_options.mode_file_path }}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="options-card">
+                                <div class="options-title">Cache Build interne</div>
+                                <div class="field-grid">
+                                    <div class="path-pill"><b>cache</b><span>{{ build_cache.updated_at_label }}</span></div>
+                                    <div class="path-pill"><b>build.jdom</b><span>{{ build_options.build_cache_file_path }}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="options-card">
+                                <div class="options-title">Dossiers Build / TAR</div>
+                                <div class="field-grid">
+                                    <div class="path-pill"><b>builds</b><span>{{ conf.DOCKER_BUILDS_DIR }}</span></div>
+                                    <div class="path-pill"><b>tar</b><span>{{ conf.DOCKER_TAR_DIR }}</span></div>
+                                    <div class="path-pill"><b>logs</b><span>{{ conf.DOCKER_LOG_DIR }}</span></div>
+                                    <div class="path-pill"><b>state</b><span>{{ conf.STATE_DIR }}</span></div>
+                                    <div class="path-pill"><b>builds état</b><span>{{ 'OK' if build_options.builds_dir_exists else 'à créer' }}</span></div>
+                                    <div class="path-pill"><b>tar état</b><span>{{ 'OK' if build_options.tar_dir_exists else 'à créer' }}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="options-card">
+                                <div class="options-title">Registre local</div>
+                                <div class="field-grid">
+                                    <div class="path-pill"><b>REGISTRY_URL</b><span>{{ build_options.registry_url }}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="options-card">
+                                <div class="options-title">TAR → Registre</div>
+                                <div class="field-grid">
+                                    <div class="path-pill"><b>registre</b><span>{{ conf.DOCKER_REGISTRY_FILE }}</span></div>
+                                    <div class="path-pill"><b>tar</b><span>{{ conf.DOCKER_TAR_DIR }}</span></div>
+                                    <div class="path-pill"><b>regctl</b><span>{{ conf.REGCTL }}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="options-card">
+                                <div class="options-title">Docker HTTP</div>
+                                <div class="field-grid">
+                                    <div class="path-pill"><b>http.conf</b><span>{{ build_options.http_conf_path }}</span></div>
+                                    <div class="path-pill"><b>autorise</b><span>{{ build_options.http_registry }}</span></div>
+                                    <div class="path-pill"><b>builds.conf</b><span>{{ build_options.builds_conf_path }}</span></div>
+                                    <div class="path-pill"><b>registry.conf</b><span>{{ build_options.registry_conf_path }}</span></div>
+                                    <div class="path-pill"><b>mode.conf</b><span>{{ build_options.mode_file_path }}</span></div>
+                                    <div class="path-pill"><b>registre_login.conf</b><span>{{ build_options.registry_login_path }}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="options-card">
+                                <div class="options-title">Options registre</div>
+                                <div class="field-grid">
+                                    <div class="path-pill"><b>conf</b><span>{{ registry_service.paths.human_conf }}</span></div>
+                                    <div class="path-pill"><b>yaml</b><span>{{ registry_service.paths.yaml_conf }}</span></div>
+                                    <div class="path-pill"><b>pid</b><span>{{ registry_service.paths.pid_file }}</span></div>
+                                    <div class="path-pill"><b>log</b><span>{{ registry_service.paths.log_file }}</span></div>
+                                    <div class="path-pill"><b>bin</b><span>{{ registry_service.paths.bin_dir }}</span></div>
+                                    <div class="path-pill"><b>runtime</b><span>{{ registry_service.paths.runtime_bin }}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+{% endblock %}

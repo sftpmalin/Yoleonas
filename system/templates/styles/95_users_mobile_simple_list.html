@@ -1,0 +1,257 @@
+/* ============================================================
+   Utilisateurs mobile : liste compacte, pas mosaïque.
+   On garde le vrai tableau côté desktop, mais sur mobile chaque
+   utilisateur devient une ligne lisible avec actions directes.
+   ============================================================ */
+
+.users-page .lu-mobile-only {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    body.yoleo-mobile-mosaic-ready .users-page .users-mobile-list-wrap,
+    .users-page .users-mobile-list-wrap {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 6px !important;
+        border: 1px solid #26364b !important;
+        border-radius: 13px !important;
+        background: #0c131e !important;
+        box-sizing: border-box !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .users-page .users-mobile-list-wrap + .yoleo-mobile-table-grid,
+    .users-page .users-mobile-list-wrap + .yoleo-mobile-table-grid,
+    .users-page .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .users-page .users-mobile-list-table,
+    .users-page .users-mobile-list-table thead,
+    .users-page .users-mobile-list-table tbody,
+    .users-page .users-mobile-list-table tr,
+    .users-page .users-mobile-list-table th,
+    .users-page .users-mobile-list-table td {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .users-page .users-mobile-list-table {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: auto !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+    }
+
+    .users-page .users-mobile-list-table thead {
+        display: none !important;
+    }
+
+    .users-page .users-mobile-list-table tbody {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 7px !important;
+        width: 100% !important;
+    }
+
+    .users-page .users-mobile-list-table tr {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) 62px 30px 30px !important;
+        grid-template-rows: auto auto !important;
+        gap: 5px 6px !important;
+        align-items: center !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 8px 8px !important;
+        border: 1px solid #26364b !important;
+        border-left: 4px solid rgba(0, 221, 255, .70) !important;
+        border-radius: 11px !important;
+        background: rgba(15, 24, 36, .97) !important;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.025) !important;
+    }
+
+    .users-page .users-mobile-list-table tr.selected,
+    .users-page .users-mobile-list-table tr.kbd-selected {
+        border-left-color: #c9a7ff !important;
+        background: linear-gradient(90deg, rgba(123,44,255,.62), rgba(15,24,36,.98)) !important;
+        outline: 2px solid rgba(26,235,255,.70) !important;
+        outline-offset: -2px !important;
+        box-shadow: inset 0 0 0 1px rgba(201,167,255,.22) !important;
+    }
+
+    .users-page .users-mobile-list-table td {
+        display: block !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        white-space: normal !important;
+        vertical-align: middle !important;
+        font-size: 11px !important;
+        line-height: 1.22 !important;
+        overflow: hidden !important;
+    }
+
+    .users-page .users-mobile-list-table td:nth-child(2),
+    .users-page .users-mobile-list-table td:nth-child(3),
+    .users-page .users-mobile-list-table td:nth-child(4),
+    .users-page .users-mobile-list-table td:nth-child(6),
+    .users-page .users-mobile-list-table td:nth-child(7) {
+        display: none !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-user-main-cell {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        min-width: 0 !important;
+        align-self: start !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-user-main-cell > b {
+        display: block !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        color: #fff !important;
+        font-size: 13px !important;
+        line-height: 1.15 !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-mobile-only {
+        display: block !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-mobile-meta {
+        margin-top: 3px !important;
+        color: #9bb0c2 !important;
+        font-size: 10px !important;
+        line-height: 1.15 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-mobile-line {
+        display: grid !important;
+        grid-template-columns: 34px minmax(0, 1fr) !important;
+        gap: 5px !important;
+        align-items: center !important;
+        margin-top: 2px !important;
+        min-width: 0 !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-mobile-line span {
+        color: #8fb4d6 !important;
+        font-size: 9px !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        letter-spacing: .2px !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-mobile-line code {
+        min-width: 0 !important;
+        color: #9debff !important;
+        font-family: Consolas, Monaco, monospace !important;
+        font-size: 10px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .users-page .users-mobile-list-table td:nth-child(5) {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+        align-self: end !important;
+        min-width: 0 !important;
+    }
+
+    .users-page .users-mobile-list-table .badge {
+        max-width: 100% !important;
+        min-height: 18px !important;
+        padding: 2px 6px !important;
+        border-radius: 999px !important;
+        font-size: 9.5px !important;
+        line-height: 1.1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .users-page .users-mobile-list-table td.ssh-cell {
+        grid-column: 2 !important;
+        grid-row: 1 / span 2 !important;
+        justify-self: end !important;
+        align-self: center !important;
+        width: auto !important;
+        overflow: visible !important;
+        text-align: right !important;
+    }
+
+    .users-page .users-mobile-list-table td:nth-child(9) {
+        grid-column: 3 !important;
+        grid-row: 1 / span 2 !important;
+        justify-self: end !important;
+        align-self: center !important;
+        overflow: visible !important;
+    }
+
+    .users-page .users-mobile-list-table td:nth-child(10) {
+        grid-column: 4 !important;
+        grid-row: 1 / span 2 !important;
+        justify-self: end !important;
+        align-self: center !important;
+        overflow: visible !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-row-ssh {
+        width: 62px !important;
+        min-width: 62px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+        padding: 0 6px !important;
+        border-radius: 8px !important;
+        font-size: 10px !important;
+        line-height: 1 !important;
+        justify-content: center !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-row-action {
+        width: 28px !important;
+        min-width: 28px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        font-size: 13px !important;
+        line-height: 1 !important;
+        justify-content: center !important;
+    }
+
+    .users-page .lu-status {
+        padding: 9px 10px !important;
+        border-top: 1px solid #26364b !important;
+        font-size: 11px !important;
+    }
+}
+
+@media (max-width: 460px) {
+    .users-page .users-mobile-list-table tr {
+        grid-template-columns: minmax(0, 1fr) 58px 28px 28px !important;
+        gap: 5px 5px !important;
+        padding: 8px 7px !important;
+    }
+
+    .users-page .users-mobile-list-table .lu-row-ssh {
+        width: 58px !important;
+        min-width: 58px !important;
+        font-size: 9.5px !important;
+    }
+}

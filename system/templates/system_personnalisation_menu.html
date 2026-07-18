@@ -1,0 +1,1112 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<div class="pers-page">
+
+    {% include "partials/system_personnalisation_subnav.html" %}
+
+    {% if pers_subtab == 'menu' %}
+                <div class="pers-menu-page pers-menu-browser-page">
+                    <div id="personalMenuStatus" class="status-line personal-menu-status-top" hidden></div>
+
+                    <div class="card pers-menu-card personal-browser-card">
+                        <div class="card-body pers-menu-card-body">
+                            <div class="personal-browser-head">
+                                <div>
+                                    <div class="pers-menu-section-title">Menu personnalisé</div>
+                                    <div id="personalMenuCounter" class="personal-browser-counter"></div>
+                                    <div id="personalMenuCrumbs" class="personal-browser-crumbs"></div>
+                                </div>
+                                <div class="personal-browser-actions personal-browser-actions-fallback">
+                                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="personalAddFolder()">+ Dossier</button>
+                                    <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="personalAddCommand()">+ Commande</button>
+                                </div>
+                            </div>
+                            <div id="personalMenuBrowser" class="personal-browser-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <style>
+                .pers-menu-browser-page { display:flex; flex-direction:column; gap:10px; }
+                .personal-menu-status-top {
+                    position: fixed;
+                    top: 126px;
+                    left: min(24vw, 360px);
+                    z-index: 5000;
+                    display: none !important;
+                    margin: 0;
+                    max-width: min(720px, calc(100vw - 48px));
+                    min-height: 0;
+                    pointer-events: none;
+                    padding:7px 11px;
+                    border-radius:10px;
+                    font-size:.84rem;
+                }
+                .personal-menu-status-top.is-visible { display:block !important; }
+                .personal-menu-status-top[hidden] { display:none !important; }
+                .personal-menu-status-top.ok { border:1px solid rgba(34,197,94,.45); background:rgba(22,163,74,.13); color:#bbf7d0; }
+                .personal-menu-status-top.bad { border:1px solid rgba(244,63,94,.5); background:rgba(127,29,29,.18); color:#fecdd3; }
+                .personal-browser-card .card-body { display:flex; flex-direction:column; gap:14px; }
+                .personal-browser-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+                .personal-browser-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+                body.yoleo-has-page-settings .personal-browser-actions-fallback { display:none !important; }
+                .personal-browser-counter { margin-top:4px; color:#b8c7dc; font-size:.84rem; }
+                .personal-browser-crumbs { margin-top:8px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; color:#a7f3d0; font-size:.84rem; }
+                .personal-browser-crumbs button { border:1px solid rgba(34,211,238,.26); border-radius:999px; background:rgba(2,6,23,.54); color:#dbeafe; padding:4px 9px; cursor:pointer; }
+                .personal-browser-crumbs button:hover { border-color:rgba(34,211,238,.62); color:#fff; }
+                .personal-browser-list { display:flex; flex-direction:column; align-items:center; gap:8px; min-height:210px; padding:2px; }
+                .personal-browser-empty { width:100%; box-sizing:border-box; padding:26px; border:1px dashed rgba(148,163,184,.28); border-radius:14px; color:#9fb3c8; text-align:center; background:rgba(2,6,23,.22); }
+                .personal-tile { position:relative; min-height:64px; width:fit-content; max-width:100%; min-width:min(420px, 100%); display:grid; grid-template-columns:48px minmax(150px, max-content) auto; grid-template-rows:auto auto; align-items:center; column-gap:12px; row-gap:2px; padding:9px 10px; border:1px solid rgba(148,163,184,.24); border-radius:12px; background:linear-gradient(180deg, rgba(15,23,42,.74), rgba(15,23,42,.46)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.018); cursor:default; user-select:none; }
+                .personal-tile:hover { border-color:rgba(34,211,238,.46); background:linear-gradient(180deg, rgba(18,31,54,.82), rgba(15,23,42,.54)); }
+                .personal-tile:focus-visible { outline:2px solid rgba(34,211,238,.95); outline-offset:2px; border-color:rgba(34,211,238,.72); }
+                .personal-tile.is-key-focused { border-color:rgba(34,211,238,.72); box-shadow:0 0 0 2px rgba(34,211,238,.12), inset 0 0 0 1px rgba(255,255,255,.028); }
+                .personal-tile.is-folder { border-color:rgba(34,211,238,.28); cursor:pointer; }
+                .personal-tile.is-folder:hover { border-color:rgba(34,211,238,.68); }
+                .personal-tile.is-command { border-color:rgba(168,85,247,.28); }
+                .personal-tile.is-command:hover { border-color:rgba(168,85,247,.58); }
+                .personal-tile-icon { grid-column:1; grid-row:1 / span 2; width:42px; height:42px; display:grid; place-items:center; border-radius:10px; font-size:28px; background:rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.18); overflow:hidden; }
+                .personal-tile-icon img, .personal-edit-icon img { max-width:100%; max-height:100%; object-fit:contain; }
+                .personal-tile.is-command .personal-tile-icon { font-size:25px; }
+                .personal-tile-label { grid-column:2; grid-row:1; min-width:0; max-width:clamp(150px, 24vw, 520px); color:#fff; font-weight:800; font-size:.94rem; line-height:1.18; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+                .personal-tile-sub { grid-column:2; grid-row:2; min-width:0; max-width:clamp(150px, 24vw, 520px); min-height:16px; color:#8edcff; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:.73rem; line-height:1.2; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+                .personal-tile.is-command .personal-tile-label, .personal-tile.is-command .personal-tile-sub { max-width:clamp(220px, 42vw, 760px); }
+                .personal-tile-actions { grid-column:3; grid-row:1 / span 2; margin-left:auto; display:flex; align-items:center; justify-content:flex-end; gap:5px; flex-wrap:nowrap; }
+                .personal-tile-action { width:27px; height:27px; flex:0 0 27px; display:grid; place-items:center; border:1px solid rgba(148,163,184,.28); border-radius:8px; background:rgba(15,23,42,.78); color:#dbeafe; cursor:pointer; font-size:13px; padding:0; }
+                .personal-tile-action:hover { border-color:rgba(34,211,238,.62); color:#fff; }
+                .personal-tile-action.is-danger { border-color:rgba(244,63,94,.45); color:#fecdd3; }
+                .personal-tile-action.is-top-menu { color:#fef3c7; }
+                .personal-tile-action.is-disabled { opacity:.35; cursor:not-allowed; filter:grayscale(1); }
+                .personal-tile-action.is-disabled:hover { border-color:rgba(148,163,184,.28); color:#dbeafe; }
+                .personal-tile-action:focus-visible { outline:2px solid rgba(34,211,238,.95); outline-offset:2px; }
+                .personal-tile.is-hard-top-menu { border-color:rgba(34,211,238,.34); cursor:pointer; }
+                .personal-tile.is-hard-top-menu:hover { border-color:rgba(34,211,238,.7); background:linear-gradient(180deg, rgba(18,31,54,.82), rgba(15,23,42,.54)); }
+                .personal-tile.is-hard-top-menu .personal-tile-label { max-width:clamp(180px, 30vw, 560px); }
+                .personal-tile.is-hard-top-menu .personal-tile-sub { max-width:clamp(220px, 38vw, 680px); }
+                .personal-tile-edit { grid-column:2; grid-row:1 / span 2; min-width:0; display:flex; align-items:center; justify-content:center; gap:7px; }
+                .personal-edit-icon { width:36px; height:36px; flex:0 0 36px; display:grid; place-items:center; border-radius:9px; border:1px solid rgba(148,163,184,.22); background:rgba(2,6,23,.42); overflow:hidden; font-size:22px; }
+                .personal-tile-edit input { width:auto; min-width:12ch; max-width:min(70vw, 76ch); text-align:left; transition:width .08s ease; }
+                .personal-command-edit { display:flex; gap:6px; flex:0 0 auto; min-width:0; align-items:center; }
+                .personal-command-edit input { width:auto; transition:width .08s ease; }
+                .personal-command-edit .personal-name-input { min-width:14ch; max-width:min(38vw, 36ch); }
+                .personal-command-edit .personal-url-input { min-width:24ch; max-width:min(70vw, 84ch); }
+                .personal-top-menu-check { display:inline-flex; align-items:center; gap:5px; color:#dbeafe; font-size:.78rem; font-weight:800; white-space:nowrap; }
+                .personal-top-menu-check input { width:auto; min-width:0; }
+                .personal-tile.is-editing { justify-content:center; }
+                .personal-tile.is-editing .personal-tile-actions { margin-left:4px; }
+                @media (max-width: 860px) {
+                    .personal-browser-head { align-items:flex-start; }
+                    .personal-browser-actions { justify-content:flex-start; }
+                    .personal-browser-list { gap:7px; align-items:stretch; }
+                    .personal-tile { width:100%; min-width:0; min-height:60px; grid-template-columns:44px minmax(0, 1fr) auto; column-gap:9px; padding:8px; }
+                    .personal-tile-icon { width:38px; height:38px; font-size:25px; }
+                    .personal-tile-label { font-size:.9rem; }
+                    .personal-tile-sub { font-size:.7rem; }
+                    .personal-tile-actions { gap:4px; }
+                    .personal-tile-action { width:25px; height:25px; flex-basis:25px; font-size:12px; }
+                    .personal-tile-edit, .personal-command-edit { flex-wrap:wrap; justify-content:flex-start; }
+                }
+                </style>
+
+                <script>
+                let personalMenuItems = {{ menu_items|tojson }};
+                let personalCurrentId = '';
+                let personalFocusIndex = -1;
+                let personalMenuSaving = false;
+                let personalEditingIndex = -1;
+                let personalEditBackup = null;
+                let personalStatusTimer = null;
+                let personalPendingDelete = null;
+
+                function personalEscape(value) {
+                    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                }
+                function personalSlug(value, fallback='menu') {
+                    let text = String(value || '').trim().toLowerCase();
+                    text = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    text = text.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+                    return text || fallback;
+                }
+                function personalFindParent() {
+                    if (!personalCurrentId) return null;
+                    return personalMenuItems.find(item => String(item.id) === String(personalCurrentId) && personalRootKind(item) === 'folder') || null;
+                }
+                function personalRootKind(item) {
+                    const children = Array.isArray(item?.children) ? item.children : [];
+                    const url = String(item?.url || item?.lien || '').trim();
+                    if (item?.kind === 'command' || item?.is_direct || item?._is_direct) return 'command';
+                    if (!children.length && url && url !== '#') return 'command';
+                    return 'folder';
+                }
+                function personalVisibleEntries() {
+                    const parent = personalFindParent();
+                    if (!parent) return personalMenuItems.map(item => ({kind: personalRootKind(item), parent: null, item}));
+                    return (parent.children || []).map(item => ({kind:'command', parent, item}));
+                }
+                function personalIconHtml(value, fallback='📁') {
+                    value = String(value || '').trim();
+                    if (value.startsWith('/static') || value.startsWith('static/')) {
+                        const src = value.startsWith('/') ? value : '/' + value;
+                        return `<img src="${personalEscape(src)}" alt="">`;
+                    }
+                    return personalEscape(value || fallback);
+                }
+                function personalTopMenuEditorUrl(item) {
+                    const params = new URLSearchParams();
+                    params.set('match', String(item?.url || ''));
+                    params.set('label', String(item?.label || 'Menu'));
+                    params.set('icon', String(item?.icon || '⚙️'));
+                    return '/system/personnalisation/top-menu?' + params.toString();
+                }
+                function personalOpenTopMenu(index) {
+                    const entry = personalVisibleEntries()[index];
+                    if (!entry || entry.kind === 'folder') return;
+                    if (!entry.item?.top_menu_enabled) return;
+                    window.location.href = personalTopMenuEditorUrl(entry.item);
+                }
+                function personalHideStatus() {
+                    const el = document.getElementById('personalMenuStatus');
+                    if (!el) return;
+                    el.textContent = '';
+                    el.className = 'status-line personal-menu-status-top';
+                    el.classList.remove('is-visible');
+                    el.setAttribute('hidden', 'hidden');
+                    el.style.display = 'none';
+                }
+                function personalSetStatus(message, ok=true) {
+                    const el = document.getElementById('personalMenuStatus');
+                    if (!el) return;
+                    if (personalStatusTimer) clearTimeout(personalStatusTimer);
+                    message = String(message || '').trim();
+                    if (!message) { personalHideStatus(); return; }
+                    el.textContent = message;
+                    el.className = 'status-line personal-menu-status-top ' + (ok ? 'ok' : 'bad');
+                    el.classList.add('is-visible');
+                    el.removeAttribute('hidden');
+                    el.style.display = 'block';
+                    if (ok) personalStatusTimer = setTimeout(personalHideStatus, 1000);
+                }
+                function personalRefreshSidebarMenu() {
+                    if (typeof window.yoleoRefreshSidebarMenuFromData === 'function') {
+                        window.yoleoRefreshSidebarMenuFromData(personalMenuItems);
+                    }
+                }
+                function personalEscapeAttr(value) {
+                    return personalEscape(value).replace(/"/g, '&quot;');
+                }
+                function personalPageSettingsIconHtml(value, fallback='⚙️') {
+                    value = String(value || fallback || '⚙️').trim();
+                    const lower = value.toLowerCase();
+                    const isImg = value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/static/')
+                        || value.startsWith('/logo/') || value.startsWith('./') || value.startsWith('../')
+                        || value.startsWith('static/') || value.startsWith('logo/')
+                        || ['.png','.jpg','.jpeg','.webp','.gif','.svg','.ico','.bmp','.avif'].some(ext => lower.endsWith(ext));
+                    if (!isImg) return personalEscape(value || fallback || '⚙️');
+                    let src = value;
+                    if (value.startsWith('static/')) src = '/' + value;
+                    else if (value.startsWith('logo/')) src = '/static/' + value;
+                    return `<img src="${personalEscapeAttr(src)}" class="yoleo-menu-img" alt="">`;
+                }
+                function personalPageSettingsItemHtml(item) {
+                    item = item || {};
+                    const href = String(item.url || '#');
+                    const onclick = String(item.onclick || '').trim();
+                    const actionClass = onclick ? ' is-action' : '';
+                    const onclickAttr = onclick ? ` onclick="${personalEscapeAttr(onclick)}"` : '';
+                    return `<a href="${personalEscapeAttr(href)}" class="${actionClass.trim()}"${onclickAttr}>`
+                        + `<span class="page-settings-icon" aria-hidden="true">${personalPageSettingsIconHtml(item.icon, '•')}</span>`
+                        + `<span>${personalEscape(item.label || 'Option')}</span></a>`;
+                }
+                function personalUpdatePageSettingsMenu(section) {
+                    const old = document.getElementById('yoleoPageSettingsMenu') || document.getElementById('yoleoPageSettingsDisabled') || document.querySelector('.yoleo-page-settings-toggle.is-disabled');
+                    if (!old) return;
+                    const items = Array.isArray(section?.items) ? section.items : [];
+                    const enabled = !!(section && section.enabled && items.length);
+                    const html = enabled
+                        ? `<details class="yoleo-page-settings-menu" id="yoleoPageSettingsMenu">`
+                            + `<summary class="yoleo-page-settings-toggle" aria-label="${personalEscapeAttr(section.label || 'Menu page')}" title="${personalEscapeAttr(section.label || 'Menu page')}">${personalPageSettingsIconHtml(section.icon, '⚙️')}</summary>`
+                            + `<nav class="yoleo-page-settings-dropdown" aria-label="${personalEscapeAttr(section.label || 'Menu page')}">${items.map(personalPageSettingsItemHtml).join('')}</nav>`
+                            + `</details>`
+                        : `<button type="button" class="yoleo-page-settings-toggle is-disabled" id="yoleoPageSettingsDisabled" aria-label="Aucun menu haut actif" title="Aucun menu haut actif" disabled>&#9881;</button>`;
+                    old.outerHTML = html;
+                    document.body.classList.toggle('yoleo-has-page-settings', enabled);
+                }
+                async function personalPostMenu(fd) {
+                    fd.append('current_path', window.location.pathname || '/');
+                    fd.append('response', 'json');
+                    const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', {
+                        method:'POST',
+                        body:fd,
+                        headers:{'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest', 'X-Current-Path': window.location.pathname || '/'}
+                    });
+                    const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+                    let data = null;
+                    if (contentType.includes('application/json')) {
+                        data = await res.json();
+                    } else {
+                        const txt = await res.text();
+                        data = {ok: res.ok, message: txt};
+                    }
+                    if (!res.ok || data.ok === false) {
+                        throw new Error(data.message || 'Erreur sauvegarde.');
+                    }
+                    return data;
+                }
+                function personalApplyServerState(data) {
+                    if (data && Array.isArray(data.menu_items)) {
+                        personalMenuItems.splice(0, personalMenuItems.length, ...data.menu_items);
+                        if (personalCurrentId && !personalFindParent()) personalCurrentId = '';
+                    }
+                    if (data && Object.prototype.hasOwnProperty.call(data, 'menu_top_current')) {
+                        personalUpdatePageSettingsMenu(data.menu_top_current);
+                    }
+                    personalRefreshSidebarMenu();
+                }
+                function personalRenderCrumbs() {
+                    const parent = personalFindParent();
+                    const box = document.getElementById('personalMenuCrumbs');
+                    if (!box) return;
+                    let html = `<button type="button" onclick="personalGoRoot()">🏠 Racine</button>`;
+                    if (parent) html += `<span>›</span><button type="button" onclick="personalRender()">${personalEscape(parent.label || 'Dossier')}</button>`;
+                    box.innerHTML = html;
+                }
+                function personalRenderCounter() {
+                    const entries = personalVisibleEntries();
+                    const folders = entries.filter(e => e.kind === 'folder').length;
+                    const commands = entries.filter(e => e.kind === 'command').length;
+                    const el = document.getElementById('personalMenuCounter');
+                    if (!el) return;
+                    if (!personalCurrentId) el.textContent = `${folders} catégorie(s) · ${commands} commande(s)`;
+                    else el.textContent = `${commands} commande(s)`;
+                }
+                function personalTile(entry, index) {
+                    const item = entry.item;
+                    const isFolder = entry.kind === 'folder';
+                    const icon = personalIconHtml(item.icon, isFolder ? '📁' : '🌐');
+                    const label = item.label || (isFolder ? 'Dossier' : 'Commande');
+                    const sub = isFolder ? (entry.parent ? 'Dossier' : 'Catégorie') : (item.url || '#');
+                    const klass = isFolder ? 'is-folder' : 'is-command';
+                    const enterButton = isFolder ? `<button type="button" class="personal-tile-action" title="Ouvrir" onclick="event.stopPropagation(); personalOpenIndex(${index})">↩</button>` : '';
+                    const topEnabled = !isFolder && !!item.top_menu_enabled && String(item.url || '').trim() && String(item.url || '').trim() !== '#';
+                    const topButton = isFolder
+                        ? `<button type="button" class="personal-tile-action is-top-menu is-disabled" title="Aucun menu cranté sur un dossier" disabled>⚙️</button>`
+                        : `<button type="button" class="personal-tile-action is-top-menu ${topEnabled ? '' : 'is-disabled'}" title="${topEnabled ? 'Configurer le menu cranté' : 'Menu cranté désactivé'}" ${topEnabled ? `onclick="event.stopPropagation(); personalOpenTopMenu(${index})"` : 'disabled'}>⚙️</button>`;
+                    return `<article class="personal-tile ${klass}" tabindex="0" data-personal-index="${index}" onclick="personalTileClick(event, ${index})" onkeydown="personalTileKey(event, ${index})">
+                        <span class="personal-tile-icon">${icon}</span>
+                        <span class="personal-tile-label">${personalEscape(label)}</span>
+                        <span class="personal-tile-sub">${personalEscape(sub)}</span>
+                        <span class="personal-tile-actions" onclick="event.stopPropagation()">
+                            ${enterButton}
+                            <button type="button" class="personal-tile-action" title="Modifier" onclick="personalEditIndex(${index})">✎</button>
+                            ${topButton}
+                            <button type="button" class="personal-tile-action" title="Monter" onclick="personalMoveIndex(${index}, -1)">▲</button>
+                            <button type="button" class="personal-tile-action" title="Descendre" onclick="personalMoveIndex(${index}, 1)">▼</button>
+                            <button type="button" class="personal-tile-action is-danger" title="Supprimer" onclick="personalAskDelete(${index})">×</button>
+                        </span>
+                    </article>`;
+                }
+                function personalHardTopMenuTile() {
+                    if (personalCurrentId) return '';
+                    return `<article class="personal-tile is-hard-top-menu personal-hard-entry" tabindex="0" onclick="window.location.href='/system/personnalisation/menu-top'" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); window.location.href='/system/personnalisation/menu-top';}">
+                        <span class="personal-tile-icon">🔝</span>
+                        <span class="personal-tile-label">Menu cranté</span>
+                        <span class="personal-tile-actions" onclick="event.stopPropagation()">
+                            <button type="button" class="personal-tile-action" title="Ouvrir" onclick="window.location.href='/system/personnalisation/menu-top'">↩</button>
+                            <button type="button" class="personal-tile-action is-disabled" title="Entrée système fixe" disabled>✎</button>
+                            <button type="button" class="personal-tile-action is-top-menu is-disabled" title="Accès fixe au catalogue des menus crantés" disabled>⚙️</button>
+                            <button type="button" class="personal-tile-action is-disabled" title="Entrée fixe" disabled>▲</button>
+                            <button type="button" class="personal-tile-action is-disabled" title="Entrée fixe" disabled>▼</button>
+                            <button type="button" class="personal-tile-action is-danger is-disabled" title="Entrée fixe non supprimable" disabled>×</button>
+                        </span>
+                    </article>`;
+                }
+                function personalRender() {
+                    personalEditingIndex = -1;
+                    personalEditBackup = null;
+                    const entries = personalVisibleEntries();
+                    personalRenderCrumbs();
+                    personalRenderCounter();
+                    const grid = document.getElementById('personalMenuBrowser');
+                    if (!grid) return;
+                    const hardTop = personalHardTopMenuTile();
+                    if (!entries.length) {
+                        grid.innerHTML = hardTop || `<div class="personal-browser-empty">Aucune entrée ici.</div>`;
+                        return;
+                    }
+                    grid.innerHTML = hardTop + entries.map(personalTile).join('');
+                    personalFocusIndex = Math.max(0, Math.min(personalFocusIndex, entries.length - 1));
+                    personalApplyFocus(false);
+                }
+                function personalApplyFocus(doFocus=true) {
+                    document.querySelectorAll('.personal-tile:not(.personal-hard-entry)').forEach((el, idx) => {
+                        el.classList.toggle('is-key-focused', idx === personalFocusIndex);
+                        if (idx === personalFocusIndex && doFocus) el.focus({preventScroll:true});
+                    });
+                }
+                async function personalTileClick(event, index) {
+                    if (event.target.closest('.personal-tile-actions') || event.target.closest('input') || event.target.closest('button')) return;
+                    personalFocusIndex = index;
+                    personalApplyFocus(false);
+                    const entry = personalVisibleEntries()[index];
+                    if (entry?.kind === 'folder') await personalOpenIndex(index);
+                    else if (entry) await personalEditIndex(index);
+                }
+                function personalTileKey(event, index) {
+                    if (personalEditingIndex >= 0) return;
+                    const entries = personalVisibleEntries();
+                    if (event.key === 'ArrowDown') { event.preventDefault(); personalFocusIndex = Math.min(entries.length - 1, index + 1); personalApplyFocus(); return; }
+                    if (event.key === 'ArrowUp') { event.preventDefault(); personalFocusIndex = Math.max(0, index - 1); personalApplyFocus(); return; }
+                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); personalOpenIndex(index); return; }
+                    if (event.key === 'F2') { event.preventDefault(); personalEditIndex(index); return; }
+                    if (event.key === 'Delete') { event.preventDefault(); personalAskDelete(index); return; }
+                    if (event.key === 'Escape' || event.key === 'Backspace' || event.key === 'ArrowLeft') { if (personalCurrentId) { event.preventDefault(); personalGoRoot(); } }
+                }
+                async function personalOpenIndex(index) {
+                    if (personalEditingIndex >= 0) {
+                        const previousIndex = personalEditingIndex;
+                        await personalCommitEdit(previousIndex);
+                        if (personalEditingIndex >= 0) return;
+                    }
+                    const entry = personalVisibleEntries()[index];
+                    if (!entry) return;
+                    if (entry.kind === 'folder') {
+                        personalCurrentId = entry.item.id || '';
+                        personalFocusIndex = 0;
+                        personalRender();
+                    } else {
+                        await personalEditIndex(index);
+                    }
+                }
+                function personalGoRoot() {
+                    personalCurrentId = '';
+                    personalFocusIndex = 0;
+                    personalRender();
+                }
+                function personalAutosize(input) {
+                    if (!input) return;
+                    const len = Math.max(8, String(input.value || input.placeholder || '').length + 3);
+                    input.style.width = Math.min(Math.max(len, 10), 86) + 'ch';
+                }
+                function personalPreviewFor(inputId, previewId) {
+                    const value = document.getElementById(inputId)?.value || '';
+                    const box = document.getElementById(previewId);
+                    if (!box) return;
+                    box.innerHTML = personalIconHtml(value, '🌐');
+                }
+                async function personalEditIndex(index, isNew=false) {
+                    if (personalEditingIndex === index) return;
+                    if (personalEditingIndex >= 0 && personalEditingIndex !== index) {
+                        const previousIndex = personalEditingIndex;
+                        await personalCommitEdit(previousIndex);
+                        if (personalEditingIndex >= 0) return;
+                    }
+                    const entries = personalVisibleEntries();
+                    const entry = entries[index];
+                    if (!entry) return;
+                    personalEditingIndex = index;
+                    personalEditBackup = {kind: entry.kind, parent: entry.parent || null, item: entry.item, wasNew: !entry.item.id};
+                    const item = entry.item;
+                    const tile = document.querySelector(`[data-personal-index="${index}"]`);
+                    if (!tile) return;
+                    tile.classList.add('is-editing');
+                    const prefix = `personal_edit_${index}`;
+                    const isFolder = entry.kind === 'folder';
+                    let editHtml = '';
+                    if (isFolder) {
+                        editHtml = `<span class="personal-edit-icon" id="${prefix}_preview">${personalIconHtml(item.icon, '📁')}</span>
+                            <input class="input personal-name-input" id="${prefix}_label" value="${personalEscape(item.label || '')}" placeholder="Nom du dossier">
+                            <input type="hidden" id="${prefix}_url" value="${personalEscape(item.url || '#')}">
+                            <input class="input personal-icon-input" id="${prefix}_icon" value="${personalEscape(item.icon || '📁')}" placeholder="Icône">
+                            <button type="button" class="personal-tile-action" title="Parcourir" onclick="openStaticBrowser('${prefix}_icon')">📂</button>`;
+                    } else {
+                        const topChecked = item.top_menu_enabled ? 'checked' : '';
+                        editHtml = `<span class="personal-edit-icon" id="${prefix}_preview">${personalIconHtml(item.icon, '🌐')}</span>
+                            <div class="personal-command-edit">
+                                <input class="input personal-name-input" id="${prefix}_label" value="${personalEscape(item.label || '')}" placeholder="Nom">
+                                <input class="input personal-url-input" id="${prefix}_url" value="${personalEscape(item.url || '')}" placeholder="/route ou commande">
+                                <input class="input personal-icon-input" id="${prefix}_icon" value="${personalEscape(item.icon || '🌐')}" placeholder="Icône">
+                                <button type="button" class="personal-tile-action" title="Parcourir" onclick="openStaticBrowser('${prefix}_icon')">📂</button>
+                                <label class="personal-top-menu-check"><input type="checkbox" id="${prefix}_top_menu" ${topChecked}> Top menu</label>
+                            </div>`;
+                    }
+                    tile.innerHTML = `<span class="personal-tile-icon">${personalIconHtml(item.icon, isFolder ? '📁' : '🌐')}</span>
+                        <span class="personal-tile-edit">${editHtml}</span>
+                        <span class="personal-tile-actions" onclick="event.stopPropagation()">
+                            <button type="button" class="personal-tile-action" title="Valider" onclick="personalCommitEdit(${index})">✓</button>
+                            <button type="button" class="personal-tile-action" title="Annuler" onclick="personalCancelEdit(${index})">↩</button>
+                        </span>`;
+                    for (const id of [`${prefix}_label`, `${prefix}_url`, `${prefix}_icon`]) {
+                        const input = document.getElementById(id);
+                        if (!input) continue;
+                        personalAutosize(input);
+                        input.addEventListener('input', () => { personalAutosize(input); if (id.endsWith('_icon')) personalPreviewFor(id, `${prefix}_preview`); });
+                        input.addEventListener('keydown', (ev) => {
+                            if (ev.key === 'Enter') { ev.preventDefault(); personalCommitEdit(index); }
+                            if (ev.key === 'Escape') { ev.preventDefault(); personalCancelEdit(index); }
+                        });
+                    }
+                    setTimeout(() => document.getElementById(`${prefix}_label`)?.focus(), 20);
+                }
+                async function personalCommitEdit(index) {
+                    if (personalMenuSaving) return;
+                    const entries = personalVisibleEntries();
+                    const entry = entries[index];
+                    if (!entry) return;
+                    const prefix = `personal_edit_${index}`;
+                    const isFolder = entry.kind === 'folder';
+                    const label = (document.getElementById(`${prefix}_label`)?.value || (isFolder ? 'Dossier' : 'Commande')).trim() || (isFolder ? 'Dossier' : 'Commande');
+                    const url = document.getElementById(`${prefix}_url`)?.value || (isFolder ? '#' : '');
+                    const icon = document.getElementById(`${prefix}_icon`)?.value || (isFolder ? '📁' : '🌐');
+                    const oldId = entry.item.id || '';
+                    const topMenuEnabled = !!document.getElementById(`${prefix}_top_menu`)?.checked;
+                    const fd = new FormData();
+                    const rootCommand = !personalCurrentId && entry.kind === 'command';
+                    const childCommand = !!personalCurrentId && entry.kind === 'command';
+                    fd.append('action', 'menu_upsert');
+                    fd.append('parent_id', childCommand ? (personalCurrentId || '') : '');
+                    fd.append('item_type', rootCommand ? 'command' : (isFolder ? 'folder' : 'child'));
+                    fd.append('item_id', oldId);
+                    fd.append('nom', label);
+                    fd.append('url', url);
+                    fd.append('icone', icon);
+                    if (!isFolder) fd.append('top_menu', topMenuEnabled ? '1' : '0');
+                    personalMenuSaving = true;
+                    try {
+                        const data = await personalPostMenu(fd);
+                        personalApplyServerState(data);
+                        personalEditingIndex = -1;
+                        personalEditBackup = null;
+                        personalFocusIndex = index;
+                        personalSetStatus(data.message || 'Enregistré', true);
+                        personalRender();
+                    } catch(e) {
+                        personalSetStatus(e.message || String(e), false);
+                    } finally {
+                        personalMenuSaving = false;
+                    }
+                }
+                function personalCancelEdit(index) {
+                    if (personalEditBackup && personalEditBackup.item && personalEditBackup.wasNew) {
+                        if (personalEditBackup.parent) {
+                            personalEditBackup.parent.children = (personalEditBackup.parent.children || []).filter(x => x !== personalEditBackup.item);
+                        } else {
+                            const pos = personalMenuItems.indexOf(personalEditBackup.item);
+                            if (pos >= 0) personalMenuItems.splice(pos, 1);
+                        }
+                    }
+                    personalEditingIndex = -1;
+                    personalEditBackup = null;
+                    personalRender();
+                }
+                function personalAddFolder() {
+                    personalCurrentId = '';
+                    const item = {id:'', safe_id:'new_folder_' + Date.now(), label:'Nouveau dossier', url:'#', icon:'📁', children:[]};
+                    personalMenuItems.push(item);
+                    personalFocusIndex = personalMenuItems.length - 1;
+                    personalRender();
+                    personalEditIndex(personalFocusIndex, true);
+                }
+                function personalAddCommand() {
+                    const parent = personalFindParent();
+                    const item = {id:'', safe_id:'new_command_' + Date.now(), label:'Nouvelle commande', url:'/system/info', icon:'🌐', kind:'command', is_direct: !parent, _is_direct: !parent, children: []};
+                    if (parent) {
+                        parent.children = parent.children || [];
+                        parent.children.push(item);
+                        personalFocusIndex = parent.children.length - 1;
+                    } else {
+                        personalMenuItems.push(item);
+                        personalFocusIndex = personalMenuItems.length - 1;
+                    }
+                    personalRender();
+                    personalEditIndex(personalFocusIndex, true);
+                }
+                async function personalMoveIndex(index, direction) {
+                    if (personalMenuSaving) return;
+                    const entry = personalVisibleEntries()[index];
+                    if (!entry) return;
+                    const fd = new FormData();
+                    fd.append('action', 'menu_move');
+                    fd.append('parent_id', entry.kind === 'command' ? (personalCurrentId || '') : '');
+                    fd.append('item_id', entry.item.id || '');
+                    fd.append('direction', String(direction || 1));
+                    personalMenuSaving = true;
+                    try {
+                        const data = await personalPostMenu(fd);
+                        personalApplyServerState(data);
+                        const entriesAfter = personalVisibleEntries();
+                        personalFocusIndex = Math.max(0, Math.min(index + Number(direction || 1), entriesAfter.length - 1));
+                        personalSetStatus(data.message || 'Enregistré', true);
+                        personalRender();
+                    } catch(e) {
+                        personalSetStatus(e.message || String(e), false);
+                    } finally {
+                        personalMenuSaving = false;
+                    }
+                }
+                async function personalAskDelete(index) {
+                    if (personalMenuSaving) return;
+                    const entry = personalVisibleEntries()[index];
+                    if (!entry) return;
+                    const kindLabel = entry.kind === 'folder' ? (entry.parent ? 'Dossier' : 'Catégorie') : 'Commande';
+                    const ok = await showConfirm('Supprimer ?', `${kindLabel} : ${entry.item.label || entry.item.id}`, 'Supprimer');
+                    if (!ok) return;
+
+                    const fd = new FormData();
+                    fd.append('action', 'menu_delete');
+                    fd.append('parent_id', entry.kind === 'command' ? (personalCurrentId || '') : '');
+                    fd.append('item_id', entry.item.id || '');
+
+                    personalMenuSaving = true;
+                    try {
+                        const data = await personalPostMenu(fd);
+                        personalApplyServerState(data);
+                        const remaining = personalVisibleEntries().length;
+                        personalFocusIndex = remaining ? Math.max(0, Math.min(index, remaining - 1)) : -1;
+                        personalSetStatus(data.message || 'Enregistré', true);
+                        personalRender();
+                    } catch(e) {
+                        personalSetStatus(e.message || String(e), false);
+                    } finally {
+                        personalMenuSaving = false;
+                    }
+                }
+                document.addEventListener('keydown', (event) => {
+                    const confirmModal = document.getElementById('confirmModal');
+                    if (confirmModal && confirmModal.style.display === 'flex') {
+                        if (event.key === 'Escape') { event.preventDefault(); settleConfirm(false); }
+                        if (event.key === 'Enter' || event.key === 'Delete') { event.preventDefault(); settleConfirm(true); }
+                        return;
+                    }
+                    if (!document.querySelector('.pers-menu-browser-page')) return;
+                    if (event.target && ['INPUT','TEXTAREA','SELECT','BUTTON'].includes(event.target.tagName)) return;
+                    const entries = personalVisibleEntries();
+                    if (!entries.length) return;
+                    if (personalFocusIndex < 0) personalFocusIndex = 0;
+                    if (event.key === 'ArrowDown') { event.preventDefault(); personalFocusIndex = Math.min(entries.length - 1, personalFocusIndex + 1); personalApplyFocus(); }
+                    if (event.key === 'ArrowUp') { event.preventDefault(); personalFocusIndex = Math.max(0, personalFocusIndex - 1); personalApplyFocus(); }
+                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); personalOpenIndex(personalFocusIndex); }
+                    if (event.key === 'F2') { event.preventDefault(); personalEditIndex(personalFocusIndex); }
+                    if (event.key === 'Delete') { event.preventDefault(); personalAskDelete(personalFocusIndex); }
+                    if ((event.key === 'Escape' || event.key === 'Backspace' || event.key === 'ArrowLeft') && personalCurrentId) { event.preventDefault(); personalGoRoot(); }
+                });
+                window.addEventListener('message', (event) => {
+                    const data = event.data || {};
+                    if (data.type !== 'yoleo-browser-select') return;
+                    const targetId = data.target || '';
+                    if (!targetId.startsWith('personal_edit_')) return;
+                    setTimeout(() => {
+                        const input = document.getElementById(targetId);
+                        if (input) {
+                            personalAutosize(input);
+                            personalPreviewFor(targetId, targetId.replace(/_icon$/, '_preview'));
+                        }
+                    }, 30);
+                });
+                document.addEventListener('DOMContentLoaded', () => {
+                    if (document.querySelector('.pers-menu-browser-page')) personalRender();
+                });
+                </script>
+
+    {% elif pers_subtab == 'home' %}
+
+                {% macro home_toggle(key, label, desc='', emoji='🔘') -%}
+                <label class="home-toggle">
+                    <span class="home-toggle-icon">{{ emoji }}</span>
+                    <input type="checkbox" class="home-check" name="{{ key }}" {% if home_config.get(key|lower, '1')|int %}checked{% endif %} onchange="toggleNvidiaSshSettings()">
+                    <span>
+                        <span class="home-toggle-title">{{ label }}</span>
+                        {% if desc %}<span class="home-toggle-desc">{{ desc }}</span>{% endif %}
+                    </span>
+                </label>
+                {%- endmacro %}
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="toolbar">
+                            <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="saveHomeConfig()">💾 Sauvegarder l’accueil</button>
+                        </div>
+                        <div class="home-note">Fichier utilisé : <span class="home-path">{{ home_config_path }}</span></div>
+                        <div class="home-config-groups">
+                            <section class="home-config-group">
+                                <div class="home-group-head"><span class="home-group-icon">🎮</span><div><h3>Carte graphique</h3><p>NVIDIA locale et Intel iGPU.</p></div></div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_NVIDIA_LOCAL', 'NVIDIA GPU local', 'Carte NVIDIA présente sur l’hôte Flask.', '🟢') }}
+                                    {{ home_toggle('SHOW_INTEL_GPU', 'Intel GPU', 'Jauge Intel iGPU locale.', '🔵') }}
+                                </div>
+                            </section>
+
+                            <section class="home-config-group">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">⚙️</span>
+                                    <div class="home-group-title"><h3>Système</h3><p>Identité du NAS, heure, uptime et services.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_TIME', 'Heure', 'Horloge et date dans le panneau principal.', '🕒') }}
+                                    {{ home_toggle('SHOW_HOST', 'Hôte', 'Hostname, système et démarrage.', '🏠') }}
+                                    {{ home_toggle('SHOW_UPTIME', 'Uptime', 'Durée de fonctionnement et kernel.', '⏱️') }}
+                                    {{ home_toggle('SHOW_SERVICES', 'Services', 'Résumé des services systemd.', '🧰') }}
+                                </div>
+                            </section>
+
+                            <section class="home-config-group">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">🐳</span>
+                                    <div class="home-group-title"><h3>Docker / VM</h3><p>Compteurs des conteneurs et des machines virtuelles.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_DOCKER_TOTAL', 'Docker', 'Tuile avec total, en exécution et arrêtés.', '🐳') }}
+                                    {{ home_toggle('SHOW_DOCKER_RUNNING', 'VM', 'Tuile avec total VM, en exécution et arrêtées.', '🖥️') }}
+                                </div>
+                            </section>
+
+                            <section class="home-config-group">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">📊</span>
+                                    <div class="home-group-title"><h3>Ressources</h3><p>CPU, RAM, stockage et réseau.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_CPU', 'Processeur', 'Jauge CPU et load average.', '🧠') }}
+                                    {{ home_toggle('SHOW_RAM', 'Mémoire RAM', 'Jauge RAM et total utilisé.', '📊') }}
+                                    {{ home_toggle('SHOW_STORAGE', 'Stockage', 'Tuile stockage rapide.', '💾') }}
+                                    {{ home_toggle('SHOW_DISK_MOUNTS', 'Vérifier montages disque', 'Affiche le contrôle des points de montage configurés dans disk_top.conf.', '💿') }}
+                                    {{ home_toggle('SHOW_NETWORK', 'Réseau local', 'IP, passerelle, débit et IP publique.', '🌐') }}
+                                    {{ home_toggle('SHOW_LOCAL_RESOLUTION', 'Résolution locale', 'Bloc réseau/résolution locale, façon OMV.', '🧭') }}
+                                </div>
+                            </section>
+
+                            <section id="sshSettingsCard" class="home-config-group pers-home-ssh-group">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">🖥️</span>
+                                    <div class="home-group-title"><h3>GPU SSH</h3><p>Carte NVIDIA d’une machine distante ou d’une VM.</p></div>
+                                </div>
+                                <div class="pers-home-ssh-toggle-row">
+                                    {{ home_toggle('SHOW_NVIDIA_SSH', 'GPU SSH', 'Active le bloc GPU distant sur l’accueil uniquement si les champs SSH sont renseignés.', '🖥️') }}
+                                </div>
+                                <div id="sshDisabledNote" class="pers-home-ssh-note">Si GPU SSH est coché, l’IP, le port, le nom d’utilisateur et le chemin de clé sont obligatoires.</div>
+                                <div class="pers-home-ssh-grid">
+                                    <div class="field-box"><div class="field-label">IP de la machine</div><input class="input" data-home-ssh="SSH_GPU_HOST" value="{{ home_ssh_config.get('SSH_GPU_HOST','') }}" placeholder="192.168.1.4"></div>
+                                    <div class="field-box"><div class="field-label">Port de la machine</div><input class="input" data-home-ssh="SSH_GPU_PORT" value="{{ home_ssh_config.get('SSH_GPU_PORT','22') or '22' }}" placeholder="22"></div>
+                                    <div class="field-box"><div class="field-label">Nom d’utilisateur de la machine</div><input class="input" data-home-ssh="SSH_GPU_USER" value="{{ home_ssh_config.get('SSH_GPU_USER','') }}" placeholder="yoan"></div>
+                                    <div class="field-box">
+                                        <div class="field-label">Chemin ou dossier de votre clé</div>
+                                        <div class="ssh-key-row pers-home-ssh-key-row">
+                                            <input id="sshGpuKeyPath" class="input" data-home-ssh="SSH_GPU_KEY_PATH" value="{{ home_ssh_config.get('SSH_GPU_KEY_PATH','') }}" placeholder="/home/key/yoan">
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" aria-label="Choisir la clé SSH" onclick="openKeyBrowser('sshGpuKeyPath')">📁</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <input type="hidden" data-home-ssh="REMOTE_NVIDIA_SMI" value="{{ home_ssh_config.get('REMOTE_NVIDIA_SMI','/usr/bin/nvidia-smi') or '/usr/bin/nvidia-smi' }}">
+                                <input type="hidden" data-home-ssh="SSH_GPU_CONNECT_TIMEOUT" value="{{ home_ssh_config.get('SSH_GPU_CONNECT_TIMEOUT','5') or '5' }}">
+                                <input type="hidden" data-home-ssh="SSH_GPU_COMMAND_TIMEOUT" value="{{ home_ssh_config.get('SSH_GPU_COMMAND_TIMEOUT','8') or '8' }}">
+                                <input type="hidden" data-home-ssh="SSH_GPU_CACHE_SECONDS" value="{{ home_ssh_config.get('SSH_GPU_CACHE_SECONDS','2') or '2' }}">
+                            </section>
+                        </div>
+                        <div id="homeConfigStatus" class="status-line"></div>
+                    </div>
+                </div>
+
+
+    {% elif pers_subtab == 'disk' %}
+
+                <div class="card disk-top-card">
+                    <div class="card-body">
+                        <div class="disk-top-head">
+                            <div>
+                                <h2 class="disk-top-title">💿 Montages affichés sur l’accueil</h2>
+                                <p class="disk-top-subtitle">Coche les chemins à vérifier. Yoleo contrôle seulement que chaque chemin est un vrai point de montage : cette page ne monte rien et ne modifie pas fstab.</p>
+                            </div>
+                            <div class="disk-top-conf">Conf : <code>{{ disk_top_config.path }}</code></div>
+                        </div>
+
+                        <form method="post" action="/system/personnalisation/disque">
+                            <div class="yoleo-table-wrap disk-top-table-wrap">
+                                <table class="yoleo-table disk-top-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Afficher</th>
+                                            <th>Point de montage</th>
+                                            <th>État réel</th>
+                                            <th>Source</th>
+                                            <th>FS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in disk_top_candidates.rows %}
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" name="mount_path" value="{{ row.path }}" {% if row.selected %}checked{% endif %}>
+                                            </td>
+                                            <td><code>{{ row.path }}</code></td>
+                                            <td>
+                                                <span class="disk-top-badge disk-top-badge-{{ row.status }}">{{ row.status_label }}</span>
+                                            </td>
+                                            <td>{{ row.source }}</td>
+                                            <td>{{ row.fstype }}</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="5" class="muted">Aucun montage détecté. Ajoute un chemin manuel ci-dessous.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="disk-top-custom-row">
+                                <label class="field-box">
+                                    <div class="field-label">Ajouter un chemin manuel</div>
+                                    <input class="input" name="custom_mount" placeholder="/mnt/cache">
+                                </label>
+                                <button type="submit" class="yoleo-btn yoleo-btn-green">💾 Enregistrer</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+
+    {% elif pers_subtab == 'info' %}
+
+                <div class="card pers-info-card pers-info-details-card">
+                    <div class="card-body pers-info-body pers-info-details-body">
+                        <div class="pers-info-header">
+                            <div class="pers-info-icon">ℹ️</div>
+                            <div>
+                                <h2>Info</h2>
+                                <p>Notes déplacées depuis les pages Accueil, Menu et l’ancienne page SSH GPU.</p>
+                            </div>
+                        </div>
+                        <div class="pers-info-grid">
+                            <section class="pers-info-note-card">
+                                <h3>Menu démarré</h3>
+                                <p>Source : <code>../conf/menu/menu.conf</code> + dossiers de catégories.</p>
+                            </section>
+                            <section class="pers-info-note-card">
+                                <h3>GPU SSH</h3>
+                                <p><b>Usage</b> : lecture de <code>nvidia-smi</code> sur une machine distante ou une VM.</p>
+                                <p><b>Affichage</b> : le bloc n’apparaît sur l’accueil que si la carte <b>GPU SSH</b> est activée.</p>
+                                <p><b>Conf</b> : les valeurs sont sauvegardées dans <code>system.conf</code>.</p>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+    {% endif %}
+</div>
+
+
+<div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+        <h2 class="modal-title" id="confirmTitle">Confirmation</h2>
+        <div id="confirmBody" class="pers-subtitle"></div>
+        <div class="modal-actions">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" id="confirmCancel">Annuler</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red" id="confirmOk">Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentBrowseTarget = '';
+let confirmResolver = null;
+
+function setStatus(id, msg, ok=true) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg || '';
+    el.className = 'status-line ' + (ok ? 'ok' : 'bad');
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+}
+
+function showConfirm(title, body, okLabel='Valider') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('confirmTitle').textContent = title || 'Confirmation';
+        document.getElementById('confirmBody').textContent = body || '';
+        document.getElementById('confirmOk').textContent = okLabel || 'Valider';
+        confirmResolver = resolve;
+        modal.style.display = 'flex';
+    });
+}
+
+function settleConfirm(value) {
+    closeModal('confirmModal');
+    if (confirmResolver) confirmResolver(value === true);
+    confirmResolver = null;
+}
+
+document.getElementById('confirmCancel')?.addEventListener('click', () => settleConfirm(false));
+document.getElementById('confirmOk')?.addEventListener('click', () => settleConfirm(true));
+
+function toggleMenuFolder(safeId) {
+    const box = document.getElementById('folder_edit_' + safeId);
+    if (!box) return;
+    box.classList.toggle('is-open');
+}
+
+function openMenuEntryModal(parentId='', itemId='', title='Entrée') {
+    document.getElementById('modal_menu_parent_id').value = parentId || '';
+    document.getElementById('modal_menu_item_id').value = itemId || '';
+    document.getElementById('modal_menu_label').value = '';
+    document.getElementById('modal_menu_url').value = parentId ? '' : '#';
+    document.getElementById('modal_menu_icon').value = parentId ? '↳' : '🌐';
+    refreshIconPreview('modal_menu_icon', 'modal_menu_icon_preview');
+    document.getElementById('menuEntryModalTitle').textContent = parentId ? 'Ajouter une entrée' : 'Ajouter un groupe';
+    const modal = document.getElementById('menuEntryModal');
+    if (modal) modal.style.display = 'flex';
+    setTimeout(() => document.getElementById('modal_menu_label')?.focus(), 50);
+}
+
+async function submitMenuEntryModal() {
+    const fd = new FormData();
+    fd.append('action', 'menu_upsert');
+    fd.append('parent_id', document.getElementById('modal_menu_parent_id')?.value || '');
+    fd.append('item_id', document.getElementById('modal_menu_item_id')?.value || '');
+    fd.append('nom', document.getElementById('modal_menu_label')?.value || '');
+    fd.append('url', document.getElementById('modal_menu_url')?.value || '#');
+    fd.append('icone', document.getElementById('modal_menu_icon')?.value || '🌐');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur ajout.', false); return; }
+        closeModal('menuEntryModal');
+        setStatus('menuStatus', 'Menu sauvegardé. Rechargement…', true);
+        if (document.querySelector('.pers-menu-browser-page')) { personalSetStatus('Menu sauvegardé.', true); personalRender(); }
+        else location.reload();
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+async function saveConfig(key, inputId) {
+    const value = document.getElementById(inputId)?.value || '';
+    const fd = new FormData();
+    fd.append('action', 'update_config');
+    fd.append('cle', key);
+    fd.append('valeur', value);
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        setStatus('configStatus', res.ok ? 'Sauvegardé.' : txt, res.ok);
+    } catch (e) {
+        setStatus('configStatus', String(e), false);
+    }
+}
+
+async function saveMenuItem(parentId, itemId, safeId) {
+    const fd = new FormData();
+    fd.append('action', 'menu_upsert');
+    fd.append('parent_id', parentId || '');
+    fd.append('item_id', itemId || '');
+    fd.append('nom', document.getElementById(`m_${safeId}_label`)?.value || '');
+    fd.append('url', document.getElementById(`m_${safeId}_url`)?.value || '');
+    fd.append('icone', document.getElementById(`m_${safeId}_icon`)?.value || '');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur sauvegarde.', false); return; }
+        setStatus('menuStatus', 'Menu sauvegardé. Rechargement…', true);
+        if (document.querySelector('.pers-menu-browser-page')) { personalSetStatus('Menu sauvegardé.', true); personalRender(); }
+        else location.reload();
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+async function deleteMenuItem(parentId, itemId, label) {
+    const ok = await showConfirm('Supprimer cette entrée ?', `Entrée : ${label || itemId}. Cette action modifiera ../conf/menu.`, 'Supprimer');
+    if (!ok) return;
+    const fd = new FormData();
+    fd.append('action', 'menu_delete');
+    fd.append('parent_id', parentId || '');
+    fd.append('item_id', itemId || '');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur suppression.', false); return; }
+        setStatus('menuStatus', 'Entrée supprimée.', true);
+        if (document.querySelector('.pers-menu-browser-page')) {
+            const pid = String(parentId || '');
+            const iid = String(itemId || '');
+            if (pid) {
+                const parent = personalMenuItems.find(item => String(item.id || '') === pid);
+                if (parent) parent.children = (parent.children || []).filter(child => String(child.id || '') !== iid);
+            } else {
+                for (let i = personalMenuItems.length - 1; i >= 0; i--) {
+                    if (String(personalMenuItems[i]?.id || '') === iid) personalMenuItems.splice(i, 1);
+                }
+            }
+            personalSetStatus('Enregistré', true);
+            personalRender();
+        }
+        else location.reload();
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+async function moveMenuItem(parentId, itemId, direction, safeId) {
+    const fd = new FormData();
+    fd.append('action', 'menu_move');
+    fd.append('parent_id', parentId || '');
+    fd.append('item_id', itemId || '');
+    fd.append('direction', String(direction || 1));
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur déplacement.', false); return; }
+
+        if (parentId) {
+            const row = document.querySelector(`[data-menu-entry="${CSS.escape(safeId || '')}"]`);
+            const list = row?.parentElement;
+            if (row && list) {
+                if (Number(direction) < 0 && row.previousElementSibling) {
+                    list.insertBefore(row, row.previousElementSibling);
+                } else if (Number(direction) > 0 && row.nextElementSibling) {
+                    list.insertBefore(row.nextElementSibling, row);
+                }
+            }
+        } else {
+            const section = document.querySelector(`[data-menu-folder="${CSS.escape(safeId || '')}"]`);
+            const list = section?.parentElement;
+            if (section && list) {
+                if (Number(direction) < 0 && section.previousElementSibling) {
+                    list.insertBefore(section, section.previousElementSibling);
+                } else if (Number(direction) > 0 && section.nextElementSibling) {
+                    list.insertBefore(section.nextElementSibling, section);
+                }
+            }
+        }
+        setStatus('menuStatus', txt || 'Ordre mis à jour.', true);
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+function normalizeBrowserStartPath(value, fallbackPath) {
+    const fallback = fallbackPath || '/';
+    const raw = String(value || '').trim();
+    if (!raw) return fallback;
+
+    // Emoji / texte libre : on ouvre le browser au dossier utile au lieu de tenter un faux chemin.
+    if (!raw.startsWith('/')) {
+        if (raw.startsWith('static/')) return '/' + raw;
+        return fallback;
+    }
+    return raw;
+}
+
+function openYoleoSystemBrowser(mode, targetId, title, fallbackPath) {
+    currentBrowseTarget = targetId || '';
+    const browserMode = mode || 'file';
+    const input = document.getElementById(currentBrowseTarget);
+    const startPath = normalizeBrowserStartPath(input ? input.value : '', fallbackPath || '/');
+    const params = new URLSearchParams({target: currentBrowseTarget, path: startPath});
+    const url = '/browser/' + browserMode + '?' + params.toString();
+    const safeTarget = String(currentBrowseTarget || 'target').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    const popup = window.open(
+        url,
+        'yoleo_system_browser_' + browserMode + '_' + safeTarget,
+        'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+    );
+    if (popup) popup.focus();
+}
+
+function openStaticBrowser(targetId) {
+    openYoleoSystemBrowser('image', targetId, 'Parcourir une image', '/static');
+}
+
+window.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type !== 'yoleo-browser-select') return;
+    if (!['image', 'file', 'folder'].includes(data.mode)) return;
+    const targetId = data.target || currentBrowseTarget;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    input.value = data.path || '';
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    input.dispatchEvent(new Event('change', {bubbles: true}));
+    const preview = document.getElementById(targetId.replace(/_icon$/, '_preview'));
+    if (preview) refreshIconPreview(targetId, preview.id);
+});
+
+function openKeyBrowser(targetId) {
+    currentBrowseTarget = targetId || '';
+    const input = document.getElementById(currentBrowseTarget);
+    const startPath = normalizeBrowserStartPath(input ? input.value : '', '/');
+    const params = new URLSearchParams({target: currentBrowseTarget, path: startPath});
+    const url = '/browser/file?' + params.toString();
+
+    // Spécifique au champ clé SSH : ouverture en vraie fenêtre popup,
+    // sans passer par la boîte commune du layout.
+    const popup = window.open(
+        url,
+        'yoleo_ssh_key_browser',
+        'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+    );
+    if (popup) popup.focus();
+}
+
+function refreshIconPreview(inputId, previewId) {
+    const value = document.getElementById(inputId)?.value || '';
+    const box = document.getElementById(previewId);
+    if (!box) return;
+    if (value.startsWith('/static') || value.startsWith('static/')) {
+        const src = value.startsWith('/') ? value : '/' + value;
+        box.innerHTML = `<img src="${escapeHtml(src)}" alt="">`;
+    } else {
+        box.textContent = value || '📁';
+    }
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeJs(value) {
+    return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
+}
+
+
+async function saveHomeConfig() {
+    const fd = new FormData();
+    fd.append('action', 'update_home_config');
+    for (const input of document.querySelectorAll('.home-check')) {
+        fd.append(input.name, input.checked ? '1' : '0');
+    }
+    for (const input of document.querySelectorAll('[data-home-ssh]')) {
+        fd.append(input.dataset.homeSsh, input.value || '');
+    }
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        setStatus('homeConfigStatus', res.ok ? 'index.conf sauvegardé. Réglages GPU SSH synchronisés dans system.conf.' : txt, res.ok);
+        toggleNvidiaSshSettings();
+    } catch (e) {
+        setStatus('homeConfigStatus', String(e), false);
+    }
+}
+
+function toggleNvidiaSshSettings() {
+    const checkbox = document.querySelector('.home-check[name="SHOW_NVIDIA_SSH"]');
+    const enabled = !!(checkbox && checkbox.checked);
+    const card = document.getElementById('sshSettingsCard');
+    const note = document.getElementById('sshDisabledNote');
+    if (card) card.classList.toggle('pers-home-ssh-enabled', enabled);
+    if (note) note.style.display = enabled ? 'block' : 'none';
+}
+
+(function initPersonalizationPage() {
+    toggleNvidiaSshSettings();
+})();
+
+document.addEventListener('click', function(e) {
+    for (const modal of document.querySelectorAll('.modal-overlay')) {
+        if (e.target === modal) {
+            if (modal.id === 'confirmModal') settleConfirm(false);
+            else modal.style.display = 'none';
+        }
+    }
+});
+</script>
+{% endblock %}

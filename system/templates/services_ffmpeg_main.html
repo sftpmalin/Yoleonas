@@ -1,0 +1,245 @@
+{% extends "services_ffmpeg_base.html" %}
+
+{% block ffmpeg_content %}
+{% macro ffoi_badge(text, state='neutral') -%}
+  <span class="ffoi-badge ffoi-badge-{{ state }}">{{ text }}</span>
+{%- endmacro %}
+
+<section class="card ffoi-card">
+  <div class="topbar ffoi-topbar ffoi-settings-fallback-head">
+    <div class="title-block">
+      <h1>⚙️ Réglage FFmpeg over IP</h1>
+      <div class="hint">Windows envoie le job, le NAS lance le vrai FFmpeg système sur ses chemins locaux ; règle ici seulement l’adresse, le port, le client et le mot de passe.</div>
+    </div>
+
+    <div class="toolbar ffoi-toolbar ffoi-main-toolbar">
+      <div class="ffoi-main-primary-actions">
+        <button class="yoleo-btn yoleo-btn-green ffoi-main-long-btn" type="submit" form="ffoiMainSettingsForm" name="apply" value="1" title="Enregistrer les réglages, régénérer la configuration, appliquer le pare-feu, installer/mettre à jour le service, activer au boot et redémarrer" {% if not status.arch_ok %}disabled{% endif %}>💾 Appliquer + redémarrer</button>
+        <a class="yoleo-btn yoleo-btn-green ffoi-main-long-btn" href="{{ url_for('services_bp.ffoi_download_client') }}" title="Télécharger le client Windows + sa configuration" {% if not status.arch_ok %}aria-disabled="true"{% endif %}>💻 Télécharger client Windows</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary-grid ffoi-summary-grid ffoi-compact-status">
+    <div class="summary-card">
+      <div class="summary-label">Architecture</div>
+      <div class="summary-value">{{ ffoi_badge(status.arch, 'ok' if status.arch_ok else 'bad') }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">FFmpeg</div>
+      <div class="summary-value">{{ ffoi_badge('installé' if status.ffmpeg_exists else 'absent', 'ok' if status.ffmpeg_exists else 'bad') }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Serveur</div>
+      <div class="summary-value">{{ ffoi_badge('présent' if status.server_bin_exists else 'absent', 'ok' if status.server_bin_exists else 'bad') }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Client Windows</div>
+      <div class="summary-value">{{ ffoi_badge('présent' if status.client_bin_exists else 'absent', 'ok' if status.client_bin_exists else 'bad') }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Service</div>
+      <div class="summary-value">{{ ffoi_badge(status.active, 'ok' if status.active in ['active', 'running', 'oui', 'ok'] else 'bad') }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Boot</div>
+      <div class="summary-value">{{ ffoi_badge(status.enabled, 'ok' if status.enabled in ['enabled', 'active', 'oui', 'ok'] else 'bad') }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Port</div>
+      <div class="summary-value">{{ ffoi_badge(status.port, 'ok' if status.listening else 'bad') }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Pare-feu</div>
+      <div class="summary-value">{{ ffoi_badge('OK' if status.firewall.configured else 'à appliquer', 'ok' if status.firewall.configured else 'bad') }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Rewrite</div>
+      <div class="summary-value">{{ ffoi_badge(status.rewrites_count, 'neutral') }}</div>
+    </div>
+    <div class="summary-card ffoi-destination-card" title="Dossier de travail du service : les sorties FFmpeg relatives sont créées ici côté serveur.">
+      <div class="summary-label">Destination serveur</div>
+      <div class="summary-value ffoi-destination-value">{{ service_workdir }}</div>
+    </div>
+  </div>
+
+  <form method="post" action="{{ url_for('services_bp.ffoi_settings_save') }}" class="ffoi-form ffoi-main-settings-form" id="ffoiMainSettingsForm">
+    <div class="ffoi-inline-settings-row">
+      <div class="ffoi-inline-edit ffoi-field-address" data-ffoi-field data-min-ch="9" data-max-ch="42">
+        <label for="ffoiAddress">Adresse écoute</label>
+        <button type="button" class="ffoi-inline-value" data-target="ffoiAddress" onclick="ffoiOpenInlineField(this)"><span>{{ conf.ADDRESS or '0.0.0.0' }}</span></button>
+        <input id="ffoiAddress" name="ADDRESS" value="{{ conf.ADDRESS }}" placeholder="0.0.0.0" autocomplete="off" hidden>
+      </div>
+
+      <div class="ffoi-inline-edit ffoi-field-port" data-ffoi-field data-min-ch="6" data-max-ch="7">
+        <label for="ffoiPort">Port</label>
+        <button type="button" class="ffoi-inline-value" data-target="ffoiPort" onclick="ffoiOpenInlineField(this)"><span>{{ conf.PORT or '3333' }}</span></button>
+        <input id="ffoiPort" name="PORT" value="{{ conf.PORT }}" placeholder="3333" inputmode="numeric" autocomplete="off" hidden>
+      </div>
+
+      <div class="ffoi-inline-edit ffoi-field-client" data-ffoi-field data-min-ch="16" data-max-ch="34">
+        <label for="ffoiClientHost">IP / nom client</label>
+        <button type="button" class="ffoi-inline-value" data-target="ffoiClientHost" onclick="ffoiOpenInlineField(this)"><span>{{ conf.CLIENT_HOST or ('auto : ' ~ status.client_address.split(':')[0]) }}</span></button>
+        <input id="ffoiClientHost" name="CLIENT_HOST" value="{{ conf.CLIENT_HOST }}" placeholder="auto : {{ status.client_address.split(':')[0] }}" autocomplete="off" hidden>
+      </div>
+
+      <div class="ffoi-inline-edit ffoi-field-secret ffoi-secret-inline" data-ffoi-field data-min-ch="18" data-max-ch="36">
+        <label for="ffoiAuthSecret">Mot de passe / authSecret</label>
+        <div class="ffoi-secret-inline-row">
+          <button type="button" class="ffoi-inline-value" data-target="ffoiAuthSecret" onclick="ffoiOpenInlineField(this)"><span data-secret-display>{% if conf.AUTH_SECRET %}••••••••••••{% else %}mot de passe vide{% endif %}</span></button>
+          <input id="ffoiAuthSecret" name="AUTH_SECRET" value="{{ conf.AUTH_SECRET }}" type="password" autocomplete="new-password" hidden>
+          <button type="button" class="ffoi-inline-btn" onclick="ffoiToggleSecret()" title="Afficher / masquer">👁️</button>
+          <button type="button" class="ffoi-inline-btn" onclick="ffoiGenerateSecret()" title="Générer un secret">🎲</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ffoi-output-row">
+      <label for="ffoiOutputDir">Destination serveur</label>
+      <div class="ffoi-output-input-row">
+        <input id="ffoiOutputDir" name="OUTPUT_DIR" value="{{ conf.OUTPUT_DIR or service_workdir }}" placeholder="/mnt/media/exports" autocomplete="off">
+        <button type="button" class="yoleo-btn yoleo-btn-muted ffoi-folder-btn" onclick="ffoiOpenFolderBrowser('ffoiOutputDir')" title="Parcourir" aria-label="Parcourir">📁</button>
+      </div>
+    </div>
+  </form>
+</section>
+
+<script>
+function ffoiFieldContainer(el){
+  return el ? el.closest('[data-ffoi-field]') : null;
+}
+function ffoiDisplayButtonFor(input){
+  const box = ffoiFieldContainer(input);
+  return box ? box.querySelector('.ffoi-inline-value') : null;
+}
+function ffoiDisplayedText(input){
+  if(!input) return '';
+  if(input.type === 'password'){
+    return input.value ? '••••••••••••' : 'mot de passe vide';
+  }
+  return input.value || input.getAttribute('placeholder') || '';
+}
+function ffoiSyncInlineDisplay(input){
+  const btn = ffoiDisplayButtonFor(input);
+  if(!btn) return;
+  const span = btn.querySelector('span') || btn;
+  span.textContent = ffoiDisplayedText(input);
+  ffoiAutosizeInline(input);
+}
+function ffoiAutosizeInline(input){
+  const box = ffoiFieldContainer(input);
+  if(!box) return;
+  const minCh = parseInt(box.dataset.minCh || '8', 10);
+  const maxCh = parseInt(box.dataset.maxCh || '32', 10);
+  const label = box.querySelector('label');
+  const display = ffoiDisplayedText(input);
+  const raw = input.value || input.getAttribute('placeholder') || display || '';
+  const labelLen = label ? label.textContent.length : 0;
+  const valueLen = input.type === 'password' ? 18 : raw.length + 2;
+  const ch = Math.max(minCh, Math.min(maxCh, Math.max(valueLen, Math.min(labelLen + 1, maxCh))));
+  box.style.setProperty('--ffoi-inline-width', ch + 'ch');
+  input.style.width = '100%';
+}
+function ffoiOpenInlineField(button){
+  const input = document.getElementById(button.dataset.target);
+  const box = ffoiFieldContainer(button);
+  if(!input || !box) return false;
+  document.querySelectorAll('[data-ffoi-field].is-editing input').forEach(function(other){
+    if(other !== input){ ffoiCloseInlineField(other, false); }
+  });
+  input.dataset.originalValue = input.value || '';
+  box.classList.add('is-editing');
+  button.hidden = true;
+  input.hidden = false;
+  ffoiAutosizeInline(input);
+  window.setTimeout(function(){ input.focus(); input.select && input.select(); }, 0);
+  return false;
+}
+function ffoiCloseInlineField(input, restore){
+  const box = ffoiFieldContainer(input);
+  const btn = ffoiDisplayButtonFor(input);
+  if(!input || !box || !btn) return;
+  if(restore){ input.value = input.dataset.originalValue || ''; }
+  ffoiSyncInlineDisplay(input);
+  input.hidden = true;
+  btn.hidden = false;
+  box.classList.remove('is-editing');
+}
+function ffoiSubmitInlineField(input){
+  if(!input || !input.form) return;
+  ffoiSyncInlineDisplay(input);
+  const applyInput = input.form.querySelector('input[name="apply"]');
+  if(applyInput){ applyInput.remove(); }
+  if(input.form.requestSubmit){ input.form.requestSubmit(); }
+  else { input.form.submit(); }
+}
+function ffoiGenerateSecret(){
+  const input = document.getElementById('ffoiAuthSecret');
+  if(!input) return;
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  input.value = Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+  const btn = ffoiDisplayButtonFor(input);
+  if(btn && input.hidden){ ffoiOpenInlineField(btn); }
+  ffoiSyncInlineDisplay(input);
+}
+function ffoiToggleSecret(){
+  const input = document.getElementById('ffoiAuthSecret');
+  if(!input) return;
+  const btn = ffoiDisplayButtonFor(input);
+  if(btn && input.hidden){ ffoiOpenInlineField(btn); }
+  input.type = input.type === 'password' ? 'text' : 'password';
+  ffoiAutosizeInline(input);
+}
+function ffoiSyncOutputDir(){
+  const input = document.getElementById('ffoiOutputDir');
+  const value = input && input.value ? input.value : '';
+  const fallbackOutputDir = {{ service_workdir|tojson }};
+  document.querySelectorAll('.ffoi-destination-value').forEach(function(box){
+    box.textContent = value || fallbackOutputDir;
+  });
+}
+function ffoiOpenFolderBrowser(targetInputId){
+  const input = document.getElementById(targetInputId);
+  const fallbackOutputDir = {{ service_workdir|tojson }};
+  const start = input && input.value ? input.value : fallbackOutputDir;
+  const params = new URLSearchParams({target: targetInputId, path: start || '/'});
+  const popup = window.open(
+    '/browser/folder?' + params.toString(),
+    'yoleo_ffoi_browser_folder_' + String(targetInputId || 'output').replace(/[^a-zA-Z0-9_-]/g, '_'),
+    'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+  );
+  if(popup && popup.focus) popup.focus();
+}
+window.addEventListener('message', function(event){
+  const data = event.data || {};
+  if(data.type !== 'yoleo-browser-select' || data.mode !== 'folder' || !data.target) return;
+  const input = document.getElementById(data.target);
+  if(!input) return;
+  input.value = data.path || '';
+  input.dispatchEvent(new Event('input', {bubbles:true}));
+  input.dispatchEvent(new Event('change', {bubbles:true}));
+});
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('[data-ffoi-field] input').forEach(function(input){
+    ffoiSyncInlineDisplay(input);
+    input.addEventListener('input', function(){ ffoiAutosizeInline(input); });
+    input.addEventListener('keydown', function(ev){
+      if(ev.key === 'Enter'){
+        ev.preventDefault();
+        ffoiSubmitInlineField(input);
+      } else if(ev.key === 'Escape'){
+        ev.preventDefault();
+        ffoiCloseInlineField(input, true);
+      }
+    });
+  });
+  const outputDir = document.getElementById('ffoiOutputDir');
+  if(outputDir){
+    outputDir.addEventListener('input', ffoiSyncOutputDir);
+    outputDir.addEventListener('change', ffoiSyncOutputDir);
+    ffoiSyncOutputDir();
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "build_base.html" %}
+
+{% block route_content %}
+<div id="tab-registry-system" class="tab-panel active">
+                    <section class="card">
+                        <div class="summary-grid">
+                            <div class="summary-card">
+                                <div class="summary-label">Processus</div>
+                                <div class="summary-value"><span id="rsvc-running" class="badge {{ 'badge-ok' if registry_service.running else 'badge-no' }}">{{ 'Actif' if registry_service.running else 'Arrêté' }}</span></div>
+                                <div class="name-sub">PID : <span id="rsvc-pid">{{ registry_service.pid or '—' }}</span></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Systemd</div>
+                                <div class="summary-value"><span id="rsvc-systemd" class="badge {{ 'badge-ok' if registry_service.service_active == 'active' else 'badge-muted' }}">{{ registry_service.service_active }}</span></div>
+                                <div class="name-sub">Installé : <span id="rsvc-installed">{{ 'oui' if registry_service.service_installed else 'non' }}</span></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Boot</div>
+                                <div class="summary-value"><span id="rsvc-enabled" class="badge {{ 'badge-ok' if registry_service.service_enabled == 'enabled' else 'badge-muted' }}">{{ registry_service.service_enabled }}</span></div>
+                                <div class="name-sub">Service : {{ registry_service.paths.service_name }}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Port</div>
+                                <div class="summary-value"><span id="rsvc-port">{{ registry_service.port or '—' }}</span></div>
+                                <div class="name-sub">Bind : <span id="rsvc-bind">{{ registry_service.bind_addr or '—' }}</span></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Stockage</div>
+                                <div class="summary-value"><span id="rsvc-storage" class="badge {{ 'badge-ok' if registry_service.storage_ready else 'badge-no' }}">{{ 'Prêt' if registry_service.storage_ready else 'Non prêt' }}</span></div>
+                                <div class="name-sub">Data : <span id="rsvc-data">{{ registry_service.data_dir or '—' }}</span></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Config</div>
+                                <div class="summary-value"><span id="rsvc-conf" class="badge {{ 'badge-ok' if not registry_service.conf_error else 'badge-no' }}">{{ 'OK' if not registry_service.conf_error else 'Erreur' }}</span></div>
+                                <div class="name-sub" id="rsvc-conf-error">{{ registry_service.conf_error or '../conf/registry.conf' }}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Binaire</div>
+                                <div class="summary-value"><span id="rsvc-bin" class="badge {{ 'badge-ok' if registry_service.source_bin_ok else 'badge-no' }}">{{ 'Source OK' if registry_service.source_bin_ok else 'Source absente' }}</span></div>
+                                <div class="name-sub">Runtime : <span id="rsvc-runtime">{{ 'oui' if registry_service.runtime_bin_ok else 'non' }}</span></div>
+                            </div>
+                        </div>
+
+                        <div class="system-grid">
+                            <div class="system-action-card">
+                                <div class="system-action-title">Service systemd</div>
+                                <div class="system-action-subtitle">Installe un service autonome qui ne dépend pas du nom du script SH. Il utilise le binaire registry et le YAML généré.</div>
+                                <div class="system-actions-row">
+                                    <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="runRegistryService('registry_service_install', this)">🛠 Installer le service</button>
+                                    <button type="button" class="yoleo-btn yoleo-btn-red" onclick="runRegistryService('registry_service_remove', this)">🗑 Supprimer service</button>
+                                </div>
+                            </div>
+                            <div class="system-action-card">
+                                <div class="system-action-title">Processus registry</div>
+                                <div class="system-action-subtitle">Démarre, arrête ou redémarre le registre. Si le service est installé, Flask passe par systemd ; sinon il lance le binaire directement.</div>
+                                <div class="system-actions-row">
+                                    <button type="button" class="yoleo-btn yoleo-btn-green" onclick="runRegistryService('registry_service_start', this)">▶ Démarrer</button>
+                                    <button type="button" class="yoleo-btn yoleo-btn-orange" onclick="runRegistryService('registry_service_restart', this)">🔁 Redémarrer</button>
+                                    <button type="button" class="yoleo-btn yoleo-btn-red" onclick="runRegistryService('registry_service_stop', this)">⏹ Arrêter</button>
+                                    <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="runRegistryService('registry_service_generate_yaml', this)">🧩 Régénérer la configuration (YAML)</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-top:14px;">
+                            <div class="topbar">
+                                <div class="title-block">
+                                    <h2>Détails</h2>
+                                    <div class="subtitle">Même logique que le script host : PID dans <b>/var/run/registry_labo_host.pid</b>, process <b>/tmp/registry-host-labo serve registry.yml</b>, conf humaine obligatoire.</div>
+                                </div>
+                            </div>
+                            <pre class="code-line" id="rsvc-detail">{{ registry_service.detail }}</pre>
+                            {% if registry_service.port_listen %}
+                            <div class="hint" style="margin-top:10px;">Port vu par ss :</div>
+                            <pre class="code-line" id="rsvc-port-listen">{{ registry_service.port_listen }}</pre>
+                            {% else %}
+                            <pre class="code-line" id="rsvc-port-listen">Port non vu par ss.</pre>
+                            {% endif %}
+                        </div>
+                    </section>
+                </div>
+{% endblock %}

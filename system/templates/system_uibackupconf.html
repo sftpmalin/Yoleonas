@@ -1,0 +1,273 @@
+{% extends "menu.html" %}
+
+{% block title %}Backups conf - Yoleo{% endblock %}
+{% block page_title %}Backups conf{% endblock %}
+{% block page_subtitle %}Archives de restauration de {{ source_dir }} vers {{ backups_dir }}.{% endblock %}
+
+{% block content %}
+<div class="backup-page uibackup-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+    <div class="wrapper">
+        <div class="max-w">
+            <div class="tabs-shell">
+                <section class="tab-panel active">
+                    <div class="stat-grid">
+                        <div class="mini-stat"><div class="label">Backups conf</div><div class="value" id="uibackupconfStatCount">{{ stats.count }}</div></div>
+                        <div class="mini-stat"><div class="label">SHA valides</div><div class="value" id="uibackupconfStatVerified">{{ stats.verified }}</div></div>
+                        <div class="mini-stat"><div class="label">Taille totale</div><div class="value" id="uibackupconfStatSize">{{ stats.total_size_label }}</div></div>
+                        <div class="mini-stat"><div class="label">Fichiers conf</div><div class="value" id="uibackupconfStatFiles">{{ stats.conf_files }}</div></div>
+                    </div>
+
+                    <div class="card card-accent uibackup-job-card" id="uibackupconfJobPanel" hidden>
+                        <div class="section-title">
+                            <span>Operation</span>
+                            <span class="title-meta" id="uibackupconfJobPhase">En attente</span>
+                        </div>
+                        <div class="progress-widget uibackup-main-progress">
+                            <div class="progress-head">
+                                <strong id="uibackupconfJobPercent">0%</strong>
+                                <span id="uibackupconfJobMessage">Preparation</span>
+                            </div>
+                            <div class="progress-track"><div class="progress-fill" id="uibackupconfJobFill" style="width:0%;"></div></div>
+                            <div class="progress-small" id="uibackupconfJobDetail"></div>
+                        </div>
+                    </div>
+
+                    <div class="card card-accent">
+                        <div class="section-title backup-table-toolbar">
+                            <div class="backup-table-filter-title">
+                                <span>Tableau des backups conf</span>
+                                <span class="title-meta">{{ backups_dir }}</span>
+                            </div>
+                            <div class="backup-table-filters" role="group" aria-label="Actions backups conf">
+                                <button type="button" class="btn btn-glow" id="uibackupconfCreateBtn" onclick="uibackupconfCreateBackup()">Creer une backup</button>
+                            </div>
+                        </div>
+
+                        <div class="uibackup-ref-line">
+                            <span class="badge {{ 'badge-green' if reference.manifest_exists else 'badge-red' }}">catalogue conf</span>
+                            <span class="badge {{ 'badge-green' if reference.archive_exists else 'badge-red' }}">archive init/conf</span>
+                            <span class="badge {{ 'badge-green' if reference.archive_sha_ok else 'badge-yellow' }}">sha archive</span>
+                            <span class="badge badge-blue">{{ reference.archive_size_label }}</span>
+                            <span class="badge {{ 'badge-green' if source.source_exists else 'badge-red' }}">source /conf</span>
+                            <span class="badge badge-blue">{{ source.files }} fichiers</span>
+                            <span class="badge badge-green">chemins relatifs</span>
+                        </div>
+
+                        {% if not backups %}
+                            <div class="empty-state" data-yoleo-context-zone="uibackupconf-table">Aucune archive conf pour le moment.</div>
+                        {% else %}
+                            <div class="desktop-table-wrap backup-wrap-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" data-yoleo-context-zone="uibackupconf-table">
+                                <table class="backup-normal-mobile-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                    <thead>
+                                        <tr>
+                                            <th>Archive</th>
+                                            <th>Date</th>
+                                            <th>Taille</th>
+                                            <th>SHA-256</th>
+                                            <th>Etat</th>
+                                            <th style="text-align:right;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="uibackupconfRows">
+                                    {% for backup in backups %}
+                                        <tr data-uibackup-name="{{ backup.name }}" data-uibackupconf-name="{{ backup.name }}" onclick="uibackupconfSelectBackup('{{ backup.name|e }}')">
+                                            <td><div class="script-title">{{ backup.name }}</div><div class="tiny">{{ backups_dir }}</div></td>
+                                            <td><div class="code-text">{{ backup.created_at }}</div></td>
+                                            <td><span class="badge badge-blue">{{ backup.size_label }}</span></td>
+                                            <td><div class="code-text">{{ backup.sha_short or '-' }}</div></td>
+                                            <td>
+                                                {% if backup.sha_ok %}
+                                                    <span class="badge badge-green">OK</span>
+                                                {% elif backup.sha_file %}
+                                                    <span class="badge badge-red">SHA invalide</span>
+                                                {% else %}
+                                                    <span class="badge badge-yellow">SHA absent</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="action-row">
+                                                    <button type="button" class="btn btn-glow icon-btn" title="Restaurer" onclick="event.stopPropagation(); uibackupconfRestoreBackup('{{ backup.name|e }}')">↩</button>
+                                                    <button type="button" class="btn btn-danger icon-btn" title="Supprimer" onclick="event.stopPropagation(); uibackupconfDeleteBackup('{{ backup.name|e }}')">×</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mobile-cards">
+                                {% for backup in backups %}
+                                <div class="mobile-card" data-uibackup-name="{{ backup.name }}" data-uibackupconf-name="{{ backup.name }}" data-yoleo-context-zone="uibackupconf-table" onclick="uibackupconfSelectBackup('{{ backup.name|e }}')">
+                                    <div><div class="script-title">{{ backup.name }}</div><div class="tiny">{{ backup.created_at }}</div></div>
+                                    <div><span class="badge badge-blue">{{ backup.size_label }}</span>
+                                        {% if backup.sha_ok %}<span class="badge badge-green">OK</span>{% elif backup.sha_file %}<span class="badge badge-red">SHA invalide</span>{% else %}<span class="badge badge-yellow">SHA absent</span>{% endif %}
+                                    </div>
+                                    <div class="code-text">{{ backup.sha_short or '-' }}</div>
+                                    <div class="action-row" style="justify-content:flex-start;">
+                                        <button type="button" class="btn btn-glow icon-btn" onclick="event.stopPropagation(); uibackupconfRestoreBackup('{{ backup.name|e }}')">↩</button>
+                                        <button type="button" class="btn btn-danger icon-btn" onclick="event.stopPropagation(); uibackupconfDeleteBackup('{{ backup.name|e }}')">×</button>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.uibackupconfLatestJob = {{ latest_job|default({})|tojson }};
+window.uibackupconfSelectedBackup = '';
+
+function uibackupconfSetBusy(busy) {
+    document.querySelectorAll('#uibackupconfCreateBtn, .uibackup-page button').forEach(function(button) {
+        button.disabled = !!busy;
+    });
+}
+
+function uibackupconfShowJob(job) {
+    const panel = document.getElementById('uibackupconfJobPanel');
+    const fill = document.getElementById('uibackupconfJobFill');
+    const percent = Math.max(0, Math.min(100, parseInt(job.percent || 0, 10) || 0));
+    if (panel) panel.hidden = false;
+    if (fill) {
+        fill.style.width = percent + '%';
+        fill.classList.toggle('progress-fill-done', !job.running && job.ok);
+        fill.classList.toggle('progress-fill-indeterminate', job.running && percent < 3);
+    }
+    const percentEl = document.getElementById('uibackupconfJobPercent');
+    const messageEl = document.getElementById('uibackupconfJobMessage');
+    const phaseEl = document.getElementById('uibackupconfJobPhase');
+    const detailEl = document.getElementById('uibackupconfJobDetail');
+    if (percentEl) percentEl.textContent = percent + '%';
+    if (messageEl) messageEl.textContent = job.message || '';
+    if (phaseEl) phaseEl.textContent = job.phase || '';
+    if (detailEl) detailEl.textContent = (job.started_at || '') + (job.ended_at ? ' - ' + job.ended_at : '');
+}
+
+function uibackupconfSelectBackup(name) {
+    window.uibackupconfSelectedBackup = String(name || '');
+    document.querySelectorAll('[data-uibackupconf-name]').forEach(function(row) {
+        row.classList.toggle('is-selected', row.getAttribute('data-uibackupconf-name') === window.uibackupconfSelectedBackup);
+    });
+}
+
+function uibackupconfContextBackup() {
+    return window.uibackupconfSelectedBackup || '';
+}
+
+async function uibackupconfPollJob(jobId, action) {
+    if (!jobId) return;
+    try {
+        const response = await fetch('/system/api/uibackupconf/job/' + encodeURIComponent(jobId), {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+        const payload = await response.json();
+        if (!response.ok || payload.ok === false) throw new Error(payload.message || 'Job introuvable');
+        const job = payload.job || {};
+        uibackupconfShowJob(job);
+        uibackupconfSetBusy(!!job.running);
+        if (job.running) {
+            window.setTimeout(function() { uibackupconfPollJob(jobId, action); }, 800);
+            return;
+        }
+        if (job.restart_requested) {
+            if (window.yoleoStartFlaskRestartProgress) window.yoleoStartFlaskRestartProgress('restart-flask');
+            return;
+        }
+        window.setTimeout(function() { window.location.reload(); }, job.ok ? 900 : 1800);
+    } catch (error) {
+        if (action === 'restore' && window.yoleoStartFlaskRestartProgress) {
+            window.yoleoStartFlaskRestartProgress('restart-flask');
+            return;
+        }
+        uibackupconfSetBusy(false);
+        const panel = document.getElementById('uibackupconfJobPanel');
+        if (panel) panel.hidden = false;
+        const messageEl = document.getElementById('uibackupconfJobMessage');
+        if (messageEl) messageEl.textContent = error.message || 'Erreur';
+    }
+}
+
+async function uibackupconfStartAction(action, backup) {
+    uibackupconfSetBusy(true);
+    try {
+        const response = await fetch('/system/api/uibackupconf/action', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+            body: JSON.stringify({action: action, backup: backup || ''})
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.ok === false) throw new Error(payload.message || 'Action impossible');
+        const job = payload.job || {};
+        uibackupconfShowJob(job);
+        uibackupconfPollJob(job.id, action);
+    } catch (error) {
+        uibackupconfSetBusy(false);
+        const panel = document.getElementById('uibackupconfJobPanel');
+        if (panel) panel.hidden = false;
+        const messageEl = document.getElementById('uibackupconfJobMessage');
+        if (messageEl) messageEl.textContent = error.message || 'Erreur';
+    }
+}
+
+function uibackupconfCreateBackup() {
+    uibackupconfStartAction('create', '');
+}
+
+function uibackupconfRestoreBackup(name) {
+    const backup = String(name || '').trim();
+    if (!backup) return;
+    uibackupconfSelectBackup(backup);
+    if (!window.confirm('Restaurer ' + backup + ' dans {{ source_dir }} et redemarrer Flask ?')) return;
+    uibackupconfStartAction('restore', backup);
+}
+
+function uibackupconfDeleteBackup(name) {
+    const backup = String(name || '').trim();
+    if (!backup) return;
+    uibackupconfSelectBackup(backup);
+    if (!window.confirm('Supprimer ' + backup + ' ?')) return;
+    uibackupconfStartAction('delete', backup);
+}
+
+function uibackupconfRestoreSelectedBackup() {
+    const backup = uibackupconfContextBackup();
+    if (!backup) {
+        window.alert('Selectionne une archive dans le tableau.');
+        return;
+    }
+    uibackupconfRestoreBackup(backup);
+}
+
+function uibackupconfDeleteSelectedBackup() {
+    const backup = uibackupconfContextBackup();
+    if (!backup) {
+        window.alert('Selectionne une archive dans le tableau.');
+        return;
+    }
+    uibackupconfDeleteBackup(backup);
+}
+
+window.uibackupconfCreateBackup = uibackupconfCreateBackup;
+window.uibackupconfRestoreSelectedBackup = uibackupconfRestoreSelectedBackup;
+window.uibackupconfDeleteSelectedBackup = uibackupconfDeleteSelectedBackup;
+
+document.addEventListener('contextmenu', function(event) {
+    const row = event.target && event.target.closest ? event.target.closest('[data-uibackupconf-name]') : null;
+    if (row) uibackupconfSelectBackup(row.getAttribute('data-uibackupconf-name') || '');
+}, true);
+
+document.addEventListener('DOMContentLoaded', function() {
+    const latest = window.uibackupconfLatestJob || {};
+    if (latest.id && latest.running) {
+        uibackupconfShowJob(latest);
+        uibackupconfSetBusy(true);
+        uibackupconfPollJob(latest.id, latest.action || '');
+    }
+});
+</script>
+{% endblock %}

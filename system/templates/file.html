@@ -1,0 +1,1233 @@
+{% extends "menu.html" %}
+
+{% block title %}Gestionnaire de fichiers - Yoleo{% endblock %}
+{% block page_title %}Gestionnaire de fichiers{% endblock %}
+{% block page_subtitle %}<span class="topbar-shortcuts fm-topbar-shortcuts"><kbd>F1</kbd> Aide <kbd>F2</kbd> Renommer <kbd>F3</kbd> Ouvrir <kbd>F4</kbd> Éditer <kbd>F5</kbd> Copier <kbd>F6</kbd> Déplacer <kbd>F7</kbd> Nouveau <kbd>F8</kbd> Effacer <kbd>Tab</kbd> Changer panneau</span>{% endblock %}
+
+{% block content %}
+<section class="fm-page">
+    <div class="mobile-tabs" role="tablist" aria-label="Panneaux du gestionnaire de fichiers">
+        <button type="button" id="tab-left" class="mob-tab active" onclick="switchMobile('left')">PANNEAU 1</button>
+        <button type="button" id="tab-right" class="mob-tab" onclick="switchMobile('right')">PANNEAU 2</button>
+    </div>
+
+    <div class="fm-container" id="fm-container" data-left-pane="{{ split_left_percent|default('50') }}" onclick="hideCtx()">
+        <section class="fm-panel mobile-show" id="panel-left"
+             onclick="clickEmpty(event, 'left')"
+             ondragover="allowDrop(event, 'left')" ondragleave="leaveDrop('left')" ondrop="drop(event, 'left')" oncontextmenu="handleBgCtx(event, 'left')">
+            <div class="fm-panel-title">
+                <span>Panneau gauche</span>
+                <small id="count-left">—</small>
+            </div>
+            <div class="fm-addr">
+                <button type="button" class="btn-fm" onclick="loadDir('left', '/')">root</button>
+                <input type="text" id="path-left" spellcheck="false" autocomplete="off" title="Dossier ou commande de script, ex: /dockers/scripts/test.sh -1" placeholder="/chemin/dossier ou /script.sh -param" onfocus="setActive('left')" onkeydown="handlePathInputKey(event, 'left')">
+                <button type="button" class="btn-fm" onclick="refresh('left')">↻</button>
+            </div>
+            <div class="fm-list">
+                <table class="fm-table">
+                    <thead><tr><th>Nom</th><th>Taille</th><th>Perms</th><th>User</th></tr></thead>
+                    <tbody id="list-left"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="fm-resizer" id="fm-resizer" title="Glisser pour régler la largeur des deux panneaux" aria-hidden="true"></div>
+
+        <section class="fm-panel" id="panel-right"
+             onclick="clickEmpty(event, 'right')"
+             ondragover="allowDrop(event, 'right')" ondragleave="leaveDrop('right')" ondrop="drop(event, 'right')" oncontextmenu="handleBgCtx(event, 'right')">
+            <div class="fm-panel-title">
+                <span>Panneau droit</span>
+                <small id="count-right">—</small>
+            </div>
+            <div class="fm-addr">
+                <button type="button" class="btn-fm" onclick="loadDir('right', '/')">root</button>
+                <input type="text" id="path-right" spellcheck="false" autocomplete="off" title="Dossier ou commande de script, ex: /dockers/scripts/test.sh -1" placeholder="/chemin/dossier ou /script.sh -param" onfocus="setActive('right')" onkeydown="handlePathInputKey(event, 'right')">
+                <button type="button" class="btn-fm" onclick="refresh('right')">↻</button>
+            </div>
+            <div class="fm-list">
+                <table class="fm-table">
+                    <thead><tr><th>Nom</th><th>Taille</th><th>Perms</th><th>User</th></tr></thead>
+                    <tbody id="list-right"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+</section>
+
+<div id="ctx-menu" aria-label="Menu contextuel">
+    <button type="button" class="ctx-item" id="ctx-open" onclick="ctxAction('open')"><span>📂</span> Ouvrir / Éditer</button>
+    <button type="button" class="ctx-item" id="ctx-execute" onclick="ctxAction('execute')"><span>▶️</span> Exécuter script</button>
+    <button type="button" class="ctx-item" id="ctx-prepare-command" onclick="ctxAction('prepare-command')"><span>⌨️</span> Préparer avec paramètres</button>
+    <div class="ctx-sep"></div>
+    <button type="button" class="ctx-item" onclick="ctxAction('copy')"><span>📄</span> Copier</button>
+    <button type="button" class="ctx-item" onclick="ctxAction('cut')"><span>✂️</span> Couper</button>
+    <button type="button" class="ctx-item" id="ctx-paste" onclick="ctxAction('paste')"><span>📋</span> Coller</button>
+    <div class="ctx-sep"></div>
+    <button type="button" class="ctx-item" onclick="ctxAction('rename')"><span>✏️</span> Renommer (F2)</button>
+    <button type="button" class="ctx-item" onclick="ctxAction('perms')"><span>🔒</span> Permissions</button>
+    <button type="button" class="ctx-item" onclick="ctxAction('owner')"><span>👤</span> Propriétaire</button>
+    <button type="button" class="ctx-item ctx-danger" onclick="ctxAction('delete')"><span>🗑️</span> Effacer</button>
+</div>
+
+<div id="universal-modal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span id="um-title"></span>
+            <button type="button" class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div id="um-content" class="modal-body"></div>
+        <div class="modal-footer" id="um-footer">
+            <button type="button" class="btn-fm" id="um-btn-cancel" onclick="closeModal()">Annuler</button>
+            <button type="button" class="btn-fm btn-primary" id="um-btn-ok">Valider</button>
+        </div>
+    </div>
+</div>
+
+<div id="editor-modal" class="modal-overlay">
+    <div class="modal-box" id="editor-box">
+        <div class="fm-modal-bar">
+            <span>📝 <span id="ed-filename"></span></span>
+            <button type="button" class="modal-close" onclick="closeEditor()">✕</button>
+        </div>
+        <textarea id="editor-area" spellcheck="false"></textarea>
+        <div id="editor-footer">
+            <button type="button" class="btn-fm" onclick="closeEditor()">Fermer</button>
+            <button type="button" class="btn-fm btn-primary" onclick="saveFile()">💾 ENREGISTRER</button>
+        </div>
+    </div>
+</div>
+
+<div id="exec-modal" class="modal-overlay">
+    <div class="modal-box" id="exec-box">
+        <div class="fm-modal-bar">
+            <span>▶️ <span id="exec-title">Exécution</span></span>
+            <button type="button" class="modal-close" onclick="closeExecModal()">✕</button>
+        </div>
+        <div id="exec-meta"></div>
+        <pre id="exec-log"></pre>
+        <div id="exec-footer">
+            <button type="button" class="btn-fm" onclick="closeExecModal()">Fermer</button>
+            <button type="button" class="btn-fm btn-stop" id="exec-stop-btn" onclick="stopExecJob()">⏹ Arrêter</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let activePanel = 'left';
+    let paths = { left: {{ start_left|tojson }}, right: {{ start_right|tojson }} };
+    let selection = { left: [], right: [] }; 
+    let currentEditPath = null;
+    let currentExecJobId = null;
+    let execPollTimer = null;
+    let clipboard = { action: null, items: [], sourcePanel: null };
+    
+    // Pour gérer le Shift+Clic et Navigation Clavier
+    let lastSelectedPath = { left: null, right: null };
+    let splitSaveTimer = null;
+
+    const TEXT_EXTS = ['txt', 'conf', 'ini', 'sh', 'py', 'yml', 'yaml', 'json', 'xml', 'md', 'log', 'css', 'js', 'html', 'php', 'cfg'];
+    const EXEC_EXTS = ['sh', 'py'];
+
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function escapeJsSingle(value) {
+        return String(value ?? '')
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'");
+    }
+
+    function isMobileTapMode() {
+        return window.innerWidth < 900
+            || (window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches)
+            || ('ontouchstart' in window)
+            || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+    }
+
+    function getFileExt(name) {
+        let clean = String(name || '').split('/').pop();
+        return clean.includes('.') ? clean.split('.').pop().toLowerCase() : '';
+    }
+
+    function isScriptName(name) {
+        return EXEC_EXTS.includes(getFileExt(name));
+    }
+
+    function quoteCommandPath(path) {
+        const raw = String(path || '');
+        if (!raw) return '';
+        if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(raw)) return raw;
+        return "'" + raw.replace(/'/g, "'\\''") + "'";
+    }
+
+    function looksLikeScriptCommand(value) {
+        const v = String(value || '').trim().toLowerCase();
+        if (!v) return false;
+        // On détecte une commande de script dans la barre du haut :
+        // /x/y/script.sh -1, '/x avec espace/script.py' --option, etc.
+        return /(^|[\s"'])([^\s"']+\.(sh|py))([\s"']|$)/.test(v)
+            || v.endsWith('.sh')
+            || v.endsWith('.py');
+    }
+
+    function prepareScriptCommand(path) {
+        const input = document.getElementById('path-' + activePanel);
+        if (!input) return;
+        input.value = quoteCommandPath(path) + ' ';
+        input.focus();
+        const len = input.value.length;
+        try { input.setSelectionRange(len, len); } catch(e) {}
+    }
+
+    function openEntry(side, path, type, name, isExecScript=false) {
+        if (type === 'dir') {
+            loadDir(side, path);
+        } else if (isExecScript && isScriptName(name || path)) {
+            confirmExecuteScript(path, name || path.split('/').pop());
+        } else {
+            tryOpen(path, name || path.split('/').pop());
+        }
+    }
+
+    function handleMobileOpen(event, side, path, type, name, row) {
+        // Sur PC : on garde le comportement classique : clic = sélection, double-clic = ouvrir.
+        // Sur mobile/tablette : un simple tap sur le nom ouvre le dossier/fichier.
+        if (!isMobileTapMode()) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        hideCtx();
+        setActive(side);
+        deselectAll(side);
+        addToSelection(side, path, row);
+        lastSelectedPath[side] = path;
+
+        // Petit délai : laisse le violet de sélection apparaître avant l'ouverture.
+        const isExecScript = row && row.getAttribute('data-exec-script') === '1';
+        window.setTimeout(() => openEntry(side, path, type, name, isExecScript), 90);
+    }
+
+    function renderSelectedPaths(items, maxItems = 12) {
+        let list = items.slice(0, maxItems).map(p =>
+            `<div class="confirm-path">${escapeHtml(p)}</div>`
+        ).join('');
+
+        if (items.length > maxItems) {
+            list += `<div class="confirm-more">+ ${items.length - maxItems} autre(s) élément(s) sélectionné(s)...</div>`;
+        }
+
+        return `<div class="confirm-path-title">Chemin(s) concerné(s) :</div>
+                <div class="confirm-path-list">${list}</div>`;
+    }
+
+
+    function getFirstSelectedInfo(side) {
+        let selected = selection[side] || [];
+        if (selected.length === 0) return null;
+
+        let rows = Array.from(document.getElementById('list-' + side).querySelectorAll('.fm-row'));
+        let row = rows.find(r => r.getAttribute('data-path') === selected[0]);
+        if (!row) return null;
+
+        return {
+            path: row.getAttribute('data-path') || '',
+            name: row.getAttribute('data-name') || '',
+            type: row.getAttribute('data-type') || '',
+            octal: row.getAttribute('data-octal') || '',
+            uid: row.getAttribute('data-uid') || '',
+            gid: row.getAttribute('data-gid') || '',
+            owner: row.getAttribute('data-owner') || ''
+        };
+    }
+
+    function renderMultiSelectionHint(info) {
+        if (!info) return '';
+        let count = selection[activePanel].length;
+        let hint = `<div class="fm-selection-hint">
+            Élément lu : <b class="fm-selection-name">${escapeHtml(info.name || info.path)}</b><br>
+            <span class="fm-selection-path">${escapeHtml(info.path)}</span>`;
+        if (count > 1) {
+            hint += `<br><span class="fm-selection-warning">Plusieurs éléments sélectionnés : les valeurs affichées viennent du premier élément.</span>`;
+        }
+        hint += `</div>`;
+        return hint;
+    }
+
+    function renderPermSelect(id, label, selectedValue) {
+        const values = ['7', '6', '5', '4', '3', '2', '1', '0'];
+        const opts = values.map(v => `<option value="${v}" ${v === selectedValue ? 'selected' : ''}>${v}</option>`).join('');
+        return `<div class="fm-perm-column"><span class="lbl-mod">${label}</span><select id="${id}" class="sel-mod">${opts}</select></div>`;
+    }
+
+    function flashPathError(side) {
+        const input = document.getElementById('path-' + side);
+        if (!input) return;
+        input.classList.add('path-error');
+        setTimeout(() => input.classList.remove('path-error'), 900);
+    }
+
+    function focusPathInput(side) {
+        setActive(side);
+        hideCtx();
+        const input = document.getElementById('path-' + side);
+        if (!input) return;
+        input.focus();
+        const len = input.value.length;
+        try { input.setSelectionRange(len, len); } catch(e) {}
+    }
+
+    async function goToTypedPath(side) {
+        const input = document.getElementById('path-' + side);
+        if (!input) return false;
+
+        let wanted = String(input.value || '').trim();
+        if (!wanted) wanted = '/';
+
+        // Si la barre contient une commande de script, Entrée lance le script
+        // avec ses paramètres au lieu d'essayer d'ouvrir ça comme un dossier.
+        if (looksLikeScriptCommand(wanted)) {
+            confirmExecuteCommand(wanted);
+            return true;
+        }
+
+        const ok = await loadDir(side, wanted, {fromAddress: true});
+        if (!ok) {
+            flashPathError(side);
+            showDialog("Dossier inexistant", `Le dossier demandé n'existe pas ou n'est pas accessible :<br><br><b class="fm-error-path">${escapeHtml(wanted)}</b>`);
+            setTimeout(() => focusPathInput(side), 150);
+        } else {
+            input.blur();
+        }
+        return ok;
+    }
+
+    function handlePathInputKey(e, side) {
+        e.stopPropagation();
+        setActive(side);
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            goToTypedPath(side);
+        }
+        else if (e.key === 'Escape') {
+            e.preventDefault();
+            document.getElementById('path-' + side).value = paths[side] || '/';
+            document.getElementById('path-' + side).blur();
+        }
+        else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const rows = Array.from(document.getElementById('list-' + side).querySelectorAll('.fm-row'));
+            if (rows.length > 0) {
+                activePanel = side;
+                selectByIndex(0, false);
+                document.getElementById('path-' + side).blur();
+            }
+        }
+    }
+
+    // --- SELECTION LOGIC (MOUSE) ---
+    function handleSelect(event, side, path, el) {
+        hideCtx();
+        event.stopPropagation();
+        setActive(side);
+
+        if (event.shiftKey && lastSelectedPath[side]) {
+            let rows = Array.from(document.getElementById('list-' + side).querySelectorAll('.fm-row'));
+            let startIdx = rows.findIndex(r => r.getAttribute('data-path') === lastSelectedPath[side]);
+            let endIdx = rows.findIndex(r => r.getAttribute('data-path') === path);
+
+            if (startIdx !== -1 && endIdx !== -1) {
+                let min = Math.min(startIdx, endIdx);
+                let max = Math.max(startIdx, endIdx);
+                if (!event.ctrlKey && !event.metaKey) deselectAll(side);
+                for (let i = min; i <= max; i++) addToSelection(side, rows[i].getAttribute('data-path'), rows[i]);
+            }
+        }
+        else if (event.ctrlKey || event.metaKey) {
+            if (selection[side].includes(path)) {
+                removeFromSelection(side, path, el);
+                lastSelectedPath[side] = path;
+            } else {
+                addToSelection(side, path, el);
+                lastSelectedPath[side] = path;
+            }
+        }
+        else {
+            deselectAll(side);
+            addToSelection(side, path, el);
+            lastSelectedPath[side] = path;
+        }
+    }
+
+    function openSelectedEntryFromKeyboard() {
+        const rows = Array.from(document.getElementById('list-' + activePanel).querySelectorAll('.fm-row'));
+        if (selection[activePanel].length === 0) return;
+        let p = lastSelectedPath[activePanel] || selection[activePanel][0];
+        let r = rows.find(row => row.getAttribute('data-path') === p);
+        if (r) {
+            openEntry(activePanel, p, r.getAttribute('data-type'), r.getAttribute('data-name'), r.getAttribute('data-exec-script') === '1');
+        }
+    }
+
+    function showKeyboardHelp() {
+        const h = `<div class="shortcut-help-grid">
+            <div><kbd>↑</kbd> <kbd>↓</kbd></div><div>Sélectionner dans le panneau actif</div>
+            <div><kbd>Entrée</kbd></div><div>Ouvrir le dossier ou éditer le fichier texte</div>
+            <div><kbd>Tab</kbd></div><div>Changer de panneau</div>
+            <div><kbd>Retour</kbd></div><div>Remonter au dossier parent</div>
+            <div><kbd>Ctrl</kbd> + <kbd>A</kbd></div><div>Tout sélectionner</div>
+            <div><kbd>F2</kbd></div><div>Renommer</div>
+            <div><kbd>F3</kbd></div><div>Ouvrir</div>
+            <div><kbd>F4</kbd></div><div>Éditer si le fichier est éditable</div>
+            <div><kbd>F5</kbd></div><div>Copier vers l'autre panneau</div>
+            <div><kbd>F6</kbd></div><div>Déplacer vers l'autre panneau</div>
+            <div><kbd>F7</kbd></div><div>Nouveau dossier</div>
+            <div><kbd>F8</kbd></div><div>Effacer la sélection</div>
+        </div>`;
+        showDialog("Raccourcis clavier", h);
+    }
+
+    // --- NAVIGATION CLAVIER (KEYBOARD) ---
+    document.addEventListener('keydown', function(e) {
+        // Si une modale est ouverte ou qu'on tape dans un input, on ignore les raccourcis
+        if (document.getElementById('universal-modal').style.display === 'flex' || 
+            document.getElementById('editor-modal').style.display === 'flex' ||
+            e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            
+            // Sauf Echap pour fermer
+            if(e.key === "Escape") { closeModal(); closeEditor(); hideCtx(); }
+            // Entrée dans une modale valide le formulaire
+            if(e.key === "Enter" && document.getElementById('universal-modal').style.display === 'flex') {
+                document.getElementById('um-btn-ok').click();
+            }
+            return;
+        }
+
+        const rows = Array.from(document.getElementById('list-' + activePanel).querySelectorAll('.fm-row'));
+        if (rows.length === 0) {
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                focusPathInput(activePanel);
+            }
+            return;
+        }
+
+        let currentIndex = -1;
+        if (lastSelectedPath[activePanel]) {
+            currentIndex = rows.findIndex(r => r.getAttribute('data-path') === lastSelectedPath[activePanel]);
+        }
+
+        switch(e.key) {
+            case "ArrowDown":
+                e.preventDefault();
+                let nextIndex = currentIndex + 1;
+                if (nextIndex >= rows.length) nextIndex = rows.length - 1;
+                selectByIndex(nextIndex, e.shiftKey);
+                break;
+
+            case "ArrowUp":
+                e.preventDefault();
+
+                // Quand on remonte au-dessus de la première ligne du tableau,
+                // on passe dans la barre de chemin pour pouvoir taper /docker, /mnt/user, etc.
+                // Si la première ligne est "..", on la considère comme le lien parent,
+                // donc on passe aussi directement au champ chemin depuis la première vraie ligne.
+                if (currentIndex <= 0) {
+                    focusPathInput(activePanel);
+                    break;
+                }
+
+                let prevIndex = currentIndex - 1;
+                let prevRow = rows[prevIndex];
+                if (prevIndex === 0 && prevRow && prevRow.getAttribute('data-name') === '..') {
+                    focusPathInput(activePanel);
+                    break;
+                }
+
+                selectByIndex(prevIndex, e.shiftKey);
+                break;
+
+            case "Enter":
+                e.preventDefault();
+                openSelectedEntryFromKeyboard();
+                break;
+
+            case "Backspace":
+                e.preventDefault();
+                let current = paths[activePanel];
+                if (current !== '/') {
+                   loadDir(activePanel, current.split('/').slice(0, -1).join('/') || '/');
+                }
+                break;
+
+            case "Tab":
+                e.preventDefault();
+                setActive(activePanel === 'left' ? 'right' : 'left');
+                break;
+
+            case "Delete":
+                e.preventDefault();
+                deleteItems();
+                break;
+            
+            case "F1":
+                e.preventDefault();
+                showKeyboardHelp();
+                break;
+
+            case "F2":
+                e.preventDefault();
+                if (selection[activePanel].length === 1) {
+                    let p = selection[activePanel][0];
+                    askRen(p, p.split('/').pop());
+                }
+                break;
+
+            case "F3":
+            case "F4":
+                e.preventDefault();
+                openSelectedEntryFromKeyboard();
+                break;
+
+            case "F5":
+                e.preventDefault();
+                transfer('copy');
+                break;
+
+            case "F6":
+                e.preventDefault();
+                transfer('move');
+                break;
+
+            case "F7":
+                e.preventDefault();
+                mkDir();
+                break;
+
+            case "F8":
+                e.preventDefault();
+                deleteItems();
+                break;
+                
+            case "a":
+            case "A":
+                if (e.ctrlKey) {
+                    e.preventDefault();
+                    rows.forEach(r => {
+                         let p = r.getAttribute('data-path');
+                         if(!p.endsWith('/..')) addToSelection(activePanel, p, r);
+                    });
+                }
+                break;
+        }
+    });
+
+    function selectByIndex(index, isShift) {
+        let rows = Array.from(document.getElementById('list-' + activePanel).querySelectorAll('.fm-row'));
+        if (!rows[index]) return;
+
+        let row = rows[index];
+        let path = row.getAttribute('data-path');
+
+        if (!isShift) deselectAll(activePanel);
+        
+        addToSelection(activePanel, path, row);
+        lastSelectedPath[activePanel] = path;
+        row.scrollIntoView({block: "nearest"});
+    }
+
+
+    // --- HELPERS SELECTION ---
+    function addToSelection(side, path, el) {
+        if (!selection[side].includes(path)) {
+            selection[side].push(path);
+            if(el) el.classList.add('selected');
+        }
+    }
+
+    function removeFromSelection(side, path, el) {
+        selection[side] = selection[side].filter(p => p !== path);
+        if(el) el.classList.remove('selected');
+    }
+
+    function deselectAll(side) {
+        selection[side] = [];
+        let rows = document.getElementById('list-' + side).querySelectorAll('.fm-row');
+        rows.forEach(r => r.classList.remove('selected'));
+    }
+
+    // Appelée quand on clique dans le vide du panneau
+    function clickEmpty(event, side) {
+        if (event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT') return;
+        setActive(side);
+        deselectAll(side);
+        lastSelectedPath[side] = null;
+    }
+
+
+    // --- MOBILE TABS ---
+    function switchMobile(side) {
+        document.getElementById('tab-left').classList.remove('active');
+        document.getElementById('tab-right').classList.remove('active');
+        document.getElementById('tab-' + side).classList.add('active');
+        document.getElementById('panel-left').classList.remove('mobile-show');
+        document.getElementById('panel-right').classList.remove('mobile-show');
+        document.getElementById('panel-' + side).classList.add('mobile-show');
+        setActive(side);
+    }
+
+    // --- CONTEXT MENU ---
+    let ctxTarget = null;
+    function hideCtx() { document.getElementById('ctx-menu').style.display = 'none'; }
+
+    // Ferme le menu clic droit dès qu'on clique ailleurs, même si la ligne cliquée
+    // stoppe la propagation normale du clic pour gérer la sélection.
+    document.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        const menu = document.getElementById('ctx-menu');
+        if (!menu || menu.style.display === 'none') return;
+        if (e.target.closest('#ctx-menu')) return;
+        hideCtx();
+    }, true);
+    function handleBgCtx(e, side) {
+        if(e.target.closest('.fm-row')) return;
+        e.preventDefault();
+        setActive(side);
+        showCtxMenu(e.clientX, e.clientY, false);
+    }
+    
+    function handleRowCtx(e, side, path, type, name, isExecScript) {
+        e.preventDefault(); e.stopPropagation(); setActive(side);
+        if (!selection[side].includes(path)) { 
+            deselectAll(side);
+            addToSelection(side, path, e.currentTarget);
+            lastSelectedPath[side] = path;
+        }
+        ctxTarget = { path: path, type: type, name: name || path.split('/').pop(), isExecScript: !!isExecScript };
+        showCtxMenu(e.clientX, e.clientY, true);
+    }
+
+    function showCtxMenu(x, y, hasTarget) {
+        const m = document.getElementById('ctx-menu');
+        const margin = 10;
+
+        // Important : on sort le menu du conteneur de la page.
+        // Certains layouts avec overflow/positionnement peuvent couper un menu fixed
+        // s'il reste dans le bloc principal. Là il devient vraiment collé à la fenêtre.
+        if (m.parentElement !== document.body) {
+            document.body.appendChild(m);
+        }
+
+        document.getElementById('ctx-open').style.display = hasTarget ? 'flex' : 'none';
+        const execBtn = document.getElementById('ctx-execute');
+        const prepareBtn = document.getElementById('ctx-prepare-command');
+        execBtn.style.display = hasTarget ? 'flex' : 'none';
+        prepareBtn.style.display = hasTarget ? 'flex' : 'none';
+        if (ctxTarget && ctxTarget.isExecScript) {
+            execBtn.classList.remove('ctx-disabled');
+            prepareBtn.classList.remove('ctx-disabled');
+        } else {
+            execBtn.classList.add('ctx-disabled');
+            prepareBtn.classList.add('ctx-disabled');
+        }
+        let pasteBtn = document.getElementById('ctx-paste');
+        if (clipboard.items.length > 0) pasteBtn.classList.remove('ctx-disabled'); else pasteBtn.classList.add('ctx-disabled');
+
+        // Mesure réelle du menu complet, hors écran, avant placement.
+        m.style.visibility = 'hidden';
+        m.style.display = 'block';
+        m.style.left = '-10000px';
+        m.style.top = '-10000px';
+
+        const rect = m.getBoundingClientRect();
+        const estimatedHeight = hasTarget ? 430 : 330;
+        const menuWidth = Math.ceil(rect.width || m.offsetWidth || 180);
+        // Sécurité : sur certains navigateurs/layouts, la hauteur mesurée peut être trop basse.
+        // On force une hauteur minimale estimée pour déclencher l'ouverture vers le haut.
+        const menuHeight = Math.ceil(Math.max(rect.height || m.offsetHeight || 0, estimatedHeight));
+
+        const vv = window.visualViewport;
+        const viewLeft = vv ? vv.offsetLeft : 0;
+        const viewTop = vv ? vv.offsetTop : 0;
+        const viewRight = viewLeft + (vv ? vv.width : document.documentElement.clientWidth);
+        const viewBottom = viewTop + (vv ? vv.height : document.documentElement.clientHeight);
+
+        let finalX = x;
+        let finalY = y;
+
+        // À droite : on bascule à gauche du clic.
+        if (finalX + menuWidth + margin > viewRight) {
+            finalX = x - menuWidth;
+        }
+
+        // En bas : on bascule au-dessus du clic.
+        // La deuxième condition rend le comportement plus proche de Windows :
+        // dans le tiers bas de l'écran, le menu préfère monter.
+        if (finalY + menuHeight + margin > viewBottom || y > (viewTop + (viewBottom - viewTop) * 0.65)) {
+            finalY = y - menuHeight;
+        }
+
+        finalX = Math.min(Math.max(finalX, viewLeft + margin), viewRight - menuWidth - margin);
+        finalY = Math.min(Math.max(finalY, viewTop + margin), viewBottom - menuHeight - margin);
+
+        m.style.left = Math.round(finalX) + 'px';
+        m.style.top = Math.round(finalY) + 'px';
+        m.style.visibility = 'visible';
+
+        // Dernière sécurité après rendu : si le navigateur a encore changé la taille,
+        // on corrige immédiatement pour que rien ne parte sous l'écran.
+        requestAnimationFrame(() => {
+            const r = m.getBoundingClientRect();
+            let x2 = parseFloat(m.style.left) || 0;
+            let y2 = parseFloat(m.style.top) || 0;
+            if (r.right > viewRight - margin) x2 -= (r.right - viewRight + margin);
+            if (r.bottom > viewBottom - margin) y2 -= (r.bottom - viewBottom + margin);
+            if (r.left < viewLeft + margin) x2 += (viewLeft + margin - r.left);
+            if (r.top < viewTop + margin) y2 += (viewTop + margin - r.top);
+            m.style.left = Math.round(x2) + 'px';
+            m.style.top = Math.round(y2) + 'px';
+        });
+    }
+    
+    function ctxAction(action) {
+        hideCtx();
+        let items = selection[activePanel];
+        if (action === 'open') {
+            if (!ctxTarget) return;
+            openEntry(activePanel, ctxTarget.path, ctxTarget.type, ctxTarget.name, ctxTarget.isExecScript);
+        }
+        else if (action === 'execute') {
+            if (!ctxTarget || !ctxTarget.isExecScript) return showDialog("Info", "Ce fichier n'est pas un script exécutable .sh ou .py.");
+            confirmExecuteScript(ctxTarget.path, ctxTarget.name);
+        }
+        else if (action === 'prepare-command') {
+            if (!ctxTarget || !ctxTarget.isExecScript) return showDialog("Info", "Ce fichier n'est pas un script exécutable .sh ou .py.");
+            prepareScriptCommand(ctxTarget.path);
+        }
+        else if (action === 'copy' || action === 'cut') {
+            clipboard.action = (action === 'cut') ? 'move' : 'copy';
+            clipboard.items = [...items]; 
+            clipboard.sourcePanel = activePanel;
+        }
+        else if (action === 'paste') {
+            if (clipboard.items.length === 0) return;
+            let dest = paths[activePanel];
+            doAction({action: clipboard.action, items: clipboard.items, dest: dest});
+            if(clipboard.action === 'move') clipboard.items = [];
+        }
+        else if (action === 'rename') {
+            if(items.length !== 1) return showDialog("Info", "Un seul fichier à la fois.");
+            let p = items[0]; askRen(p, p.split('/').pop());
+        }
+        else if (action === 'perms') openChmod();
+        else if (action === 'owner') openChown();
+        else if (action === 'delete') deleteItems();
+    }
+
+    // --- EDITEUR & CORE ---
+    async function tryOpen(path, name) {
+        let ext = name.includes('.') ? name.split('.').pop().toLowerCase() : 'txt';
+        if (!TEXT_EXTS.includes(ext)) return showDialog("Info", "Fichier non éditable.");
+        try {
+            const r = await fetch('/api/files/read', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:path})});
+            const d = await r.json();
+            if(d.error) return showDialog("Erreur", d.error);
+            currentEditPath = path;
+            document.getElementById('ed-filename').innerText = name;
+            document.getElementById('editor-area').value = d.content;
+            document.getElementById('editor-modal').style.display = 'flex';
+            setTimeout(() => document.getElementById('editor-area').focus(), 100);
+        } catch(e) {}
+    }
+    async function saveFile() {
+        if(!currentEditPath) return;
+        try {
+            const r = await fetch('/api/files/save', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:currentEditPath, content:document.getElementById('editor-area').value})});
+            const d = await r.json();
+            if(d.error) {
+                showDialog("Erreur", d.error);
+                return;
+            }
+            let btn = document.querySelector('#editor-footer button:last-child');
+            let old = btn.innerText;
+            btn.innerText = "✅ OK";
+            setTimeout(()=>btn.innerText=old, 1000);
+        } catch(e) {
+            showDialog("Erreur", "Impossible de sauvegarder le fichier.");
+        }
+    }
+    function closeEditor() { document.getElementById('editor-modal').style.display='none'; }
+    function closeModal() { document.getElementById('universal-modal').style.display='none'; }
+
+    function confirmExecuteScript(path, name) {
+        const h = `<div>Exécuter ce script sur l'hôte ?</div>`
+                + `<div class="confirm-path-list"><div class="confirm-path">${escapeHtml(path)}</div></div>`
+                + `<div class="danger-note">Le script sera lancé avec les droits du service Flask. Vérifiez bien ce que vous exécutez.</div>`;
+        showDialog("Exécuter le script", h, () => {
+            startExecuteScript(path, name);
+        });
+    }
+
+    function confirmExecuteCommand(commandLine) {
+        const h = `<div>Exécuter cette commande de script sur l'hôte ?</div>`
+                + `<div class="confirm-path-list"><div class="confirm-path">${escapeHtml(commandLine)}</div></div>`
+                + `<div class="danger-note">Seuls les scripts .sh/.py exécutables sont acceptés. Les paramètres sont passés sans shell.</div>`;
+        showDialog("Exécuter avec paramètres", h, () => {
+            startExecuteScript(null, 'Commande script', commandLine);
+        });
+    }
+
+    async function startExecuteScript(path, name, commandLine=null) {
+        try {
+            const body = commandLine ? {command:commandLine} : {path:path};
+            const r = await fetch('/api/files/execute', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(body)
+            });
+            const d = await r.json();
+            if (d.error) return showDialog("Erreur", d.error);
+
+            currentExecJobId = d.job_id;
+            document.getElementById('exec-title').innerText = name || (path ? path.split('/').pop() : 'Commande script');
+            document.getElementById('exec-meta').innerText = commandLine || path || '';
+            document.getElementById('exec-log').textContent = "Lancement du script...\n";
+            document.getElementById('exec-stop-btn').style.display = 'inline-block';
+            document.getElementById('exec-modal').style.display = 'flex';
+            pollExecJob();
+        } catch(e) {
+            showDialog("Erreur", "Impossible de lancer le script.");
+        }
+    }
+
+    async function pollExecJob() {
+        if (!currentExecJobId) return;
+
+        clearTimeout(execPollTimer);
+
+        try {
+            const r = await fetch('/api/files/execute/status', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({job_id:currentExecJobId})
+            });
+            const d = await r.json();
+            if (d.error) {
+                document.getElementById('exec-log').textContent += "\nERREUR: " + d.error + "\n";
+                document.getElementById('exec-stop-btn').style.display = 'none';
+                return;
+            }
+
+            const meta = [
+                d.command || d.path || '',
+                d.pid ? `PID: ${d.pid}` : '',
+                d.running ? 'EN COURS' : `TERMINÉ code ${d.returncode}`
+            ].filter(Boolean).join('  |  ');
+
+            const logEl = document.getElementById('exec-log');
+            document.getElementById('exec-meta').innerText = meta;
+            logEl.textContent = d.log || '';
+            logEl.scrollTop = logEl.scrollHeight;
+
+            if (d.running) {
+                document.getElementById('exec-stop-btn').style.display = 'inline-block';
+                execPollTimer = setTimeout(pollExecJob, 700);
+            } else {
+                document.getElementById('exec-stop-btn').style.display = 'none';
+                currentExecJobId = null;
+            }
+        } catch(e) {
+            execPollTimer = setTimeout(pollExecJob, 1200);
+        }
+    }
+
+    async function stopExecJob() {
+        if (!currentExecJobId) return;
+        try {
+            await fetch('/api/files/execute/stop', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({job_id:currentExecJobId})
+            });
+            pollExecJob();
+        } catch(e) {
+            showDialog("Erreur", "Impossible d'arrêter le script.");
+        }
+    }
+
+    function closeExecModal() {
+        document.getElementById('exec-modal').style.display='none';
+        clearTimeout(execPollTimer);
+        execPollTimer = null;
+    }
+    function showDialog(t, h, cb, dang=false) {
+        document.getElementById('um-title').innerText=t; document.getElementById('um-content').innerHTML=h;
+        let ok=document.getElementById('um-btn-ok'), no=document.getElementById('um-btn-cancel');
+        ok.classList.toggle('btn-danger', !!dang); ok.classList.toggle('btn-primary', !dang); ok.innerText=dang?"SUPPRIMER":"Valider";
+        ok.onclick = () => { if(cb) { if(cb() !== false) closeModal(); } else { closeModal(); } };
+        if(cb){ no.style.display='inline-block'; } else{ no.style.display='none'; ok.innerText="OK"; }
+        document.getElementById('universal-modal').style.display='flex';
+        setTimeout(()=>{ let i=document.querySelector('#um-content input'); if(i) i.focus(); else ok.focus(); },100);
+    }
+
+    function setActive(side) {
+        activePanel = side;
+        if (window.innerWidth < 900) { } else {
+            document.getElementById('panel-left').classList.remove('is-active-panel');
+            document.getElementById('panel-right').classList.remove('is-active-panel');
+            document.getElementById('panel-'+side).classList.add('is-active-panel');
+        }
+    }
+
+    async function loadDir(side, path, options = {}) {
+        const previousPath = paths[side] || '/';
+        const wantedPath = String(path || '/').trim() || '/';
+
+        try {
+            const r = await fetch('/api/files/list', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({path:wantedPath, panel:side})
+            });
+            const d = await r.json();
+            if(d.error) {
+                document.getElementById('path-'+side).value = previousPath;
+                if (!options.fromAddress) showDialog("Erreur", d.error);
+                return false;
+            }
+
+            const currentPath = d.current || wantedPath;
+            paths[side] = currentPath;
+            document.getElementById('path-'+side).value = currentPath;
+            selection[side] = [];
+            lastSelectedPath[side] = null;
+
+            let h = "";
+            d.items.forEach(f => {
+                let isExecScript = !f.is_dir && !!f.is_exec_script;
+                let ico = f.is_dir ? "📁" : (isExecScript ? "🚀" : "📄");
+                if (f.name === '..') ico = "⬆️";
+
+                let escPath = escapeJsSingle(f.path);
+                let escName = escapeJsSingle(f.name);
+                let safePathAttr = escapeHtml(f.path);
+                let safeName = escapeHtml(f.name);
+                let safeOwner = escapeHtml(f.owner || '');
+                let safeOwnerAttr = escapeHtml(f.owner || '');
+                let safeOctalAttr = escapeHtml(f.octal || '');
+                let safeUidAttr = escapeHtml(f.uid ?? '');
+                let safeGidAttr = escapeHtml(f.gid ?? '');
+
+                let type = f.is_dir ? 'dir' : 'file';
+                let execFlag = isExecScript ? '1' : '0';
+                let clk = `ondblclick="openEntry('${side}','${escPath}','${type}','${escName}', ${isExecScript ? 'true' : 'false'})"`;
+                let sel = `onclick="handleSelect(event, '${side}', '${escPath}', this)"`;
+                let ctx = f.name !== '..'
+                    ? `oncontextmenu="handleRowCtx(event, '${side}', '${escPath}', '${type}', '${escName}', ${isExecScript ? 'true' : 'false'})"`
+                    : '';
+                let drg = f.name !== '..'
+                    ? `draggable="true" ondragstart="dragStart(event,'${side}','${escPath}')"`
+                    : '';
+                let mobileOpen = `onclick="handleMobileOpen(event, '${side}', '${escPath}', '${type}', '${escName}', this.closest('tr'))"`;
+
+                h += `<tr class="fm-row" data-path="${safePathAttr}" data-type="${type}" data-name="${safeName}" data-exec-script="${execFlag}" data-octal="${safeOctalAttr}" data-uid="${safeUidAttr}" data-gid="${safeGidAttr}" data-owner="${safeOwnerAttr}" ${clk} ${sel} ${ctx} ${drg}>
+                    <td class="fm-name-cell" ${mobileOpen}><span class="${f.is_dir ? 'is-dir' : 'is-file'}">${ico} ${safeName}</span></td>
+                    <td>${f.is_dir ? '' : formatSize(f.size)}</td>
+                    <td class="fm-perms-cell">${escapeHtml(f.octal || '')}</td>
+                    <td class="fm-owner-cell">${safeOwner}</td></tr>`;
+            });
+            document.getElementById('list-'+side).innerHTML = h;
+            const countEl = document.getElementById('count-' + side);
+            if (countEl) countEl.innerText = (d.items || []).length + ' élément(s)';
+            return true;
+
+        } catch(e) {
+            document.getElementById('path-'+side).value = previousPath;
+            if (!options.fromAddress) showDialog("Erreur", "Impossible de lire le dossier.");
+            return false;
+        }
+    }
+
+    async function doAction(p) {
+        const r = await fetch('/api/files/action', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p)});
+        const d = await r.json();
+        if(d.error) showDialog("Erreur", d.error);
+        refresh('left'); refresh('right');
+    }
+    function refresh(s) { loadDir(s, paths[s]); }
+
+    // DRAG
+    function dragStart(ev, side, path) {
+        let d = JSON.stringify({ origin: side, path: path });
+        ev.dataTransfer.setData("text/plain", d);
+        if(!selection[side].includes(path)) { deselectAll(side); addToSelection(side, path, ev.target); }
+    }
+    function allowDrop(ev, s) { ev.preventDefault(); document.getElementById('panel-'+s).classList.add('drag-active'); }
+    function leaveDrop(s) { document.getElementById('panel-'+s).classList.remove('drag-active'); }
+    function drop(ev, ds) {
+        ev.preventDefault(); leaveDrop(ds);
+        let raw = ev.dataTransfer.getData("text/plain"); if(!raw) return;
+        let d = JSON.parse(raw); if(d.origin === ds) return;
+        let i = selection[d.origin]; if(i.length===0) i=[d.path];
+        openDragModal(i, d.origin, paths[ds]);
+    }
+    function openDragModal(i, o, d) {
+        const escOrigin = escapeJsSingle(o);
+        const escDest = escapeJsSingle(d);
+        let h = `<div class="fm-drag-summary"><b>${i.length} éléments</b><br>Vers: <span class="fm-drag-dest">${escapeHtml(d)}</span></div>
+        <div class="fm-drag-actions">
+        <button class="btn-fm btn-copy" onclick="finDrag('copy','${escOrigin}','${escDest}')">⏩ COPIER</button>
+        <button class="btn-fm btn-move" onclick="finDrag('move','${escOrigin}','${escDest}')">🚚 DÉPLACER</button></div>`;
+        window.tmpDrag=i; showDialog("Action", h, null); document.getElementById('um-footer').style.display='none';
+    }
+    function finDrag(a,o,d) { doAction({action:a, items:window.tmpDrag, dest:d}); closeModal(); document.getElementById('um-footer').style.display='flex'; }
+
+
+    function getActivePanelDir() {
+        return paths[activePanel] || '/';
+    }
+
+    function getSelectedRowInfo(side) {
+        const selected = selection[side] || [];
+        if (selected.length !== 1) return null;
+        const rows = Array.from(document.getElementById('list-' + side).querySelectorAll('.fm-row'));
+        const row = rows.find(r => r.getAttribute('data-path') === selected[0]);
+        if (!row) return null;
+        return {
+            path: row.getAttribute('data-path') || selected[0],
+            name: row.getAttribute('data-name') || '',
+            type: row.getAttribute('data-type') || ''
+        };
+    }
+
+    function openImportFile() {
+        const dest = getActivePanelDir();
+        if (!dest) return showDialog("Import", "Dossier actif introuvable.");
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.style.display = 'none';
+        document.body.appendChild(input);
+
+        input.addEventListener('change', async () => {
+            const file = input.files && input.files[0];
+            input.remove();
+            if (!file) return;
+
+            const fd = new FormData();
+            fd.append('path', dest);
+            fd.append('file', file);
+
+            try {
+                let r = await fetch('/api/files/upload', { method: 'POST', body: fd });
+                let d = await r.json();
+
+                if (r.status === 409 && d.error === 'Fichier déjà existant') {
+                    showDialog("Fichier existant", `Le fichier <b>${escapeHtml(file.name)}</b> existe déjà dans <b>${escapeHtml(dest)}</b>.<br>Écraser le fichier existant ?`, async () => {
+                        const fd2 = new FormData();
+                        fd2.append('path', dest);
+                        fd2.append('file', file);
+                        fd2.append('overwrite', '1');
+                        const r2 = await fetch('/api/files/upload', { method: 'POST', body: fd2 });
+                        const d2 = await r2.json();
+                        if (d2.error) {
+                            showDialog("Erreur", d2.error);
+                            return false;
+                        }
+                        refresh(activePanel);
+                    });
+                    return;
+                }
+
+                if (d.error) return showDialog("Erreur", d.error);
+                refresh(activePanel);
+            } catch(e) {
+                showDialog("Erreur", "Import impossible.");
+            }
+        }, { once: true });
+
+        input.click();
+    }
+
+    function exportSelectedFile() {
+        const selected = selection[activePanel] || [];
+        if (selected.length !== 1) return showDialog("Export", "Sélectionne un seul fichier à exporter.");
+
+        const info = getSelectedRowInfo(activePanel);
+        if (!info) return showDialog("Export", "Sélection introuvable.");
+        if (info.type !== 'file') return showDialog("Export", "Export direct possible uniquement sur un fichier.");
+
+        window.location.href = '/api/files/download?path=' + encodeURIComponent(info.path);
+    }
+
+    // TOOLBAR ACTIONS
+    function transfer(act) {
+        let s=activePanel, t=s==='left'?'right':'left', i=selection[s], d=paths[t];
+        if(i.length===0) return showDialog("Info","Sélectionnez un fichier.");
+        showDialog("Confirmation", `${act.toUpperCase()} <b>${i.length}</b> vers ${d} ?`, ()=>doAction({action:act, items:i, dest:d}));
+    }
+    function deleteItems() {
+        let i = [...selection[activePanel]];
+        if(i.length===0) return showDialog("Info","Rien de sélectionné.");
+
+        let label = i.length === 1 ? "cet élément" : "ces éléments";
+        let h = `<div>Voulez-vous vraiment supprimer <b class="danger-count">${i.length}</b> ${label} ?</div>`
+              + renderSelectedPaths(i)
+              + `<div class="danger-note">Attention : suppression réelle sur le disque.</div>`;
+
+        showDialog("Danger", h, ()=>doAction({action:'delete', items:i}), true);
+    }
+    function mkDir() {
+        showDialog("Nouveau", `<label class="lbl-mod">Nom:</label><input type="text" id="nn" class="inp-mod">`, ()=>{
+            let n=document.getElementById('nn').value; if(n) doAction({action:'mkdir', path:paths[activePanel], name:n});
+        });
+    }
+    function askRen(p, n) {
+        showDialog("Renommer", `<label class="lbl-mod">Nom:</label><input type="text" id="rn" class="inp-mod" value="${n}">`, ()=>{
+            let v=document.getElementById('rn').value; if(v && v!==n) { let par = p.substring(0, p.lastIndexOf('/')); doAction({action:'move', items:[p], dest:par+'/'+v}); }
+        });
+    }
+    function openChmod() {
+        if(selection[activePanel].length===0) return showDialog("Info","Sélection.");
+
+        let info = getFirstSelectedInfo(activePanel);
+        let octal = (info && /^[0-7]{3}$/.test(info.octal)) ? info.octal : '755';
+        let h = renderMultiSelectionHint(info)
+              + `<div class="fm-permissions-form">
+                    <div class="fm-current-perms">Droits actuels : <b class="fm-code-accent">${escapeHtml(octal)}</b></div>
+                    <div class="fm-perm-grid">`
+              + renderPermSelect('p1', 'Proprio', octal[0])
+              + renderPermSelect('p2', 'Group', octal[1])
+              + renderPermSelect('p3', 'Autres', octal[2])
+              + `    </div>
+                 </div>
+                 <label class="chk-mod fm-perm-recursive"><input type="checkbox" id="chmod-recursive"> Appliquer au dossier et à tous les sous-dossiers / fichiers</label>`;
+
+        showDialog("Permissions", h, ()=>{
+            let m=document.getElementById('p1').value+document.getElementById('p2').value+document.getElementById('p3').value;
+            let rec=document.getElementById('chmod-recursive').checked;
+            doAction({action:'chmod', items:selection[activePanel], mode:m, recursive:rec});
+        });
+    }
+    async function openChown() {
+        if(selection[activePanel].length===0) return showDialog("Info","Sélection.");
+
+        let info = getFirstSelectedInfo(activePanel);
+        let currentUid = info ? String(info.uid || '') : '';
+        let currentGid = info ? String(info.gid || '') : '100';
+        let currentOwner = info ? String(info.owner || currentUid) : currentUid;
+
+        const r=await fetch('/api/users');
+        let u=await r.json();
+        if (!Array.isArray(u)) u = [];
+
+        // Si l'UID actuel n'est pas dans la liste /api/users, on l'ajoute quand même,
+        // sinon le menu retomberait sur root par défaut.
+        if (currentUid && !u.some(x => String(x.uid) === currentUid)) {
+            u.unshift({uid: currentUid, name: currentOwner || currentUid});
+        }
+
+        let o=u.map(x=>{
+            let uid = String(x.uid);
+            let name = String(x.name || uid);
+            return `<option value="${escapeHtml(uid)}" ${uid === currentUid ? 'selected' : ''}>${escapeHtml(name)} (${escapeHtml(uid)})</option>`;
+        }).join('');
+
+        let h = renderMultiSelectionHint(info)
+              + `<div class="fm-owner-form">
+                    <div class="fm-owner-fields">
+                        <label class="lbl-mod">User:<select id="uid" class="sel-mod">${o}</select></label>
+                        <label class="lbl-mod">Group ID:<input id="gid" class="inp-mod" value="${escapeHtml(currentGid || '100')}"></label>
+                    </div>
+                    <label class="chk-mod"><input type="checkbox" id="chown-recursive"> Appliquer au dossier et à tous les sous-dossiers / fichiers</label>
+                 </div>`;
+
+        showDialog("Propriétaire", h, ()=>{
+            let rec=document.getElementById('chown-recursive').checked;
+            doAction({action:'chown', items:selection[activePanel], uid:document.getElementById('uid').value, gid:document.getElementById('gid').value, recursive:rec});
+        });
+    }
+    function formatSize(b) { if(b===0)return""; const s=['o','Ko','Mo','Go']; const i=Math.floor(Math.log(b)/Math.log(1024)); return parseFloat((b/Math.pow(1024,i)).toFixed(1))+' '+s[i]; }
+
+    function getCurrentSplitPercent() {
+        const container = document.getElementById('fm-container');
+        if (!container) return 50;
+        const raw = getComputedStyle(container).getPropertyValue('--left-pane').trim().replace('%', '');
+        let pct = parseFloat(raw);
+        if (!Number.isFinite(pct)) pct = 50;
+        return Math.max(20, Math.min(80, pct));
+    }
+
+    function applySplitPercent(pct) {
+        const container = document.getElementById('fm-container');
+        if (!container) return;
+        pct = Math.max(20, Math.min(80, pct));
+        container.style.setProperty('--left-pane', pct.toFixed(2) + '%');
+    }
+
+    function saveSplitPercentDebounced(pct) {
+        clearTimeout(splitSaveTimer);
+        splitSaveTimer = setTimeout(async () => {
+            try {
+                await fetch('/api/files/ui_state', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({split_left_percent: pct})
+                });
+            } catch(e) {}
+        }, 250);
+    }
+
+    function initFileManagerSplitter() {
+        const container = document.getElementById('fm-container');
+        const resizer = document.getElementById('fm-resizer');
+        if (!container || !resizer) return;
+
+        let dragging = false;
+
+        resizer.addEventListener('pointerdown', (e) => {
+            if (window.innerWidth < 900) return;
+            dragging = true;
+            document.body.classList.add('fm-resizing');
+            try { resizer.setPointerCapture(e.pointerId); } catch(err) {}
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        document.addEventListener('pointermove', (e) => {
+            if (!dragging) return;
+            const rect = container.getBoundingClientRect();
+            if (!rect.width) return;
+            const pct = ((e.clientX - rect.left) / rect.width) * 100;
+            applySplitPercent(pct);
+        });
+
+        document.addEventListener('pointerup', () => {
+            if (!dragging) return;
+            dragging = false;
+            document.body.classList.remove('fm-resizing');
+            saveSplitPercentDebounced(getCurrentSplitPercent());
+        });
+
+        window.addEventListener('resize', () => applySplitPercent(getCurrentSplitPercent()));
+    }
+
+    const initialSplitRaw = document.getElementById('fm-container')?.dataset.leftPane || '50';
+    const initialSplit = parseFloat(String(initialSplitRaw).replace(',', '.'));
+    applySplitPercent(Number.isFinite(initialSplit) ? initialSplit : 50);
+    initFileManagerSplitter();
+    loadDir('left', paths.left); loadDir('right', paths.right); 
+    if(window.innerWidth < 900) switchMobile('left'); else setActive('left');
+
+</script>
+{% endblock %}

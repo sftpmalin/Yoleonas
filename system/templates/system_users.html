@@ -1,0 +1,491 @@
+{% extends "system_base.html" %}
+
+{% block title %}Utilisateur Linux - Yoleo{% endblock %}
+{% block page_title %}Utilisateur Linux{% endblock %}
+{% block page_subtitle %}Comptes Linux, UID/GID, mots de passe et verrouillage{% endblock %}
+
+{% block system_content %}
+<main class="su-page su-users-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+    <section class="su-panel su-table-panel">
+        <div class="su-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" data-yoleo-context-zone="system-users-table">
+            <table class="su-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th width="80">UID</th>
+                        <th width="80">GID</th>
+                        <th>Groupe</th>
+                        <th>Password</th>
+                        <th>Home</th>
+                        <th>Shell</th>
+                        <th width="86">SSH</th>
+                        <th width="62">Lock</th>
+                        <th width="54">Del</th>
+                    </tr>
+                </thead>
+                <tbody id="su-users-body"></tbody>
+            </table>
+        </div>
+
+        <div class="su-status" id="su-status">Chargement...</div>
+    </section>
+</main>
+
+<div id="su-modal" class="su-modal-overlay" hidden>
+    <section class="su-modal-box" role="dialog" aria-modal="true" aria-labelledby="su-modal-title">
+        <header class="su-modal-header">
+            <strong id="su-modal-title"></strong>
+            <button type="button" class="su-modal-close" onclick="closeModal()" aria-label="Fermer">✕</button>
+        </header>
+        <div class="su-modal-body" id="su-modal-body"></div>
+        <footer class="su-modal-footer">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeModal()">Annuler</button>
+            <button type="button" class="yoleo-btn yoleo-btn-primary" id="su-modal-ok">Valider</button>
+        </footer>
+    </section>
+</div>
+
+<div id="su-ssh-modal" class="su-modal-overlay su-ssh-overlay" hidden onclick="if (event.target === this) closeSshPopup();">
+    <section class="su-modal-box su-ssh-box" role="dialog" aria-modal="true" aria-labelledby="su-ssh-title">
+        <header class="su-modal-header">
+            <strong id="su-ssh-title">🔐 Générateur de clé SSH</strong>
+            <button type="button" class="su-modal-close" onclick="closeSshPopup()" aria-label="Fermer">✕</button>
+        </header>
+        <iframe id="su-ssh-frame" class="su-ssh-frame" title="Générateur de clé SSH" scrolling="no"></iframe>
+    </section>
+</div>
+
+<script>
+    let users = [];
+    let selectedUser = null;
+    const allowActions = {{ allow_actions | tojson }};
+    const allowedShells = {{ allowed_shells | tojson }};
+    const defaultShell = {{ default_shell | tojson }};
+    const SSH_URL = {{ url_for('users_bp.show_ssh')|tojson }};
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function shellOptions(selectedShell=null) {
+        const shells = Array.isArray(allowedShells) && allowedShells.length ? allowedShells : ['/bin/bash'];
+        const wanted = selectedShell || defaultShell;
+        return shells.map(sh => `<option value="${escapeHtml(sh)}"${sh === wanted ? ' selected' : ''}>${escapeHtml(sh)}</option>`).join('');
+    }
+
+    function setStatus(message, isError=false) {
+        const el = document.getElementById('su-status');
+        if (!el) return;
+        el.textContent = message;
+        el.classList.toggle('is-error', !!isError);
+    }
+
+    function passwordBadge(state) {
+        let cls = 'su-badge';
+        if (state === 'mot de passe défini') cls += ' is-ok';
+        if (state === 'verrouillé' || state === 'désactivé') cls += ' is-locked';
+        return `<span class="${cls}">${escapeHtml(state || '?')}</span>`;
+    }
+
+    function isUserLocked(user) {
+        const state = user && user.password_state ? String(user.password_state) : '';
+        return state === 'verrouillé' || state === 'désactivé';
+    }
+
+    function getUserRows() {
+        return Array.from(document.querySelectorAll('#su-users-body .su-row'));
+    }
+
+    function selectUser(name, row=null, opts={}) {
+        selectedUser = users.find(u => u.name === name) || null;
+        const selectedRow = row || getUserRows().find(r => r.dataset.user === name);
+        getUserRows().forEach(r => {
+            r.classList.remove('is-selected');
+            r.setAttribute('aria-selected', 'false');
+        });
+        if (selectedRow) {
+            selectedRow.classList.add('is-selected');
+            selectedRow.setAttribute('aria-selected', 'true');
+            if (!opts.keepFocus && typeof selectedRow.focus === 'function') selectedRow.focus({preventScroll:true});
+            if (!opts.noScroll) selectedRow.scrollIntoView({block:'nearest'});
+        }
+        if (selectedUser && !opts.silent) {
+            const prot = selectedUser.protected ? ' — utilisateur protégé' : '';
+            setStatus(`Sélection : ${selectedUser.name} UID=${selectedUser.uid} GID=${selectedUser.gid}${prot}`);
+        }
+    }
+
+    async function loadUsers(opts={}) {
+        const previous = selectedUser ? selectedUser.name : null;
+        selectedUser = null;
+        if (!opts.quiet) setStatus('Chargement...');
+        try {
+            const response = await fetch('/api/users/list', {headers: {'Accept': 'application/json'}});
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                setStatus(data.error || 'Erreur de chargement.', true);
+                return;
+            }
+            users = data.items || [];
+            renderUsers(previous);
+            if (!opts.quiet) setStatus(`${users.length} utilisateur(s) affiché(s).`);
+        } catch (err) {
+            if (!opts.quiet) setStatus('Erreur de chargement.', true);
+        }
+    }
+
+    function renderUsers(preferredName=null) {
+        const body = document.getElementById('su-users-body');
+        if (!body) return;
+        body.innerHTML = users.map(u => {
+            const protectedIcon = u.protected ? ' 🔐' : '';
+            const disabled = (!allowActions || u.protected) ? ' disabled' : '';
+            const protectedTitle = u.protected ? 'Utilisateur protégé' : '';
+            const locked = isUserLocked(u);
+            const lockIcon = locked ? '🔒' : '🔓';
+            const sshTitle = protectedTitle || `Générer une clé SSH pour ${u.name}`;
+            const lockTitle = protectedTitle || (locked ? `Déverrouiller ${u.name}` : `Verrouiller ${u.name}`);
+            const delTitle = protectedTitle || `Supprimer ${u.name}`;
+            const mobileIdentity = [`UID ${escapeHtml(u.uid)}`, `GID ${escapeHtml(u.gid)}`, `Groupe ${escapeHtml(u.group || '—')}`].join(' · ');
+            const mobileHome = `<div class="su-mobile-only su-mobile-line"><span>Home</span><code>${escapeHtml(u.home || '—')}</code></div>`;
+            const mobileShell = `<div class="su-mobile-only su-mobile-line"><span>Shell</span><code>${escapeHtml(u.shell || '—')}</code></div>`;
+            return `<tr class="su-row" tabindex="0" data-user="${escapeHtml(u.name)}" onclick="selectUser(this.dataset.user, this)">
+                <td class="su-user-cell su-user-main-cell"><b>${escapeHtml(u.name)}</b>${protectedIcon}<div class="su-mobile-only su-mobile-meta">${mobileIdentity}</div>${mobileHome}${mobileShell}</td>
+                <td>${escapeHtml(u.uid)}</td>
+                <td>${escapeHtml(u.gid)}</td>
+                <td>${escapeHtml(u.group || '—')}</td>
+                <td class="su-password-cell">${passwordBadge(u.password_state)}</td>
+                <td><code>${escapeHtml(u.home || '—')}</code></td>
+                <td><code>${escapeHtml(u.shell || '—')}</code></td>
+                <td class="su-action-cell su-ssh-cell"><button type="button" class="yoleo-btn yoleo-btn-mini su-row-btn su-row-ssh" title="${escapeHtml(sshTitle)}" onclick='event.stopPropagation(); openSshForUser(${JSON.stringify(u.name)})'${disabled}>🔐 SSH</button></td>
+                <td class="su-action-cell"><button type="button" class="yoleo-btn yoleo-btn-mini su-icon-btn su-row-action" title="${escapeHtml(lockTitle)}" onclick='event.stopPropagation(); toggleLockUser(${JSON.stringify(u.name)})'${disabled}>${lockIcon}</button></td>
+                <td class="su-action-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red su-icon-btn su-row-action" title="${escapeHtml(delTitle)}" onclick='event.stopPropagation(); removeUser(${JSON.stringify(u.name)})'${disabled}>✕</button></td>
+            </tr>`;
+        }).join('');
+
+        const wanted = preferredName && users.some(u => u.name === preferredName)
+            ? preferredName
+            : (users[0] ? users[0].name : null);
+        if (wanted) {
+            const row = getUserRows().find(r => r.dataset.user === wanted);
+            if (row) selectUser(wanted, row, {silent:true, keepFocus:true, noScroll:true});
+        }
+    }
+
+    function requireSelected() {
+        if (!selectedUser) {
+            setStatus('Sélectionne un utilisateur.', true);
+            return null;
+        }
+        return selectedUser;
+    }
+
+    function findUserAndSelect(name=null) {
+        const u = name ? users.find(item => item.name === name) : selectedUser;
+        if (!u) return null;
+        const row = getUserRows().find(r => r.dataset.user === u.name);
+        if (row) selectUser(u.name, row, {silent:true, keepFocus:true, noScroll:true});
+        return u;
+    }
+
+    function modalIsOpen() {
+        const modal = document.getElementById('su-modal');
+        return !!(modal && !modal.hidden);
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('su-modal');
+        if (modal) modal.hidden = true;
+    }
+
+    function showModal(title, html, onOk, danger=false, modalClass='') {
+        const modal = document.getElementById('su-modal');
+        const titleEl = document.getElementById('su-modal-title');
+        const bodyEl = document.getElementById('su-modal-body');
+        const ok = document.getElementById('su-modal-ok');
+        const box = modal ? modal.querySelector('.su-modal-box') : null;
+        if (!modal || !titleEl || !bodyEl || !ok) return;
+        if (box) {
+            box.className = 'su-modal-box';
+            const extraClasses = String(modalClass || '').split(/\s+/).filter(Boolean);
+            extraClasses.forEach(cls => box.classList.add(cls));
+        }
+        titleEl.textContent = title;
+        bodyEl.innerHTML = html;
+        ok.textContent = danger ? 'SUPPRIMER' : 'Valider';
+        ok.classList.toggle('yoleo-btn-red', !!danger);
+        ok.classList.toggle('yoleo-btn-primary', !danger);
+        ok.onclick = async () => {
+            const keepOpen = await onOk();
+            if (keepOpen !== true) closeModal();
+        };
+        modal.hidden = false;
+        setTimeout(() => {
+            const input = bodyEl.querySelector('input, select, textarea, button');
+            if (input) input.focus();
+        }, 80);
+    }
+
+    async function postAction(payload) {
+        if (!allowActions) {
+            setStatus('Actions désactivées dans la configuration.', true);
+            return false;
+        }
+        setStatus('Action en cours...');
+        try {
+            const response = await fetch('/api/users/action', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                setStatus(data.error || 'Erreur pendant l’action.', true);
+                return false;
+            }
+            setStatus(data.warning || data.message || 'Action terminée.');
+            await loadUsers({quiet:true});
+            return true;
+        } catch (err) {
+            setStatus('Erreur pendant l’action.', true);
+            return false;
+        }
+    }
+
+    async function backupUsers() {
+        return await postAction({action:'backup_users'});
+    }
+
+    function restoreUsers() {
+        showModal('Restaurer les utilisateurs', `
+            <div class="su-warn">Cette action lit <b>users_backup.conf</b>, crée les comptes manquants et remet UID, GID et shell.</div>
+            <p class="su-muted">Aucun mot de passe n’est restauré : les nouveaux comptes sont créés sans mot de passe.</p>
+        `, async () => !(await postAction({action:'restore_users'})), false, 'su-modal-compact su-modal-restore');
+    }
+
+    function openAdd() {
+        showModal('Ajouter un utilisateur Linux', `
+            <div class="su-form-grid su-grid-3">
+                <label>Nom utilisateur<input id="new-user" class="yoleo-input" placeholder="ex: antony"></label>
+                <label>UID<input id="new-uid" class="yoleo-input" inputmode="numeric" placeholder="auto"></label>
+                <label>GID<input id="new-gid" class="yoleo-input" inputmode="numeric" placeholder="auto"></label>
+            </div>
+            <div class="su-form-grid su-grid-3">
+                <label>Mot de passe<input id="new-pass" class="yoleo-input" type="password" placeholder="vide = aucun mot de passe"></label>
+                <label>Home<input id="new-home" class="yoleo-input" placeholder="auto = /home/nom"></label>
+                <label>Shell<select id="new-shell" class="yoleo-input">${shellOptions()}</select></label>
+            </div>
+        `, async () => {
+            const user = document.getElementById('new-user').value.trim();
+            const uid = document.getElementById('new-uid').value.trim();
+            const gid = document.getElementById('new-gid').value.trim();
+            const password = document.getElementById('new-pass').value;
+            const home = document.getElementById('new-home').value.trim();
+            const shell = document.getElementById('new-shell').value;
+            if (!user) { setStatus('Nom utilisateur vide.', true); return true; }
+            if (home && !home.startsWith('/')) { setStatus('Le home doit commencer par /', true); return true; }
+            return !(await postAction({action:'add', user, uid, gid, password, home, shell}));
+        }, false, 'su-modal-add');
+    }
+
+    function openIds() {
+        const u = requireSelected();
+        if (!u) return;
+        if (u.protected) return setStatus('Utilisateur protégé.', true);
+        showModal(`Changer UID/GID : ${u.name}`, `
+            <div class="su-form-grid su-grid-2">
+                <label>UID<input id="edit-uid" class="yoleo-input" inputmode="numeric" value="${escapeHtml(u.uid)}"></label>
+                <label>GID<input id="edit-gid" class="yoleo-input" inputmode="numeric" value="${escapeHtml(u.gid)}"></label>
+            </div>
+            <div class="su-warn">Ça change l’identité Linux du compte dans passwd/group. Les propriétaires des fichiers déjà existants ne sont pas corrigés automatiquement.</div>
+        `, async () => {
+            const uid = document.getElementById('edit-uid').value.trim();
+            const gid = document.getElementById('edit-gid').value.trim();
+            if (!uid && !gid) { setStatus('UID/GID vides.', true); return true; }
+            return !(await postAction({action:'setids', user:u.name, uid, gid}));
+        }, false, 'su-modal-compact su-modal-ids');
+    }
+
+    function openShell() {
+        const u = requireSelected();
+        if (!u) return;
+        if (u.protected) return setStatus('Utilisateur protégé.', true);
+        showModal(`Changer le shell : ${u.name}`, `
+            <label class="su-full-label">Shell utilisateur<select id="edit-shell" class="yoleo-input">${shellOptions(u.shell)}</select></label>
+            <p class="su-muted">Shell actuel : <code>${escapeHtml(u.shell || '-')}</code></p>
+        `, async () => {
+            const shell = document.getElementById('edit-shell').value;
+            if (!shell) { setStatus('Shell vide.', true); return true; }
+            return !(await postAction({action:'setshell', user:u.name, shell}));
+        }, false, 'su-modal-compact su-modal-shell');
+    }
+
+    function openHome() {
+        const u = requireSelected();
+        if (!u) return;
+        if (u.protected) return setStatus('Utilisateur protégé.', true);
+
+        const suggestedHome = (u.home && u.home !== '/') ? u.home : `/home/${u.name}`;
+        showModal(`Changer le home : ${u.name}`, `
+            <label class="su-full-label">Dossier home
+                <input id="edit-home" class="yoleo-input" value="${escapeHtml(suggestedHome)}" placeholder="/home/${escapeHtml(u.name)}">
+            </label>
+            <p class="su-muted">Home actuel : <code>${escapeHtml(u.home || '-')}</code></p>
+            <div class="su-warn">
+                Cette action modifie le champ HOME Linux avec <code>usermod -d</code>.
+                Elle ne déplace pas les fichiers et ne crée pas le dossier automatiquement.
+            </div>
+        `, async () => {
+            const home = document.getElementById('edit-home').value.trim();
+            if (!home) { setStatus('Dossier home vide.', true); return true; }
+            if (!home.startsWith('/')) { setStatus('Le home doit commencer par /', true); return true; }
+            return !(await postAction({action:'sethome', user:u.name, home}));
+        }, false, 'su-modal-compact su-modal-home');
+    }
+
+    function openPass() {
+        const u = requireSelected();
+        if (!u) return;
+        showModal(`Changer le mot de passe : ${u.name}`, `
+            <div class="su-form-grid su-grid-1">
+                <label>Nouveau mot de passe<input id="set-pass" class="yoleo-input" type="password" autocomplete="new-password"></label>
+                <label>Confirmation<input id="set-pass-confirm" class="yoleo-input" type="password" autocomplete="new-password"></label>
+                <p id="set-pass-feedback" class="su-muted">Tape deux fois le même mot de passe puis valide.</p>
+            </div>
+        `, async () => {
+            const passInput = document.getElementById('set-pass');
+            const confirmInput = document.getElementById('set-pass-confirm');
+            const feedback = document.getElementById('set-pass-feedback');
+            const password = passInput ? passInput.value : '';
+            const confirmPassword = confirmInput ? confirmInput.value : '';
+            if (!password) { if (feedback) feedback.textContent = 'Mot de passe vide.'; setStatus('Mot de passe vide.', true); return true; }
+            if (password !== confirmPassword) { if (feedback) feedback.textContent = 'Les deux mots de passe ne correspondent pas.'; setStatus('Les deux mots de passe ne correspondent pas.', true); return true; }
+            return !(await postAction({action:'setpass', user:u.name, password}));
+        }, false, 'su-modal-compact su-modal-pass');
+    }
+
+    async function toggleLockUser(name=null) {
+        const u = findUserAndSelect(name);
+        if (!u) return setStatus('Utilisateur introuvable.', true);
+        if (u.protected) return setStatus('Utilisateur protégé.', true);
+        await postAction({action: isUserLocked(u) ? 'unlock' : 'lock', user:u.name});
+    }
+
+    function removeUser(name=null) {
+        const u = findUserAndSelect(name) || requireSelected();
+        if (!u) return;
+        if (u.protected) return setStatus('Utilisateur protégé.', true);
+        showModal(`Supprimer : ${u.name}`, `
+            <div>Supprimer uniquement l’entrée utilisateur Linux :</div>
+            <div class="su-danger"><b>${escapeHtml(u.name)}</b><br>UID=${escapeHtml(u.uid)} GID=${escapeHtml(u.gid)}<br>Home conservé : ${escapeHtml(u.home)}</div>
+            <p class="su-muted">Le dossier home ne sera pas supprimé.</p>
+        `, async () => !(await postAction({action:'remove', user:u.name})), true, 'su-modal-compact su-modal-remove');
+    }
+
+    function openSshForUser(name) {
+        const u = users.find(item => item.name === name);
+        if (!u) return setStatus('Utilisateur introuvable.', true);
+        if (u.protected) return setStatus('Utilisateur protégé.', true);
+        findUserAndSelect(name);
+        const url = new URL(SSH_URL, window.location.origin);
+        url.searchParams.set('user', name);
+        url.searchParams.set('popup', '1');
+        const modal = document.getElementById('su-ssh-modal');
+        const frame = document.getElementById('su-ssh-frame');
+        const title = document.getElementById('su-ssh-title');
+        if (!modal || !frame) { window.location.href = url.toString(); return; }
+        if (title) title.textContent = `🔐 Générateur de clé SSH — ${name}`;
+        frame.src = url.toString();
+        modal.hidden = false;
+    }
+
+    function closeSshPopup() {
+        const modal = document.getElementById('su-ssh-modal');
+        const frame = document.getElementById('su-ssh-frame');
+        if (modal) modal.hidden = true;
+        if (frame) frame.src = 'about:blank';
+    }
+
+    window.addEventListener('message', (event) => {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data || {};
+        if (data.type === 'yoleo:ssh-close') closeSshPopup();
+        if (data.type === 'yoleo:ssh-generated') {
+            closeSshPopup();
+            setStatus(data.message || 'Clé SSH générée.');
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            if (modalIsOpen()) closeModal();
+            closeSshPopup();
+        }
+        if (event.key === 'F5') {
+            event.preventDefault();
+            loadUsers();
+        }
+        if (['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key) && !['INPUT', 'SELECT', 'TEXTAREA'].includes(String(event.target.tagName || '').toUpperCase())) {
+            const rows = getUserRows();
+            if (!rows.length) return;
+            let index = rows.findIndex(r => r.classList.contains('is-selected'));
+            if (index < 0) index = 0;
+            if (event.key === 'ArrowUp') index -= 1;
+            if (event.key === 'ArrowDown') index += 1;
+            if (event.key === 'Home') index = 0;
+            if (event.key === 'End') index = rows.length - 1;
+            index = Math.max(0, Math.min(index, rows.length - 1));
+            event.preventDefault();
+            selectUser(rows[index].dataset.user, rows[index]);
+        }
+    });
+
+    /*
+     * Menu clic droit Yoleo : le menu global de menu.html ouvre les entrées
+     * du menu haut quand le clic droit part d'une zone data-yoleo-context-zone.
+     * Cette page doit juste faire comme l'ancienne route /users/linux :
+     * sélectionner la ligne sous la souris AVANT que le menu global s'ouvre,
+     * sinon les actions UID/GID, Shell, Mot de passe, SSH, etc. ne savent pas
+     * sur quel compte travailler.
+     */
+    document.addEventListener('contextmenu', function(event) {
+        const row = event.target && event.target.closest ? event.target.closest('.su-row') : null;
+        if (!row) return;
+        const user = findUserAndSelect(row.dataset.user);
+        if (user) selectedUser = user;
+    }, true);
+
+    /*
+     * Sécurité pour les actions écrites dans les fichiers menu_top/*.conf.
+     * Les onclick du menu cranté/clic droit appellent ces noms directement
+     * (openAdd(), openIds(), requireSelected(), etc.). On les expose donc
+     * explicitement sur window au lieu de dépendre du comportement implicite
+     * du navigateur avec les fonctions déclarées dans le template.
+     */
+    Object.assign(window, {
+        openAdd,
+        openIds,
+        openShell,
+        openHome,
+        openPass,
+        openSshForUser,
+        backupUsers,
+        restoreUsers,
+        requireSelected,
+        toggleLockUser,
+        removeUser,
+        loadUsers
+    });
+
+    setInterval(() => {
+        if (!modalIsOpen() && document.hidden === false) loadUsers({quiet:true});
+    }, 10000);
+
+    loadUsers();
+</script>
+{% endblock %}

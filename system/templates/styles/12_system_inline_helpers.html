@@ -1,0 +1,121 @@
+    /* ------------------------------------------------------------------
+       Browser commun / boîtes Parcourir
+       À réutiliser pour les futurs /browser/file et /browser/folder.
+       ------------------------------------------------------------------ */
+    .browser-modal,
+    .browse-modal,
+    .static-browser-modal {
+        border: 1px solid var(--yoleo-border);
+        border-radius: 14px;
+        background: var(--yoleo-panel);
+        color: var(--yoleo-text);
+        box-shadow: var(--yoleo-shadow);
+    }
+
+    .browser-list,
+    .browse-list {
+        max-height: 52vh;
+        overflow: auto;
+        border: 1px solid var(--yoleo-border-soft);
+        border-radius: 12px;
+        background: rgba(4, 7, 11, .65);
+    }
+
+    .browser-row,
+    .browse-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 7px 9px;
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        cursor: pointer;
+    }
+
+    .browser-row:hover,
+    .browse-row:hover {
+        background: var(--yoleo-panel-soft);
+    }
+
+
+
+    /* Styles inline migrés automatiquement depuis les templates système. */
+    .sys-inline-001 { width:min(640px,96vw);background:#152033;border:1px solid #30435b;border-radius:18px;box-shadow:0 22px 50px rgba(0,0,0,.55);padding:16px;color:#e9eef5; } /* system.html */
+    .sys-inline-002 { display:flex;justify-content:space-between;gap:10px;align-items:flex-start;border-bottom:1px solid #30435b;padding-bottom:10px;margin-bottom:12px; } /* system.html */
+    .sys-inline-003 { margin:0;color:#fff;font-size:20px;font-weight:900; } /* system.html */
+    .sys-inline-004 { color:#92a6ba;font-size:12px;margin-top:4px; } /* system.html */
+    .sys-inline-005 { background:#263242;color:#e9eef5;border:1px solid #39485d;border-radius:10px;padding:8px 10px;cursor:pointer;font-weight:900; } /* system.html */
+    .sys-inline-006 { font-size:14px;line-height:1.45; } /* system.html */
+    .sys-inline-007 { display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap; } /* system.html */
+    .sys-inline-008 { background:#263242;color:#e9eef5;border:1px solid #39485d;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:900; } /* system.html */
+    .sys-inline-009 { background:#c93a3a;color:#fff;border:1px solid #c93a3a;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:900;opacity:.45; } /* system.html */
+    .sys-inline-010 { display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:#10161f;border:1px solid #39485d;border-radius:12px;padding:12px;cursor:pointer; } /* system.html */
+    .sys-inline-011 { margin-top:3px;transform:scale(1.25); } /* system.html */
+    .sys-inline-012 { color:#93a8bd;font-size:12px; } /* system.html */
+    .sys-inline-013 { margin-bottom:6px; } /* system_gestionnaire_conf.html */
+    .sys-inline-014 { margin-bottom:6px; } /* system_gestionnaire_conf.html */
+    .sys-inline-015 { margin-top:16px; } /* system_gestionnaire_conf.html */
+    .sys-inline-016 { font-weight:bold; color:#fff; } /* system_gestionnaire_conf.html */
+    .sys-inline-017 { flex:1; min-width:220px; } /* system_gestionnaire_conf.html */
+    .sys-inline-018 { color:#1AEBFF; font-weight:bold; } /* system_info.html */
+    .sys-inline-019 { font-size:11px; color:#aaa; } /* system_info.html */
+    .sys-inline-020 { min-height:180px; align-items:center; text-align:center; } /* system_info.html */
+    .sys-inline-021 { border-top: 3px solid #2ecc71; } /* system_info.html */
+    .sys-inline-022 { color:#2ecc71; cursor:pointer; } /* system_info.html */
+    .sys-inline-023 { font-size:10px; } /* system_info.html */
+    .sys-inline-024 { color:#666 } /* system_info.html */
+    .sys-inline-025 { border-top: 3px solid #3498db; } /* system_info.html */
+    .sys-inline-026 { color:#3498db; cursor:pointer; } /* system_info.html */
+    .sys-inline-027 { font-size:10px; } /* system_info.html */
+    .sys-inline-028 { color:#666 } /* system_info.html */
+    .sys-inline-029 { font-size:10px; color:#888; } /* system_info.html */
+    .sys-inline-030 { font-size:18px; font-weight:bold; color:#1AEBFF; } /* system_info.html */
+    .sys-inline-031 { font-size:10px; color:#888; } /* system_info.html */
+    .sys-inline-032 { font-size:18px; font-weight:bold; color:#fdcb6e; } /* system_info.html */
+    .sys-inline-033 { padding-left:0; padding-right:0; } /* system_info.html */
+    .sys-inline-034 { padding-left:0; padding-right:0; } /* system_info.html */
+    .sys-inline-035 { border-color: #3498db; box-shadow: 0 0 30px rgba(52, 152, 219, 0.2); } /* system_info.html */
+    .sys-inline-036 { color: #3498db; } /* system_info.html */
+    .sys-inline-037 { color:#888 } /* system_info.html */
+    .sys-inline-038 { color:#888 } /* system_info.html */
+    .sys-inline-039 { max-width:320px; } /* system_lan.html */
+    .sys-inline-040 { width:270px;text-align:right; } /* system_lan.html */
+    .sys-inline-041 { margin-bottom:14px; } /* system_lan.html */
+    .sys-inline-042 { max-width:320px; } /* system_lan.html */
+    .sys-inline-043 { width:300px;text-align:right; } /* system_lan.html */
+    .sys-inline-044 { margin-top:10px; } /* system_lan.html */
+    .sys-inline-045 { margin-top:10px; } /* system_lan.html */
+    .sys-inline-046 { padding-top:24px; } /* system_lan.html */
+    .sys-inline-047 { padding-top:24px; } /* system_lan.html */
+    .sys-inline-048 { margin-top:10px; } /* system_lan.html */
+    .sys-inline-049 { margin-top:10px; } /* system_lan.html */
+    .sys-inline-050 { width:min(720px,96vw); } /* system_lan.html */
+    .sys-inline-051 { display:none;margin-top:12px; } /* system_lan.html */
+    .sys-inline-052 { white-space:pre-wrap;margin:0; } /* system_lan.html */
+    .sys-inline-053 { display:none; } /* system_logs.html */
+    .sys-inline-054 { width: 32%; } /* system_mdns.html */
+    .sys-inline-055 { width: 48%; } /* system_mdns.html */
+    .sys-inline-056 { width: 20%; text-align:right; } /* system_mdns.html */
+    .sys-inline-057 { display:none; } /* system_personnalisation.html */
+    .sys-inline-058 { width:26px;height:26px;object-fit:contain; } /* system_personnalisation.html */
+    .sys-inline-059 { width:26px;height:26px;object-fit:contain; } /* system_personnalisation.html */
+    .sys-inline-060 { margin-top:12px; } /* system_personnalisation.html */
+    .sys-inline-061 { color:#8fa1b7;padding:8px; } /* system_personnalisation.html */
+    .sys-inline-062 { font-size:28px; } /* system_personnalisation.html */
+    .sys-inline-063 { font-size:30px; } /* system_personnalisation.html */
+    .sys-inline-064 { color:#8fa1b7;padding:8px; } /* system_personnalisation.html */
+    .sys-inline-065 { color:#ffaaa4;padding:8px; } /* system_personnalisation.html */
+    .sys-inline-066 { color:#8fa1b7;padding:8px; } /* system_personnalisation.html */
+    .sys-inline-067 { font-size:28px; } /* system_personnalisation.html */
+    .sys-inline-068 { font-size:30px; } /* system_personnalisation.html */
+    .sys-inline-069 { font-size:28px; } /* system_personnalisation.html */
+    .sys-inline-070 { color:#8fa1b7;padding:8px; } /* system_personnalisation.html */
+    .sys-inline-071 { color:#ffaaa4;padding:8px; } /* system_personnalisation.html */
+    .sys-inline-072 { grid-column:1/-1; } /* system_services.html */
+    .sys-inline-073 { justify-content:flex-start;margin-bottom:10px; } /* system_system.html */
+    .sys-inline-074 { width:44px; } /* system_system.html */
+    .sys-inline-075 { width:44px; } /* system_system.html */
+    .sys-gpu-power-value { font-size: 20px; }
+
+
+

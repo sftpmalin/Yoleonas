@@ -1,0 +1,233 @@
+{% extends "dockers_base.html" %}
+
+{% block route_content %}
+{% set docker_icon_fallback = url_for('static', filename='logo.png') %}
+{% macro docker_container_icon(c) -%}
+<img class="docker-icon"
+     src="{{ c.icon or docker_icon_fallback }}"
+     alt=""
+     decoding="async"
+     referrerpolicy="no-referrer"
+     data-docker-icon-fallback="{{ docker_icon_fallback }}"
+     onerror="this.onerror=null;this.src=this.dataset.dockerIconFallback;">
+{%- endmacro %}
+{% set dsvc = docker_service_status if docker_service_status is defined else {'state':'unknown','label':'Inconnu','active':none} %}
+    {% set docker_service_active = dsvc.active == true %}
+    {% set docker_running_count = docker_stats.running if docker_stats is defined else 0 %}
+    {% set docker_stopped_count = docker_stats.stopped if docker_stats is defined else 0 %}
+    <div id="docker-live-area">
+    <section class="summary-grid docker-containers-summary-compact">
+        <div class="yoleo-card summary-card"><div class="summary-label">Conteneurs</div><div class="summary-value cyan">{{ docker_stats.total if docker_stats is defined else 0 }}</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">Démarrés</div><div class="summary-value green">{{ docker_stats.running if docker_stats is defined else 0 }}</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">Arrêtés</div><div class="summary-value red">{{ docker_stats.stopped if docker_stats is defined else 0 }}</div></div>
+        <div class="yoleo-card summary-card"><div class="summary-label">Service Docker</div><div class="summary-value">{{ dsvc.label }}</div></div>
+        <div class="yoleo-card summary-card docker-compose-mini-card"><div class="summary-label">Stacks Compose</div><div class="summary-value cyan">{{ stack_summary.stacks }}</div></div>
+        <div class="yoleo-card summary-card docker-compose-mini-card"><div class="summary-label">YAML</div><div class="summary-value green">{{ yml_files|length }}</div></div>
+        <div class="yoleo-card summary-card docker-compose-path-card"><div class="summary-label">Dossier YML</div><div class="summary-value docker-ellipsis" title="{{ conf.YML_FOLDER }}">{{ conf.YML_FOLDER }}</div></div>
+        <div class="docker-compose-progress-wrap docker-compose-progress-compact" data-docker-compose-progress aria-label="Progression Compose compact">
+            <div class="docker-compose-status-line" data-docker-compose-status hidden>Prêt.</div>
+            <div class="docker-compose-progress-line">
+                <div class="docker-compose-progress-bar"><span data-docker-compose-progress-fill style="width:0%"></span></div>
+                <span class="docker-compose-progress-text" data-docker-compose-progress-text>0%</span>
+            </div>
+        </div>
+        <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-compose-log-open docker-compose-log-open-compact" data-docker-compose-log-open type="button" onclick="dockerOpenComposeTtyd()" title="Ouvrir le vrai log Compose dans ttyd">📜</button>
+    </section>
+
+    <section class="yoleo-card docker-section">
+        <div class="docker-containers-actions-row">
+            <div class="docker-compose-inline-zone" aria-label="Actions Compose">
+                <div class="docker-compose-inline-actions">
+                    <button class="yoleo-btn yoleo-btn-green yoleo-btn-compact" type="button" onclick="dockerRunStream('system_stacks_update', this)">🔄 Pull</button>
+                    <button class="yoleo-btn yoleo-btn-primary yoleo-btn-compact" type="button" onclick="dockerRunStream('system_stacks_start', this)">▶ Start</button>
+                    <button class="yoleo-btn yoleo-btn-muted yoleo-btn-compact" type="button" onclick="dockerRunStream('system_stacks_list', this)">📋 List</button>
+                </div>
+                <div class="docker-compose-progress-wrap" id="docker-compose-progress" data-docker-compose-progress aria-label="Progression Compose">
+                    <div class="docker-compose-status-line" data-docker-compose-status hidden>Prêt.</div>
+                    <div class="docker-compose-progress-line">
+                        <div class="docker-compose-progress-bar"><span id="docker-compose-progress-fill" data-docker-compose-progress-fill style="width:0%"></span></div>
+                        <span class="docker-compose-progress-text" id="docker-compose-progress-text" data-docker-compose-progress-text>0%</span>
+                    </div>
+                </div>
+                <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-compose-log-open" id="docker-compose-log-open" data-docker-compose-log-open type="button" onclick="dockerOpenComposeTtyd()" title="Ouvrir le vrai log Compose dans ttyd">📜</button>
+            </div>
+            <div class="docker-service-inline-zone">
+                <form method="post" action="{{ url_for('dockers_bp.stacks_docker') }}" class="actions-line">
+                    <button class="yoleo-btn yoleo-btn-green yoleo-btn-compact" name="action" value="start_all" type="submit" {% if not docker_service_active or docker_stopped_count == 0 %}disabled aria-disabled="true" title="{{ 'Le service Docker doit être actif' if not docker_service_active else 'Tous les conteneurs sont déjà démarrés' }}"{% endif %}>▶ Tout démarrer</button>
+                    <button class="yoleo-btn yoleo-btn-orange yoleo-btn-compact" name="action" value="stop_all" type="submit" {% if not docker_service_active or docker_running_count == 0 %}disabled aria-disabled="true" title="{{ 'Le service Docker doit être actif' if not docker_service_active else 'Tous les conteneurs sont déjà arrêtés' }}"{% endif %}>■ Tout arrêter</button>
+                    <button class="yoleo-btn yoleo-btn-green yoleo-btn-icon" name="action" value="start_docker_service" type="submit" title="Démarrer Docker" {% if docker_service_active %}disabled aria-disabled="true"{% endif %}>▶</button>
+                    <button class="yoleo-btn yoleo-btn-orange yoleo-btn-icon" name="action" value="restart_docker_service" type="submit" title="Redémarrer Docker" {% if not docker_service_active %}disabled aria-disabled="true"{% endif %}>↻</button>
+                    <button class="yoleo-btn yoleo-btn-red yoleo-btn-icon" name="action" value="stop_docker_service" type="submit" title="Arrêter Docker" {% if not docker_service_active %}disabled aria-disabled="true"{% endif %}>■</button>
+                </form>
+            </div>
+        </div>
+        <pre id="docker-stream-log" class="docker-log-box docker-compose-log-box docker-compose-inline-log" hidden></pre>
+        {% if docker_connection_notice %}<div class="action-message">{{ docker_connection_notice }}</div>{% endif %}
+        {% if docker_connection_error %}<div class="action-message bad">{{ docker_connection_error }}</div>{% endif %}
+        <div class="table-wrap" data-yoleo-context-zone="docker-containers-table">
+            <table class="yoleo-table docker-table">
+                <thead><tr><th>État</th><th>Nom</th><th>Image</th><th>IP</th><th>Volumes</th><th>Actions</th></tr></thead>
+                <tbody>
+                    {% if not docker_stacks %}
+                    <tr><td colspan="6">Aucun conteneur.</td></tr>
+                    {% else %}
+                    {% for stack_name, containers in docker_stacks.items() %}
+                    <tr class="group-row"><td colspan="6">📂 {{ stack_name }}</td></tr>
+                    {% for c in containers %}
+                    <tr class="docker-container-row">
+                        <td>
+                            <div class="docker-state-tools">
+                                <span class="status-pill {{ 'ok' if c.state == 'running' else 'bad' }}">{{ c.state }}</span>
+                                <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-ttyd-btn" type="button" title="Logs Docker" onclick='dockerOpenContainerTtyd("logs", {{ c.name|tojson }})'>📜</button>
+                                {% if c.state == 'running' %}
+                                <button class="yoleo-btn yoleo-btn-primary yoleo-btn-icon docker-ttyd-btn" type="button" title="Terminal docker exec" onclick='dockerOpenContainerTtyd("exec", {{ c.name|tojson }})'>⌨</button>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="docker-name-cell">
+                            {% if c.webui %}<a href="{{ c.webui }}" target="_blank">{{ docker_container_icon(c) }}</a>{% else %}{{ docker_container_icon(c) }}{% endif %}
+                            <span>{{ c.name }}</span>
+                        </td>
+                        <td><span class="docker-ellipsis" title="{{ c.image }}">{{ c.image }}</span></td>
+                        <td><span class="mono">{{ c.ip }}</span></td>
+                        <td><span class="docker-ellipsis" title="{% for m in c.mounts %}{{ m.Source if m.Source is defined else m['Source'] }} → {{ m.Destination if m.Destination is defined else m['Destination'] }}{% if not loop.last %} | {% endif %}{% endfor %}">{% if c.mounts %}{{ c.mounts|length }} volume(s){% else %}—{% endif %}</span></td>
+                        <td>
+                            <form method="post" action="{{ url_for('dockers_bp.stacks_docker') }}" class="actions-line">
+                                <input type="hidden" name="id" value="{{ c.id }}">
+                                <input type="hidden" name="docker_name" value="{{ c.name }}">
+                                {% if c.state == 'running' %}
+                                <button class="yoleo-btn yoleo-btn-orange yoleo-btn-icon" name="action" value="restart" title="Redémarrer">↻</button>
+                                <button class="yoleo-btn yoleo-btn-red yoleo-btn-icon" name="action" value="stop" title="Stopper">■</button>
+                                {% else %}
+                                <button class="yoleo-btn yoleo-btn-green yoleo-btn-icon" name="action" value="start" title="Démarrer">▶</button>
+                                {% endif %}
+                                <button class="yoleo-btn yoleo-btn-red yoleo-btn-icon" name="action" value="rm" title="Supprimer conteneur">✕</button>
+                                <button class="yoleo-btn yoleo-btn-red yoleo-btn-icon" name="action" value="rmi" title="Supprimer image">🗑</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    </div>
+<script>
+(function () {
+    'use strict';
+    const fallbackDelayMs = 2500;
+
+    function useFallback(img) {
+        if (!img || img.dataset.dockerIconFallbackApplied === '1') return;
+        const fallback = img.dataset.dockerIconFallback || '/static/logo.png';
+        if (!fallback || img.getAttribute('src') === fallback) return;
+        img.dataset.dockerIconFallbackApplied = '1';
+        img.src = fallback;
+    }
+
+    function wireDockerIconFallbacks(root) {
+        (root || document).querySelectorAll('img.docker-icon[data-docker-icon-fallback]').forEach(function (img) {
+            if (img.dataset.dockerIconFallbackReady === '1') return;
+            img.dataset.dockerIconFallbackReady = '1';
+            img.addEventListener('error', function () { useFallback(img); }, {once: true});
+            window.setTimeout(function () {
+                if (!img.complete || img.naturalWidth === 0) useFallback(img);
+            }, fallbackDelayMs);
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { wireDockerIconFallbacks(document); });
+    } else {
+        wireDockerIconFallbacks(document);
+    }
+})();
+</script>
+<style>
+/* Docker > Conteneurs : quand la roue crantée est active, les boutons passent dans le menu haut.
+   Sans roue crantée, l'ancien affichage reste intact en fallback. */
+.docker-compose-progress-compact,
+.docker-compose-log-open-compact {
+    display: none;
+}
+
+body.yoleo-has-page-settings .docker-containers-summary-compact {
+    grid-template-columns: repeat(7, minmax(70px, 1fr)) minmax(210px, 320px) auto;
+    align-items: stretch;
+    gap: 7px;
+}
+
+body.yoleo-has-page-settings .docker-containers-summary-compact .summary-card {
+    min-width: 0;
+    min-height: 48px;
+    padding: 7px 9px;
+}
+
+body.yoleo-has-page-settings .docker-containers-summary-compact .summary-label {
+    font-size: 9px;
+    letter-spacing: .35px;
+}
+
+body.yoleo-has-page-settings .docker-containers-summary-compact .summary-value {
+    font-size: 17px;
+    line-height: 1.12;
+}
+
+body.yoleo-has-page-settings .docker-containers-summary-compact .docker-compose-path-card {
+    min-width: 0;
+}
+
+body.yoleo-has-page-settings .docker-containers-summary-compact .docker-compose-path-card .summary-value {
+    font-size: 12px;
+    line-height: 1.05;
+    font-weight: 750;
+    white-space: normal;
+    word-break: break-word;
+}
+
+body.yoleo-has-page-settings .docker-containers-summary-compact .docker-compose-progress-compact {
+    display: flex;
+    align-self: stretch;
+    min-width: 0;
+    margin: 0;
+}
+
+body.yoleo-has-page-settings .docker-containers-summary-compact .docker-compose-log-open-compact {
+    display: inline-flex;
+}
+
+body.yoleo-has-page-settings .docker-containers-summary-compact .docker-compose-log-open-compact {
+    align-self: center;
+    justify-self: end;
+}
+
+body.yoleo-has-page-settings .docker-containers-actions-row {
+    display: none !important;
+}
+
+body.yoleo-has-page-settings .docker-section {
+    padding-top: 0;
+}
+
+@media (max-width: 1350px) {
+    body.yoleo-has-page-settings .docker-containers-summary-compact {
+        grid-template-columns: repeat(4, minmax(76px, 1fr)) minmax(210px, 1fr) auto;
+    }
+}
+
+@media (max-width: 760px) {
+    body.yoleo-has-page-settings .docker-containers-summary-compact {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    body.yoleo-has-page-settings .docker-containers-summary-compact .docker-compose-progress-compact {
+        grid-column: 1 / -1;
+    }
+    body.yoleo-has-page-settings .docker-containers-summary-compact .docker-compose-log-open-compact {
+        justify-self: start;
+    }
+}
+</style>
+
+{% endblock %}

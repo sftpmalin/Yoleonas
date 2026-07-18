@@ -1,0 +1,827 @@
+/* Partage > Samba : sous-navigation interne ajoutée en style4 uniquement. */
+.partage-samba-subnav-v4 {
+    margin-bottom: 14px;
+    gap: 10px;
+}
+
+.partage-page .partage-samba-subnav-v4 .yoleo-subnav-link {
+    white-space: nowrap;
+}
+
+.partage-empty-tab-v4 {
+    min-height: 180px;
+}
+
+.partage-empty-note-v4 {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px dashed rgba(148, 163, 184, .35);
+    background: rgba(15, 23, 42, .28);
+    color: var(--yoleo-muted);
+}
+
+@media (max-width: 900px) {
+    .partage-samba-subnav-v4 {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+}
+
+
+/* Partage > Samba : répartition propre des sous-pages sans toucher aux anciens styles. */
+.partage-samba-main-actions-v4 .toolbar {
+    align-items: center;
+}
+
+.partage-main-note-v4 {
+    margin-top: 12px;
+    padding: 13px 15px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, .20);
+    background: rgba(15, 23, 42, .30);
+    color: var(--yoleo-muted);
+    line-height: 1.45;
+}
+
+.partage-main-note-v4 a {
+    color: var(--yoleo-accent-2);
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.partage-main-note-v4 a:hover {
+    text-decoration: underline;
+}
+
+.partage-table-actions-v4 {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.partage-info-summary-v4 {
+    margin-top: 4px;
+}
+
+@media (max-width: 900px) {
+    .partage-table-actions-v4 {
+        justify-content: stretch;
+        width: 100%;
+    }
+
+    .partage-table-actions-v4 .yoleo-btn,
+    .partage-samba-main-actions-v4 .toolbar .yoleo-btn {
+        width: 100%;
+    }
+}
+
+
+/* Partage > Samba : réorganisation Général/Réglage, classes isolées style4. */
+.partage-samba-general-head-v4 {
+    align-items: center;
+}
+
+.partage-samba-backup-summary-v4 {
+    grid-template-columns: minmax(220px, 340px);
+    margin-top: 12px;
+}
+
+.partage-samba-backup-form-v4 {
+    grid-template-columns: minmax(260px, 420px);
+    margin-top: 12px;
+}
+
+.partage-samba-settings-toolbar-v4 {
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.partage-service-head-v4 {
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.partage-service-head-v4 .title-block h2 {
+    margin-bottom: 0;
+}
+
+.partage-samba-services-v4 {
+    margin-top: 12px;
+}
+
+.partage-service-summary-v4 {
+    margin-top: 0;
+}
+
+@media (max-width: 900px) {
+    .partage-samba-backup-summary-v4,
+    .partage-samba-backup-form-v4 {
+        grid-template-columns: 1fr;
+    }
+
+    .partage-samba-settings-toolbar-v4,
+    .partage-service-head-v4 .toolbar,
+    .partage-samba-general-head-v4 .toolbar {
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .partage-samba-settings-toolbar-v4 .yoleo-btn,
+    .partage-service-head-v4 .toolbar .yoleo-btn,
+    .partage-samba-general-head-v4 .toolbar .yoleo-btn {
+        width: 100%;
+    }
+}
+
+/* Partage > Samba : Général nettoyé, sans titre/bouton dupliqués. */
+.partage-samba-backup-only-v4 {
+    margin-top: 0;
+    max-width: 440px;
+}
+
+.partage-samba-backup-only-v4 .field {
+    margin-bottom: 0;
+}
+
+.partage-samba-main-actions-v4 + .partage-samba-services-v4 {
+    margin-top: 12px;
+}
+
+
+
+/* Partage > Samba : nettoyage final Général / Réglage / Info sans toucher aux styles 1-3. */
+.partage-samba-services-main-v4 {
+    margin-top: 0;
+}
+
+.partage-service-summary-compact-v4 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 8px;
+}
+
+.partage-service-card-compact-v4 {
+    min-width: 0;
+    padding: 10px 10px;
+}
+
+.partage-service-card-compact-v4 .summary-label {
+    font-size: 11px;
+    letter-spacing: .04em;
+}
+
+.partage-service-card-compact-v4 .summary-value {
+    font-size: 15px;
+    line-height: 1.2;
+}
+
+.partage-service-badges-compact-v4 {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.partage-service-badges-compact-v4 .badge {
+    padding: 3px 7px;
+    font-size: 10px;
+}
+
+.partage-info-inline-card-v4 .summary-value {
+    font-weight: 900;
+}
+
+.partage-info-fields-v4 {
+    margin-top: 6px;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 12px;
+}
+
+.partage-info-fields-v4 .field label {
+    font-size: 11px;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.partage-info-fields-v4 .path-pill,
+.partage-info-fields-v4 .text-input[readonly] {
+    min-height: 34px;
+}
+
+.partage-info-fields-v4 .text-input[readonly] {
+    opacity: .95;
+    cursor: default;
+}
+
+.partage-settings-services-only-v4 {
+    margin-top: 0;
+}
+
+.partage-settings-service-grid-v4 {
+    margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+    .partage-service-summary-compact-v4,
+    .partage-info-fields-v4 {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+
+/* Partage > Samba : retours d'action inline, spinner et liens Log. */
+.status-box.partage-message-ok-v4,
+.status-box.partage-message-error-v4 {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-weight: 800;
+}
+
+.status-box.partage-message-ok-v4 {
+    border: 1px solid rgba(76, 175, 80, .45);
+    background: rgba(76, 175, 80, .13);
+    color: #b7ffbf;
+}
+
+.status-box.partage-message-error-v4 {
+    border: 1px solid rgba(244, 67, 54, .50);
+    background: rgba(244, 67, 54, .16);
+    color: #ffd5d5;
+}
+
+.partage-log-link-v4 {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 10px;
+    color: #ff9cff;
+    text-decoration: none;
+    font-weight: 900;
+}
+
+.partage-log-link-v4:hover {
+    text-decoration: underline;
+}
+
+.yoleo-spinner-v4 {
+    display: inline-block;
+    width: .95em;
+    height: .95em;
+    margin-right: 7px;
+    border: 2px solid rgba(255, 255, 255, .35);
+    border-top-color: rgba(255, 255, 255, .95);
+    border-radius: 50%;
+    vertical-align: -2px;
+    animation: yoleo-spin-v4 .8s linear infinite;
+}
+
+.yoleo-btn.is-loading-v4 {
+    opacity: .88;
+    cursor: wait;
+}
+
+@keyframes yoleo-spin-v4 {
+    to { transform: rotate(360deg); }
+}
+
+.partage-table-actions-v4 {
+    margin-left: auto;
+    justify-content: flex-end;
+}
+
+
+/* Partage > Samba > Info : texte d'aide déplacé depuis Dossier partagé. */
+.partage-samba-info-note-v4 {
+    margin: 8px 0 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(184, 92, 255, .28);
+    border-radius: 14px;
+    background: rgba(184, 92, 255, .08);
+}
+
+.partage-samba-info-title-v4 {
+    margin-bottom: 6px;
+    color: #ff9cff;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.partage-samba-info-text-v4 {
+    color: var(--yoleo-text);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+
+
+
+/* Partage > Samba : Réglages simplifiés, actions techniques compactes. */
+.partage-samba-settings-toolbar-v4 .partage-samba-save-apply-v4 {
+    min-width: 190px;
+}
+
+.partage-samba-settings-toolbar-v4 .partage-samba-icon-action-v4 {
+    min-width: 40px;
+    width: 40px;
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+}
+
+@media (max-width: 900px) {
+    .partage-samba-settings-toolbar-v4 .partage-samba-save-apply-v4 {
+        width: auto;
+        flex: 1 1 210px;
+    }
+
+    .partage-samba-settings-toolbar-v4 .partage-samba-icon-action-v4 {
+        width: 40px;
+        flex: 0 0 40px;
+    }
+}
+
+
+/* Partage > Samba : petit OK psychologique sur les réglages globaux. */
+.partage-samba-setting-ok-line-v4 {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.partage-samba-setting-ok-line-v4 .select-input {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.partage-samba-global-ok-v4 {
+    min-width: 48px;
+    padding-left: 12px;
+    padding-right: 12px;
+    justify-content: center;
+}
+
+/* Partage > Samba : tableau des partages mieux équilibré + verrouillage visuel. */
+.partage-samba-shares-auto-v5 #sambaSharesTable {
+    table-layout: fixed !important;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-name { width: 9%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-path { width: 24%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-owner { width: 9%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-type { width: 8%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-small { width: 6.9%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-state { width: 7.5%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-actions { width: 8%; }
+
+.partage-samba-shares-auto-v5 #sambaSharesTable th,
+.partage-samba-shares-auto-v5 #sambaSharesTable td {
+    padding-left: 7px;
+    padding-right: 7px;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .path-edit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .path-edit .text-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .path-edit .yoleo-btn {
+    flex: 0 0 34px;
+    width: 34px;
+    min-width: 34px;
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(n+4):nth-child(-n+9) .select-input {
+    width: auto;
+    min-width: 58px;
+    max-width: 86px;
+    padding-left: 8px;
+    padding-right: 22px;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(3) .select-input {
+    width: 100%;
+    min-width: 74px;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .text-input,
+.partage-samba-shares-auto-v5 #sambaSharesTable .select-input {
+    height: 34px;
+    font-size: 12px;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .actions-cell {
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .is-invalid-v5 {
+    border-color: rgba(255, 92, 92, .92) !important;
+    box-shadow: 0 0 0 2px rgba(255, 92, 92, .18) !important;
+    background: rgba(90, 18, 24, .40) !important;
+}
+
+
+.partage-samba-shares-auto-v5 #sambaSharesTable th {
+    white-space: nowrap;
+    font-size: 10.5px;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable th:nth-child(7) {
+    letter-spacing: .02em;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable tr:focus-visible {
+    outline: 2px solid var(--yoleo-accent-2);
+    outline-offset: -2px;
+}
+
+@media (max-width: 1200px) {
+    .partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-path { width: 22.5%; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-small { width: 7.15%; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable th,
+    .partage-samba-shares-auto-v5 #sambaSharesTable td {
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+}
+
+@media (max-width: 900px) {
+    .partage-samba-shares-auto-v5 .partage-samba-shares-table-wrap {
+        display: block !important;
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable,
+    .partage-samba-shares-auto-v5 #sambaSharesTable tbody,
+    .partage-samba-shares-auto-v5 #sambaSharesTable tr,
+    .partage-samba-shares-auto-v5 #sambaSharesTable td {
+        display: block;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable {
+        border-collapse: separate;
+        border-spacing: 0;
+        table-layout: auto !important;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable colgroup,
+    .partage-samba-shares-auto-v5 #sambaSharesTable thead {
+        display: none !important;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable tbody {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 10px;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable tr {
+        padding: 10px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 14px;
+        background: rgba(12, 18, 27, .92);
+        box-shadow: 0 12px 26px rgba(0, 0, 0, .18);
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable tr.share-editing {
+        border-color: rgba(26, 235, 255, .40);
+        background: rgba(10, 20, 31, .96);
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable td {
+        min-height: 34px;
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+        padding: 6px 0 !important;
+        border: 0 !important;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable td::before {
+        color: #8fb4d6;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(1)::before { content: "Nom"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(2)::before { content: "Chemin"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(3)::before { content: "Utilisateur"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(4)::before { content: "Type"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(5)::before { content: "Guest"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(6)::before { content: "Read only"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(7)::before { content: "Browsable"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(8)::before { content: "Writable"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(9)::before { content: "Corbeille"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(10)::before { content: "État"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(11)::before { content: "Actions"; }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable .path-pill,
+    .partage-samba-shares-auto-v5 #sambaSharesTable .readonly-cell,
+    .partage-samba-shares-auto-v5 #sambaSharesTable .badge {
+        justify-self: start;
+        max-width: 100%;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable .path-pill {
+        width: 100%;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable .text-input,
+    .partage-samba-shares-auto-v5 #sambaSharesTable .select-input,
+    .partage-samba-shares-auto-v5 #sambaSharesTable .path-edit {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(n+4):nth-child(-n+9) .select-input,
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(3) .select-input {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable .actions-cell {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 430px) {
+    .partage-samba-shares-auto-v5 #sambaSharesTable tbody {
+        grid-template-columns: 1fr;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable td {
+        grid-template-columns: 82px minmax(0, 1fr);
+        gap: 6px;
+    }
+}
+
+
+/* Partage > Samba : réglages globaux simplifiés pour usage NAS normal. */
+.partage-samba-global-simple-card-v6 .topbar {
+    justify-content: center;
+    text-align: center;
+}
+
+/* Partage > Samba : nouveau tableau Public / Securise / Prive. */
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-name { width: 9%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-path { width: 25%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-access { width: 10%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-users { width: 26%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-small { width: 8%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-state { width: 7.5%; }
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-share-col-actions { width: 7.5%; }
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-access-summary {
+    display: block;
+    margin-top: 5px;
+    color: var(--yoleo-muted);
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-access-summary-lines b {
+    color: #8fe9ff;
+    margin-right: 4px;
+}
+
+.partage-samba-shares-auto-v5 #sambaSharesTable .samba-access-users-btn:disabled,
+.partage-samba-shares-auto-v5 #sambaSharesTable .select-input:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+.samba-access-modal {
+    max-width: 620px;
+}
+
+.samba-access-modal-note {
+    margin-bottom: 10px;
+    color: var(--yoleo-muted);
+    font-size: 12px;
+}
+
+.samba-access-modal-table-wrap {
+    max-height: 52vh;
+    overflow: auto;
+}
+
+.samba-root-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(34, 211, 238, .25);
+    border-radius: 8px;
+    background: rgba(10, 18, 32, .72);
+    color: var(--yoleo-text);
+    font-weight: 800;
+}
+
+.samba-root-option[hidden] {
+    display: none !important;
+}
+
+.samba-root-option input {
+    width: 16px;
+    height: 16px;
+    accent-color: #22d3ee;
+}
+
+@media (max-width: 900px) {
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(1)::before { content: "Nom"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(2)::before { content: "Chemin"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(3)::before { content: "Acces"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(4)::before { content: "Utilisateurs"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(5)::before { content: "Browsable"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(6)::before { content: "Corbeille"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(7)::before { content: "Etat"; }
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(8)::before { content: "Actions"; }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable td:nth-child(n+9) {
+        display: none !important;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable .samba-access-summary {
+        margin-top: 7px;
+        font-size: 12px;
+    }
+
+    .partage-samba-shares-auto-v5 #sambaSharesTable .samba-access-users-btn {
+        margin-bottom: 2px;
+    }
+}
+
+.partage-samba-global-simple-v6 {
+    grid-template-columns: 260px 330px 58px;
+    align-items: end;
+    justify-content: center;
+    gap: 10px;
+    width: min(100%, 680px);
+    margin: 0 auto;
+}
+
+.partage-samba-global-simple-v6 .field {
+    min-width: 0;
+}
+
+.partage-samba-global-simple-v6 .text-input {
+    width: 100%;
+}
+
+.partage-samba-global-ok-field-v6 {
+    min-width: 58px;
+    width: 58px;
+}
+
+.partage-samba-global-ok-v6 {
+    width: 58px;
+    min-width: 58px;
+    min-height: 36px;
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+}
+
+@media (max-width: 720px) {
+    .partage-samba-global-simple-card-v6 .topbar {
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    .partage-samba-global-simple-v6 {
+        grid-template-columns: 1fr;
+        width: min(100%, 380px);
+        justify-content: stretch;
+        margin: 0 auto;
+    }
+
+    .partage-samba-global-ok-field-v6 {
+        width: 58px;
+    }
+
+    .partage-samba-global-ok-field-v6 label {
+        display: none;
+    }
+}
+
+/* Patch 2026-06-16 - Samba droits modal : un seul ascenseur interne */
+#sambaAccessModal.modal-backdrop {
+    overflow: hidden;
+}
+
+#sambaAccessModal .samba-access-modal {
+    width: min(580px, calc(100vw - 42px));
+    max-width: 580px;
+    max-height: min(82vh, 720px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#sambaAccessModal .samba-access-modal .modal-head,
+#sambaAccessModal .samba-access-modal .modal-actions {
+    flex: 0 0 auto;
+}
+
+#sambaAccessModal .samba-access-modal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#sambaAccessModal .samba-access-modal-note {
+    flex: 0 0 auto;
+}
+
+#sambaAccessModal .samba-access-modal-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#sambaAccessModal .samba-access-modal-table {
+    width: 100%;
+}
+
+#sambaAccessModal .samba-access-modal-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+/* Patch 2026-06-16 - Samba droits modal : titre compact et liste remontee */
+#sambaAccessModal .samba-access-modal-title-line {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+#sambaAccessModal .samba-access-modal-subtitle {
+    color: var(--yoleo-muted);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+#sambaAccessModal .samba-access-modal .modal-body {
+    padding-top: 10px;
+    gap: 0;
+}
+
+#sambaAccessModal .samba-access-modal-note {
+    display: none !important;
+    margin: 0 !important;
+}
+
+/* Patch 2026-06-17 - Partages Samba : édition verrouillée + confirmation suppression. */
+.partage-samba-shares-auto-v5 #sambaSharesTable .actions-cell .yoleo-btn-icon {
+    min-width: 30px;
+    padding-left: 7px;
+    padding-right: 7px;
+}
+
+#sambaDeleteConfirmModal .samba-delete-confirm-modal {
+    width: min(460px, calc(100vw - 42px));
+    max-width: 460px;
+}
+
+#sambaDeleteConfirmModal .samba-delete-confirm-text {
+    margin: 0;
+    color: var(--yoleo-text);
+    font-weight: 800;
+    line-height: 1.45;
+}

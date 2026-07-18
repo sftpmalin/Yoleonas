@@ -1,0 +1,61 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<section id="tab-logs" class="system-tab-panel active">
+                <div class="system-tools-page">
+                    <div class="system-tool-card">
+                        <div class="system-tool-head system-tool-head-compact">
+                            <div class="system-form-line">
+                                <select class="system-select" id="logs-source" onchange="toggleLogsUnit(); loadSystemLogs()">
+                                    <option value="system">Système</option>
+                                    <option value="boot">Boot courant</option>
+                                    <option value="kernel">Kernel</option>
+                                    <option value="unit">Service</option>
+                                </select>
+                                <input class="system-input sys-inline-053" id="logs-unit" placeholder="docker.service" value="{{ default_log_unit }}">
+                                <select class="system-select" id="logs-lines" onchange="loadSystemLogs()">
+                                    <option value="80">80 lignes</option>
+                                    <option value="180" selected>180 lignes</option>
+                                    <option value="400">400 lignes</option>
+                                    <option value="800">800 lignes</option>
+                                </select>
+                                <button class="yoleo-btn" type="button" onclick="loadSystemLogs(true)">↻ Lire</button>
+                            </div>
+                            <div class="system-tool-subtitle" id="logs-last">journalctl général, kernel, boot ou service précis.</div>
+                        </div>
+                        <pre class="log-box" id="system-logs-box">Chargement...</pre>
+                    </div>
+                </div>
+            </section>
+
+
+            
+
+<script>
+function logsSetText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (value === undefined || value === null || value === '') ? '—' : value;
+}
+function toggleLogsUnit() {
+    const source = document.getElementById('logs-source')?.value || 'system';
+    const unit = document.getElementById('logs-unit');
+    if (unit) unit.style.display = source === 'unit' ? '' : 'none';
+}
+async function loadSystemLogs(force = false) {
+    try {
+        toggleLogsUnit();
+        const source = encodeURIComponent(document.getElementById('logs-source')?.value || 'system');
+        const unit = encodeURIComponent(document.getElementById('logs-unit')?.value || '');
+        const lines = encodeURIComponent(document.getElementById('logs-lines')?.value || '180');
+        const data = await (await fetch(`/system/api/logs?source=${source}&unit=${unit}&lines=${lines}`, {cache:'no-store'})).json();
+        const box = document.getElementById('system-logs-box');
+        if (box) box.textContent = data.output || data.message || '(aucun log)';
+        logsSetText('logs-last', `${data.message || 'Logs'} — ${data.generated_at || ''}`);
+    } catch (e) {
+        const box = document.getElementById('system-logs-box');
+        if (box) box.textContent = 'Erreur lecture journalctl.';
+    }
+}
+document.addEventListener('DOMContentLoaded', function () { loadSystemLogs(); });
+</script>
+{% endblock %}

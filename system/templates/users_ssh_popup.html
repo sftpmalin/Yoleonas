@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Générateur de clé SSH</title>
+    {% include "style.html" %}
+    <style>html, body.ssh-route-page { overflow: hidden !important; min-height: 0 !important; height: auto !important; margin:0 !important; }</style>
+</head>
+<body class="ssh-route-page">
+<div class="users-page ssh-popup-page">
+    <div class="form-card ssh-popup-card">
+        {% if ssh_error %}
+            <div class="ssh-popup-error">
+                <strong>Erreur</strong>
+                <span>{{ ssh_error }}</span>
+            </div>
+            <div class="ssh-popup-actions">
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closePopup()">Fermer</button>
+            </div>
+        {% else %}
+            <div class="ssh-popup-mainrow">
+                <div class="ssh-popup-user">
+                    <span class="ssh-popup-label">Utilisateur</span>
+                    <strong>{{ target_user.name }}</strong>
+                </div>
+                <div class="ssh-popup-type">
+                    <label class="lbl-lu" for="ssh-key-type">Type de clé</label>
+                    <select id="ssh-key-type" class="select-input sel-lu">
+                        {% for key, label in ssh_key_types.items() %}
+                        <option value="{{ key }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="ssh-popup-paths">
+                <div>
+                    <span>Clé privée</span>
+                    <code id="ssh-private-preview"></code>
+                </div>
+                <div>
+                    <span>Clé publique</span>
+                    <code id="ssh-public-preview"></code>
+                </div>
+            </div>
+
+            <div id="ssh-result" class="result-box ssh-popup-result" style="display:none;"></div>
+
+            <div class="ssh-popup-actions">
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closePopup()">Annuler</button>
+                <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="generateSshKey()" {% if not allow_actions %}disabled{% endif %}>🚀 Générer</button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    const SSH_POPUP_USER = {{ (target_user.name if target_user else '') | tojson }};
+    const SSH_POPUP_HOME = {{ (target_user.home if target_user else '') | tojson }};
+
+
+    function closePopup(message=null) {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({type: 'yoleo:ssh-close', message: message || ''}, window.location.origin);
+        } else {
+            window.location.href = {{ url_for('users_bp.index') | tojson }};
+        }
+    }
+
+    function notifyGenerated(message) {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({type: 'yoleo:ssh-generated', message: message || 'Clé SSH générée.'}, window.location.origin);
+        } else {
+            window.location.href = {{ url_for('users_bp.index') | tojson }};
+        }
+    }
+
+    function showResult(id, msg, isError=false) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.display = 'block';
+        el.classList.remove('ok', 'error');
+        el.classList.add(isError ? 'error' : 'ok');
+        el.textContent = msg;
+    }
+
+    function updatePreview() {
+        if (!SSH_POPUP_USER) return;
+        const home = String(SSH_POPUP_HOME || `/home/${SSH_POPUP_USER}`).replace(/\/+$/, '');
+        const privateEl = document.getElementById('ssh-private-preview');
+        const publicEl = document.getElementById('ssh-public-preview');
+        if (privateEl) privateEl.textContent = `${home}/key/${SSH_POPUP_USER}`;
+        if (publicEl) publicEl.textContent = `${home}/key/${SSH_POPUP_USER}.pub`;
+    }
+
+    async function generateSshKey() {
+        const keyTypeEl = document.getElementById('ssh-key-type');
+        const keyType = keyTypeEl ? keyTypeEl.value : 'ed25519';
+        if (!SSH_POPUP_USER) {
+            showResult('ssh-result', 'Utilisateur invalide.', true);
+            return;
+        }
+
+        showResult('ssh-result', 'Génération SSH en cours...');
+        try {
+            const r = await fetch('/api/users/ssh/generate', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({user: SSH_POPUP_USER, key_type: keyType})
+            });
+            const d = await r.json();
+
+            if (d.error) {
+                showResult('ssh-result', d.error, true);
+                return;
+            }
+
+            const msg = `✅ ${d.message}`;
+            showResult('ssh-result', msg);
+            setTimeout(() => notifyGenerated(msg), 450);
+        } catch (e) {
+            showResult('ssh-result', 'Erreur pendant la génération SSH.', true);
+        }
+    }
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closePopup();
+        if (event.key === 'Enter' && SSH_POPUP_USER) generateSshKey();
+    });
+
+    updatePreview();
+</script>
+</body>
+</html>

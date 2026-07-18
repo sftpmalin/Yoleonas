@@ -1,0 +1,66 @@
+/* Colonne Label Disk/Maintenance + popup changement de label. */
+.label-col {
+    width: 118px;
+    min-width: 104px;
+    max-width: 140px;
+    white-space: nowrap;
+}
+
+.disk-label-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.disk-label-text {
+    display: inline-block;
+    max-width: 88px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.disk-label-edit {
+    padding: 3px 6px;
+    min-width: 28px;
+    line-height: 1;
+    flex: 0 0 auto;
+}
+
+.disk-label-edit:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+.label-modal-compact {
+    max-width: 560px;
+}
+
+.label-modal-body {
+    display: grid;
+    gap: 10px;
+}
+
+.label-modal-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+}
+
+.disk-table-compact .yoleo-table {
+    min-width: 1360px;
+}
+
+.disk-maintenance-raid-card .table-wrap .yoleo-table,
+.disk-maintenance-main-card .table-wrap .yoleo-table {
+    min-width: 1280px;
+}
+
+@media (max-width: 760px) {
+    .label-modal-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,30 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-mergerfs" class="disk-section disk-mergerfs-page">
+    <section class="yoleo-card disk-card disk-mergerfs-card">
+        <div class="disk-card-head compact-head mergerfs-head">
+            <div class="mergerfs-head-title">
+                <h3>Profils MergerFS</h3>
+            </div>
+        </div>
+        <pre class="output-box mergerfs-output-hidden" id="mergerfs-output" hidden></pre>
+        <div class="table-wrap disk-table-compact mergerfs-table-wrap">
+            <table class="yoleo-table mini-table mergerfs-table">
+                <thead>
+                    <tr>
+                        <th class="state-col">État</th>
+                        <th class="mergerfs-destination-col">Destination</th>
+                        <th class="mergerfs-sources-col">Sources</th>
+                        <th class="mergerfs-options-col">Options</th>
+                        <th class="actions-col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="mergerfs-tbody">
+                    <tr><td colspan="5" class="empty-state">Chargement MergerFS...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

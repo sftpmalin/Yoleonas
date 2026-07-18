@@ -1,0 +1,35 @@
+{% extends "dockers_base.html" %}
+
+{% block route_content %}
+<form method="post" action="{{ url_for('dockers_bp.stacks_config_save') }}" class="yoleo-card docker-section docker-options-form">
+        <input type="hidden" name="active_tab" value="options">
+
+        <div class="docker-options-layout docker-options-layout-simple">
+            <section class="docker-option-panel docker-option-wide">
+                <div class="docker-option-head docker-option-head-actions">
+                    <div>
+                        <div class="card-title">Chemins principaux</div>
+                        <div class="subtitle">Fichier : <span class="mono">{{ config_file }}</span></div>
+                    </div>
+                    <button class="yoleo-btn yoleo-btn-primary" type="submit">💾 Enregistrer</button>
+                </div>
+                <div class="docker-option-fields docker-option-fields-compact">
+                    <div class="form-row docker-option-full docker-option-path-row">
+                        <label>Dossier YML</label>
+                        <div class="actions-line docker-path-field docker-option-short-path">
+                            <input id="YML_FOLDER" class="yoleo-input mono" name="YML_FOLDER" value="{{ conf.UI_YML_FOLDER or conf.YML_FOLDER }}">
+                            <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon" type="button" onclick="openYoleoBrowser('folder','YML_FOLDER','{{ (conf.UI_YML_FOLDER or conf.YML_FOLDER)|e }}')" title="Parcourir">📁</button>
+                        </div>
+                    </div>
+                    <div class="form-row docker-option-full docker-option-path-row">
+                        <label>Dossier Docker Run</label>
+                        <div class="actions-line docker-path-field docker-option-short-path">
+                            <input id="DOCKER_RUN_DIR" class="yoleo-input mono" name="DOCKER_RUN_DIR" value="{{ conf.UI_DOCKER_RUN_DIR or conf.DOCKER_RUN_DIR }}">
+                            <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon" type="button" onclick="openYoleoBrowser('folder','DOCKER_RUN_DIR','{{ (conf.UI_DOCKER_RUN_DIR or conf.DOCKER_RUN_DIR)|e }}')" title="Parcourir">📁</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </form>
+{% endblock %}

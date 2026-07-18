@@ -1,0 +1,815 @@
+{% extends "dockers_base.html" %}
+
+{% block route_content %}
+<form method="post" action="{{ url_for('dockers_bp.stacks_env_save') }}" class="docker-env-browser-form" id="dockerEnvBrowserForm">
+    <section class="yoleo-card docker-section docker-env-browser-section">
+        <div id="dockerEnvBrowserStatus" class="status-line docker-env-browser-status" hidden></div>
+
+        <div class="docker-env-browser-head">
+            <div>
+                <div id="dockerEnvBrowserCounter" class="docker-env-browser-counter"></div>
+                <div class="docker-env-browser-path mono" title="{{ conf.ENV_FILE }}">Fichier ENV : {{ conf.ENV_FILE }}</div>
+                <div id="dockerEnvBrowserCrumbs" class="docker-env-browser-crumbs"></div>
+            </div>
+            {% if not (_menu_top_active|default(false)) %}
+            <div class="docker-env-browser-actions">
+                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="dockerEnvAddVariable()">+ Variable</button>
+                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="dockerEnvAddComment()">+ Commentaire</button>
+            </div>
+            {% endif %}
+        </div>
+
+        <div id="dockerEnvBrowserGrid" class="docker-env-browser-grid" data-yoleo-context-zone="docker-env-grid"></div>
+        <div id="dockerEnvHiddenRows" hidden></div>
+    </section>
+</form>
+
+<div id="dockerEnvConfirmModal" class="docker-env-confirm-modal" hidden>
+    <div class="docker-env-confirm-box" role="dialog" aria-modal="true" aria-labelledby="dockerEnvConfirmTitle">
+        <h3 id="dockerEnvConfirmTitle">Confirmer la suppression</h3>
+        <p id="dockerEnvConfirmText">Supprimer cette entrée ?</p>
+        <div class="docker-env-confirm-actions">
+            <button type="button" id="dockerEnvConfirmCancel" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="dockerEnvCancelDelete()">Annuler</button>
+            <button type="button" id="dockerEnvConfirmDelete" class="yoleo-btn yoleo-btn-danger yoleo-btn-small" onclick="dockerEnvConfirmDelete()">Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let dockerEnvRows = [
+{% for row in env_rows %}
+{% if row.row_type == 'raw' %}
+    {id: 'env_{{ loop.index0 }}', type: 'raw', raw: {{ row.raw|tojson }}}{% if not loop.last %},{% endif %}
+{% else %}
+    {id: 'env_{{ loop.index0 }}', type: 'kv', key: {{ row.key|tojson }}, value: {{ row.value|tojson }}}{% if not loop.last %},{% endif %}
+{% endif %}
+{% endfor %}
+];
+if (!Array.isArray(dockerEnvRows) || !dockerEnvRows.length) {
+    dockerEnvRows = [{id: dockerEnvNewId('raw'), type: 'raw', raw: '# General'}];
+}
+
+let dockerEnvCurrentGroup = -1;
+let dockerEnvEditing = null;
+let dockerEnvEditBackup = null;
+let dockerEnvFocus = {type: 'group', rowIndex: dockerEnvFirstCommentIndex()};
+let dockerEnvDeletePending = null;
+let dockerEnvStatusTimer = null;
+let dockerEnvAutoSaveTimer = null;
+let dockerEnvSaveInFlight = false;
+let dockerEnvSaveQueued = false;
+const dockerEnvKeyRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function dockerEnvNewId(prefix) {
+    return String(prefix || 'env') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function dockerEnvEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function dockerEnvIsComment(row) {
+    return row && row.type === 'raw' && String(row.raw || '').trim().startsWith('#');
+}
+
+function dockerEnvIsKv(row) {
+    return row && row.type === 'kv';
+}
+
+function dockerEnvCleanRaw(value) {
+    return String(value ?? '').replace(/[\r\n]/g, ' ').trim();
+}
+
+function dockerEnvCommentTitle(row) {
+    const raw = dockerEnvCleanRaw(row?.raw || '# Groupe');
+    return raw.replace(/^#+\s*/, '').trim() || 'Groupe';
+}
+
+function dockerEnvMakeComment(title) {
+    title = dockerEnvCleanRaw(title || 'Nouveau groupe').replace(/^#+\s*/, '').trim() || 'Nouveau groupe';
+    return '# ' + title;
+}
+
+function dockerEnvNormalize() {
+    dockerEnvRows = (Array.isArray(dockerEnvRows) ? dockerEnvRows : []).map((row) => {
+        if (row?.type === 'kv') {
+            return {id: row.id || dockerEnvNewId('kv'), type: 'kv', key: String(row.key ?? ''), value: String(row.value ?? '')};
+        }
+        return {id: row?.id || dockerEnvNewId('raw'), type: 'raw', raw: String(row?.raw ?? '')};
+    });
+    if (!dockerEnvRows.length) dockerEnvRows.push({id: dockerEnvNewId('raw'), type: 'raw', raw: '# General'});
+    if (dockerEnvCurrentGroup >= 0 && !dockerEnvIsComment(dockerEnvRows[dockerEnvCurrentGroup])) dockerEnvCurrentGroup = -1;
+}
+
+function dockerEnvCommentIndices() {
+    const out = [];
+    dockerEnvRows.forEach((row, index) => {
+        if (dockerEnvIsComment(row)) out.push(index);
+    });
+    return out;
+}
+
+function dockerEnvFirstCommentIndex() {
+    const comments = dockerEnvCommentIndices();
+    return comments.length ? comments[0] : -1;
+}
+
+function dockerEnvNextCommentIndex(rowIndex) {
+    for (let i = rowIndex + 1; i < dockerEnvRows.length; i++) {
+        if (dockerEnvIsComment(dockerEnvRows[i])) return i;
+    }
+    return dockerEnvRows.length;
+}
+
+function dockerEnvGroupChildren(rowIndex) {
+    if (rowIndex < 0 || !dockerEnvIsComment(dockerEnvRows[rowIndex])) return [];
+    const end = dockerEnvNextCommentIndex(rowIndex);
+    const out = [];
+    for (let i = rowIndex + 1; i < end; i++) out.push(i);
+    return out;
+}
+
+function dockerEnvGroupVariableCount(rowIndex) {
+    return dockerEnvGroupChildren(rowIndex).filter(i => dockerEnvIsKv(dockerEnvRows[i])).length;
+}
+
+function dockerEnvRootItems() {
+    const comments = dockerEnvCommentIndices();
+    if (!comments.length) return dockerEnvRows.map((_row, index) => index);
+    const first = comments[0];
+    const loose = [];
+    for (let i = 0; i < first; i++) loose.push(i);
+    return [...loose, ...comments];
+}
+
+function dockerEnvVisibleItems() {
+    if (dockerEnvCurrentGroup >= 0) return dockerEnvGroupChildren(dockerEnvCurrentGroup);
+    return dockerEnvRootItems();
+}
+
+function dockerEnvTotalVars() {
+    return dockerEnvRows.filter(dockerEnvIsKv).length;
+}
+
+function dockerEnvTotalGroups() {
+    return dockerEnvCommentIndices().length;
+}
+
+function dockerEnvHideStatus() {
+    const el = document.getElementById('dockerEnvBrowserStatus');
+    if (!el) return;
+    el.textContent = '';
+    el.className = 'status-line docker-env-browser-status';
+    el.setAttribute('hidden', 'hidden');
+    el.style.display = 'none';
+}
+
+function dockerEnvSetStatus(message, ok=true, autohide=true) {
+    const el = document.getElementById('dockerEnvBrowserStatus');
+    if (!el) return;
+    if (dockerEnvStatusTimer) {
+        clearTimeout(dockerEnvStatusTimer);
+        dockerEnvStatusTimer = null;
+    }
+    message = String(message || '').trim();
+    if (!message) {
+        dockerEnvHideStatus();
+        return;
+    }
+    el.textContent = message;
+    el.className = 'status-line docker-env-browser-status ' + (ok ? 'ok' : 'bad');
+    el.removeAttribute('hidden');
+    el.style.display = 'inline-flex';
+    if (ok && autohide) dockerEnvStatusTimer = setTimeout(dockerEnvHideStatus, 1100);
+}
+
+function dockerEnvRenderCrumbs() {
+    const crumbs = document.getElementById('dockerEnvBrowserCrumbs');
+    if (!crumbs) return;
+    const parts = [`<button type="button" onclick="dockerEnvGoRoot()">🏠 Racine</button>`];
+    if (dockerEnvCurrentGroup >= 0 && dockerEnvRows[dockerEnvCurrentGroup]) {
+        parts.push(`<span>›</span><button type="button" onclick="dockerEnvOpenGroup(${dockerEnvCurrentGroup})">${dockerEnvEscape(dockerEnvCommentTitle(dockerEnvRows[dockerEnvCurrentGroup]))}</button>`);
+    }
+    crumbs.innerHTML = parts.join('');
+}
+
+function dockerEnvRenderCounter() {
+    const counter = document.getElementById('dockerEnvBrowserCounter');
+    if (!counter) return;
+    if (dockerEnvCurrentGroup >= 0 && dockerEnvRows[dockerEnvCurrentGroup]) {
+        counter.textContent = `Groupe : ${dockerEnvCommentTitle(dockerEnvRows[dockerEnvCurrentGroup])} · ${dockerEnvGroupVariableCount(dockerEnvCurrentGroup)} variable(s)`;
+        return;
+    }
+    counter.textContent = `${dockerEnvTotalGroups()} groupe(s) · ${dockerEnvTotalVars()} variable(s)`;
+}
+
+function dockerEnvRender() {
+    dockerEnvNormalize();
+    dockerEnvRenderCrumbs();
+    dockerEnvRenderCounter();
+    const grid = document.getElementById('dockerEnvBrowserGrid');
+    if (!grid) return;
+    const items = dockerEnvVisibleItems();
+    grid.innerHTML = items.length
+        ? items.map((rowIndex) => dockerEnvRenderRowTile(rowIndex)).join('')
+        : '<div class="docker-env-browser-empty">Ce groupe est vide. Ajoute une variable avec le bouton du haut.</div>';
+    dockerEnvApplyInlineLayout();
+    dockerEnvAfterRenderFocus();
+}
+
+function dockerEnvMeasureTextChars(value) {
+    return Array.from(String(value ?? '')).reduce((total, char) => total + (/[MW@#%&]/.test(char) ? 1.35 : /[il.,:;|!]/.test(char) ? 0.55 : 1), 0);
+}
+
+function dockerEnvApplyInlineLayout() {
+    const grid = document.getElementById('dockerEnvBrowserGrid');
+    if (!grid) return;
+    const rows = dockerEnvVisibleItems()
+        .map((rowIndex) => dockerEnvRows[rowIndex])
+        .filter((row) => dockerEnvIsKv(row));
+    if (!rows.length) {
+        grid.style.removeProperty('--docker-env-key-col');
+        grid.style.removeProperty('--docker-env-line-ch');
+        return;
+    }
+    const maxKey = Math.max(...rows.map((row) => dockerEnvMeasureTextChars(String(row.key || '').trim() || 'Variable sans nom')));
+    const maxLine = Math.max(...rows.map((row) => {
+        const key = String(row.key || '').trim() || 'Variable sans nom';
+        const value = String(row.value || '(valeur vide)');
+        return dockerEnvMeasureTextChars(key) + dockerEnvMeasureTextChars(value) + 5;
+    }));
+    grid.style.setProperty('--docker-env-key-col', Math.max(10, Math.min(42, Math.ceil(maxKey + 2))) + 'ch');
+    grid.style.setProperty('--docker-env-line-ch', Math.max(48, Math.min(120, Math.ceil(maxLine + 8))));
+}
+
+function dockerEnvInputWidth(value, min=12, max=64, extra=4) {
+    const len = Math.max(String(value || '').length, 1) + extra;
+    return Math.max(min, Math.min(max, len));
+}
+
+function dockerEnvInputStyle(value, min=12, max=64, extra=4) {
+    return `width:${dockerEnvInputWidth(value, min, max, extra)}ch`;
+}
+
+function dockerEnvAutoSize(input, min=12, max=64, extra=4) {
+    if (!input) return;
+    input.style.width = dockerEnvInputWidth(input.value, min, max, extra) + 'ch';
+}
+
+function dockerEnvRenderRowTile(rowIndex) {
+    const row = dockerEnvRows[rowIndex];
+    if (dockerEnvIsComment(row)) return dockerEnvRenderGroupTile(row, rowIndex);
+    if (dockerEnvIsKv(row)) return dockerEnvRenderVariableTile(row, rowIndex);
+    return dockerEnvRenderRawTile(row, rowIndex);
+}
+
+function dockerEnvEditFocusOut(rowIndex) {
+    setTimeout(() => {
+        if (!dockerEnvEditing || dockerEnvEditing.rowIndex !== rowIndex) return;
+        const tile = document.querySelector(`.docker-env-tile[data-row-index="${rowIndex}"]`);
+        if (tile && !tile.contains(document.activeElement)) dockerEnvStopEdit();
+    }, 0);
+}
+
+function dockerEnvRenderGroupTile(row, rowIndex) {
+    const title = dockerEnvCommentTitle(row);
+    const safeTitle = dockerEnvEscape(title);
+    const count = dockerEnvGroupVariableCount(rowIndex);
+    const focused = dockerEnvFocus.type === 'group' && dockerEnvFocus.rowIndex === rowIndex ? ' is-key-focused' : '';
+    if (dockerEnvEditing && dockerEnvEditing.type === 'group' && dockerEnvEditing.rowIndex === rowIndex) {
+        return `
+            <div class="docker-env-tile is-group is-editing" data-type="group" data-row-index="${rowIndex}" tabindex="0" onfocus="dockerEnvFocus={type:'group',rowIndex:${rowIndex}}" onfocusout="dockerEnvEditFocusOut(${rowIndex})">
+                <div class="docker-env-tile-icon">📁</div>
+                <div class="docker-env-tile-edit">
+                    <input class="yoleo-input" value="${safeTitle}" placeholder="Nom du groupe" style="${dockerEnvInputStyle(title, 14, 42, 5)}" oninput="dockerEnvRows[${rowIndex}].raw=dockerEnvMakeComment(this.value); dockerEnvAutoSize(this,14,42,5)">
+                </div>
+                <div class="docker-env-tile-actions">
+                    <button type="button" class="docker-env-tile-action is-save" title="Valider" onclick="dockerEnvStopEdit()">💾</button>
+                    <button type="button" class="docker-env-tile-action" title="Annuler" onclick="dockerEnvCancelEdit()">↩</button>
+                </div>
+            </div>`;
+    }
+    return `
+        <div class="docker-env-tile is-group${focused}" data-type="group" data-row-index="${rowIndex}" tabindex="0" onfocus="dockerEnvFocus={type:'group',rowIndex:${rowIndex}}" onkeydown="dockerEnvTileKeydown(event, 'group', ${rowIndex})" onclick="if (!event.target.closest('.docker-env-tile-action, button, input')) dockerEnvOpenGroup(${rowIndex})">
+            <div class="docker-env-tile-icon">📁</div>
+            <div class="docker-env-tile-label">${safeTitle}</div>
+            <div class="docker-env-tile-sub">${count} variable(s) · clic pour ouvrir</div>
+            <div class="docker-env-tile-actions">
+                <button type="button" class="docker-env-tile-action" title="Ouvrir" onclick="dockerEnvOpenGroup(${rowIndex})">↵</button>
+                <button type="button" class="docker-env-tile-action" title="Renommer" onclick="dockerEnvStartEdit('group', ${rowIndex})">✎</button>
+                <button type="button" class="docker-env-tile-action" title="Monter" onclick="dockerEnvMoveGroup(${rowIndex}, -1)">▲</button>
+                <button type="button" class="docker-env-tile-action" title="Descendre" onclick="dockerEnvMoveGroup(${rowIndex}, 1)">▼</button>
+                <button type="button" class="docker-env-tile-action is-danger" title="Supprimer" onclick="dockerEnvAskDelete('group', ${rowIndex})">×</button>
+            </div>
+        </div>`;
+}
+
+function dockerEnvRenderVariableTile(row, rowIndex) {
+    const key = String(row.key || '').trim();
+    const value = String(row.value || '');
+    const safeKey = dockerEnvEscape(key || 'Variable sans nom');
+    const safeValue = dockerEnvEscape(value || '(valeur vide)');
+    const focused = dockerEnvFocus.type === 'variable' && dockerEnvFocus.rowIndex === rowIndex ? ' is-key-focused' : '';
+    if (dockerEnvEditing && dockerEnvEditing.type === 'variable' && dockerEnvEditing.rowIndex === rowIndex) {
+        return `
+            <div class="docker-env-tile is-variable is-editing" data-type="variable" data-row-index="${rowIndex}" tabindex="0" onfocus="dockerEnvFocus={type:'variable',rowIndex:${rowIndex}}" onfocusout="dockerEnvEditFocusOut(${rowIndex})">
+                <div class="docker-env-tile-icon">🗒️</div>
+                <div class="docker-env-var-edit">
+                    <input class="yoleo-input mono docker-env-key-input" value="${dockerEnvEscape(row.key || '')}" placeholder="VARIABLE" style="${dockerEnvInputStyle(row.key || '', 14, 34, 5)}" oninput="dockerEnvRows[${rowIndex}].key=this.value; dockerEnvAutoSize(this,14,34,5)">
+                    <span class="docker-env-equals">=</span>
+                    <input class="yoleo-input mono docker-env-value-input" value="${dockerEnvEscape(row.value || '')}" placeholder="valeur" style="${dockerEnvInputStyle(row.value || '', 16, 52, 8)}" oninput="dockerEnvRows[${rowIndex}].value=this.value; dockerEnvAutoSize(this,16,52,8)">
+                </div>
+                <div class="docker-env-tile-sub">Modification variable</div>
+                <div class="docker-env-tile-actions">
+                    <button type="button" class="docker-env-tile-action is-save" title="Valider" onclick="dockerEnvStopEdit()">💾</button>
+                    <button type="button" class="docker-env-tile-action" title="Annuler" onclick="dockerEnvCancelEdit()">↩</button>
+                </div>
+            </div>`;
+    }
+    return `
+        <div class="docker-env-tile is-variable${focused}" data-type="variable" data-row-index="${rowIndex}" tabindex="0" title="${safeKey}=${safeValue}" onfocus="dockerEnvFocus={type:'variable',rowIndex:${rowIndex}}" onkeydown="dockerEnvTileKeydown(event, 'variable', ${rowIndex})" onclick="if (!event.target.closest('.docker-env-tile-action, button, input')) dockerEnvStartEdit('variable', ${rowIndex})">
+            <div class="docker-env-tile-icon">🗒️</div>
+            <div class="docker-env-inline-kv mono">
+                <span class="docker-env-inline-key">${safeKey}</span>
+                <span class="docker-env-inline-equals">=</span>
+                <span class="docker-env-inline-value">${safeValue}</span>
+            </div>
+            <div class="docker-env-tile-actions">
+                <button type="button" class="docker-env-tile-action" title="Modifier" onclick="dockerEnvStartEdit('variable', ${rowIndex})">✎</button>
+                <button type="button" class="docker-env-tile-action" title="Monter" onclick="dockerEnvMoveRow(${rowIndex}, -1)">▲</button>
+                <button type="button" class="docker-env-tile-action" title="Descendre" onclick="dockerEnvMoveRow(${rowIndex}, 1)">▼</button>
+                <button type="button" class="docker-env-tile-action is-danger" title="Supprimer" onclick="dockerEnvAskDelete('variable', ${rowIndex})">×</button>
+            </div>
+        </div>`;
+}
+
+function dockerEnvRenderRawTile(row, rowIndex) {
+    const raw = String(row.raw || '');
+    const safeRaw = dockerEnvEscape(raw || 'Ligne brute');
+    const focused = dockerEnvFocus.type === 'raw' && dockerEnvFocus.rowIndex === rowIndex ? ' is-key-focused' : '';
+    if (dockerEnvEditing && dockerEnvEditing.type === 'raw' && dockerEnvEditing.rowIndex === rowIndex) {
+        return `
+            <div class="docker-env-tile is-raw is-editing" data-type="raw" data-row-index="${rowIndex}" tabindex="0" onfocus="dockerEnvFocus={type:'raw',rowIndex:${rowIndex}}" onfocusout="dockerEnvEditFocusOut(${rowIndex})">
+                <div class="docker-env-tile-icon">📝</div>
+                <div class="docker-env-raw-edit">
+                    <input class="yoleo-input mono" value="${dockerEnvEscape(raw)}" placeholder="Ligne brute" style="${dockerEnvInputStyle(raw, 18, 72, 6)}" oninput="dockerEnvRows[${rowIndex}].raw=this.value; dockerEnvAutoSize(this,18,72,6)">
+                </div>
+                <div class="docker-env-tile-sub">Modification ligne brute</div>
+                <div class="docker-env-tile-actions">
+                    <button type="button" class="docker-env-tile-action is-save" title="Valider" onclick="dockerEnvStopEdit()">💾</button>
+                    <button type="button" class="docker-env-tile-action" title="Annuler" onclick="dockerEnvCancelEdit()">↩</button>
+                </div>
+            </div>`;
+    }
+    return `
+        <div class="docker-env-tile is-raw${focused}" data-type="raw" data-row-index="${rowIndex}" tabindex="0" onfocus="dockerEnvFocus={type:'raw',rowIndex:${rowIndex}}" onkeydown="dockerEnvTileKeydown(event, 'raw', ${rowIndex})" onclick="if (!event.target.closest('.docker-env-tile-action, button, input')) dockerEnvStartEdit('raw', ${rowIndex})">
+            <div class="docker-env-tile-icon">📝</div>
+            <div class="docker-env-tile-label">Ligne brute</div>
+            <div class="docker-env-tile-sub">${safeRaw || '(vide)'}</div>
+            <div class="docker-env-tile-actions">
+                <button type="button" class="docker-env-tile-action" title="Modifier" onclick="dockerEnvStartEdit('raw', ${rowIndex})">✎</button>
+                <button type="button" class="docker-env-tile-action" title="Monter" onclick="dockerEnvMoveRow(${rowIndex}, -1)">▲</button>
+                <button type="button" class="docker-env-tile-action" title="Descendre" onclick="dockerEnvMoveRow(${rowIndex}, 1)">▼</button>
+                <button type="button" class="docker-env-tile-action is-danger" title="Supprimer" onclick="dockerEnvAskDelete('raw', ${rowIndex})">×</button>
+            </div>
+        </div>`;
+}
+
+function dockerEnvOpenGroup(rowIndex) {
+    if (!dockerEnvIsComment(dockerEnvRows[rowIndex])) return;
+    dockerEnvCurrentGroup = rowIndex;
+    dockerEnvEditing = null;
+    const firstChild = dockerEnvGroupChildren(rowIndex)[0];
+    dockerEnvFocus = {type: firstChild === undefined ? 'group' : (dockerEnvIsKv(dockerEnvRows[firstChild]) ? 'variable' : 'raw'), rowIndex: firstChild === undefined ? rowIndex : firstChild};
+    dockerEnvRender();
+}
+
+function dockerEnvGoRoot() {
+    dockerEnvCurrentGroup = -1;
+    dockerEnvEditing = null;
+    if (!dockerEnvRows[dockerEnvFocus.rowIndex]) dockerEnvFocus = {type: 'group', rowIndex: dockerEnvFirstCommentIndex()};
+    dockerEnvRender();
+}
+
+function dockerEnvCloneState() {
+    return JSON.parse(JSON.stringify(dockerEnvRows));
+}
+
+function dockerEnvStartEdit(type, rowIndex, backupState=null) {
+    dockerEnvEditing = {type, rowIndex};
+    dockerEnvFocus = {type, rowIndex};
+    dockerEnvEditBackup = backupState || dockerEnvCloneState();
+    dockerEnvRender();
+}
+
+function dockerEnvFindDuplicateKey(key, rowIndex) {
+    key = String(key || '').trim();
+    if (!key) return -1;
+    for (let i = 0; i < dockerEnvRows.length; i++) {
+        if (i === rowIndex || !dockerEnvIsKv(dockerEnvRows[i])) continue;
+        if (String(dockerEnvRows[i].key || '').trim() === key) return i;
+    }
+    return -1;
+}
+
+function dockerEnvValidateEditedRow() {
+    if (!dockerEnvEditing) return true;
+    const {type, rowIndex} = dockerEnvEditing;
+    const row = dockerEnvRows[rowIndex];
+    if (!row) return true;
+    if (type === 'group') {
+        row.raw = dockerEnvMakeComment(dockerEnvCommentTitle(row));
+        return true;
+    }
+    if (type === 'raw') {
+        row.raw = dockerEnvCleanRaw(row.raw || '');
+        return true;
+    }
+    if (type === 'variable') {
+        row.key = String(row.key || '').trim();
+        row.value = String(row.value || '').trim();
+        if (!row.key && !row.value) {
+            dockerEnvRows.splice(rowIndex, 1);
+            return true;
+        }
+        if (!row.key) {
+            dockerEnvSetStatus('Nom de variable obligatoire.', false, false);
+            return false;
+        }
+        if (!dockerEnvKeyRe.test(row.key)) {
+            dockerEnvSetStatus('Nom de variable invalide : lettres, chiffres et underscore seulement, sans chiffre au début.', false, false);
+            return false;
+        }
+        const duplicate = dockerEnvFindDuplicateKey(row.key, rowIndex);
+        if (duplicate >= 0) {
+            dockerEnvSetStatus('Variable déjà présente : ' + row.key, false, false);
+            return false;
+        }
+    }
+    return true;
+}
+
+function dockerEnvValidateAllRows(show=true) {
+    const seen = new Set();
+    for (const row of dockerEnvRows) {
+        if (!dockerEnvIsKv(row)) continue;
+        const key = String(row.key || '').trim();
+        const value = String(row.value || '').trim();
+        if (!key && !value) continue;
+        if (!key) {
+            if (show) dockerEnvSetStatus('Une variable a un nom vide.', false, false);
+            return false;
+        }
+        if (!dockerEnvKeyRe.test(key)) {
+            if (show) dockerEnvSetStatus('Nom de variable invalide : ' + key, false, false);
+            return false;
+        }
+        if (seen.has(key)) {
+            if (show) dockerEnvSetStatus('Variable en double : ' + key, false, false);
+            return false;
+        }
+        seen.add(key);
+    }
+    return true;
+}
+
+function dockerEnvStopEdit() {
+    if (!dockerEnvValidateEditedRow()) return;
+    dockerEnvEditing = null;
+    dockerEnvEditBackup = null;
+    dockerEnvRender();
+    dockerEnvScheduleAutoSave(250);
+}
+
+function dockerEnvCancelEdit() {
+    if (dockerEnvEditBackup) dockerEnvRows = dockerEnvEditBackup;
+    dockerEnvEditing = null;
+    dockerEnvEditBackup = null;
+    dockerEnvRender();
+}
+
+function dockerEnvAddComment() {
+    const backup = dockerEnvCloneState();
+    const insertAt = dockerEnvCurrentGroup >= 0 ? dockerEnvNextCommentIndex(dockerEnvCurrentGroup) : dockerEnvRows.length;
+    const row = {id: dockerEnvNewId('raw'), type: 'raw', raw: '# Nouveau groupe'};
+    dockerEnvRows.splice(insertAt, 0, row);
+    dockerEnvCurrentGroup = -1;
+    dockerEnvFocus = {type: 'group', rowIndex: insertAt};
+    dockerEnvStartEdit('group', insertAt, backup);
+}
+
+function dockerEnvAddVariable() {
+    const backup = dockerEnvCloneState();
+    let insertAt;
+    if (dockerEnvCurrentGroup >= 0 && dockerEnvIsComment(dockerEnvRows[dockerEnvCurrentGroup])) {
+        insertAt = dockerEnvNextCommentIndex(dockerEnvCurrentGroup);
+    } else {
+        const firstComment = dockerEnvFirstCommentIndex();
+        insertAt = firstComment >= 0 ? firstComment : dockerEnvRows.length;
+    }
+    dockerEnvRows.splice(insertAt, 0, {id: dockerEnvNewId('kv'), type: 'kv', key: '', value: ''});
+    dockerEnvFocus = {type: 'variable', rowIndex: insertAt};
+    dockerEnvStartEdit('variable', insertAt, backup);
+}
+
+function dockerEnvMoveGroup(rowIndex, direction) {
+    if (!dockerEnvIsComment(dockerEnvRows[rowIndex])) return;
+    const end = dockerEnvNextCommentIndex(rowIndex);
+    const block = dockerEnvRows.slice(rowIndex, end);
+    if (direction < 0) {
+        let previousStart = -1;
+        for (let i = rowIndex - 1; i >= 0; i--) {
+            if (dockerEnvIsComment(dockerEnvRows[i])) { previousStart = i; break; }
+        }
+        if (previousStart < 0) return;
+        dockerEnvRows.splice(rowIndex, block.length);
+        dockerEnvRows.splice(previousStart, 0, ...block);
+        dockerEnvCurrentGroup = dockerEnvCurrentGroup === rowIndex ? previousStart : dockerEnvCurrentGroup;
+        dockerEnvFocus = {type:'group', rowIndex: previousStart};
+        dockerEnvRender();
+        dockerEnvScheduleAutoSave();
+        return;
+    }
+    if (end >= dockerEnvRows.length || !dockerEnvIsComment(dockerEnvRows[end])) return;
+    const nextEnd = dockerEnvNextCommentIndex(end);
+    const nextBlock = dockerEnvRows.slice(end, nextEnd);
+    dockerEnvRows.splice(end, nextBlock.length);
+    dockerEnvRows.splice(rowIndex, 0, ...nextBlock);
+    const newIndex = rowIndex + nextBlock.length;
+    dockerEnvCurrentGroup = dockerEnvCurrentGroup === rowIndex ? newIndex : dockerEnvCurrentGroup;
+    dockerEnvFocus = {type:'group', rowIndex: newIndex};
+    dockerEnvRender();
+    dockerEnvScheduleAutoSave();
+}
+
+function dockerEnvCanMoveWithinView(rowIndex, targetIndex) {
+    const visible = dockerEnvVisibleItems();
+    return visible.includes(rowIndex) && visible.includes(targetIndex);
+}
+
+function dockerEnvMoveRow(rowIndex, direction) {
+    const visible = dockerEnvVisibleItems();
+    const pos = visible.indexOf(rowIndex);
+    if (pos < 0) return;
+    const targetIndex = visible[pos + direction];
+    if (targetIndex === undefined || !dockerEnvCanMoveWithinView(rowIndex, targetIndex)) return;
+
+    const item = dockerEnvRows[rowIndex];
+    dockerEnvRows[rowIndex] = dockerEnvRows[targetIndex];
+    dockerEnvRows[targetIndex] = item;
+    dockerEnvFocus = {type: item.type === 'kv' ? 'variable' : 'raw', rowIndex: targetIndex};
+    dockerEnvRender();
+    dockerEnvScheduleAutoSave();
+}
+
+function dockerEnvDeleteVariable(rowIndex) {
+    dockerEnvRows.splice(rowIndex, 1);
+    if (dockerEnvCurrentGroup > rowIndex) dockerEnvCurrentGroup -= 1;
+    dockerEnvFocus = {type:'variable', rowIndex: Math.max(0, rowIndex - 1)};
+    dockerEnvRender();
+    dockerEnvScheduleAutoSave();
+}
+
+function dockerEnvAskDelete(type, rowIndex) {
+    const modal = document.getElementById('dockerEnvConfirmModal');
+    const text = document.getElementById('dockerEnvConfirmText');
+    if (!modal || !text) return;
+    dockerEnvDeletePending = {type, rowIndex};
+    if (type === 'group') {
+        const count = dockerEnvGroupChildren(rowIndex).length;
+        text.textContent = `Supprimer le groupe « ${dockerEnvCommentTitle(dockerEnvRows[rowIndex])} » et ses ${count} ligne(s) ?`;
+    } else {
+        text.textContent = 'Supprimer cette entrée ?';
+    }
+    modal.hidden = false;
+    setTimeout(() => document.getElementById('dockerEnvConfirmDelete')?.focus(), 0);
+}
+
+function dockerEnvCancelDelete() {
+    dockerEnvDeletePending = null;
+    const modal = document.getElementById('dockerEnvConfirmModal');
+    if (modal) modal.hidden = true;
+    dockerEnvAfterRenderFocus();
+}
+
+function dockerEnvConfirmDelete() {
+    const pending = dockerEnvDeletePending;
+    dockerEnvDeletePending = null;
+    const modal = document.getElementById('dockerEnvConfirmModal');
+    if (modal) modal.hidden = true;
+    if (!pending) return;
+    if (pending.type === 'group') {
+        const start = pending.rowIndex;
+        const end = dockerEnvNextCommentIndex(start);
+        dockerEnvRows.splice(start, end - start);
+        dockerEnvCurrentGroup = -1;
+        dockerEnvFocus = {type:'group', rowIndex: dockerEnvFirstCommentIndex()};
+    } else {
+        dockerEnvDeleteVariable(pending.rowIndex);
+        return;
+    }
+    dockerEnvRender();
+    dockerEnvScheduleAutoSave();
+}
+
+function dockerEnvVisibleTiles() {
+    return Array.from(document.querySelectorAll('#dockerEnvBrowserGrid .docker-env-tile[data-type]'));
+}
+
+function dockerEnvAfterRenderFocus() {
+    setTimeout(() => {
+        if (dockerEnvEditing) {
+            const tile = document.querySelector(`.docker-env-tile[data-row-index="${dockerEnvEditing.rowIndex}"]`);
+            const input = tile?.querySelector('input');
+            if (input) {
+                input.focus();
+                input.select?.();
+                return;
+            }
+        }
+        const tile = document.querySelector(`.docker-env-tile[data-row-index="${dockerEnvFocus.rowIndex}"]`);
+        if (tile) tile.focus({preventScroll:true});
+    }, 0);
+}
+
+function dockerEnvFocusByStep(step) {
+    const tiles = dockerEnvVisibleTiles();
+    if (!tiles.length) return;
+    let pos = tiles.findIndex(tile => Number(tile.dataset.rowIndex || -1) === Number(dockerEnvFocus.rowIndex));
+    if (pos < 0) pos = 0;
+    pos = Math.max(0, Math.min(tiles.length - 1, pos + step));
+    const tile = tiles[pos];
+    dockerEnvFocus = {type: tile.dataset.type === 'variable' ? 'variable' : tile.dataset.type, rowIndex: Number(tile.dataset.rowIndex || -1)};
+    tile.focus({preventScroll:false});
+}
+
+function dockerEnvTileKeydown(event, type, rowIndex) {
+    if (document.getElementById('dockerEnvConfirmModal')?.hidden === false) return;
+    if (event.key === 'ArrowDown') { event.preventDefault(); dockerEnvFocusByStep(1); return; }
+    if (event.key === 'ArrowUp') { event.preventDefault(); dockerEnvFocusByStep(-1); return; }
+    if (event.key === 'Home') { event.preventDefault(); dockerEnvFocusByStep(-999); return; }
+    if (event.key === 'End') { event.preventDefault(); dockerEnvFocusByStep(999); return; }
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (type === 'group') dockerEnvOpenGroup(rowIndex);
+        else dockerEnvStartEdit(type, rowIndex);
+        return;
+    }
+    if (event.key === 'F2') {
+        event.preventDefault();
+        dockerEnvStartEdit(type, rowIndex);
+        return;
+    }
+    if (event.key === 'Delete') {
+        event.preventDefault();
+        if (type === 'group') dockerEnvAskDelete('group', rowIndex);
+        else dockerEnvAskDelete(type, rowIndex);
+        return;
+    }
+    if (event.key === 'Backspace' || event.key === 'ArrowLeft') { event.preventDefault(); dockerEnvGoRoot(); return; }
+    if (event.key === 'ArrowRight' && type === 'group') { event.preventDefault(); dockerEnvOpenGroup(rowIndex); return; }
+}
+
+function dockerEnvConfirmButtons() {
+    return [document.getElementById('dockerEnvConfirmCancel'), document.getElementById('dockerEnvConfirmDelete')].filter(Boolean);
+}
+
+function dockerEnvFocusConfirmButton(step=1) {
+    const buttons = dockerEnvConfirmButtons();
+    if (!buttons.length) return;
+    let pos = buttons.indexOf(document.activeElement);
+    if (pos < 0) pos = 0;
+    pos = (pos + step + buttons.length) % buttons.length;
+    buttons[pos].focus();
+}
+
+function dockerEnvHandleKeys(event) {
+    const modalOpen = document.getElementById('dockerEnvConfirmModal')?.hidden === false;
+    const target = event.target;
+    const isTextInput = target && (target.matches?.('input, textarea') || target.isContentEditable);
+
+    if (modalOpen) {
+        if (event.key === 'Escape') { event.preventDefault(); dockerEnvCancelDelete(); return; }
+        if (event.key === 'Enter' || event.key === 'Delete') {
+            event.preventDefault();
+            if (target?.id === 'dockerEnvConfirmCancel') dockerEnvCancelDelete();
+            else dockerEnvConfirmDelete();
+            return;
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') { event.preventDefault(); dockerEnvFocusConfirmButton(-1); return; }
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); dockerEnvFocusConfirmButton(1); return; }
+        if (event.key === 'Tab') { event.preventDefault(); dockerEnvFocusConfirmButton(event.shiftKey ? -1 : 1); return; }
+        return;
+    }
+
+    if (dockerEnvEditing && isTextInput) {
+        if (event.key === 'Enter') { event.preventDefault(); dockerEnvStopEdit(); }
+        if (event.key === 'Escape') { event.preventDefault(); dockerEnvCancelEdit(); }
+        return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 's') {
+        event.preventDefault();
+        if (dockerEnvEditing) dockerEnvStopEdit();
+        else dockerEnvAutoSaveNow(true);
+        return;
+    }
+
+    if (!isTextInput && event.key === 'Escape' && dockerEnvCurrentGroup >= 0) {
+        event.preventDefault();
+        dockerEnvGoRoot();
+    }
+}
+
+document.addEventListener('keydown', dockerEnvHandleKeys);
+
+document.addEventListener('click', (event) => {
+    const modal = document.getElementById('dockerEnvConfirmModal');
+    if (modal && !modal.hidden && event.target === modal) dockerEnvCancelDelete();
+});
+
+function dockerEnvAppendHidden(container, name, value) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value ?? '';
+    container.appendChild(input);
+}
+
+function dockerEnvBuildHiddenRows() {
+    dockerEnvNormalize();
+    const container = document.getElementById('dockerEnvHiddenRows');
+    if (!container) return;
+    container.innerHTML = '';
+    for (const row of dockerEnvRows) {
+        if (row.type === 'raw') {
+            dockerEnvAppendHidden(container, 'env_row_type[]', 'raw');
+            dockerEnvAppendHidden(container, 'env_raw[]', row.raw || '');
+            dockerEnvAppendHidden(container, 'env_key[]', '');
+            dockerEnvAppendHidden(container, 'env_value[]', '');
+        } else {
+            dockerEnvAppendHidden(container, 'env_row_type[]', 'kv');
+            dockerEnvAppendHidden(container, 'env_raw[]', '');
+            dockerEnvAppendHidden(container, 'env_key[]', String(row.key || '').trim());
+            dockerEnvAppendHidden(container, 'env_value[]', String(row.value || '').trim());
+        }
+    }
+}
+
+function dockerEnvScheduleAutoSave(delay=450) {
+    if (dockerEnvAutoSaveTimer) clearTimeout(dockerEnvAutoSaveTimer);
+    dockerEnvAutoSaveTimer = setTimeout(() => dockerEnvAutoSaveNow(false), delay);
+}
+
+async function dockerEnvAutoSaveNow(manual=false) {
+    if (dockerEnvEditing) return;
+    if (!dockerEnvValidateAllRows(true)) return;
+    const form = document.getElementById('dockerEnvBrowserForm');
+    if (!form) return;
+    dockerEnvBuildHiddenRows();
+    if (dockerEnvSaveInFlight) {
+        dockerEnvSaveQueued = true;
+        return;
+    }
+    dockerEnvSaveInFlight = true;
+    if (manual) dockerEnvSetStatus('Sauvegarde...', true, false);
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: {
+                'X-Requested-With': 'fetch',
+                'Accept': 'application/json'
+            }
+        });
+        let data = null;
+        try { data = await response.json(); } catch (_err) { data = null; }
+        if (!response.ok || !data || data.ok === false) {
+            dockerEnvSetStatus((data && (data.message || data.error)) || 'Erreur sauvegarde .env.', false, false);
+            return;
+        }
+        dockerEnvSetStatus(data.message || '.env sauvegardé.', true, true);
+    } catch (err) {
+        dockerEnvSetStatus('Erreur sauvegarde .env : ' + err, false, false);
+    } finally {
+        dockerEnvSaveInFlight = false;
+        if (dockerEnvSaveQueued) {
+            dockerEnvSaveQueued = false;
+            dockerEnvScheduleAutoSave(200);
+        }
+    }
+}
+
+const dockerEnvForm = document.getElementById('dockerEnvBrowserForm');
+if (dockerEnvForm) {
+    dockerEnvForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (dockerEnvEditing) dockerEnvStopEdit();
+        else dockerEnvAutoSaveNow(true);
+    });
+}
+
+dockerEnvRender();
+setTimeout(() => dockerEnvAfterRenderFocus(), 0);
+</script>
+{% endblock %}

@@ -1,0 +1,1198 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<section id="tab-system" class="system-tab-panel active no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+    <div class="mini-page" id="systemHostAdmin">
+        <div class="mini-panel">
+            {% if active_system_subtab == 'install' %}
+                    <section class="card">
+                        <div class="summary-grid">
+                            <div class="summary-card"><div class="summary-label">Contrôle root</div><div class="summary-value small" id="installRootBadge">Lecture…</div></div>
+                            <div class="summary-card"><div class="summary-label">Blocs</div><div class="summary-value small" id="installCount">Chargement…</div></div>
+                        </div>
+
+                        <div class="table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                            <table class="mini-table no-mobile-mosaic mobile-no-mosaic" aria-label="Installation système" data-mobile-mosaic="off">
+                                <thead>
+                                    <tr>
+                                        <th>Bloc</th>
+                                        <th>Catégorie</th>
+                                        <th>État</th>
+                                        <th>Progression</th>
+                                        <th class="col-actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="installTableBody">
+                                    <tr><td colspan="5">Chargement des blocs système…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+            {% elif active_system_subtab == 'updates' %}
+
+                    <section class="card">
+                        <div class="topbar updates-topbar">
+                            <input id="updatesFilter" class="filter-input" type="search" placeholder="Filtrer les paquets…">
+                            <div id="updatesInlineProgress" class="install-progress-wrap updates-inline-progress" hidden role="status" aria-live="polite">
+                                <div id="updatesProgressLine" class="install-progress-line">
+                                    <span class="install-row-spinner" aria-hidden="true"></span>
+                                    <span id="updatesProgressTitle">Mise à jour en cours…</span>
+                                </div>
+                                <div class="install-progress-track"><span></span></div>
+                                <div id="updatesProgressDetail" class="install-progress-log">Lecture du log APT…</div>
+                            </div>
+                            <div class="toolbar">
+                                <button type="button" id="refreshUpdatesBtn" class="yoleo-btn yoleo-btn-muted">🔄 Rafraîchir</button>
+                                <button type="button" id="refreshAptBtn" class="yoleo-btn yoleo-btn-orange">🧭 APT update + liste</button>
+                            </div>
+                        </div>
+
+                        <div class="summary-grid">
+                            <div class="summary-card"><div class="summary-label">Paquets</div><div class="summary-value small" id="updatesCount">Chargement…</div></div>
+                            <div class="summary-card"><div class="summary-label">Sélection</div><div class="summary-value small" id="updatesSelectedCount">0 sélectionné</div></div>
+                        </div>
+
+                        <div class="toolbar sys-inline-073">
+                            <button type="button" id="updateSelectedBtn" class="yoleo-btn yoleo-btn-green">Mettre à jour la sélection</button>
+                            <button type="button" id="updateAllBtn" class="yoleo-btn yoleo-btn-red">Tout mettre à jour</button>
+                        </div>
+
+                        <div class="table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                            <table class="mini-table no-mobile-mosaic mobile-no-mosaic" aria-label="Mises à jour APT" data-mobile-mosaic="off">
+                                <thead>
+                                    <tr>
+                                        <th class="sys-inline-074"><input id="selectAllUpdates" class="update-check" type="checkbox" title="Tout sélectionner"></th>
+                                        <th>Paquet</th>
+                                        <th>Version actuelle</th>
+                                        <th>Nouvelle version</th>
+                                        <th>Dépôt</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="updatesTableBody">
+                                    <tr><td colspan="5">Chargement des mises à jour…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+            {% elif active_system_subtab == 'troubleshooting' %}
+
+                    <section class="card">
+                        <div class="troubleshooting-conf-toolbar">
+                            <label class="field troubleshooting-conf-field">
+                                <span>Dossier de configuration</span>
+                                <div class="input-with-button troubleshooting-conf-inputs">
+                                    <input class="yoleo-input" id="resetConfDirInput" type="text" value="{{ path_rescue|default('') }}" placeholder="/yoleo/conf ou /etc/yoleo" autocomplete="off">
+                                    <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" type="button" onclick="openResetConfDirBrowser()" title="Parcourir" aria-label="Choisir le dossier de configuration">📁</button>
+                                    <button type="button" id="loadResetConfsBtn" class="yoleo-btn yoleo-btn-primary yoleo-btn-small">OK</button>
+                                </div>
+                            </label>
+                            <span id="resetConfInlineStatus" class="troubleshooting-inline-status" role="status"></span>
+                            <button type="button" id="resetAllConfsBtn" class="yoleo-btn yoleo-btn-red">Remise tout par défaut</button>
+                        </div>
+
+                        <div class="danger-note">
+                            <b>Remise tout par défaut :</b> supprime les entrées directes du dossier choisi puis redémarre Flask. Le dossier <span class="mono">menu</span> est conservé sauf si tu demandes explicitement le rétablissement du menu par défaut. Garde-fou : les dossiers système trop larges comme <span class="mono">/</span> ou <span class="mono">/etc</span> seul sont refusés.
+                        </div>
+
+                        <label class="reset-menu-default-option">
+                            <input type="checkbox" id="resetMenuDefaultCheck">
+                            <span>Rétablir le menu de démarrage par défaut</span>
+                            <small>efface aussi le dossier <span class="mono">menu</span> dans le dossier de configuration choisi</small>
+                        </label>
+
+                        <div class="table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                            <table class="mini-table troubleshooting-conf-table no-mobile-mosaic mobile-no-mosaic" aria-label="Dossier des configurations" data-mobile-mosaic="off">
+                                <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Taille</th>
+                                        <th>Modifié</th>
+                                        <th class="table-actions-col">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resetConfTableBody">
+                                    <tr><td colspan="6">Veuillez d’abord choisir votre dossier de configuration, puis cliquer sur OK.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+            {% elif active_system_subtab == 'logs' %}
+
+                    <section class="card">
+                        <div class="card-head">
+                            <div class="hint">Le retour brut des installations et mises à jour est relu depuis les logs Python.</div>
+                            <div class="toolbar">
+                                <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="clearSystemHostLogs()">🧹 Nettoyer l'affichage</button>
+                            </div>
+                        </div>
+
+                        <div class="status-line">
+                            <div class="status-k">Installation</div>
+                            <div class="status-v">Dernière action lancée depuis le tableau Installation.</div>
+                        </div>
+                        <pre id="installLog" class="code-box log-box-tall">Aucune action installation lancée.</pre>
+
+                        <div class="status-line">
+                            <div class="status-k">Mise à jour</div>
+                            <div class="status-v">Dernière action APT ou dernier rafraîchissement.</div>
+                        </div>
+                        <pre id="updatesLog" class="code-box log-box-tall">Aucune mise à jour lancée.</pre>
+                    </section>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<div id="systemActionModal" class="action-modal" role="dialog" aria-modal="true" aria-labelledby="systemActionModalTitle">
+    <div class="action-modal-box">
+        <div class="action-modal-head">
+            <div>
+                <h2 id="systemActionModalTitle" class="action-modal-title">Action système</h2>
+                <div id="systemActionModalSubtitle" class="action-modal-subtitle">Commande en cours…</div>
+            </div>
+            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" onclick="closeSystemActionModal()">✕</button>
+        </div>
+        <div class="action-modal-body">
+            <pre id="systemActionModalLog" class="action-modal-log">Préparation…</pre>
+        </div>
+        <div class="action-modal-foot">
+            <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="closeSystemActionModal()">Fermer</button>
+        </div>
+    </div>
+</div>
+
+<div id="resetConfirmModal" class="action-modal" role="dialog" aria-modal="true" aria-labelledby="resetConfirmTitle">
+    <div class="action-modal-box reset-confirm-box">
+        <div class="action-modal-head">
+            <div>
+                <h2 id="resetConfirmTitle" class="action-modal-title">Confirmer la remise par défaut</h2>
+                <div id="resetConfirmSubtitle" class="action-modal-subtitle">Vérification avant suppression.</div>
+            </div>
+            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" id="resetConfirmCancelTop">✕</button>
+        </div>
+        <div class="action-modal-body">
+            <div id="resetConfirmText" class="reset-confirm-text">Confirmer l’action ?</div>
+            <label class="reset-menu-default-option reset-confirm-option">
+                <input type="checkbox" id="resetConfirmMenuDefaultCheck">
+                <span>Rétablir aussi le menu de démarrage par défaut</span>
+                <small>efface le dossier <span class="mono">menu</span> dans le dossier de configuration choisi</small>
+            </label>
+        </div>
+        <div class="action-modal-foot">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" id="resetConfirmCancelBtn">Annuler</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red" id="resetConfirmOkBtn">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<div id="systemConfirmModal" class="action-modal" role="dialog" aria-modal="true" aria-labelledby="systemConfirmTitle">
+    <div class="action-modal-box reset-confirm-box">
+        <div class="action-modal-head">
+            <div>
+                <h2 id="systemConfirmTitle" class="action-modal-title">Confirmation</h2>
+                <div id="systemConfirmSubtitle" class="action-modal-subtitle">Vérification avant action.</div>
+            </div>
+            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" id="systemConfirmCancelTop">✕</button>
+        </div>
+        <div class="action-modal-body">
+            <div id="systemConfirmText" class="reset-confirm-text">Confirmer l’action ?</div>
+        </div>
+        <div class="action-modal-foot">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" id="systemConfirmCancelBtn">Annuler</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red" id="systemConfirmOkBtn">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    const state = {
+        installRows: [],
+        installJobs: {},
+        updateJob: null,
+        updates: [],
+        resetConfs: [],
+        busy: false,
+        activeTab: 'main',
+        currentLogKind: 'install'
+    };
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, (c) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[c]));
+    }
+
+    function nowText() {
+        try {
+            return new Date().toLocaleTimeString('fr-FR');
+        } catch (e) {
+            return 'maintenant';
+        }
+    }
+
+    function setText(id, value) {
+        const el = $(id);
+        if (el) el.textContent = (value === undefined || value === null || value === '') ? '—' : value;
+    }
+
+    function setLog(id, text) {
+        const el = $(id);
+        if (el) el.textContent = text || 'OK';
+    }
+
+    function postHeightSoon() {
+        [80, 250, 700].forEach((delay) => {
+            setTimeout(() => {
+                try {
+                    window.parent.postMessage({type: 'system-frame-resize'}, '*');
+                } catch (e) {}
+            }, delay);
+        });
+    }
+
+    function formatJobOutput(data) {
+        if (!data) return '';
+        const status = data.running ? 'EN COURS' : (data.rc === 0 ? 'TERMINÉ OK' : `ERREUR rc=${data.rc ?? '?'}`);
+        const head = `[${data.generated_at || nowText()}] ${status}\nJob: ${data.label || data.job_id || '-'}\nLog: ${data.log || '-'}\n\n`;
+        return head + (data.output || 'Aucune sortie pour le moment…');
+    }
+
+    function lastLogLine(text) {
+        const lines = String(text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        if (!lines.length) return '';
+        return lines[lines.length - 1].slice(0, 180);
+    }
+
+    function installJobInfo(rowId) {
+        return state.installJobs[String(rowId || '')] || null;
+    }
+
+    function setInstallJob(rowId, patch) {
+        const key = String(rowId || '');
+        if (!key) return;
+        state.installJobs[key] = { ...(state.installJobs[key] || {}), ...(patch || {}) };
+        renderInstallRows();
+    }
+
+    function capturePageScroll() {
+        const root = document.scrollingElement || document.documentElement || document.body;
+        return {
+            x: window.scrollX || (root ? root.scrollLeft : 0) || 0,
+            y: window.scrollY || (root ? root.scrollTop : 0) || 0
+        };
+    }
+
+    function restorePageScroll(snapshot) {
+        if (!snapshot) return;
+        const x = Number(snapshot.x || 0);
+        const y = Number(snapshot.y || 0);
+        const apply = () => {
+            try {
+                window.scrollTo(x, y);
+                const root = document.scrollingElement || document.documentElement || document.body;
+                if (root) {
+                    root.scrollLeft = x;
+                    root.scrollTop = y;
+                }
+            } catch (e) {}
+        };
+        apply();
+        window.requestAnimationFrame(apply);
+        window.setTimeout(apply, 80);
+    }
+
+    function clearInstallJobSoon(rowId, delay) {
+        window.setTimeout(() => {
+            const scrollSnapshot = capturePageScroll();
+            delete state.installJobs[String(rowId || '')];
+            renderInstallRows();
+            restorePageScroll(scrollSnapshot);
+        }, Number(delay) || 2500);
+    }
+
+    function setActionModal(title, subtitle, text) {
+        const modal = $('systemActionModal');
+        if (!modal) return;
+        $('systemActionModalTitle').textContent = title || 'Action système';
+        $('systemActionModalSubtitle').textContent = subtitle || 'Commande en cours…';
+        $('systemActionModalLog').textContent = text || 'Préparation…';
+        $('systemActionModalLog').scrollTop = $('systemActionModalLog').scrollHeight;
+        modal.style.display = 'flex';
+        postHeightSoon();
+    }
+
+    window.closeSystemActionModal = function () {
+        const modal = $('systemActionModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    function closeActionModalSoon(delay) {
+        window.setTimeout(() => closeSystemActionModal(), Number(delay) || 1400);
+    }
+
+    function bindConfirmKeyboard(modal, cancelBtn, okBtn, onCancel, onOk) {
+        const buttons = [cancelBtn, okBtn].filter(Boolean);
+        let activeIndex = buttons.length > 1 ? 1 : 0;
+        const focusActive = () => {
+            const btn = buttons[activeIndex];
+            if (btn) btn.focus({preventScroll: true});
+        };
+        const onKey = (event) => {
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                event.preventDefault();
+                activeIndex = event.key === 'ArrowRight'
+                    ? Math.min(buttons.length - 1, activeIndex + 1)
+                    : Math.max(0, activeIndex - 1);
+                focusActive();
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                const active = document.activeElement;
+                if (active === cancelBtn) onCancel();
+                else onOk();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                onCancel();
+            }
+        };
+        modal.addEventListener('keydown', onKey);
+        window.setTimeout(focusActive, 30);
+        return () => modal.removeEventListener('keydown', onKey);
+    }
+
+    function systemModernConfirm(options) {
+        options = options || {};
+        const modal = $('systemConfirmModal');
+        const okBtn = $('systemConfirmOkBtn');
+        const cancelBtn = $('systemConfirmCancelBtn');
+        const cancelTop = $('systemConfirmCancelTop');
+        if (!modal || !okBtn || !cancelBtn || !cancelTop) {
+            setActionModal(options.title || 'Confirmation', 'Confirmation indisponible.', 'Action annulée : boîte moderne introuvable.');
+            closeActionModalSoon(1800);
+            return Promise.resolve(false);
+        }
+        $('systemConfirmTitle').textContent = options.title || 'Confirmation';
+        $('systemConfirmSubtitle').textContent = options.subtitle || 'Vérification avant action.';
+        $('systemConfirmText').textContent = options.text || 'Confirmer cette action ?';
+        okBtn.textContent = options.okLabel || 'Confirmer';
+        okBtn.className = options.okClass || 'yoleo-btn yoleo-btn-red';
+        modal.style.display = 'flex';
+        postHeightSoon();
+
+        return new Promise((resolve) => {
+            let done = false;
+            let cleanupKeys = null;
+            const finish = (confirmed) => {
+                if (done) return;
+                done = true;
+                modal.style.display = 'none';
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                cancelTop.removeEventListener('click', onCancel);
+                if (cleanupKeys) cleanupKeys();
+                resolve(!!confirmed);
+            };
+            const onOk = () => finish(true);
+            const onCancel = () => finish(false);
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+            cancelTop.addEventListener('click', onCancel);
+            cleanupKeys = bindConfirmKeyboard(modal, cancelBtn, okBtn, onCancel, onOk);
+        });
+    }
+
+    window.openResetConfDirBrowser = function () {
+        const input = $('resetConfDirInput');
+        const raw = String(input ? input.value : '').trim();
+        const startPath = raw && raw.startsWith('/') ? raw : '/';
+        const params = new URLSearchParams({target: 'resetConfDirInput', path: startPath});
+        const url = '/browser/folder?' + params.toString();
+        const popup = window.open(
+            url,
+            'yoleo_browser_folder_reset_conf',
+            'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+        );
+        if (popup) popup.focus();
+    };
+
+    window.addEventListener('message', (event) => {
+        const data = event.data || {};
+        if (data.type === 'yoleo-browser-select' && data.target === 'resetConfDirInput') {
+            const input = $('resetConfDirInput');
+            if (input) {
+                input.value = data.path || '';
+                input.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+        }
+    });
+
+    function writeCurrentLog(kind, text) {
+        if (kind === 'updates') setLog('updatesLog', text);
+        else setLog('installLog', text);
+    }
+
+    async function pollSystemJob(jobId, kind, options) {
+        options = options || {};
+        let lastText = '';
+        while (true) {
+            const res = await fetch(`/system/api/system/job/${encodeURIComponent(jobId)}`, {cache: 'no-store'});
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) throw new Error(data.message || 'Job introuvable.');
+
+            lastText = formatJobOutput(data);
+            writeCurrentLog(kind, lastText);
+            setActionModal(options.title || 'Action système', data.running ? 'Commande en cours… tu peux fermer, le log reste dans l’onglet Log.' : 'Commande terminée.', lastText);
+
+            if (!data.running) {
+                if (kind === 'install') await loadInstallStatus();
+                if (kind === 'updates') await loadUpdates(false, true);
+                state.busy = false;
+                closeActionModalSoon(data.rc === 0 ? 1200 : 2200);
+                postHeightSoon();
+                return data;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
+    }
+
+    async function startSystemJob(url, payload, kind, title) {
+        state.busy = true;
+        state.currentLogKind = kind;
+        const opening = `[${nowText()}] Lancement…\n${title}\n`;
+        writeCurrentLog(kind, opening);
+        setActionModal(title, 'Commande lancée côté Flask. Le log reste disponible dans la page Log, sans changer de page.', opening);
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload || {})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+            state.busy = false;
+            const message = data.output || data.message || 'Action refusée côté Flask.';
+            writeCurrentLog(kind, message);
+            setActionModal(title, 'Erreur au lancement.', message);
+            throw new Error(message);
+        }
+        return pollSystemJob(data.job_id, kind, {title});
+    }
+
+
+    function updateGeneralSummary(root) {
+        const total = state.installRows.length;
+        const installed = state.installRows.filter((row) => row.installed).length;
+        const missing = total - installed;
+
+        if (typeof root === 'boolean') {
+            setText('sumRoot', root ? '✅ root' : '❌ non root');
+            setText('installRootBadge', root ? '✅ Flask tourne en root' : '❌ Flask pas root');
+        }
+
+        setText('sumBlocks', total || '—');
+        setText('sumInstalled', total ? installed : '—');
+        setText('sumMissing', total ? missing : '—');
+        setText('sumUpdates', state.updates.length || '0');
+        setText('sumRefresh', nowText());
+    }
+
+    function installBadge(row) {
+        const job = installJobInfo(row.id);
+        if (job && job.status === 'running') {
+            return '<span class="badge badge-warn"><span class="install-row-spinner" aria-hidden="true"></span> En cours</span>';
+        }
+        if (job && job.status === 'error') {
+            return '<span class="badge badge-no">⚠️ Erreur</span>';
+        }
+        if (job && job.status === 'success') {
+            return '<span class="badge badge-ok">✅ Terminé</span>';
+        }
+        if (row.installed) {
+            return '<span class="badge badge-ok">✅ Installé</span>';
+        }
+        if (row.status === 'error') {
+            return '<span class="badge badge-warn">⚠️ Erreur</span>';
+        }
+        return '<span class="badge badge-no">❌ Non installé</span>';
+    }
+
+    function installDetail(row) {
+        const job = installJobInfo(row.id);
+        if (job && job.status === 'running') {
+            const label = job.action === 'remove' ? 'Désinstallation en cours' : 'Installation en cours';
+            return `<div class="install-progress-wrap is-running" role="status" aria-live="polite">
+                <div class="install-progress-line"><span>${label}</span><b>En cours</b></div>
+                <div class="install-progress-track"><span style="width:55%"></span></div>
+            </div>`;
+        }
+        if (job && job.status === 'error') {
+            return `<div class="install-progress-wrap is-error" role="status">
+                <div class="install-progress-line"><span>Erreur</span><a href="/system/logs">Log système</a></div>
+                <div class="install-progress-track"><span style="width:100%"></span></div>
+            </div>`;
+        }
+        if (job && job.status === 'success') {
+            return `<div class="install-progress-wrap is-success" role="status">
+                <div class="install-progress-line"><span>Terminé</span><b>OK</b></div>
+                <div class="install-progress-track"><span style="width:100%"></span></div>
+            </div>`;
+        }
+        if (row.installed) {
+            return `<div class="install-progress-wrap is-success" role="status">
+                <div class="install-progress-line"><span>Installé</span><b>100%</b></div>
+                <div class="install-progress-track"><span style="width:100%"></span></div>
+            </div>`;
+        }
+        return `<div class="install-progress-wrap is-idle" role="status">
+            <div class="install-progress-line"><span>Non installé</span><b>0%</b></div>
+            <div class="install-progress-track"><span style="width:0%"></span></div>
+        </div>`;
+    }
+
+    function renderInstallRows() {
+        const body = $('installTableBody');
+        if (!body) return;
+
+        const filter = (($('installFilter') || {}).value || '').trim().toLowerCase();
+        const rows = state.installRows.filter((row) => {
+            const blob = `${row.title || ''} ${row.category || ''} ${row.description || ''} ${row.detail || ''}`.toLowerCase();
+            return !filter || blob.includes(filter);
+        });
+
+        setText('installCount', `${rows.length}/${state.installRows.length} bloc(s)`);
+
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="5">Aucun bloc trouvé.</td></tr>';
+            postHeightSoon();
+            return;
+        }
+
+        body.innerHTML = rows.map((row) => {
+            const installLabel = row.installed ? 'Réinstaller' : 'Installer';
+            const job = installJobInfo(row.id);
+            const isRunning = !!(job && job.status === 'running');
+            const disabledAttr = (state.busy || isRunning) ? 'disabled' : '';
+            const removeDisabled = row.removable && !state.busy && !isRunning ? '' : 'disabled';
+            const dangerAttr = row.danger ? 'data-danger="1"' : '';
+            const rowClass = isRunning ? ' class="is-install-running"' : (job && job.status === 'error' ? ' class="is-install-error"' : '');
+
+            return `<tr data-row-id="${escapeHtml(row.id)}"${rowClass}>
+                <td>
+                    <div class="name-main">${escapeHtml(row.title)}</div>
+                    <div class="name-sub">${escapeHtml(row.description)}</div>
+                </td>
+                <td><span class="badge badge-muted">${escapeHtml(row.category)}</span></td>
+                <td>${installBadge(row)}</td>
+                <td>${installDetail(row)}</td>
+                <td class="col-actions">
+                    <div class="row-actions">
+                        <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-mini" data-install-action="install" data-id="${escapeHtml(row.id)}" ${dangerAttr} ${disabledAttr}>${installLabel}</button>
+                        <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-mini" data-install-action="remove" data-id="${escapeHtml(row.id)}" ${removeDisabled}>Désactiver / enlever</button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+
+        postHeightSoon();
+    }
+
+    window.loadInstallStatus = async function (options) {
+        options = options || {};
+        const body = $('installTableBody');
+        const preserveScroll = !!options.preserveScroll;
+        const silent = !!options.silent;
+        const scrollSnapshot = preserveScroll ? capturePageScroll() : null;
+        if (body && !silent) body.innerHTML = '<tr><td colspan="5">Lecture des statuts système…</td></tr>';
+
+        try {
+            const res = await fetch('/system/api/system/install/status', {cache: 'no-store'});
+            const data = await res.json();
+            state.installRows = data.rows || [];
+            updateGeneralSummary(!!data.root);
+            renderInstallRows();
+            restorePageScroll(scrollSnapshot);
+        } catch (err) {
+            if (body && !silent) body.innerHTML = `<tr><td colspan="5">Erreur chargement : ${escapeHtml(err.message || err)}</td></tr>`;
+            setText('sumRoot', '⚠️ erreur API');
+            setText('installRootBadge', '⚠️ erreur API');
+            restorePageScroll(scrollSnapshot);
+        }
+    };
+
+    async function pollInstallRowJob(jobId, id, action, label) {
+        let finalData = null;
+        while (true) {
+            const res = await fetch(`/system/api/system/job/${encodeURIComponent(jobId)}`, {cache: 'no-store'});
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) throw new Error(data.message || 'Job introuvable.');
+
+            const logText = formatJobOutput(data);
+            writeCurrentLog('install', logText);
+            setInstallJob(id, {
+                status: data.running ? 'running' : (data.rc === 0 ? 'success' : 'error'),
+                action,
+                label,
+                rc: data.rc,
+                log: data.log,
+                message: lastLogLine(data.output) || (data.running ? 'Commande en cours…' : 'Commande terminée.')
+            });
+
+            if (!data.running) {
+                finalData = data;
+                break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
+
+        state.busy = false;
+        await loadInstallStatus({silent: true, preserveScroll: true});
+        if (finalData && finalData.rc === 0) clearInstallJobSoon(id, 2200);
+        postHeightSoon();
+        return finalData;
+    }
+
+    async function startInstallRowJob(id, action, label) {
+        state.busy = true;
+        setInstallJob(id, {status: 'running', action, label, message: 'Lancement côté Flask…'});
+        const opening = `[${nowText()}] ${label}\nLancement côté Flask…\n`;
+        writeCurrentLog('install', opening);
+
+        const res = await fetch('/system/api/system/install/action_async', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id, action})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+            state.busy = false;
+            const message = data.output || data.message || 'Action refusée côté Flask.';
+            writeCurrentLog('install', message);
+            setInstallJob(id, {status: 'error', action, label, rc: data.rc ?? '?', message});
+            throw new Error(message);
+        }
+        setInstallJob(id, {status: 'running', action, label, job_id: data.job_id, log: data.log, message: 'Job démarré, lecture du log…'});
+        return pollInstallRowJob(data.job_id, id, action, label);
+    }
+
+    async function runInstallAction(id, action, danger) {
+        if (state.busy) return;
+        const row = state.installRows.find((item) => item.id === id) || {};
+        if (action === 'remove') {
+            const ok = await systemModernConfirm({
+                title: 'Confirmer la désinstallation',
+                subtitle: 'Suppression ou désactivation d’un bloc système.',
+                text: `Désactiver / enlever : ${row.title || id} ?`,
+                okLabel: 'Désactiver / enlever',
+                okClass: 'yoleo-btn yoleo-btn-red'
+            });
+            if (!ok) return;
+        }
+
+        try {
+            const label = action === 'remove' ? `Désinstallation : ${row.title || id}` : `${row.installed ? 'Réinstallation' : 'Installation'} : ${row.title || id}`;
+            await startInstallRowJob(id, action, label);
+        } catch (err) {
+            const message = 'Erreur : ' + (err.message || err);
+            setLog('installLog', message);
+            setInstallJob(id, {
+                status: 'error',
+                action,
+                label: action === 'remove' ? `Desinstallation : ${row.title || id}` : `Installation : ${row.title || id}`,
+                message
+            });
+            state.busy = false;
+            renderInstallRows();
+            postHeightSoon();
+        }
+    }
+
+    function setUpdatesProgress(status, title, detail) {
+        const box = $('updatesInlineProgress');
+        if (!box) return;
+        const titleEl = $('updatesProgressTitle');
+        const detailEl = $('updatesProgressDetail');
+        const spinner = box.querySelector('.install-row-spinner');
+        const track = box.querySelector('.install-progress-track');
+        box.hidden = false;
+        box.classList.toggle('is-error', status === 'error');
+        box.classList.toggle('is-success', status === 'success');
+        box.classList.toggle('is-running', status === 'running');
+        if (spinner) spinner.style.display = status === 'running' ? 'inline-block' : 'none';
+        if (track) track.style.display = status === 'running' ? 'block' : 'none';
+        if (titleEl) titleEl.textContent = title || (status === 'running' ? 'Mise à jour en cours…' : 'Mise à jour');
+        if (detailEl) detailEl.textContent = detail || (status === 'running' ? 'Lecture du log APT…' : 'Terminé.');
+    }
+
+    function clearUpdatesProgressSoon(delay) {
+        window.setTimeout(() => {
+            if (state.updateJob && state.updateJob.status === 'running') return;
+            const box = $('updatesInlineProgress');
+            if (box) box.hidden = true;
+        }, Number(delay) || 2500);
+    }
+
+    async function pollUpdatesJob(jobId, label) {
+        let finalData = null;
+        while (true) {
+            const res = await fetch(`/system/api/system/job/${encodeURIComponent(jobId)}`, {cache: 'no-store'});
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) throw new Error(data.message || 'Job introuvable.');
+
+            const logText = formatJobOutput(data);
+            writeCurrentLog('updates', logText);
+            const running = !!data.running;
+            const status = running ? 'running' : (data.rc === 0 ? 'success' : 'error');
+            const detail = lastLogLine(data.output) || (running ? 'Commande APT en cours…' : 'Commande APT terminée.');
+            state.updateJob = {status, label, rc: data.rc, log: data.log, message: detail};
+            setUpdatesProgress(
+                status,
+                running ? (label || 'Mise à jour en cours…') : (data.rc === 0 ? 'Mise à jour terminée' : `Erreur APT rc=${data.rc ?? '?'}`),
+                data.rc === 0 || running ? detail : `${detail} — détails dans l’onglet Log.`
+            );
+
+            if (!running) {
+                finalData = data;
+                break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
+
+        state.busy = false;
+        await loadUpdates(false, true);
+        if (finalData && finalData.rc === 0) clearUpdatesProgressSoon(2600);
+        postHeightSoon();
+        return finalData;
+    }
+
+    async function startUpdatesJob(url, payload, label) {
+        if (state.busy) return;
+        state.busy = true;
+        renderUpdates();
+        state.currentLogKind = 'updates';
+        state.updateJob = {status: 'running', label, message: 'Lancement côté Flask…'};
+        setUpdatesProgress('running', label || 'Mise à jour en cours…', 'Lancement côté Flask…');
+        writeCurrentLog('updates', `[${nowText()}] ${label || 'Mise à jour'}\nLancement côté Flask…\n`);
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload || {})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+            state.busy = false;
+            const message = data.output || data.message || 'Action refusée côté Flask.';
+            writeCurrentLog('updates', message);
+            state.updateJob = {status: 'error', label, message};
+            setUpdatesProgress('error', 'Erreur au lancement', message);
+            throw new Error(message);
+        }
+        state.updateJob = {status: 'running', label, job_id: data.job_id, log: data.log, message: 'Job démarré, lecture du log…'};
+        setUpdatesProgress('running', label || 'Mise à jour en cours…', 'Job démarré, lecture du log APT…');
+        return pollUpdatesJob(data.job_id, label);
+    }
+
+    function updateSelectedCount() {
+        const count = document.querySelectorAll('.update-row-check:checked').length;
+        setText('updatesSelectedCount', `${count} sélectionné${count > 1 ? 's' : ''}`);
+    }
+
+    function renderUpdates() {
+        const body = $('updatesTableBody');
+        if (!body) return;
+
+        const filter = (($('updatesFilter') || {}).value || '').trim().toLowerCase();
+        const rows = state.updates.filter((row) => {
+            const blob = `${row.name || ''} ${row.old_version || ''} ${row.new_version || ''} ${row.repo || ''}`.toLowerCase();
+            return !filter || blob.includes(filter);
+        });
+
+        setText('updatesCount', `${rows.length}/${state.updates.length} paquet(s)`);
+        setText('sumUpdates', state.updates.length || '0');
+
+        const updateSelectedBtn = $('updateSelectedBtn');
+        const updateAllBtn = $('updateAllBtn');
+        const refreshUpdatesBtn = $('refreshUpdatesBtn');
+        const refreshAptBtn = $('refreshAptBtn');
+        const selectAllUpdates = $('selectAllUpdates');
+        if (updateSelectedBtn) updateSelectedBtn.disabled = !state.updates.length || state.busy;
+        if (updateAllBtn) updateAllBtn.disabled = !state.updates.length || state.busy;
+        if (refreshUpdatesBtn) refreshUpdatesBtn.disabled = state.busy;
+        if (refreshAptBtn) refreshAptBtn.disabled = state.busy;
+        if (selectAllUpdates) selectAllUpdates.disabled = state.busy;
+        const updateDisabledAttr = state.busy ? 'disabled' : '';
+
+        if (!rows.length) {
+            body.innerHTML = `<tr><td colspan="5">${state.updates.length ? 'Aucun paquet trouvé avec ce filtre.' : 'Aucune mise à jour disponible.'}</td></tr>`;
+            updateSelectedCount();
+            postHeightSoon();
+            return;
+        }
+
+        body.innerHTML = rows.map((row) => `<tr>
+            <td><input class="update-check update-row-check" type="checkbox" value="${escapeHtml(row.name)}" ${updateDisabledAttr}></td>
+            <td>
+                <div class="name-main">${escapeHtml(row.name)}</div>
+                <div class="name-sub">${escapeHtml(row.arch || '')}</div>
+            </td>
+            <td class="mono">${escapeHtml(row.old_version || '-')}</td>
+            <td class="mono">${escapeHtml(row.new_version || '-')}</td>
+            <td>${escapeHtml(row.repo || '-')}</td>
+        </tr>`).join('');
+
+        updateSelectedCount();
+        postHeightSoon();
+    }
+
+    window.loadUpdates = async function (refreshApt, silentRefresh) {
+        const body = $('updatesTableBody');
+        if (body && !refreshApt) body.innerHTML = '<tr><td colspan="5">Lecture des mises à jour…</td></tr>';
+
+        if (refreshApt && !silentRefresh) {
+            if (state.busy) return;
+            try {
+                await startUpdatesJob('/system/api/system/updates/refresh_async', {}, 'APT update + liste');
+            } catch (err) {
+                setLog('updatesLog', 'Erreur : ' + (err.message || err));
+                state.busy = false;
+                renderUpdates();
+            }
+            return;
+        }
+
+        try {
+            const res = await fetch('/system/api/system/updates/list', {cache: 'no-store'});
+            const data = await res.json();
+            state.updates = data.updates || [];
+            if (data.output && !silentRefresh) setLog('updatesLog', data.output);
+            renderUpdates();
+            updateGeneralSummary();
+        } catch (err) {
+            if (body) body.innerHTML = `<tr><td colspan="5">Erreur chargement : ${escapeHtml(err.message || err)}</td></tr>`;
+        }
+    };
+
+    function selectedPackages() {
+        return Array.from(document.querySelectorAll('.update-row-check:checked')).map((el) => el.value);
+    }
+
+    async function runUpdate(action) {
+        if (state.busy) return;
+
+        const packages = selectedPackages();
+        if (action !== 'all' && !packages.length) {
+            const msg = 'Sélectionne au moins un paquet.';
+            setLog('updatesLog', msg);
+            setUpdatesProgress('error', 'Sélection requise', msg);
+            clearUpdatesProgressSoon(2200);
+            return;
+        }
+
+        try {
+            await startUpdatesJob('/system/api/system/updates/action_async', {action, packages}, action === 'all' ? 'Mise à jour globale APT' : `Mise à jour : ${packages.join(', ')}`);
+        } catch (err) {
+            setLog('updatesLog', 'Erreur : ' + (err.message || err));
+            state.busy = false;
+            renderUpdates();
+            postHeightSoon();
+        }
+    }
+
+    function formatBytes(value) {
+        if (value === null || value === undefined || value === '') return '—';
+        const n = Number(value || 0);
+        if (n < 1024) return `${n} o`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} Ko`;
+        return `${(n / 1024 / 1024).toFixed(1)} Mo`;
+    }
+
+    function getResetConfDir() {
+        return String($('resetConfDirInput')?.value || '').trim();
+    }
+
+    function setResetConfInlineStatus(message, tone) {
+        const el = $('resetConfInlineStatus');
+        if (!el) return;
+        el.textContent = message || '';
+        el.classList.toggle('is-error', tone === 'error');
+        el.classList.toggle('is-ok', tone === 'ok');
+    }
+
+    function showResetConfDirRequired() {
+        const msg = 'Veuillez d’abord choisir votre dossier de configuration.';
+        const body = $('resetConfTableBody');
+        if (body) body.innerHTML = `<tr><td colspan="6">${escapeHtml(msg)}</td></tr>`;
+        state.resetConfs = [];
+        setText('resetConfCount', '—');
+        setResetConfInlineStatus(msg, 'error');
+        setLog('installLog', msg);
+        return msg;
+    }
+
+    function wantsResetMenuDefault() {
+        return !!$('resetMenuDefaultCheck')?.checked;
+    }
+
+    function setResetMenuDefaultChecked(value) {
+        const main = $('resetMenuDefaultCheck');
+        if (main) main.checked = !!value;
+        const modalBox = $('resetConfirmMenuDefaultCheck');
+        if (modalBox) modalBox.checked = !!value;
+    }
+
+    function renderResetConfs() {
+        const body = $('resetConfTableBody');
+        if (!body) return;
+        setText('resetConfCount', `${state.resetConfs.length} entrée(s)`);
+        setResetConfInlineStatus(`Dossier enregistré : ${state.resetConfs.length} entrée(s).`, 'ok');
+        if (!state.resetConfs.length) {
+            body.innerHTML = '<tr><td colspan="6">Aucune entrée trouvée dans le dossier choisi.</td></tr>';
+            postHeightSoon();
+            return;
+        }
+        body.innerHTML = state.resetConfs.map((item) => `<tr>
+            <td><div class="name-main mono">${escapeHtml(item.name)}</div><div class="name-sub mono">${escapeHtml(item.path || '')}</div></td>
+            <td>${escapeHtml(item.description || '')}</td>
+            <td>${escapeHtml(item.type || 'fichier')}</td>
+            <td class="mono">${escapeHtml(formatBytes(item.size))}</td>
+            <td class="mono">${escapeHtml(item.modified || '-')}</td>
+            <td><button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-small" onclick='runResetOneConf(${JSON.stringify(item.name)})'>🗑️ Supprimer</button></td>
+        </tr>`).join('');
+        postHeightSoon();
+    }
+
+    async function loadResetConfs() {
+        const body = $('resetConfTableBody');
+        const confDir = getResetConfDir();
+        if (!confDir) {
+            showResetConfDirRequired();
+            return;
+        }
+        if (body) body.innerHTML = '<tr><td colspan="6">Lecture du dossier choisi…</td></tr>';
+        try {
+            const params = new URLSearchParams({conf_dir: confDir});
+            const res = await fetch('/system/api/system/troubleshooting/confs?' + params.toString(), {cache: 'no-store'});
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) {
+                throw new Error(data.message || 'Erreur de lecture du dossier choisi.');
+            }
+            state.resetConfs = data.items || [];
+            renderResetConfs();
+        } catch (err) {
+            state.resetConfs = [];
+            setText('resetConfCount', '—');
+            const msg = String(err.message || err);
+            if (body) body.innerHTML = `<tr><td colspan="6">Erreur : ${escapeHtml(msg)}</td></tr>`;
+            setResetConfInlineStatus(msg, 'error');
+        }
+    }
+
+    function confirmResetConfs(all, files, confDir, initialMenuDefault) {
+        const modal = $('resetConfirmModal');
+        const okBtn = $('resetConfirmOkBtn');
+        const cancelBtn = $('resetConfirmCancelBtn');
+        const cancelTop = $('resetConfirmCancelTop');
+        const menuBox = $('resetConfirmMenuDefaultCheck');
+        const menuLabel = menuBox ? menuBox.closest('.reset-menu-default-option') : null;
+        if (!modal || !okBtn || !cancelBtn || !cancelTop || !menuBox) {
+            setActionModal('Dépannage', 'Confirmation indisponible.', 'Action annulée : boîte moderne introuvable.');
+            closeActionModalSoon(1800);
+            return Promise.resolve({confirmed: false, includeMenuDefault: !!initialMenuDefault});
+        }
+
+        $('resetConfirmTitle').textContent = all ? 'Confirmer la remise par défaut' : 'Confirmer la suppression';
+        $('resetConfirmSubtitle').textContent = all
+            ? 'Les confs seront supprimées, le dossier menu reste conservé sauf case cochée.'
+            : 'Suppression d’une seule ligne, en Ajax.';
+        $('resetConfirmText').textContent = all
+            ? `Supprimer les entrées directes de ${confDir}, puis redémarrer Flask ?`
+            : `Supprimer ${files[0] || 'le dossier menu'} dans ${confDir}, puis redémarrer Flask ?`;
+        menuBox.checked = !!initialMenuDefault;
+        if (menuLabel) menuLabel.style.display = all ? 'flex' : 'none';
+        modal.style.display = 'flex';
+        postHeightSoon();
+
+        return new Promise((resolve) => {
+            let done = false;
+            let cleanupKeys = null;
+            const finish = (confirmed) => {
+                if (done) return;
+                done = true;
+                modal.style.display = 'none';
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                cancelTop.removeEventListener('click', onCancel);
+                if (cleanupKeys) cleanupKeys();
+                resolve({confirmed, includeMenuDefault: !!menuBox.checked});
+            };
+            const onOk = () => finish(true);
+            const onCancel = () => finish(false);
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+            cancelTop.addEventListener('click', onCancel);
+            cleanupKeys = bindConfirmKeyboard(modal, cancelBtn, okBtn, onCancel, onOk);
+        });
+    }
+
+    async function runResetConfs(all, filesOverride) {
+        if (state.busy) return;
+        const confDir = getResetConfDir();
+        if (!confDir) {
+            showResetConfDirRequired();
+            return;
+        }
+        const files = Array.isArray(filesOverride) ? filesOverride.filter(Boolean).slice(0, 1) : [];
+        const rowIsMenu = files.length === 1 && files[0] === 'menu';
+        const initialMenuDefault = all ? wantsResetMenuDefault() : rowIsMenu;
+        if (!all && !files.length) {
+            const msg = 'Dépannage : aucune entrée de configuration sélectionnée.';
+            setLog('installLog', msg);
+            setActionModal('Dépannage', 'Sélection requise.', msg);
+            closeActionModalSoon(1800);
+            return;
+        }
+        const confirmation = await confirmResetConfs(all, files, confDir, initialMenuDefault);
+        if (!confirmation.confirmed) return;
+        const includeMenuDefault = all ? !!confirmation.includeMenuDefault : rowIsMenu;
+        if (all) setResetMenuDefaultChecked(includeMenuDefault);
+
+        state.busy = true;
+        const title = all ? 'Remise tout par défaut' : 'Suppression';
+        const menuLine = includeMenuDefault ? '\nMenu : rétablissement par défaut demandé.' : '\nMenu : conservé.';
+        const opening = `[${nowText()}] ${title}${all ? menuLine : ''}\nSuppression demandée…`;
+        setLog('installLog', opening);
+        setActionModal('🛟 ' + title, 'Suppression Ajax, sans recharger la page.', opening);
+
+        try {
+            const res = await fetch('/system/api/system/troubleshooting/confs/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({all: !!all, files, conf_dir: confDir, include_menu_default: includeMenuDefault})
+            });
+            const data = await res.json().catch(() => ({}));
+            const out = [
+                data.message || '',
+                data.deleted && data.deleted.length ? '\nSupprimés :\n- ' + data.deleted.join('\n- ') : '',
+                data.errors && data.errors.length ? '\nErreurs :\n- ' + data.errors.join('\n- ') : '',
+                data.skipped && data.skipped.length ? '\nConservés :\n- ' + data.skipped.join('\n- ') : '',
+                data.restart ? `\nRedémarrage : ${data.restart.message || ''}\nLog restart : ${data.restart.log || '-'}` : ''
+            ].filter(Boolean).join('\n');
+            setLog('installLog', out || 'Terminé.');
+            setActionModal('🛟 ' + title, data.ok ? 'Suppression effectuée. Flask redémarre.' : 'Action terminée avec avertissement.', out || 'Terminé.');
+            await loadResetConfs();
+            closeActionModalSoon(data.ok ? 1800 : 2600);
+        } catch (err) {
+            const msg = 'Erreur dépannage : ' + (err.message || err);
+            setLog('installLog', msg);
+            setActionModal('🛟 Dépannage', 'Erreur.', msg);
+        } finally {
+            state.busy = false;
+            postHeightSoon();
+        }
+    }
+
+    window.runResetOneConf = function (name) {
+        const clean = String(name || '').trim();
+        if (!clean) return;
+        runResetConfs(false, [clean]);
+    };
+
+    async function loadLatestJobLog(kind, targetId, emptyText) {
+        try {
+            const res = await fetch('/system/api/system/jobs/latest?kind=' + encodeURIComponent(kind), {cache: 'no-store'});
+            const data = await res.json().catch(() => ({}));
+            if (data && data.ok) {
+                setLog(targetId, formatJobOutput(data));
+            } else {
+                setLog(targetId, emptyText);
+            }
+        } catch (err) {
+            setLog(targetId, 'Impossible de lire le dernier log : ' + (err.message || err));
+        }
+    }
+
+    async function loadLatestSystemLogs() {
+        await loadLatestJobLog('install', 'installLog', 'Aucune action installation lancée.');
+        await loadLatestJobLog('updates', 'updatesLog', 'Aucune mise à jour lancée.');
+    }
+
+    window.clearSystemHostLogs = function () {
+        setLog('installLog', 'Aucune action installation lancée.');
+        setLog('updatesLog', 'Aucune mise à jour lancée.');
+    };
+
+    function bindEvents() {
+        $('refreshInstallBtn')?.addEventListener('click', () => loadInstallStatus({preserveScroll: true}));
+        $('installFilter')?.addEventListener('input', renderInstallRows);
+
+        $('refreshUpdatesBtn')?.addEventListener('click', () => loadUpdates(false));
+        $('refreshAptBtn')?.addEventListener('click', () => loadUpdates(true));
+        $('updatesFilter')?.addEventListener('input', renderUpdates);
+
+        $('loadResetConfsBtn')?.addEventListener('click', () => loadResetConfs());
+        $('resetAllConfsBtn')?.addEventListener('click', () => runResetConfs(true));
+        $('resetConfDirInput')?.addEventListener('change', () => {
+            state.resetConfs = [];
+            setText('resetConfCount', '—');
+            setResetConfInlineStatus('Clique sur OK pour enregistrer ce dossier et lister son contenu.', '');
+            const body = $('resetConfTableBody');
+            if (body) body.innerHTML = '<tr><td colspan="6">Clique sur OK pour lister le dossier choisi.</td></tr>';
+            postHeightSoon();
+        });
+
+        $('updateSelectedBtn')?.addEventListener('click', () => runUpdate('selected'));
+        $('updateAllBtn')?.addEventListener('click', () => runUpdate('all'));
+
+        $('selectAllUpdates')?.addEventListener('change', (ev) => {
+            document.querySelectorAll('.update-row-check').forEach((box) => {
+                box.checked = ev.target.checked;
+            });
+            updateSelectedCount();
+        });
+
+        document.addEventListener('change', (ev) => {
+            if (ev.target && ev.target.classList.contains('update-row-check')) {
+                updateSelectedCount();
+            }
+        });
+
+        document.addEventListener('click', (ev) => {
+            const button = ev.target.closest('[data-install-action]');
+            if (!button) return;
+            ev.preventDefault();
+            runInstallAction(button.dataset.id, button.dataset.installAction, button.dataset.danger === '1');
+        });
+    }
+
+    const currentSystemSubtab = "{{ active_system_subtab|default('install') }}";
+    bindEvents();
+    loadInstallStatus();
+    if (currentSystemSubtab === 'updates') loadUpdates(false);
+    if (currentSystemSubtab === 'logs') loadLatestSystemLogs();
+    if (currentSystemSubtab === 'troubleshooting') {
+        const body = $('resetConfTableBody');
+        setText('resetConfCount', '—');
+        setResetMenuDefaultChecked(false);
+        if (getResetConfDir()) {
+            setResetConfInlineStatus('Dossier restauré depuis system.conf. Lecture en cours…', '');
+            loadResetConfs();
+        } else {
+            if (body) body.innerHTML = '<tr><td colspan="6">Veuillez d’abord choisir votre dossier de configuration, puis cliquer sur OK.</td></tr>';
+            setResetConfInlineStatus('', '');
+        }
+    }
+})();
+</script>
+{% endblock %}

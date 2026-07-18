@@ -1,0 +1,24 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-general" class="disk-section">
+                <div class="summary-grid">
+                    <div class="summary-card yoleo-card"><div class="summary-label">Disques</div><div class="summary-value cyan" id="sum-count">—</div></div>
+                    <div class="summary-card yoleo-card"><div class="summary-label">Montés</div><div class="summary-value" id="sum-mounted">—</div></div>
+                    <div class="summary-card yoleo-card"><div class="summary-label">Actifs</div><div class="summary-value green" id="sum-active">—</div></div>
+                    <div class="summary-card yoleo-card"><div class="summary-label">Veille</div><div class="summary-value gray" id="sum-standby">—</div></div>
+                    <div class="summary-card yoleo-card"><div class="summary-label">Alertes</div><div class="summary-value red" id="sum-alerts">—</div></div>
+                    <div class="summary-card yoleo-card"><div class="summary-label">Capacité brute</div><div class="summary-value" id="sum-size">—</div></div>
+                </div>
+                <div class="yoleo-card table-card">
+                    <div class="table-head"><div><h2 class="table-title">État des disques</h2><div class="table-subtitle" id="last-update">Chargement...</div></div><div class="disk-head-tools"><div class="action-message disk-inline-message" id="action-message">Prêt.</div><div class="refresh-pill"><span>Auto-refresh {{ refresh_seconds }}s</span></div></div></div>
+                    <div class="table-wrap disk-table-compact" data-mobile-mosaic="off">
+                        <table class="yoleo-table disk-status-table">
+                            <thead><tr><th class="state-col">État</th><th class="disk-col">Disque</th><th class="ident-col">Identification</th><th class="label-col">Label</th><th class="fs-col">FS</th><th class="size-cell">Taille</th><th class="used-cell">Utilisé</th><th class="free-cell">Libre</th><th class="temp-col">Temp.</th><th class="mount-col">Montage</th></tr></thead>
+                            <tbody id="disk-tbody"><tr><td colspan="10" class="empty-state">Chargement des disques...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="mobile-list disk-mobile-cards" id="disk-mobile"><div class="empty-state">Chargement des disques...</div></div>
+                </div>
+            </div>
+{% endblock %}

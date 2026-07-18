@@ -1,0 +1,96 @@
+    /* Accueil NAS : panneau ventilateurs / RPM */
+    .nas-fans-card {
+        min-height: 148px;
+        padding: 12px;
+    }
+
+    .nas-fans-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 7px;
+        color: #91a6bb;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
+    .nas-fans-count b {
+        color: #fff;
+        font-size: 12px;
+    }
+
+    .nas-fans-source {
+        color: #6f859b;
+        font-size: 10px;
+        text-transform: uppercase;
+    }
+
+    .nas-fan-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+        gap: 6px;
+    }
+
+    .nas-fan-tile {
+        background: #0b1118;
+        border: 1px solid #26384c;
+        border-radius: 8px;
+        padding: 6px 7px;
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+    }
+
+    .nas-fan-name {
+        color: #91a6bb;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .nas-fan-rpm {
+        color: #fff;
+        font-size: 14px;
+        font-weight: 950;
+        line-height: 1.05;
+        font-family: Consolas, Monaco, monospace;
+    }
+
+    .nas-fan-chip {
+        color: #5f7288;
+        font-size: 9px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .nas-fan-ok .nas-fan-rpm { color: #55ef8f; }
+    .nas-fan-stopped .nas-fan-rpm { color: #91a6bb; }
+    .nas-fan-fault .nas-fan-rpm { color: #ff7675; }
+
+    .nas-fan-empty {
+        grid-column: 1 / -1;
+        color: #91a6bb;
+        background: #0b1118;
+        border: 1px dashed #31465c;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 13px;
+    }
+
+    @media (max-width: 780px) {
+        .nas-fans-head {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .nas-fan-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .nas-fan-rpm {
+            font-size: 15px;
+        }
+    }

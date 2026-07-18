@@ -1,0 +1,283 @@
+/* ------------------------------------------------------------------
+   Standard d'espacement des pages Stockage / Disques.
+   Objectif : même hauteur de départ que les autres pages Yoleo sous
+   le bandeau haut commun, sans marge spéciale par sous-page.
+   ------------------------------------------------------------------ */
+
+.yoleo-content > .disk-page {
+    width: min(var(--yoleo-content-wide, 1680px), calc(100% - (var(--yoleo-page-gap-x, 18px) * 2))) !important;
+    margin: var(--yoleo-page-gap-top, 14px) auto var(--yoleo-page-gap-bottom, 34px) !important;
+    padding: 0 !important;
+    gap: 12px !important;
+}
+
+.yoleo-content > .disk-page .summary-grid {
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+}
+
+.yoleo-content > .disk-page .summary-card {
+    padding: 10px 12px !important;
+}
+
+.yoleo-content > .disk-page .disk-card,
+.yoleo-content > .disk-page .yoleo-card {
+    margin-top: 0 !important;
+}
+
+.yoleo-content > .disk-page .disk-card-head,
+.yoleo-content > .disk-page .compact-head {
+    box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+    .yoleo-content > .disk-page {
+        width: calc(100% - 20px) !important;
+        margin-top: var(--yoleo-page-gap-top, 14px) !important;
+    }
+}
+
+/* Disques > General : tableau fluide sans largeurs de colonnes figees. */
+.yoleo-content > .disk-page .disk-table-compact {
+    overflow-x: hidden !important;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table thead,
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table tbody,
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table tr {
+    width: 100%;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table thead tr,
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table tbody tr:not(.group-row) {
+    display: grid;
+    grid-template-columns:
+        minmax(0, .82fr)
+        minmax(0, .58fr)
+        minmax(0, 1.42fr)
+        minmax(0, .62fr)
+        minmax(0, .42fr)
+        minmax(0, .58fr)
+        minmax(0, 1.42fr)
+        minmax(0, .78fr)
+        minmax(0, .52fr)
+        minmax(0, 1.22fr);
+    align-items: stretch;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table .group-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table th,
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table td {
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    padding-left: clamp(5px, .55vw, 9px) !important;
+    padding-right: clamp(5px, .55vw, 9px) !important;
+    display: flex;
+    align-items: center;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table td[colspan],
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table th[colspan] {
+    grid-column: 1 / -1;
+    display: block;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table :where(
+    .state-col,
+    .disk-col,
+    .ident-col,
+    .label-col,
+    .fs-col,
+    .size-cell,
+    .used-cell,
+    .free-cell,
+    .temp-col,
+    .mount-col
+) {
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .disk-status-table :where(
+    .disk-col,
+    .fs-col,
+    .size-cell,
+    .free-cell,
+    .temp-col
+) {
+    white-space: nowrap;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .status-cell,
+.yoleo-content > .disk-page .disk-table-compact .disk-label-cell,
+.yoleo-content > .disk-page .disk-table-compact .mount-line,
+.yoleo-content > .disk-page .disk-table-compact .free-with-cache {
+    min-width: 0;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .status-cell > span,
+.yoleo-content > .disk-page .disk-table-compact .disk-name,
+.yoleo-content > .disk-page .disk-table-compact .disk-label-text,
+.yoleo-content > .disk-page .disk-table-compact .model-main,
+.yoleo-content > .disk-page .disk-table-compact .model-sub,
+.yoleo-content > .disk-page .disk-table-compact .mount-path,
+.yoleo-content > .disk-page .disk-table-compact .code-line {
+    min-width: 0;
+    max-width: 100% !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .usage-combo {
+    width: 100%;
+    min-width: 0 !important;
+    max-width: 100%;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .usage-labels {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: clamp(4px, .45vw, 8px);
+}
+
+.yoleo-content > .disk-page .disk-table-compact .usage-used-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.yoleo-content > .disk-page .disk-table-compact .usage-progress {
+    min-width: 0;
+}
+
+@media (max-width: 1120px) {
+    .yoleo-content > .disk-page .disk-table-compact .disk-status-table thead tr,
+    .yoleo-content > .disk-page .disk-table-compact .disk-status-table tbody tr:not(.group-row) {
+        grid-template-columns:
+            minmax(0, .72fr)
+            minmax(0, .54fr)
+            minmax(0, 1.18fr)
+            minmax(0, .54fr)
+            minmax(0, .38fr)
+            minmax(0, .52fr)
+            minmax(0, 1.34fr)
+            minmax(0, .70fr)
+            minmax(0, .48fr)
+            minmax(0, 1fr);
+    }
+
+    .yoleo-content > .disk-page .disk-table-compact .disk-status-table th,
+    .yoleo-content > .disk-page .disk-table-compact .disk-status-table td {
+        font-size: 11px;
+    }
+
+    .yoleo-content > .disk-page .disk-table-compact .model-sub,
+    .yoleo-content > .disk-page .disk-table-compact .mount-kind {
+        display: none;
+    }
+}
+
+@media (max-width: 850px) {
+    .yoleo-content > .disk-page .disk-table-compact {
+        display: none !important;
+    }
+
+    .yoleo-content > .disk-page .disk-table-compact + .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-cards,
+    body.yoleo-mobile-mosaic-ready .yoleo-content > .disk-page .disk-mobile-cards {
+        display: grid !important;
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-card {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(18, 26, 36, .92);
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-card.is-mounted {
+        border-color: rgba(72, 213, 151, .58);
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-card.is-unmounted {
+        border-color: rgba(255, 93, 115, .58);
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 8px;
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-title {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-title-text,
+    .yoleo-content > .disk-page .mobile-name,
+    .yoleo-content > .disk-page .mobile-sub {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-details {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .yoleo-content > .disk-page .disk-mobile-wide {
+        grid-column: 1 / -1;
+    }
+
+    .yoleo-content > .disk-page .mobile-kv {
+        min-width: 0;
+        border-radius: 6px;
+        padding: 8px;
+    }
+
+    .yoleo-content > .disk-page .mobile-v,
+    .yoleo-content > .disk-page .mobile-v .usage-combo {
+        min-width: 0;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 520px) {
+    .yoleo-content > .disk-page .disk-mobile-metrics,
+    .yoleo-content > .disk-page .disk-mobile-details {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,37 @@
+/* System > Backups systeme */
+.uibackup-page .uibackup-ref-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+}
+
+.uibackup-page .uibackup-job-card {
+  border-color: rgba(26, 235, 255, .38);
+}
+
+.uibackup-page .uibackup-main-progress {
+  max-width: 760px;
+}
+
+.uibackup-page [data-uibackup-name] {
+  cursor: pointer;
+}
+
+.uibackup-page tr[data-uibackup-name].is-selected td,
+.uibackup-page .mobile-card[data-uibackup-name].is-selected {
+  background: rgba(26, 235, 255, .08);
+  box-shadow: inset 3px 0 0 #1AEBFF;
+}
+
+.uibackup-page .backup-table-filters .btn {
+  min-width: 150px;
+}
+
+@media (max-width: 700px) {
+  .uibackup-page .backup-table-filters,
+  .uibackup-page .backup-table-filters .btn {
+    width: 100%;
+  }
+}

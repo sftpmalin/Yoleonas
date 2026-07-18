@@ -1,0 +1,30 @@
+/* ==========================================================
+   73 - Task manager: wrap long planification badges
+   ----------------------------------------------------------
+   Corrige la colonne Planification du tableau des tâches.
+   La règle globale d'autofit garde les .badge en nowrap !important ;
+   ici on la surcharge uniquement pour cette colonne.
+   ========================================================== */
+
+.task-page #tab-tasks th:nth-child(2),
+.task-page #tab-tasks td:nth-child(2) {
+    width: 150px !important;
+    max-width: 170px !important;
+    min-width: 0 !important;
+}
+
+.task-page #tab-tasks td:nth-child(2) .badge,
+.task-page #tab-tasks td:nth-child(2) .badge.badge-cyan {
+    display: inline-block !important;
+    width: auto !important;
+    max-width: 150px !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+    line-height: 1.22 !important;
+    text-align: center !important;
+    vertical-align: top !important;
+}

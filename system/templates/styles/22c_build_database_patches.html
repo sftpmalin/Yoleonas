@@ -1,0 +1,235 @@
+    /* Build / Base de données : réduction des colonnes pour éviter l'ascenseur horizontal desktop */
+    .builds-page .db-table {
+        width: 100%;
+        min-width: 0 !important;
+        table-layout: fixed;
+    }
+
+    .builds-page .db-scroll-top {
+        display: none;
+    }
+
+    .builds-page .db-scroll-top-inner {
+        min-width: 0 !important;
+    }
+
+    .builds-page .db-table th:nth-child(1),
+    .builds-page .db-table td:nth-child(1) {
+        width: 17% !important;
+    }
+
+    .builds-page .db-table th:nth-child(2),
+    .builds-page .db-table td:nth-child(2) {
+        width: auto !important;
+    }
+
+    .builds-page .db-table th:nth-child(3),
+    .builds-page .db-table td:nth-child(3) {
+        width: 190px !important;
+    }
+
+    .builds-page .db-table th:nth-child(4),
+    .builds-page .db-table td:nth-child(4) {
+        width: 110px !important;
+    }
+
+    .builds-page .db-table th:nth-child(5),
+    .builds-page .db-table td:nth-child(5) {
+        width: 132px !important;
+    }
+
+    .builds-page .db-table select[name="db_platforms"] {
+        width: 100%;
+        min-width: 0;
+        max-width: 176px;
+    }
+
+    .builds-page .db-table select[name="db_mode"] {
+        width: 100%;
+        min-width: 0;
+        max-width: 96px;
+    }
+
+    .builds-page .db-table input[name="db_registry"] {
+        min-width: 0;
+    }
+
+    @media (max-width: 900px) {
+        .builds-page .db-scroll-top {
+            display: block;
+        }
+
+        .builds-page .db-table {
+            min-width: 760px !important;
+        }
+
+        .builds-page .db-scroll-top-inner {
+            min-width: 760px !important;
+        }
+    }
+
+    .builds-page .database-auto-all-btn {
+        width: 30px;
+        min-width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        flex: 0 0 30px;
+        font-size: 16px;
+        line-height: 1;
+        box-shadow: 0 0 0 1px rgba(255,181,92,.22), 0 0 14px rgba(255,181,92,.16);
+    }
+
+    .builds-page .database-auto-note {
+        min-width: 0;
+    }
+
+    /* Build → TAR : bouton options par ligne + popup de réglage rapide de la base interne */
+    .builds-page .build-row-actions {
+        gap: 6px;
+        justify-content: flex-end;
+        flex-wrap: nowrap;
+    }
+
+    .builds-page .build-db-option-btn {
+        width: 28px;
+        min-width: 28px;
+        height: 28px;
+        padding: 0;
+        border-radius: 999px;
+        background: rgba(255,181,92,.16);
+        border-color: rgba(255,181,92,.55);
+        color: #ffd089;
+        box-shadow: 0 0 0 1px rgba(255,181,92,.18), 0 0 10px rgba(255,181,92,.14);
+    }
+
+    .builds-page .build-db-option-btn:hover {
+        background: rgba(255,181,92,.28);
+        border-color: #ffb55c;
+        color: #fff0cc;
+    }
+
+    .build-db-option-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483002;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,.72);
+        backdrop-filter: blur(5px);
+        padding: 18px;
+        color: #eaf2ff;
+    }
+
+    .build-db-option-box {
+        width: min(620px, 96vw);
+        background: #0e1723;
+        border: 1px solid #314760;
+        border-radius: 18px;
+        box-shadow: 0 28px 80px rgba(0,0,0,.60);
+        overflow: hidden;
+    }
+
+    .build-db-option-head,
+    .build-db-option-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        background: rgba(10, 18, 29, .92);
+        border-bottom: 1px solid #26384e;
+    }
+
+    .build-db-option-actions {
+        justify-content: flex-end;
+        border-top: 1px solid #26384e;
+        border-bottom: 0;
+    }
+
+    .build-db-option-title {
+        font-size: 18px;
+        font-weight: 900;
+        color: #fff;
+    }
+
+    .build-db-option-sub {
+        margin-top: 3px;
+        color: #95aac2;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .build-db-option-close {
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
+        padding: 0;
+        font-size: 22px;
+        line-height: 1;
+    }
+
+    .build-db-option-body {
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+    }
+
+    .build-db-option-grid {
+        display: grid;
+        grid-template-columns: 1fr 150px;
+        gap: 12px;
+    }
+
+    .build-db-option-field {
+        display: grid;
+        gap: 6px;
+    }
+
+    .build-db-option-field span {
+        color: #a8eaff;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .35px;
+        font-weight: 900;
+    }
+
+    .build-db-option-help,
+    .build-db-option-status {
+        color: #91a6bd;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    .build-db-option-status {
+        min-height: 18px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(255,255,255,.035);
+        border: 1px solid rgba(255,255,255,.07);
+    }
+
+    .build-db-option-status:empty {
+        display: none;
+    }
+
+    .build-db-option-status.is-ok {
+        color: #b9ffd0;
+        background: rgba(46, 204, 113, .10);
+        border-color: rgba(46, 204, 113, .35);
+    }
+
+    .build-db-option-status.is-error {
+        color: #ffd5d5;
+        background: rgba(244, 67, 54, .12);
+        border-color: rgba(244, 67, 54, .38);
+    }
+
+    @media (max-width: 700px) {
+        .build-db-option-grid {
+            grid-template-columns: 1fr;
+        }
+        .build-db-option-actions .yoleo-btn {
+            width: 100%;
+        }
+    }
+

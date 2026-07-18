@@ -1,0 +1,778 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<section id="tab-lan" class="lan-route-page">
+<div class="lan-page">
+    <div class="lan-panel">
+        <nav class="yoleo-subnav" aria-label="Navigation LAN">
+            <a href="/system/lan" class="yoleo-subnav-link {{ 'is-active' if current_lan_subtab == 'overview' else '' }}">🌐 Réseau Linux</a>
+            <a href="/system/lan/plans" class="yoleo-subnav-link {{ 'is-active' if current_lan_subtab == 'plans' else '' }}">🧩 Plans / Bridges</a>
+            <a href="/system/lan/apply" class="yoleo-subnav-link {{ 'is-active' if current_lan_subtab == 'apply' else '' }}">⚡ Appliquer</a>
+        </nav>
+
+        {% if current_lan_subtab == 'overview' %}
+            <div class="lan-content-section" data-lan-section="overview">
+                <div class="topbar">
+                    <div></div>
+                    <div class="toolbar">
+                        <button class="yoleo-btn yoleo-btn-primary" onclick="refreshLanStatus()">🔄 Actualiser</button>
+                        <button class="yoleo-btn yoleo-btn-green" onclick="openPlanModalFromDefaults()">➕ Ajouter un réseau</button>
+                    </div>
+                </div>
+
+                <div class="summary-grid" id="summaryGrid">
+                    <div class="summary-card"><div class="summary-label">Interface défaut</div><div class="summary-value cyan" id="sumDefaultIface">{{ defaults.parent or '-' }}</div></div>
+                    <div class="summary-card"><div class="summary-label">Passerelle</div><div class="summary-value" id="sumGateway">{{ defaults.gateway or '-' }}</div></div>
+                    <div class="summary-card"><div class="summary-label">IP actuelle</div><div class="summary-value green" id="sumIpv4">{{ defaults.parent_ipv4 or '-' }}</div></div>
+                    <div class="summary-card"><div class="summary-label">MAC physique</div><div class="summary-value" id="sumMac">{{ defaults.parent_mac or '-' }}</div></div>
+                    <div class="summary-card"><div class="summary-label">DNS</div><div class="summary-value" id="sumDns">{{ defaults.dns or '-' }}</div></div>
+                </div>
+
+                <div class="path-grid">
+                    <div class="path-pill"><b>conf</b><span>{{ conf._config_path }}</span></div>
+                    <div class="path-pill"><b>plans</b><span>{{ conf.PLAN_FILE_DISPLAY|default(conf.PLAN_FILE) }}</span></div>
+                    <div class="path-pill"><b>logs</b><span>{{ conf.LOG_FILE_DISPLAY|default(conf.LOG_FILE) }}</span></div>
+                    <div class="path-pill"><b>rollback</b><span>{{ conf.BACKUP_DIR_DISPLAY|default(conf.BACKUP_DIR) }}</span></div>
+                    <div class="path-pill"><b>IP_BIN</b><span>{{ conf.IP_BIN }}</span></div>
+                    <div class="path-pill"><b>runtime</b><span>{{ conf.ALLOW_RUNTIME_APPLY }}</span></div>
+                    <div class="path-pill"><b>persistant</b><span>{{ conf.ALLOW_PERSISTENT_WRITE }}</span></div>
+                    <div class="path-pill"><b>rollback sec.</b><span>{{ conf.ROLLBACK_SECONDS }}</span></div>
+                    <div class="path-pill"><b>interfaces</b><span>{{ conf.INTERFACES_OUTPUT_FILE }}</span></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <div>
+                            <h2 class="card-title">Interfaces détectées</h2>
+                            <div class="hint">Les interfaces physiques ne sont jamais supprimées par le bouton supprimer. La suppression runtime est limitée aux interfaces virtuelles.</div>
+                        </div>
+                        <input id="ifaceSearch" class="text-input sys-inline-039" placeholder="🔍 Filtrer..." oninput="filterTable('ifaceTable', this.value)">
+                    </div>
+                    <div class="table-wrap">
+                        <table id="ifaceTable" class="lan-table keyboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Interface</th>
+                                    <th>Type</th>
+                                    <th>État</th>
+                                    <th>MAC</th>
+                                    <th>IPv4</th>
+                                    <th>Master</th>
+                                    <th>Route</th>
+                                    <th class="sys-inline-040">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ifaceTbody">
+                                {% for item in interfaces %}
+                                <tr data-filter="{{ (item.name ~ ' ' ~ item.kind ~ ' ' ~ item.mac ~ ' ' ~ (item.ipv4|join(' ')) ~ ' ' ~ item.master)|lower }}" data-iface="{{ item.name }}">
+                                    <td><div class="name-main">{{ item.name }}</div><div class="name-sub">MTU {{ item.mtu }}{% if item.speed %} • {{ item.speed }} Mb/s{% endif %}</div></td>
+                                    <td><span class="badge badge-info">{{ item.kind }}</span>{% if item.is_virtual %} <span class="badge badge-muted">virtuel</span>{% endif %}</td>
+                                    <td>{% if item.state in ['up','unknown'] %}<span class="badge badge-ok">{{ item.state }}</span>{% else %}<span class="badge badge-no">{{ item.state }}</span>{% endif %}</td>
+                                    <td class="mono">{{ item.mac }}</td>
+                                    <td class="mono">{{ item.ipv4|join('<br>')|safe if item.ipv4 else '-' }}</td>
+                                    <td class="mono">{{ item.master or '-' }}</td>
+                                    <td>{% if item.default_route %}<span class="badge badge-ok">défaut</span> <span class="mono">{{ item.gateway }}</span>{% else %}<span class="badge badge-muted">-</span>{% endif %}</td>
+                                    <td><div class="actions-cell">
+                                        <button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" onclick="openPlanModalFromIface('{{ item.name }}')">Modifier</button>
+                                        <button class="yoleo-btn yoleo-btn-mini yoleo-btn-green" onclick="ifaceAction('{{ item.name }}','up')">Activer</button>
+                                        <button class="yoleo-btn yoleo-btn-mini yoleo-btn-orange" onclick="ifaceAction('{{ item.name }}','down')">Désactiver</button>
+                                        <button class="yoleo-btn yoleo-btn-mini yoleo-btn-red" onclick="ifaceAction('{{ item.name }}','delete')" {% if not item.is_virtual %}disabled title="Suppression refusée sur interface physique"{% endif %}>Supprimer</button>
+                                    </div></td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="8" class="hint">Aucune interface détectée.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% elif current_lan_subtab == 'plans' %}
+            <div class="lan-content-section" data-lan-section="plans">
+                <div class="topbar">
+                    <div></div>
+                    <div class="toolbar">
+                        <button class="yoleo-btn yoleo-btn-green" onclick="openPlanModalFromDefaults()">➕ Ajouter</button>
+                        <button class="yoleo-btn yoleo-btn-primary" onclick="savePlans()">💾 Sauvegarder plans</button>
+                        <a class="yoleo-btn yoleo-btn-orange" href="/system/lan/apply">👁️ Aperçu</a>
+                    </div>
+                </div>
+
+                <div class="warn-note sys-inline-041">Pour ton cas typique : type <b>Switch virtuel Linux / bridge</b>, nom <b>br0</b>, parent <b>{{ defaults.parent or 'eth0' }}</b>, mode IPv4 <b>copier IP actuelle</b>, et case <b>reprendre la MAC physique</b> cochée.</div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <div>
+                            <h2 class="card-title">Table des plans</h2>
+                            <div class="hint">Modifier/Supprimer agit seulement sur le JSON des plans. Le bouton Appliquer est dans l’onglet suivant.</div>
+                        </div>
+                        <input id="planSearch" class="text-input sys-inline-042" placeholder="🔍 Filtrer..." oninput="filterTable('plansTable', this.value)">
+                    </div>
+                    <div class="table-wrap">
+                        <table id="plansTable" class="lan-table keyboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Réseau</th>
+                                    <th>Type</th>
+                                    <th>Parent</th>
+                                    <th>IPv4</th>
+                                    <th>MAC</th>
+                                    <th>Boot</th>
+                                    <th class="sys-inline-043">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="plansTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% elif current_lan_subtab == 'apply' %}
+            <div class="lan-content-section" data-lan-section="apply">
+                <div class="topbar">
+                    <div></div>
+                    <div class="toolbar">
+                        <button class="yoleo-btn yoleo-btn-primary" onclick="previewPlans()">👁️ Générer aperçu</button>
+                        <button class="yoleo-btn yoleo-btn-red" onclick="openApplyConfirm()">⚡ Appliquer maintenant</button>
+                        <button class="yoleo-btn yoleo-btn-green" onclick="cancelRollback()">✅ Annuler rollback</button>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <h2 class="card-title">Commandes runtime</h2>
+                        <div class="hint">Ces commandes sont générées depuis les plans activés. Elles sont exécutées seulement après confirmation.</div>
+                        <pre id="previewShell" class="code-box">Clique sur “Générer aperçu”.</pre>
+                    </div>
+                    <div class="card">
+                        <h2 class="card-title">Conf persistante prévue</h2>
+                        <div class="hint">Écriture réelle désactivée par défaut sauf si <span class="mono">ALLOW_PERSISTENT_WRITE=1</span> dans lan.conf et case cochée au moment d’appliquer.</div>
+                        <pre id="previewPersistent" class="code-box">Clique sur “Générer aperçu”.</pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <div>
+                            <h2 class="card-title">Résultat / logs</h2>
+                            <div class="hint">Après application, un rollback automatique peut être armé. Si l’accès revient correctement, clique sur Annuler rollback.</div>
+                        </div>
+                        <button class="yoleo-btn yoleo-btn-muted" onclick="refreshLog()">🔄 Logs</button>
+                    </div>
+                    <pre id="lanLog" class="modal-log">{{ log_tail }}</pre>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div id="planModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-head">
+            <div>
+                <h3 id="planModalTitle" class="modal-title">Ajouter un réseau</h3>
+                <div class="hint">Ce formulaire modifie seulement le plan local. Rien n’est appliqué tant que tu n’appuies pas sur Appliquer.</div>
+            </div>
+            <button class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" onclick="closePlanModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="plan-id">
+            <div class="grid-3">
+                <div>
+                    <label>Nom réseau/interface</label>
+                    <input id="plan-name" class="text-input" placeholder="br0">
+                </div>
+                <div>
+                    <label>Type</label>
+                    <select id="plan-type" class="select-input" onchange="syncPlanTypeHelp()">
+                        <option value="bridge">Switch virtuel Linux / bridge</option>
+                        <option value="direct">Interface directe</option>
+                        <option value="vlan">VLAN</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Parent physique</label>
+                    <input id="plan-parent" class="text-input" placeholder="eth0 / enp5s0">
+                </div>
+            </div>
+            <div class="grid-4 sys-inline-044">
+                <div>
+                    <label>Mode IPv4</label>
+                    <select id="plan-ipv4-mode" class="select-input">
+                        <option value="copy">Copier IP actuelle du parent</option>
+                        <option value="dhcp">DHCP</option>
+                        <option value="static">Statique</option>
+                        <option value="none">Aucune IP</option>
+                    </select>
+                </div>
+                <div><label>Adresse statique CIDR</label><input id="plan-address" class="text-input" placeholder="192.168.1.10/24"></div>
+                <div><label>Passerelle</label><input id="plan-gateway" class="text-input" placeholder="192.168.1.254"></div>
+                <div><label>DNS</label><input id="plan-dns" class="text-input" placeholder="1.1.1.1,8.8.8.8"></div>
+            </div>
+            <div class="grid-4 sys-inline-045">
+                <div><label>MTU</label><input id="plan-mtu" class="text-input" placeholder="1500"></div>
+                <div><label>VLAN ID</label><input id="plan-vlan-id" class="text-input" placeholder="10"></div>
+                <div class="check-row sys-inline-046"><input type="checkbox" id="plan-enabled" checked><span>Plan activé</span></div>
+                <div class="check-row sys-inline-047"><input type="checkbox" id="plan-autostart" checked><span>Prévoir au boot</span></div>
+            </div>
+            <div class="grid-2 sys-inline-048">
+                <div class="check-row"><input type="checkbox" id="plan-use-parent-mac" checked><span>Reprendre la MAC physique du parent sur le bridge</span></div>
+                <div class="hint" id="planTypeHelp">Le bridge agit comme un switch virtuel Linux : la carte physique devient un port de br0, et l’IP passe sur br0.</div>
+            </div>
+            <div class="sys-inline-049">
+                <label>Commentaire</label>
+                <input id="plan-comment" class="text-input" placeholder="ex: LAN principal avec MAC conservée">
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="yoleo-btn yoleo-btn-muted" onclick="closePlanModal()">Annuler</button>
+            <button class="yoleo-btn yoleo-btn-primary" onclick="savePlanFromModal()">💾 Valider le plan</button>
+        </div>
+    </div>
+</div>
+
+<div id="confirmModal" class="modal-overlay">
+    <div class="modal-box sys-inline-050">
+        <div class="modal-head">
+            <div>
+                <h3 id="confirmTitle" class="modal-title">Confirmation</h3>
+                <div id="confirmSubtitle" class="hint"></div>
+            </div>
+            <button class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" onclick="closeConfirmModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div id="confirmBody" class="danger-note"></div>
+            <div class="sys-inline-051" id="applyOptions">
+                <div class="grid-2">
+                    <div class="check-row"><input type="checkbox" id="applyPersistent"><span>Écrire aussi la conf persistante</span></div>
+                    <div><label>Confirmation</label><input id="applyConfirmInput" class="text-input" placeholder="Tape APPLIQUER"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="yoleo-btn yoleo-btn-muted" onclick="closeConfirmModal()">Annuler</button>
+            <button id="confirmOkBtn" class="yoleo-btn yoleo-btn-red">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const initialPlans = {{ plans|tojson }};
+let lanPlans = Array.isArray(initialPlans) ? initialPlans : [];
+let lanSnapshot = {{ snapshot|tojson }};
+let lanDefaults = {{ defaults|tojson }};
+let confirmCallback = null;
+let modalButtonIndex = 0;
+const keyboardNav = { tableId: '', rowIndex: 0, actionIndex: 0 };
+const initialLanSubtab = {{ current_lan_subtab|tojson }} || 'overview';
+
+function $(id) { return document.getElementById(id); }
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+}
+function badge(text, cls) { return `<span class="badge ${cls || 'badge-muted'}">${escapeHtml(text)}</span>`; }
+function uuidPlan() { return Math.random().toString(16).slice(2, 10) + Date.now().toString(16).slice(-4); }
+
+function normalizeLanSubtab(tab) {
+    tab = String(tab || '').trim().toLowerCase().replace(/-/g, '_');
+    if (['plans', 'bridges', 'bridge'].includes(tab)) return 'plans';
+    if (['apply', 'appliquer'].includes(tab)) return 'apply';
+    if (['info', 'infos', 'config', 'conf', 'settings'].includes(tab)) return 'info';
+    return 'overview';
+}
+
+function normalizePlan(plan) {
+    const defaults = lanDefaults || {};
+    const type = String(plan?.type || 'bridge');
+    return {
+        id: String(plan?.id || uuidPlan()),
+        enabled: plan?.enabled !== false,
+        name: String(plan?.name || (type === 'bridge' ? (defaults.bridge_name || 'br0') : (defaults.parent || ''))),
+        type: ['bridge','direct','vlan'].includes(type) ? type : 'bridge',
+        parent: String(plan?.parent || defaults.parent || ''),
+        vlan_id: String(plan?.vlan_id || ''),
+        use_parent_mac: plan?.use_parent_mac !== false,
+        ipv4_mode: String(plan?.ipv4_mode || defaults.ipv4_mode || 'copy'),
+        address: String(plan?.address || ''),
+        gateway: String(plan?.gateway || defaults.gateway || ''),
+        dns: String(plan?.dns || defaults.dns || ''),
+        mtu: String(plan?.mtu || ''),
+        autostart: plan?.autostart !== false,
+        comment: String(plan?.comment || ''),
+        updated_at: String(plan?.updated_at || '')
+    };
+}
+
+function typeLabel(type) {
+    if (type === 'bridge') return 'Switch virtuel / bridge';
+    if (type === 'direct') return 'Interface directe';
+    if (type === 'vlan') return 'VLAN';
+    return type || '-';
+}
+function ipv4Label(plan) {
+    if (plan.ipv4_mode === 'copy') return 'copie parent';
+    if (plan.ipv4_mode === 'dhcp') return 'DHCP';
+    if (plan.ipv4_mode === 'static') return plan.address || 'statique';
+    return 'aucune';
+}
+function renderPlansTable() {
+    const tbody = $('plansTbody');
+    if (!tbody) return;
+    if (!lanPlans.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="hint">Aucun plan. Clique sur Ajouter pour créer br0 ou un autre réseau.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = lanPlans.map((raw, index) => {
+        const p = normalizePlan(raw);
+        const haystack = [p.name,p.type,p.parent,p.address,p.gateway,p.dns,p.comment].join(' ').toLowerCase();
+        return `<tr data-filter="${escapeHtml(haystack)}" data-plan-id="${escapeHtml(p.id)}">
+            <td><div class="name-main">${escapeHtml(p.name)}</div><div class="name-sub">${escapeHtml(p.comment || p.id)}</div></td>
+            <td>${badge(typeLabel(p.type), p.type === 'bridge' ? 'badge-info' : 'badge-muted')} ${p.enabled ? badge('activé','badge-ok') : badge('désactivé','badge-no')}</td>
+            <td class="mono">${escapeHtml(p.parent || '-')}</td>
+            <td><span class="mono">${escapeHtml(ipv4Label(p))}</span><div class="hint">GW ${escapeHtml(p.gateway || '-')}</div></td>
+            <td>${p.use_parent_mac ? badge('MAC parent','badge-ok') : badge('MAC auto','badge-warn')}</td>
+            <td>${p.autostart ? badge('boot','badge-ok') : badge('runtime','badge-muted')}</td>
+            <td><div class="actions-cell">
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" onclick="openPlanModalByIndex(${index})">Modifier</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" onclick="duplicatePlan(${index})">Copier</button>
+                <button class="yoleo-btn yoleo-btn-mini ${p.enabled ? 'yoleo-btn-orange' : 'yoleo-btn-green'}" onclick="togglePlan(${index})">${p.enabled ? 'Désactiver' : 'Activer'}</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-red" onclick="deletePlan(${index})">Supprimer</button>
+            </div></td>
+        </tr>`;
+    }).join('');
+    filterTable('plansTable', $('planSearch')?.value || '');
+    bindKeyboardRows();
+}
+
+function openPlanModal(plan) {
+    const p = normalizePlan(plan || {});
+    $('planModalTitle').textContent = plan && plan.id ? 'Modifier le réseau' : 'Ajouter un réseau';
+    $('plan-id').value = p.id;
+    $('plan-name').value = p.name;
+    $('plan-type').value = p.type;
+    $('plan-parent').value = p.parent;
+    $('plan-vlan-id').value = p.vlan_id;
+    $('plan-use-parent-mac').checked = !!p.use_parent_mac;
+    $('plan-ipv4-mode').value = p.ipv4_mode;
+    $('plan-address').value = p.address;
+    $('plan-gateway').value = p.gateway;
+    $('plan-dns').value = p.dns;
+    $('plan-mtu').value = p.mtu;
+    $('plan-enabled').checked = !!p.enabled;
+    $('plan-autostart').checked = !!p.autostart;
+    $('plan-comment').value = p.comment;
+    syncPlanTypeHelp();
+    $('planModal').style.display = 'flex';
+    setTimeout(() => $('plan-name').focus(), 60);
+}
+function closePlanModal() { $('planModal').style.display = 'none'; }
+function openPlanModalFromDefaults() {
+    const d = lanDefaults || {};
+    openPlanModal({
+        name: d.bridge_name || 'br0', type:'bridge', parent:d.parent || '', use_parent_mac:true,
+        ipv4_mode:'copy', gateway:d.gateway || '', dns:d.dns || '', comment:'Switch virtuel LAN principal'
+    });
+}
+function openPlanModalFromIface(name) {
+    const rows = (lanSnapshot && lanSnapshot.interfaces) || [];
+    const iface = rows.find(x => x.name === name) || {};
+    openPlanModal({
+        name: 'br0', type:'bridge', parent:name, use_parent_mac:true, ipv4_mode:'copy',
+        gateway: iface.gateway || (lanDefaults && lanDefaults.gateway) || '',
+        dns: (lanDefaults && lanDefaults.dns) || '',
+        mtu: iface.mtu || '',
+        comment: `Bridge depuis ${name}`
+    });
+}
+function openPlanModalByIndex(index) { openPlanModal(lanPlans[index]); }
+function syncPlanTypeHelp() {
+    const type = $('plan-type').value;
+    const help = $('planTypeHelp');
+    if (type === 'bridge') help.textContent = 'Le bridge agit comme un switch virtuel Linux : la carte physique devient un port de br0, et l’IP passe sur br0.';
+    else if (type === 'direct') help.textContent = 'Interface directe : le module agit directement sur cette interface, sans créer de bridge.';
+    else help.textContent = 'VLAN : crée une interface VLAN au-dessus du parent physique.';
+}
+function planFromModal() {
+    return normalizePlan({
+        id: $('plan-id').value || uuidPlan(),
+        name: $('plan-name').value,
+        type: $('plan-type').value,
+        parent: $('plan-parent').value,
+        vlan_id: $('plan-vlan-id').value,
+        use_parent_mac: $('plan-use-parent-mac').checked,
+        ipv4_mode: $('plan-ipv4-mode').value,
+        address: $('plan-address').value,
+        gateway: $('plan-gateway').value,
+        dns: $('plan-dns').value,
+        mtu: $('plan-mtu').value,
+        enabled: $('plan-enabled').checked,
+        autostart: $('plan-autostart').checked,
+        comment: $('plan-comment').value,
+    });
+}
+function validatePlanClient(p) {
+    const errors = [];
+    if (!p.name.trim()) errors.push('Nom réseau/interface manquant.');
+    if ((p.type === 'bridge' || p.type === 'vlan') && !p.parent.trim()) errors.push('Parent physique manquant.');
+    if (p.type === 'vlan' && !p.vlan_id.trim()) errors.push('VLAN ID manquant.');
+    if (p.ipv4_mode === 'static' && !p.address.trim()) errors.push('Adresse statique manquante.');
+    return errors;
+}
+function savePlanFromModal() {
+    const p = planFromModal();
+    const errors = validatePlanClient(p);
+    if (errors.length) return showResult('Erreur plan', errors.join('\n'), false);
+    const index = lanPlans.findIndex(x => String(x.id) === String(p.id));
+    if (index >= 0) lanPlans[index] = p;
+    else lanPlans.push(p);
+    closePlanModal();
+    renderPlansTable();
+    savePlans(false);
+}
+function duplicatePlan(index) {
+    const p = normalizePlan(lanPlans[index]);
+    p.id = uuidPlan();
+    p.name = p.name + '_copie';
+    p.comment = (p.comment || '') + ' copie';
+    lanPlans.push(p);
+    renderPlansTable();
+}
+function togglePlan(index) {
+    lanPlans[index].enabled = !normalizePlan(lanPlans[index]).enabled;
+    renderPlansTable();
+}
+function deletePlan(index) {
+    const p = normalizePlan(lanPlans[index]);
+    showConfirm('Supprimer le plan', `Supprimer le plan <b>${escapeHtml(p.name)}</b> ?<br>Ça ne supprime rien dans Linux tant que tu n’appliques pas.`, () => {
+        lanPlans.splice(index, 1);
+        renderPlansTable();
+        savePlans(false);
+    }, false);
+}
+async function savePlans(showOk = true) {
+    const res = await fetch('/system/api/lan/plans/save', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({plans: lanPlans.map(normalizePlan)})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) return showResult('Erreur sauvegarde', (data.errors || [data.error || 'Erreur inconnue']).join('\n'), false);
+    lanPlans = data.plans || lanPlans;
+    renderPlansTable();
+    if (showOk) showResult('Plans sauvegardés', `${lanPlans.length} plan(s) sauvegardé(s).`, true);
+}
+
+async function refreshLanStatus() {
+    const res = await fetch('/system/api/lan/status');
+    const data = await res.json().catch(() => ({}));
+    if (!data.ok) return showResult('Erreur', data.error || 'Impossible d’actualiser.', false);
+    lanSnapshot = data.snapshot;
+    lanDefaults = data.defaults;
+    lanPlans = data.plans || lanPlans;
+    updateSummary();
+    renderIfaceTable();
+    renderPlansTable();
+}
+function updateSummary() {
+    if (!$('sumDefaultIface')) return;
+    $('sumDefaultIface').textContent = lanDefaults.parent || '-';
+    $('sumGateway').textContent = lanDefaults.gateway || '-';
+    $('sumIpv4').textContent = lanDefaults.parent_ipv4 || '-';
+    $('sumMac').textContent = lanDefaults.parent_mac || '-';
+    $('sumDns').textContent = lanDefaults.dns || '-';
+}
+function renderIfaceTable() {
+    const tbody = $('ifaceTbody');
+    if (!tbody) return;
+    const rows = (lanSnapshot && lanSnapshot.interfaces) || [];
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="hint">Aucune interface détectée.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = rows.map(item => {
+        const haystack = [item.name,item.kind,item.mac,(item.ipv4||[]).join(' '),item.master].join(' ').toLowerCase();
+        const stateBadge = ['up','unknown'].includes(String(item.state)) ? badge(item.state, 'badge-ok') : badge(item.state, 'badge-no');
+        return `<tr data-filter="${escapeHtml(haystack)}" data-iface="${escapeHtml(item.name)}">
+            <td><div class="name-main">${escapeHtml(item.name)}</div><div class="name-sub">MTU ${escapeHtml(item.mtu || '-')} ${item.speed ? '• ' + escapeHtml(item.speed) + ' Mb/s' : ''}</div></td>
+            <td>${badge(item.kind || '-', 'badge-info')} ${item.is_virtual ? badge('virtuel','badge-muted') : ''}</td>
+            <td>${stateBadge}</td>
+            <td class="mono">${escapeHtml(item.mac || '-')}</td>
+            <td class="mono">${(item.ipv4 && item.ipv4.length) ? item.ipv4.map(escapeHtml).join('<br>') : '-'}</td>
+            <td class="mono">${escapeHtml(item.master || '-')}</td>
+            <td>${item.default_route ? badge('défaut','badge-ok') + ' <span class="mono">' + escapeHtml(item.gateway || '') + '</span>' : badge('-','badge-muted')}</td>
+            <td><div class="actions-cell">
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" onclick="openPlanModalFromIface('${escapeHtml(item.name)}')">Modifier</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-green" onclick="ifaceAction('${escapeHtml(item.name)}','up')">Activer</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-orange" onclick="ifaceAction('${escapeHtml(item.name)}','down')">Désactiver</button>
+                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-red" onclick="ifaceAction('${escapeHtml(item.name)}','delete')" ${item.is_virtual ? '' : 'disabled title="Suppression refusée sur interface physique"'}>Supprimer</button>
+            </div></td>
+        </tr>`;
+    }).join('');
+    filterTable('ifaceTable', $('ifaceSearch')?.value || '');
+    bindKeyboardRows();
+}
+
+async function ifaceAction(iface, action) {
+    const label = action === 'up' ? 'activer' : action === 'down' ? 'désactiver' : 'supprimer';
+    showConfirm('Action interface', `${label.toUpperCase()} <b>${escapeHtml(iface)}</b> maintenant ?<br>Cette action agit directement sur Linux.`, async () => {
+        const res = await fetch('/system/api/lan/interface/action', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({iface, action})});
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) showResult('Erreur interface', data.error || data.stderr || 'Erreur inconnue', false);
+        else showResult('Action terminée', data.stdout || 'OK', true);
+        await refreshLanStatus();
+        await refreshLog();
+    }, action === 'delete');
+}
+
+async function previewPlans() {
+    await savePlans(false);
+    const res = await fetch('/system/api/lan/preview', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({})});
+    const data = await res.json().catch(() => ({}));
+    if (!$('previewShell')) {
+        window.location.href = '/system/lan/apply';
+        return;
+    }
+    $('previewShell').textContent = data.shell || (data.errors || ['Aucune commande.']).join('\n');
+    $('previewPersistent').textContent = data.persistent_text || '';
+    if (data.warnings && data.warnings.length) showResult('Avertissement', data.warnings.join('\n'), false);
+}
+function openApplyConfirm() {
+    showConfirm('Appliquer le réseau Linux',
+        `Cette action peut couper l’accès à Flask pendant quelques secondes.<br><br>` +
+        `Un rollback automatique sera armé si configuré. Si le réseau revient correctement, clique ensuite sur <b>Annuler rollback</b>.<br><br>` +
+        `Tape <b>APPLIQUER</b> pour confirmer.`,
+        applyPlans,
+        true,
+        true
+    );
+    setTimeout(() => $('applyConfirmInput')?.focus(), 80);
+}
+async function applyPlans() {
+    await savePlans(false);
+    const confirm = $('applyConfirmInput') ? $('applyConfirmInput').value : '';
+    const writePersistent = $('applyPersistent') ? $('applyPersistent').checked : false;
+    closeConfirmModal();
+    $('lanLog').textContent += '\n--- Application demandée ---\n';
+    const res = await fetch('/system/api/lan/apply', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({confirm, write_persistent: writePersistent})
+    });
+    const data = await res.json().catch(() => ({}));
+    let text = '';
+    if (data.results) {
+        text += data.results.map(r => `${r.ok ? 'OK' : 'ERREUR'} :: ${r.command}\n${r.stdout || ''}${r.stderr || ''}`).join('\n');
+    }
+    if (data.message) text += '\n' + data.message;
+    if (data.warnings && data.warnings.length) text += '\nWarnings:\n' + data.warnings.join('\n');
+    if (data.error) text += '\nErreur: ' + data.error;
+    if (data.errors) text += '\nErreurs:\n' + data.errors.join('\n');
+    if (data.backup && data.backup.marker) window.lastRollbackMarker = data.backup.marker;
+    showResult(data.ok ? 'Application terminée' : 'Application en erreur', text || 'Terminé.', !!data.ok);
+    await refreshLog();
+    await refreshLanStatus();
+}
+async function cancelRollback() {
+    const marker = window.lastRollbackMarker || '';
+    const res = await fetch('/system/api/lan/rollback/cancel', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({marker})});
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) showResult('Erreur rollback', data.error || 'Impossible d’annuler.', false);
+    else showResult('Rollback annulé', `${data.removed || 0} marker(s) supprimé(s).`, true);
+    await refreshLog();
+}
+async function refreshLog() {
+    const res = await fetch('/system/api/lan/log?lines=400');
+    const data = await res.json().catch(() => ({}));
+    if (data.ok) $('lanLog').textContent = data.log || '';
+}
+
+function filterTable(tableId, query) {
+    query = String(query || '').toLowerCase().trim();
+    document.querySelectorAll(`#${tableId} tbody tr`).forEach(row => {
+        const haystack = row.dataset.filter || row.textContent.toLowerCase();
+        row.style.display = (!query || haystack.includes(query)) ? '' : 'none';
+    });
+    bindKeyboardRows();
+    ensureKeyboardSelection($(tableId));
+}
+
+function activeTabPanel() { return document.querySelector('.lan-content-section') || document; }
+function visibleTableRows(table) {
+    if (!table) return [];
+    return Array.from(table.querySelectorAll('tbody tr')).filter(row => {
+        const style = window.getComputedStyle(row);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        if (row.offsetParent === null) return false;
+        return row.querySelectorAll('td').length > 0 && !row.querySelector('.hint[colspan]');
+    });
+}
+function activeKeyboardTable() {
+    const panel = activeTabPanel();
+    if (!panel) return null;
+    const tables = Array.from(panel.querySelectorAll('table.keyboard-table'));
+    return tables.find(table => visibleTableRows(table).length > 0) || null;
+}
+function rowActionButtons(row) {
+    if (!row) return [];
+    return Array.from(row.querySelectorAll('.actions-cell button')).filter(button => {
+        const style = window.getComputedStyle(button);
+        return style.display !== 'none' && style.visibility !== 'hidden' && !button.disabled;
+    });
+}
+function clearKeyboardPaint() {
+    document.querySelectorAll('.keyboard-selected-row').forEach(row => row.classList.remove('keyboard-selected-row'));
+    document.querySelectorAll('.keyboard-action-focus').forEach(button => button.classList.remove('keyboard-action-focus'));
+}
+function paintKeyboardRow(row, actionIndex = keyboardNav.actionIndex, focusButton = false, scrollRow = true) {
+    if (!row) return;
+    clearKeyboardPaint();
+    row.classList.add('keyboard-selected-row');
+    const table = row.closest('table');
+    keyboardNav.tableId = table ? table.id : '';
+    const rows = visibleTableRows(table);
+    keyboardNav.rowIndex = Math.max(0, rows.indexOf(row));
+    const buttons = rowActionButtons(row);
+    if (buttons.length) {
+        keyboardNav.actionIndex = Math.max(0, Math.min(actionIndex, buttons.length - 1));
+        const activeButton = buttons[keyboardNav.actionIndex];
+        activeButton.classList.add('keyboard-action-focus');
+        if (focusButton && typeof activeButton.focus === 'function') activeButton.focus({preventScroll:true});
+    } else keyboardNav.actionIndex = 0;
+    if (scrollRow) row.scrollIntoView({block:'nearest', inline:'nearest'});
+}
+function ensureKeyboardSelection(table = activeKeyboardTable(), scrollRow = false) {
+    if (!table) { clearKeyboardPaint(); return null; }
+    const rows = visibleTableRows(table);
+    if (!rows.length) { clearKeyboardPaint(); return null; }
+    let row = null;
+    if (keyboardNav.tableId === table.id) row = rows[Math.max(0, Math.min(keyboardNav.rowIndex, rows.length - 1))];
+    if (!row) row = rows[0];
+    paintKeyboardRow(row, keyboardNav.actionIndex, false, scrollRow);
+    return row;
+}
+function moveKeyboardRow(delta) {
+    const table = activeKeyboardTable();
+    const rows = visibleTableRows(table);
+    if (!rows.length) return;
+    const current = ensureKeyboardSelection(table);
+    const idx = Math.max(0, rows.indexOf(current));
+    paintKeyboardRow(rows[Math.max(0, Math.min(rows.length - 1, idx + delta))], 0, true);
+}
+function moveKeyboardAction(delta) {
+    const row = ensureKeyboardSelection();
+    const buttons = rowActionButtons(row);
+    if (!buttons.length) return;
+    paintKeyboardRow(row, Math.max(0, Math.min(buttons.length - 1, keyboardNav.actionIndex + delta)), true);
+}
+function activateKeyboardAction() {
+    const row = ensureKeyboardSelection();
+    const buttons = rowActionButtons(row);
+    if (buttons.length) buttons[Math.max(0, Math.min(keyboardNav.actionIndex, buttons.length - 1))].click();
+}
+function bindKeyboardRows() {
+    document.querySelectorAll('table.keyboard-table tbody tr').forEach(row => {
+        if (row.dataset.keyboardBound === '1') return;
+        row.dataset.keyboardBound = '1';
+        row.addEventListener('click', event => {
+            const buttons = rowActionButtons(row);
+            const clickedButton = event.target.closest('button');
+            const idx = buttons.indexOf(clickedButton);
+            paintKeyboardRow(row, idx >= 0 ? idx : keyboardNav.actionIndex, false);
+        });
+    });
+}
+
+function isLanEmbeddedTabActive() {
+    const hostPanel = document.getElementById('tab-lan');
+    return !hostPanel || hostPanel.classList.contains('active');
+}
+
+function isTypingTarget(el) {
+    if (!el) return false;
+    const tag = String(el.tagName || '').toLowerCase();
+    return ['input','textarea','select'].includes(tag) || el.isContentEditable;
+}
+function anyModalOpen() {
+    return Array.from(document.querySelectorAll('.modal-overlay')).some(m => getComputedStyle(m).display !== 'none');
+}
+
+function showConfirm(title, html, callback, danger = false, applyMode = false) {
+    $('confirmTitle').textContent = title;
+    $('confirmBody').className = danger ? 'danger-note' : 'warn-note';
+    $('confirmBody').innerHTML = html;
+    $('applyOptions').style.display = applyMode ? 'block' : 'none';
+    if ($('applyConfirmInput')) $('applyConfirmInput').value = '';
+    if ($('applyPersistent')) $('applyPersistent').checked = false;
+    confirmCallback = callback;
+    $('confirmOkBtn').onclick = () => { if (confirmCallback) confirmCallback(); };
+    $('confirmModal').style.display = 'flex';
+    setModalButtonIndex(0);
+}
+function showResult(title, text, ok) {
+    showConfirm(title, `<pre class="sys-inline-052">${escapeHtml(text)}</pre>`, closeConfirmModal, !ok, false);
+    $('confirmOkBtn').className = ok ? 'yoleo-btn yoleo-btn-green' : 'yoleo-btn yoleo-btn-red';
+    $('confirmOkBtn').textContent = 'OK';
+}
+function closeConfirmModal() {
+    $('confirmModal').style.display = 'none';
+    $('confirmOkBtn').className = 'yoleo-btn yoleo-btn-red';
+    $('confirmOkBtn').textContent = 'Confirmer';
+    confirmCallback = null;
+}
+function modalButtons() {
+    const modal = Array.from(document.querySelectorAll('.modal-overlay')).find(m => getComputedStyle(m).display !== 'none');
+    if (!modal) return [];
+    return Array.from(modal.querySelectorAll('button, input, select')).filter(el => {
+        if (el.disabled) return false;
+        const style = getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+    });
+}
+function setModalButtonIndex(index) {
+    document.querySelectorAll('.modal-button-selected').forEach(el => el.classList.remove('modal-button-selected'));
+    document.querySelectorAll('.modal-box').forEach(el => el.classList.remove('keyboard-modal-active'));
+    const buttons = modalButtons();
+    const modal = Array.from(document.querySelectorAll('.modal-overlay')).find(m => getComputedStyle(m).display !== 'none');
+    if (modal) modal.querySelector('.modal-box')?.classList.add('keyboard-modal-active');
+    if (!buttons.length) return;
+    modalButtonIndex = Math.max(0, Math.min(index, buttons.length - 1));
+    const btn = buttons[modalButtonIndex];
+    btn.classList.add('modal-button-selected');
+    try { btn.focus({preventScroll:true}); } catch(e) { btn.focus(); }
+}
+function handleModalKeyboard(e) {
+    if (!anyModalOpen()) return false;
+    if (!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Enter',' ','Escape'].includes(e.key)) return false;
+    if (isTypingTarget(e.target) && !['Escape'].includes(e.key)) return false;
+    e.preventDefault();
+    const buttons = modalButtons();
+    if (e.key === 'Escape') { closePlanModal(); closeConfirmModal(); return true; }
+    if (!buttons.length) return true;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') setModalButtonIndex((modalButtonIndex + 1) % buttons.length);
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') setModalButtonIndex((modalButtonIndex - 1 + buttons.length) % buttons.length);
+    else if (e.key === 'Home') setModalButtonIndex(0);
+    else if (e.key === 'End') setModalButtonIndex(buttons.length - 1);
+    else if (e.key === 'Enter' || e.key === ' ') buttons[modalButtonIndex].click();
+    return true;
+}
+
+document.addEventListener('keydown', function(e) {
+    if (!isLanEmbeddedTabActive()) return;
+    if (handleModalKeyboard(e)) return;
+    if (isTypingTarget(e.target)) return;
+    if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','Enter',' '].includes(e.key)) return;
+    e.preventDefault();
+    if (e.key === 'ArrowUp') moveKeyboardRow(-1);
+    else if (e.key === 'ArrowDown') moveKeyboardRow(1);
+    else if (e.key === 'ArrowLeft') moveKeyboardAction(-1);
+    else if (e.key === 'ArrowRight') moveKeyboardAction(1);
+    else if (e.key === 'Home') { const t = activeKeyboardTable(); const r = visibleTableRows(t); if (r.length) paintKeyboardRow(r[0],0,true); }
+    else if (e.key === 'End') { const t = activeKeyboardTable(); const r = visibleTableRows(t); if (r.length) paintKeyboardRow(r[r.length-1],0,true); }
+    else if (e.key === 'Enter' || e.key === ' ') activateKeyboardAction();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    lanPlans = lanPlans.map(normalizePlan);
+    renderPlansTable();
+    bindKeyboardRows();
+    ensureKeyboardSelection();
+});
+</script>
+            </section>
+{% endblock %}

@@ -1,0 +1,450 @@
+    /* ------------------------------------------------------------------
+       Browser commun : /browser/file, /browser/folder, /browser/image
+       ------------------------------------------------------------------ */
+    .browser-page {
+        height: calc(100vh - 55px);
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+        overflow: hidden;
+    }
+
+    .browser-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .browser-toolbar {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        background: rgba(10, 15, 22, .72);
+    }
+
+    .browser-path-label {
+        color: var(--yoleo-muted);
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .browser-path-input {
+        flex: 1 1 auto;
+        color: var(--yoleo-accent-2);
+        font-family: Consolas, "Courier New", monospace;
+    }
+
+    .browser-status {
+        flex: 0 0 auto;
+        min-height: 30px;
+        padding: 8px 11px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        color: var(--yoleo-muted);
+        font-size: 12px;
+    }
+
+    .browser-status.is-error {
+        color: var(--yoleo-danger);
+    }
+
+    .browser-view-toggle {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding-left: 4px;
+    }
+
+    .browser-view-btn.is-active {
+        border-color: var(--yoleo-accent-2);
+        background: var(--yoleo-accent-2);
+        color: #000;
+        font-weight: 900;
+    }
+
+    .browser-table-wrap,
+    .browser-grid-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #344963 transparent;
+    }
+
+    .browser-grid-wrap[hidden],
+    .browser-table-wrap[hidden] {
+        display: none;
+    }
+
+    .browser-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .browser-grid-card {
+        min-width: 0;
+        min-height: 142px;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 9px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 12px;
+        background: rgba(10, 15, 22, .72);
+        color: var(--yoleo-text);
+        cursor: pointer;
+        font: inherit;
+        text-align: left;
+    }
+
+    .browser-grid-card:hover,
+    .browser-grid-card.is-selected {
+        border-color: var(--yoleo-accent-2);
+        background: rgba(27, 42, 62, .92);
+    }
+
+    .browser-grid-card.is-selected {
+        box-shadow: inset 0 0 0 1px rgba(26, 235, 255, .55);
+    }
+
+    .browser-grid-card:not(.is-selectable) {
+        color: #a8b6c6;
+    }
+
+    .browser-grid-thumb {
+        height: 78px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border: 1px solid var(--yoleo-border-soft);
+        border-radius: 10px;
+        background: rgba(4, 7, 11, .7);
+    }
+
+    .browser-grid-thumb img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+    }
+
+    .browser-grid-icon {
+        font-size: 34px;
+        line-height: 1;
+    }
+
+    .browser-grid-name {
+        min-height: 32px;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.25;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+    }
+
+    .browser-grid-meta {
+        color: var(--yoleo-muted);
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    .browser-grid-empty {
+        grid-column: 1 / -1;
+        padding: 18px;
+        color: var(--yoleo-muted);
+    }
+
+    .browser-row {
+        cursor: pointer;
+    }
+
+    .browser-row.is-selected td {
+        background: linear-gradient(90deg, rgba(139, 92, 246, .95), rgba(126, 34, 206, .82)) !important;
+        color: #fff;
+    }
+
+    .browser-row:not(.is-selectable) {
+        color: #a8b6c6;
+    }
+
+    .browser-name-cell {
+        min-width: 260px;
+        max-width: 620px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .browser-file-icon {
+        display: inline-flex;
+        width: 22px;
+        min-width: 22px;
+        justify-content: center;
+        margin-right: 4px;
+    }
+
+
+    /* Table du navigateur : la fenêtre /browser est volontairement compacte.
+       On interdit le min-width global qui créait un ascenseur horizontal et on
+       laisse les colonnes se répartir dans la largeur disponible. */
+    body.yoleo-browser-window .browser-table-wrap {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+
+    body.yoleo-browser-window .browser-table-wrap .browser-table {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
+    }
+
+    body.yoleo-browser-window .browser-table th,
+    body.yoleo-browser-window .browser-table td {
+        min-width: 0 !important;
+        padding-left: 6px;
+        padding-right: 6px;
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        overflow-wrap: normal !important;
+        word-break: normal !important;
+    }
+
+    body.yoleo-browser-window .browser-table th:nth-child(1),
+    body.yoleo-browser-window .browser-table td:nth-child(1) {
+        width: 34%;
+    }
+
+    body.yoleo-browser-window .browser-table th:nth-child(2),
+    body.yoleo-browser-window .browser-table td:nth-child(2) {
+        width: 12%;
+    }
+
+    body.yoleo-browser-window .browser-table th:nth-child(3),
+    body.yoleo-browser-window .browser-table td:nth-child(3) {
+        width: 8%;
+    }
+
+    body.yoleo-browser-window .browser-table th:nth-child(4),
+    body.yoleo-browser-window .browser-table td:nth-child(4) {
+        width: 14%;
+    }
+
+    body.yoleo-browser-window .browser-table th:nth-child(5),
+    body.yoleo-browser-window .browser-table td:nth-child(5) {
+        width: 14%;
+    }
+
+    body.yoleo-browser-window .browser-table th:nth-child(6),
+    body.yoleo-browser-window .browser-table td:nth-child(6) {
+        width: 18%;
+    }
+
+
+    /* Browser commun : texte renforcé dans les fenêtres /browser/file,
+       /browser/folder et /browser/image pour une lecture plus nette. */
+    body.yoleo-browser-window .browser-page,
+    body.yoleo-browser-window .browser-panel,
+    body.yoleo-browser-window .browser-table,
+    body.yoleo-browser-window .browser-table th,
+    body.yoleo-browser-window .browser-table td,
+    body.yoleo-browser-window .browser-name-cell,
+    body.yoleo-browser-window .browser-grid-card,
+    body.yoleo-browser-window .browser-grid-name,
+    body.yoleo-browser-window .browser-grid-meta,
+    body.yoleo-browser-window .browser-status,
+    body.yoleo-browser-window .browser-selection,
+    body.yoleo-browser-window .browser-path-label,
+    body.yoleo-browser-window .browser-path-input {
+        font-weight: 800;
+    }
+
+    body.yoleo-browser-window .browser-table th {
+        font-weight: 900;
+    }
+
+    .browser-footer {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px;
+        border-top: 1px solid var(--yoleo-border-soft);
+        background: rgba(10, 15, 22, .72);
+    }
+
+    .browser-selection {
+        min-width: 0;
+        color: var(--yoleo-muted);
+        font-size: 12px;
+    }
+
+    .browser-selection strong {
+        color: var(--yoleo-text);
+        font-family: Consolas, "Courier New", monospace;
+        overflow-wrap: anywhere;
+    }
+
+    .browser-actions {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    @media (max-width: 900px) {
+        .browser-page {
+            height: auto;
+            min-height: calc(100vh - 55px);
+            overflow: visible;
+            padding: 8px;
+        }
+
+        .browser-toolbar,
+        .browser-footer {
+            align-items: center;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 7px;
+            padding: 8px;
+        }
+
+        .browser-toolbar .yoleo-btn,
+        .browser-footer .yoleo-btn {
+            min-height: 32px;
+            padding: 7px 10px;
+            font-size: 11px;
+        }
+
+        .browser-path-label {
+            font-size: 10px;
+        }
+
+        .browser-path-input {
+            flex: 1 1 170px;
+            min-width: 0;
+            height: 34px;
+            padding: 7px 9px;
+            font-size: 12px;
+        }
+
+        .browser-view-toggle {
+            display: inline-flex;
+            flex: 0 0 auto;
+            gap: 5px;
+            padding-left: 0;
+        }
+
+        .browser-grid {
+            grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+            gap: 8px;
+            padding: 8px;
+        }
+
+        .browser-actions {
+            width: auto;
+            flex: 1 1 auto;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .browser-selection {
+            flex: 1 1 160px;
+        }
+
+        body.yoleo-browser-window .browser-table th:nth-child(4),
+        body.yoleo-browser-window .browser-table td:nth-child(4),
+        body.yoleo-browser-window .browser-table th:nth-child(5),
+        body.yoleo-browser-window .browser-table td:nth-child(5),
+        body.yoleo-browser-window .browser-table th:nth-child(6),
+        body.yoleo-browser-window .browser-table td:nth-child(6) {
+            display: none !important;
+        }
+
+        body.yoleo-browser-window .browser-table th:nth-child(1),
+        body.yoleo-browser-window .browser-table td:nth-child(1) {
+            width: 62%;
+        }
+
+        body.yoleo-browser-window .browser-table th:nth-child(2),
+        body.yoleo-browser-window .browser-table td:nth-child(2) {
+            width: 22%;
+        }
+
+        body.yoleo-browser-window .browser-table th:nth-child(3),
+        body.yoleo-browser-window .browser-table td:nth-child(3) {
+            width: 16%;
+        }
+    }
+
+
+    /* Ajustements compacts communs pour les barres d'outils Système.
+       Ce bloc était déjà dans ce fragment, mais sa règle mobile était tronquée. */
+    .system-tool-head-compact {
+        align-items: center;
+    }
+
+    .system-tool-head-compact .system-form-line {
+        flex: 1 1 auto;
+        min-width: 0;
+        justify-content: flex-start;
+    }
+
+    .system-tool-head-compact .system-tool-subtitle {
+        flex: 0 1 auto;
+        text-align: right;
+    }
+
+    .system-form-line .system-input,
+    .system-form-line .system-select {
+        width: auto;
+        min-width: 0;
+    }
+
+    .system-form-line .system-input {
+        flex: 1 1 300px;
+        max-width: 420px;
+    }
+
+    .system-form-line .system-select {
+        flex: 0 0 155px;
+    }
+
+    .system-form-line .yoleo-btn {
+        flex: 0 0 auto;
+    }
+
+    .topbar > .filter-input {
+        width: min(420px, 100%);
+        min-width: 260px;
+        max-width: 420px;
+    }
+
+    @media (max-width: 900px) {
+        .system-tool-head-compact .system-tool-subtitle {
+            width: 100%;
+            text-align: left;
+        }
+
+        .system-form-line .system-input,
+        .system-form-line .system-select,
+        .topbar > .filter-input {
+            flex: 1 1 100%;
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+        }
+    }

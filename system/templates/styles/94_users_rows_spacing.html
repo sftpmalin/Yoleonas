@@ -1,0 +1,38 @@
+/* Utilisateurs - actions en ligne uniquement.
+   Le layout global de la page est defini dans 96_users_unified_style.html. */
+
+.users-page .lu-table th:nth-last-child(-n+2),
+.users-page .lu-table td.lu-action-cell,
+.users-page .lu-table td.ssh-cell {
+    text-align: center !important;
+}
+
+.users-page .lu-row-ssh {
+    min-width: 62px !important;
+    height: 28px !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
+    justify-content: center !important;
+}
+
+.users-page .lu-row-action {
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    line-height: 1 !important;
+}
+
+.users-page .lu-delete-user {
+    color: #ffd1d1 !important;
+    border-color: rgba(255, 85, 85, .38) !important;
+    background: rgba(115, 30, 42, .38) !important;
+}
+
+.users-page .lu-delete-user:hover:not(:disabled) {
+    background: rgba(180, 40, 55, .58) !important;
+}

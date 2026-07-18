@@ -1,0 +1,383 @@
+/* ------------------------------------------------------------------
+   Module Partage - Samba / NFS
+   CSS centralisé : templates/partage.html ne contient pas de <style>.
+   ------------------------------------------------------------------ */
+.partage-page {
+    padding: 16px 18px 34px;
+    display: flex;
+    justify-content: center;
+    color: #eaf2ff;
+}
+
+.partage-panel {
+    width: 100%;
+    max-width: 1580px;
+}
+
+.partage-subnav {
+    margin-bottom: 14px;
+}
+
+.partage-section-shell {
+    background: #121a26;
+    border: 1px solid #273447;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 12px 26px rgba(0,0,0,.24);
+}
+
+.partage-page .tab-panel {
+    display: block;
+    padding: 16px;
+}
+
+.partage-page .card {
+    background: linear-gradient(180deg, #131d2b 0%, #101722 100%);
+    border: 1px solid #26364b;
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 14px 30px rgba(0,0,0,.18);
+}
+
+.partage-page .card:last-child {
+    margin-bottom: 0;
+}
+
+.partage-page .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: start;
+    margin-bottom: 14px;
+}
+
+.partage-page .title-block h1,
+.partage-page .title-block h2 {
+    margin: 0;
+    color: #fff;
+    letter-spacing: -.2px;
+}
+
+.partage-page .title-block h1 { font-size: 24px; }
+.partage-page .title-block h2 { font-size: 21px; }
+
+.partage-page .subtitle,
+.partage-page .hint {
+    margin-top: 6px;
+    color: #99acc2;
+    line-height: 1.45;
+    font-size: 12px;
+}
+
+.partage-page .toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.partage-page .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.partage-page .summary-card {
+    background: #0e1723;
+    border: 1px solid #25364b;
+    border-radius: 13px;
+    padding: 10px 12px;
+    min-width: 0;
+}
+
+.partage-page .summary-label {
+    color: #8ba0b8;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .45px;
+    font-weight: 900;
+}
+
+.partage-page .summary-value {
+    color: #fff;
+    font-size: 19px;
+    font-weight: 900;
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.partage-page .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 10px;
+}
+
+.partage-page .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(170px, 1fr));
+    gap: 10px;
+    align-items: start;
+}
+
+.partage-page .settings-grid .field { min-width: 0; }
+.partage-page .settings-span-2 { grid-column: span 2; }
+.partage-page .settings-span-4 { grid-column: 1 / -1; }
+.partage-page .settings-stack { display: grid; gap: 10px; align-self: stretch; }
+
+.partage-page .field {
+    display: grid;
+    gap: 6px;
+}
+
+.partage-page .field label {
+    color: #9defff;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .35px;
+    font-weight: 900;
+}
+
+.partage-page .text-input,
+.partage-page .select-input,
+.partage-page textarea {
+    width: 100%;
+    background: #07101b;
+    border: 1px solid #2b3d55;
+    color: #eaf2ff;
+    border-radius: 10px;
+    padding: 9px 10px;
+    outline: none;
+    min-height: 38px;
+}
+
+.partage-page .text-input:focus,
+.partage-page .select-input:focus,
+.partage-page textarea:focus {
+    border-color: #1AEBFF;
+    box-shadow: 0 0 0 3px rgba(26,235,255,.12);
+}
+
+.partage-page .table-tools {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.partage-page .search-input {
+    min-width: 260px;
+}
+
+.partage-page .table-wrap {
+    border: 1px solid #26364b;
+    border-radius: 14px;
+    overflow: auto;
+    background: #0c131e;
+}
+
+.partage-page .share-table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+}
+
+.partage-page .share-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #1a2636;
+    color: #a8eaff;
+    text-transform: uppercase;
+    letter-spacing: .35px;
+    font-size: 10px;
+    text-align: left;
+    padding: 10px 9px;
+    border-bottom: 1px solid #30435b;
+    white-space: nowrap;
+}
+
+.partage-page .share-table td {
+    padding: 8px;
+    border-bottom: 1px solid rgba(255,255,255,.055);
+    vertical-align: top;
+    font-size: 12px;
+}
+
+.partage-page .share-table tbody tr:hover {
+    background: rgba(255,255,255,.025);
+}
+
+.partage-page .share-editing td {
+    background: rgba(26,235,255,.045);
+}
+
+.partage-page .path-edit {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    align-items: center;
+}
+
+.partage-page .path-pill {
+    min-width: 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: #0a121d;
+    border: 1px solid #26364b;
+    border-radius: 12px;
+    padding: 8px 10px;
+    color: #b9c9dc;
+    font-family: Consolas, Monaco, monospace;
+    overflow: hidden;
+}
+
+.partage-page .path-pill span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.partage-page .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.partage-page .badge-ok { background: rgba(76,175,80,.15); color: #98f2a2; border: 1px solid rgba(76,175,80,.28); }
+.partage-page .badge-ko { background: rgba(244,67,54,.13); color: #ff9e9e; border: 1px solid rgba(244,67,54,.27); }
+.partage-page .badge-warn { background: rgba(241,166,43,.13); color: #ffdca0; border: 1px solid rgba(241,166,43,.30); }
+.partage-page .badge-info { background: rgba(26,235,255,.11); color: #9debff; border: 1px solid rgba(26,235,255,.25); }
+
+.partage-page .status-box {
+    border-radius: 13px;
+    padding: 10px 12px;
+    line-height: 1.45;
+    border: 1px solid #2b394d;
+    background: #0c121b;
+    color: #dce6ef;
+    margin-bottom: 10px;
+    white-space: pre-wrap;
+}
+
+.partage-page .raw-editor {
+    min-height: 420px;
+    resize: vertical;
+    font-family: Consolas, Monaco, monospace;
+    line-height: 1.42;
+    white-space: pre;
+}
+
+.partage-page #terminal-output,
+.partage-page #live-log-output {
+    width: 100%;
+    min-height: 520px;
+    background: #05080d;
+    border: 1px solid #243246;
+    color: #d9e7f5;
+    padding: 12px;
+    border-radius: 14px;
+    resize: vertical;
+    font-family: Consolas, Monaco, monospace;
+    line-height: 1.42;
+    white-space: pre;
+}
+
+.partage-page .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.78);
+    z-index: 9999;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+    padding: 16px;
+}
+
+.partage-page .modal-box {
+    background: #152033;
+    border: 1px solid #30435b;
+    border-radius: 18px;
+    width: min(980px, 96vw);
+    padding: 18px;
+    box-shadow: 0 22px 50px rgba(0,0,0,.55);
+}
+
+.partage-page .modal-title {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 900;
+    margin: 0 0 10px 0;
+}
+
+.partage-page .modal-log {
+    margin-top: 12px;
+    background: #05080d;
+    border: 1px solid #26364b;
+    color: #d9e7f5;
+    border-radius: 12px;
+    padding: 10px;
+    height: min(56vh, 540px);
+    overflow: auto;
+    white-space: pre-wrap;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+}
+
+.partage-page .modal-actions,
+.partage-page .actions-cell {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+@media (max-width: 1100px) {
+    .partage-page .settings-grid {
+        grid-template-columns: repeat(2, minmax(180px, 1fr));
+    }
+    .partage-page .settings-span-2,
+    .partage-page .settings-span-4 {
+        grid-column: 1 / -1;
+    }
+    .partage-page .topbar {
+        grid-template-columns: 1fr;
+    }
+    .partage-page .toolbar {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 720px) {
+    .partage-page {
+        padding: 10px;
+    }
+    .partage-page .tab-panel {
+        padding: 10px;
+    }
+    .partage-page .form-grid,
+    .partage-page .settings-grid {
+        grid-template-columns: 1fr;
+    }
+    .partage-page .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+

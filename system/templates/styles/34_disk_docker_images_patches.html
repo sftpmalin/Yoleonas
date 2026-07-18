@@ -1,0 +1,342 @@
+/* Disques : le statut et l'auto-refresh restent dans l'en-tête du tableau.
+   Le bouton manuel Rafraîchir a été supprimé : la page se met à jour toute seule. */
+.disk-head-tools {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.action-message.disk-inline-message {
+    flex: 0 1 auto;
+    min-height: 28px;
+    padding: 5px 9px;
+    font-size: 11px;
+    white-space: nowrap;
+    max-width: 360px;
+}
+
+@media (max-width: 760px) {
+    .disk-head-tools {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .action-message.disk-inline-message {
+        flex: 1 1 140px;
+        white-space: normal;
+    }
+}
+
+/* Disques : le tableau principal doit tenir dans la carte sans ascenseur horizontal. */
+.disk-table-compact {
+    overflow-x: hidden;
+}
+
+.disk-table-compact .yoleo-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.disk-table-compact .yoleo-table th,
+.disk-table-compact .yoleo-table td {
+    min-width: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.disk-table-compact .state-col { width: 10%; }
+.disk-table-compact .disk-col { width: 8%; }
+.disk-table-compact .ident-col { width: 16%; }
+.disk-table-compact .fs-col { width: 12%; }
+.disk-table-compact .size-cell { width: 8%; }
+.disk-table-compact .used-cell { width: 12%; }
+.disk-table-compact .free-cell { width: 8%; }
+.disk-table-compact .temp-col { width: 6%; }
+.disk-table-compact .mount-col { width: 20%; }
+
+.disk-table-compact .mount-col,
+.disk-table-compact .status-cell,
+.disk-table-compact .mount-line {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.disk-table-compact .mount-path {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Patch Docker Images: actions compactes + flash succès temporaire */
+.docker-flash-stack .action-message.ok {
+    transition: opacity .25s ease, transform .25s ease, margin .25s ease, min-height .25s ease, padding .25s ease;
+}
+
+.docker-flash-stack .action-message.ok.docker-flash-hiding {
+    opacity: 0;
+    transform: translateY(-4px);
+    min-height: 0;
+    margin: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+}
+
+.docker-images-maintenance {
+    display: grid;
+    gap: 0;
+}
+
+.docker-images-error-row {
+    padding: 10px 12px 0;
+}
+
+.docker-images-actions-compact {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-bottom: 1px solid var(--yoleo-border-soft);
+    background: rgba(10, 15, 22, .38);
+}
+
+.docker-images-actions-compact .yoleo-btn {
+    flex: 1 1 170px;
+    max-width: 220px;
+    justify-content: center;
+    min-height: 34px;
+    white-space: nowrap;
+}
+
+.docker-images-maintenance-note {
+    padding: 0 12px 12px;
+}
+
+@media (max-width: 900px) {
+    .docker-images-actions-compact .yoleo-btn {
+        flex-basis: calc(50% - 8px);
+        max-width: none;
+    }
+}
+
+
+/* Docker Images : colonnes du tableau stabilisées pour éviter le chevauchement image/stack. */
+.docker-images-maintenance > .table-wrap .yoleo-table {
+    table-layout: fixed;
+    min-width: 980px;
+}
+
+.docker-images-maintenance > .table-wrap .yoleo-table th:nth-child(1),
+.docker-images-maintenance > .table-wrap .yoleo-table td:nth-child(1) {
+    width: 32%;
+}
+
+.docker-images-maintenance > .table-wrap .yoleo-table th:nth-child(2),
+.docker-images-maintenance > .table-wrap .yoleo-table td:nth-child(2) {
+    width: 15%;
+}
+
+.docker-images-maintenance > .table-wrap .yoleo-table th:nth-child(3),
+.docker-images-maintenance > .table-wrap .yoleo-table td:nth-child(3) {
+    width: 12%;
+}
+
+.docker-images-maintenance > .table-wrap .yoleo-table th:nth-child(4),
+.docker-images-maintenance > .table-wrap .yoleo-table td:nth-child(4) {
+    width: 14%;
+}
+
+.docker-images-maintenance > .table-wrap .yoleo-table th:nth-child(5),
+.docker-images-maintenance > .table-wrap .yoleo-table td:nth-child(5) {
+    width: 12%;
+}
+
+.docker-images-maintenance > .table-wrap .yoleo-table th:nth-child(6),
+.docker-images-maintenance > .table-wrap .yoleo-table td:nth-child(6) {
+    width: 15%;
+}
+
+.docker-images-maintenance > .table-wrap .docker-name-cell {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.docker-images-maintenance > .table-wrap .docker-name-cell > div {
+    min-width: 0;
+    max-width: calc(100% - 36px);
+}
+
+.docker-images-maintenance > .table-wrap .status-pill,
+.docker-images-maintenance > .table-wrap .yoleo-btn-mini {
+    max-width: 100%;
+}
+
+/* Patch Disques : garder les pastilles/boutons SMART parfaitement ronds.
+   Le tableau compact peut réduire la colonne état ; le texte doit se comprimer,
+   mais jamais le bouton rond ni la pastille interne. */
+.disk-table-compact .status-power,
+.status-power {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    max-width: 26px;
+    min-height: 26px;
+    max-height: 26px;
+    flex: 0 0 26px;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.disk-table-compact .status-dot,
+.status-dot {
+    width: 10px;
+    height: 10px;
+    min-width: 10px;
+    max-width: 10px;
+    min-height: 10px;
+    max-height: 10px;
+    flex: 0 0 10px;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.disk-table-compact .status-cell > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Docker Images mobile : liste simplifiée, sans mosaïque. */
+.docker-images-mobile-list {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .docker-images-maintenance > .docker-images-table-wrap,
+    .docker-images-maintenance > .docker-images-table-wrap.yoleo-mobile-source-wrap {
+        display: none !important;
+    }
+
+    .docker-images-maintenance > .docker-images-table-wrap + .yoleo-mobile-table-grid,
+    .docker-images-maintenance .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .docker-images-mobile-list {
+        display: flex !important;
+        flex-direction: column;
+        gap: 7px;
+        width: 100%;
+        padding: 8px 10px 12px;
+        box-sizing: border-box;
+    }
+
+    .docker-images-mobile-item {
+        width: 100%;
+        min-height: 54px;
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto 14px;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 10px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 11px;
+        background: rgba(18, 26, 36, .94);
+        color: var(--yoleo-text);
+        cursor: pointer;
+        text-align: left;
+        font: inherit;
+        box-sizing: border-box;
+    }
+
+    .docker-images-mobile-item:focus-visible,
+    .docker-images-mobile-item:active {
+        outline: 2px solid var(--yoleo-accent-2);
+        outline-offset: 2px;
+        border-color: var(--yoleo-accent-2);
+    }
+
+    .docker-images-mobile-item.is-used {
+        border-color: rgba(72, 213, 151, .38);
+    }
+
+    .docker-images-mobile-item.is-unused {
+        border-color: rgba(255, 93, 115, .38);
+    }
+
+    .docker-images-mobile-icon {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+        border: 1px solid rgba(255, 255, 255, .08);
+        border-radius: 9px;
+        background: rgba(5, 8, 13, .82);
+        padding: 3px;
+        box-sizing: border-box;
+    }
+
+    .docker-images-mobile-text {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+    }
+
+    .docker-images-mobile-title,
+    .docker-images-mobile-sub {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .docker-images-mobile-title {
+        color: #fff;
+        font-size: 14px;
+        font-weight: 900;
+        line-height: 1.25;
+    }
+
+    .docker-images-mobile-sub {
+        color: var(--yoleo-muted);
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.25;
+    }
+
+    .docker-images-mobile-state {
+        max-width: 76px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        justify-self: end;
+    }
+
+    .docker-images-mobile-chevron {
+        color: var(--yoleo-accent-2);
+        font-size: 22px;
+        font-weight: 900;
+        line-height: 1;
+        opacity: .9;
+    }
+
+    .docker-images-mobile-empty {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 460px) {
+    .docker-images-mobile-item {
+        grid-template-columns: 30px minmax(0, 1fr) 12px;
+    }
+
+    .docker-images-mobile-state {
+        display: none;
+    }
+}

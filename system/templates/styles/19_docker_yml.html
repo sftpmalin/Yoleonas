@@ -1,0 +1,166 @@
+    /* Docker / YML : comportement type gestionnaire de configuration. */
+    .docker-yml-page-wrap {
+        padding-top: 0;
+    }
+
+    .docker-yml-panel {
+        max-width: 1480px;
+    }
+
+    .docker-yml-page-head {
+        margin: 10px 0 12px;
+    }
+
+    .docker-yml-list-actions-head {
+        margin-top: 8px;
+    }
+
+    .docker-yml-top-actions {
+        justify-content: flex-end;
+        align-items: center;
+    }
+
+    .docker-yml-folder-section {
+        padding: 14px;
+    }
+
+    .docker-yml-folder-title-block {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    .docker-yml-folder-path {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 900;
+    }
+
+    .docker-yml-folder-count {
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 900;
+        line-height: 1.2;
+    }
+
+    .docker-yml-folder-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(180px, 320px);
+        gap: 12px;
+        align-items: end;
+    }
+
+    .docker-yml-folder-head .docker-yml-search {
+        width: 100%;
+        margin: 0;
+    }
+
+    .docker-yml-files-grid .file-card {
+        min-height: 62px;
+    }
+
+    .docker-yml-file-card[hidden] {
+        display: none !important;
+    }
+
+    .docker-yml-editor-section {
+        display: grid;
+        gap: 10px;
+    }
+
+    .docker-yml-name-card {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        align-items: end;
+        padding: 12px;
+    }
+
+    .docker-yml-name-field {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .label-mini {
+        color: var(--yoleo-accent-2);
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .docker-yml-form {
+        display: grid;
+        gap: 10px;
+        min-height: 0;
+    }
+
+    .docker-yml-form .action-message {
+        margin: 0;
+    }
+
+    .docker-yml-confstyle-textarea {
+        min-height: 220px;
+        height: clamp(220px, calc(100vh - 360px), 680px);
+        resize: vertical;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+        border: 1px solid var(--yoleo-border-soft);
+        border-radius: 12px;
+    }
+
+    .docker-hidden-form {
+        display: none;
+    }
+
+    @media (max-width: 900px) {
+        .docker-yml-folder-head,
+        .docker-yml-name-card {
+            grid-template-columns: 1fr;
+            align-items: stretch;
+        }
+
+        .docker-yml-top-actions {
+            justify-content: flex-start;
+        }
+
+        .docker-yml-confstyle-textarea {
+            min-height: 180px;
+            height: clamp(180px, calc(100vh - 300px), 520px);
+        }
+    }
+
+/* Barre de travail YAML indépendante du vieux squelette .yoleo-subnav.
+   Important : ne pas lui remettre la classe .yoleo-subnav, sinon la règle globale
+   body.yoleo-has-page-settings ... la masque dès que la roue crantée est active. */
+.docker-yml-workbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 7px !important;
+    margin: 0 0 14px !important;
+    border: 1px solid var(--yoleo-border-soft);
+    border-radius: 12px;
+    background: rgba(18, 26, 36, .82);
+}
+
+.docker-yml-workbar .yoleo-subnav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 7px 11px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 850;
+    letter-spacing: 0;
+    text-decoration: none;
+}

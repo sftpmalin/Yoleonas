@@ -1,0 +1,128 @@
+    /* ------------------------------------------------------------------
+       Module Système - styles migrés depuis system_style.html
+       CSS centralisé : les templates system*.html ne contiennent pas de <style>.
+       ------------------------------------------------------------------ */
+.system-page { padding: 16px 18px 34px; background:#0e1218; min-height: calc(100vh - 40px); color:#e9eef5; }
+    .system-shell { width:100%; max-width:1800px; margin:0 auto; }
+    .system-tabs { background:#121a26; border:1px solid #273447; border-radius:16px; overflow:hidden; box-shadow:0 12px 26px rgba(0,0,0,.24); }
+    .system-tabs-bar { display:flex; gap:0; background:#0f1620; border-bottom:1px solid #273447; overflow-x:auto; }
+    .system-tab-btn { border:0; background:transparent; color:#b8c7d8; padding:14px 18px; min-height:48px; cursor:pointer; font-weight:900; white-space:nowrap; border-bottom:3px solid transparent; }
+    .system-tab-btn:hover { background:rgba(255,255,255,.04); color:#fff; }
+    .system-tab-btn.active { color:#1AEBFF; border-bottom-color:#1AEBFF; background:rgba(26,235,255,.07); }
+    .system-tab-actions { margin-left:auto; padding:6px 8px; display:flex; align-items:center; gap:8px; flex:0 0 auto; border-left:1px solid #273447; background:rgba(0,0,0,.10); }
+    .system-tab-action-btn { border:0; cursor:pointer; font-weight:900; border-radius:10px; padding:8px 11px; min-height:34px; color:#fff; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 6px 14px rgba(0,0,0,.18); }
+    .system-tab-action-btn:hover { transform:translateY(-1px); filter:brightness(1.08); }
+    .system-tab-action-btn.shutdown { background:#c93a3a; }
+    .system-tab-action-btn.reboot { background:#2f8f46; }
+    .system-tab-action-btn.ui { background:#1AEBFF; color:#001014; }
+    @media (max-width: 850px) {
+        .system-tab-actions { margin-left:0; border-left:0; }
+        .system-tab-action-btn { min-width:max-content; }
+    }
+.system-tab-panel { display:none; }
+.system-tab-panel.active { display:block; }
+#tab-system > .system-home,
+#tab-system > .system-tools-page { display:none; }
+    .system-tab-title { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px 0; color:#8fb4d6; font-size:12px; }
+    .system-conf-pill { font-family:Consolas, Monaco, monospace; color:#91a6bd; font-size:11px; background:#10161f; border:1px solid #2b394d; border-radius:999px; padding:6px 10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70vw; }
+    @media (max-width: 850px) {
+        .system-page { padding:10px; }
+        .system-tab-btn { flex:1; }
+        .system-tab-title { align-items:flex-start; flex-direction:column; }
+        .system-conf-pill { max-width:100%; }
+    }
+
+
+/* ===== Onglet Moniteur : CSS repris de monitor.html ===== */
+/* --- CONFIGURATION GLOBALE --- */
+    *, *:before, *:after { box-sizing: border-box; }
+    
+    .dash-wrap { 
+        padding: 20px; 
+        max-width: 1800px;
+        margin: 0 auto; 
+        color: #fff; 
+        font-family: 'Segoe UI', sans-serif;
+        width: 100%;
+        overflow-x: hidden; 
+    }
+    
+    /* GRILLE STANDARD (Ligne 1) */
+    .grid-3 { 
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 25px; 
+    }
+    
+    /* --- LA LIGNE 2 (NVIDIA SSH + INTEL LOCAL + RESEAU DIRECT) --- */
+    .grid-gpu-lan {
+        display: grid;
+        grid-template-columns: minmax(380px, 1.35fr) minmax(380px, 1.35fr) minmax(340px, 1fr);
+        gap: 20px;
+        margin-bottom: 25px;
+        align-items: stretch;
+    }
+
+    .tile { 
+        background: #1b212b; border-radius: 16px; padding: 15px; 
+        border: 1px solid #2f3640; box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
+        position: relative; width: 100%;
+        display: flex; flex-direction: column; 
+    }
+    
+    .t-head { 
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; 
+        font-weight: bold; color: #1AEBFF; text-transform: uppercase; font-size: 13px; width: 100%; 
+    }
+
+    /* CERCLES SYSTEME */
+    .gauge-sys { display: flex; justify-content: center; align-items: center; position: relative; height: 180px; }
+    .svg-sys { transform: rotate(-90deg); width: 180px; height: 180px; }
+    .bg-sys { fill: none; stroke: #262e3b; stroke-width: 14; }
+    .fill-sys { fill: none; stroke-width: 14; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease; stroke-dasharray: 502; stroke-dashoffset: 502; }
+    
+    /* CERCLES GPU */
+    .gpu-row { display: flex; justify-content: space-around; align-items: center; flex-grow: 1; width: 100%; }
+    .gauge-gpu { position: relative; width: 170px; height: 170px; }
+    .svg-gpu { transform: rotate(-90deg); width: 170px; height: 170px; }
+    .bg-gpu { fill: none; stroke: #0f141a; stroke-width: 14; }
+    .fill-gpu { fill: none; stroke-width: 14; stroke-linecap: round; stroke-dasharray: 471; stroke-dashoffset: 471; transition: 0.5s; }
+    
+    .circle-txt { position: absolute; text-align: center; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; }
+    .val-sys { font-size: 34px; font-weight: bold; color: #fff; }
+    .val-gpu { font-size: 28px; font-weight: bold; color: #fff; }
+    .sub-gpu { font-size: 12px; color: #ccc; margin-top: 2px; text-transform: uppercase; }
+
+    /* POPUP TERMINAL NVIDIA & INTEL */
+    #nvidia-modal, #intel-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+    .terminal-box { background: #0c0c0c; border: 1px solid #2ecc71; width: 90%; max-width: 900px; height: 80vh; border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(46, 204, 113, 0.2); }
+    .terminal-header { background: #1a1a1a; padding: 10px 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; color: #2ecc71; font-family: monospace; font-weight: bold; }
+    .terminal-content { flex: 1; padding: 15px; overflow: auto; color: #e9eef5; font-family: 'Courier New', monospace; white-space: pre; font-size: 12px; line-height: 1.2; }
+    .btn-close-term { background: none; border: none; color: #ff5252; font-weight: bold; cursor: pointer; font-size: 16px; }
+
+    /* RESEAU */
+    .net-stats { display: flex; justify-content: space-between; text-align: center; margin-bottom: 12px; border-bottom: 1px solid #2f3640; padding-bottom: 12px; gap: 12px; }
+    .net-stats > div { flex: 1; background:#141a22; border:1px solid #27313d; border-radius:10px; padding:8px 6px; }
+    .ip-list { font-size: 12px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; row-gap: 0; flex-grow: 1; }
+    .ip-row { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid #222; padding: 8px 0; min-width: 0; }
+    .ip-lbl { color: #888; white-space: nowrap; }
+    .ip-val { color: #1AEBFF; font-family: monospace; font-weight: bold; text-align: right; overflow-wrap: anywhere; }
+    .network-tile { border-top: 3px solid #1AEBFF; }
+    .network-tile .t-head { color:#1AEBFF; }
+
+    /* MOBILE */
+    @media (max-width: 1200px) {
+        .dash-wrap { padding: 10px; }
+        .grid-3, .grid-gpu-lan { grid-template-columns: 1fr; gap: 15px; } 
+        .svg-sys, .svg-gpu { width: 150px; height: 150px; }
+        .gauge-sys, .gauge-gpu { height: 150px; width: 150px; margin: 0 auto; }
+        .val-sys, .val-gpu { font-size: 28px; }
+        .bg-sys, .fill-sys, .bg-gpu, .fill-gpu { stroke-width: 10; r: 65; cx: 75; cy: 75; stroke-dasharray: 408; stroke-dashoffset: 408; }
+        .gpu-row { flex-wrap: wrap; justify-content: center; gap: 20px; }
+        .ip-list { grid-template-columns: 1fr; }
+        .hide-mobile { display: none; }
+    }
+
+/* ===== Onglet Services : CSS repris de systemctl.html ===== */
+* { box-sizing: border-box; }
+    body, html { margin: 0; padding: 0; overflow-x: hidden; background: #0e1218; color: #e9eef5; }
+
+    .svc-page { padding: 8px 14px 28px 14px; display: flex; justify-content: center; }

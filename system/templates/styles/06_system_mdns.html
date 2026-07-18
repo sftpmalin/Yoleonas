@@ -1,0 +1,100 @@
+    .mdns-page .mdns-panel { width: 100%; max-width: 1560px; }
+    .mdns-page .tabs-shell { background: #121a26; border: 1px solid #273447; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 26px rgba(0,0,0,.24); }
+    .mdns-page .tabs-bar { display: flex; gap: 0; background: #0f1620; border-bottom: 1px solid #273447; overflow-x: auto; }
+    .mdns-page .mdns-tab-btn { border: 0; background: transparent; color: #b8c7d8; padding: 14px 18px; min-height: 48px; cursor: pointer; font-weight: 900; white-space: nowrap; border-bottom: 3px solid transparent; }
+    .mdns-page .mdns-tab-btn:hover { background: rgba(255,255,255,.04); color: #fff; }
+    .mdns-page .mdns-tab-btn.active { color: #1AEBFF; border-bottom-color: #1AEBFF; background: rgba(26,235,255,.07); }
+    .mdns-page .mdns-tab-panel { display: none; padding: 16px; }
+    .mdns-page .mdns-tab-panel.active { display: block; }
+
+    .mdns-page .card { background: linear-gradient(180deg, #131d2b 0%, #101722 100%); border: 1px solid #26364b; border-radius: 16px; padding: 14px; margin-bottom: 14px; box-shadow: 0 14px 30px rgba(0,0,0,.18); }
+    .mdns-page .topbar { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: start; margin-bottom: 14px; }
+    .mdns-page .title-block h1, .mdns-page .title-block h2 { margin: 0; color: #fff; letter-spacing: -.2px; }
+    .mdns-page .title-block h1 { font-size: 24px; }
+    .mdns-page .title-block h2 { font-size: 21px; }
+    .mdns-page .subtitle { margin-top: 6px; color: #99acc2; line-height: 1.45; }
+    .mdns-page .toolbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+
+    .mdns-page .btn { border: 0; cursor: pointer; font-weight: 900; border-radius: 10px; padding: 9px 12px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; transition: transform .12s ease, opacity .12s ease; }
+    .mdns-page .btn:hover { transform: translateY(-1px); }
+    .mdns-page .btn:disabled { opacity: .48; cursor: not-allowed; transform: none; }
+    .mdns-page .btn-primary { background: #1AEBFF; color: #001014; }
+    .mdns-page .btn-green { background: #2f8f46; color: #fff; }
+    .mdns-page .btn-orange { background: #f1a62b; color: #111; }
+    .mdns-page .btn-red { background: #c93a3a; color: #fff; }
+    .mdns-page .btn-gray { background: #26364a; color: #eaf2ff; border: 1px solid #344861; }
+    .mdns-page .btn-mini { padding: 6px 8px; min-height: 30px; border-radius: 8px; font-size: 11px; }
+    .mdns-page .btn-icon { width: 32px; min-width: 32px; height: 30px; padding: 0; font-size: 14px; line-height: 1; }
+    .mdns-page .yoleo-btn.is-running { opacity:.82; cursor:progress; transform:none; }
+    .mdns-page .yoleo-btn.is-ok { box-shadow:0 0 0 3px rgba(76,175,80,.18); }
+    .mdns-page .yoleo-btn.is-fail { box-shadow:0 0 0 3px rgba(244,67,54,.18); }
+    .mdns-page .is-hidden, .mdns-page .mdns-force-hidden { display: none !important; }
+
+    .mdns-page .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .mdns-page .summary-card { background: #0e1723; border: 1px solid #25364b; border-radius: 13px; padding: 10px 12px; }
+    .mdns-page .summary-label { color: #8ba0b8; font-size: 10px; text-transform: uppercase; letter-spacing: .45px; }
+    .mdns-page .summary-value { color: #fff; font-size: 21px; font-weight: 900; margin-top: 4px; }
+    .mdns-page .summary-sub { color: #91a6bd; font-size: 11px; margin-top: 4px; overflow-wrap: anywhere; }
+
+    .mdns-page .path-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .mdns-page .path-pill { min-width: 0; display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 12px; background: rgba(0,0,0,.22); border: 1px solid #26364b; color: #cfe1f5; font-family: Consolas, Monaco, monospace; font-size: 12px; }
+    .mdns-page .path-pill b { color: #72eaff; white-space: nowrap; }
+    .mdns-page .path-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .mdns-page .table-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .mdns-page .table-wrap { border: 1px solid #26364b; border-radius: 14px; overflow: auto; background: #0c131e; }
+    .mdns-page .mdns-table { width: 100%; min-width: 760px; border-collapse: collapse; }
+    .mdns-page .mdns-table th { position: sticky; top: 0; z-index: 1; background: #1a2636; color: #a8eaff; text-transform: uppercase; letter-spacing: .35px; font-size: 10px; text-align: left; padding: 10px 9px; border-bottom: 1px solid #30435b; }
+    .mdns-page .mdns-table td { padding: 9px; border-bottom: 1px solid #1d2c3f; vertical-align: middle; }
+    .mdns-page .mdns-table tr:last-child td { border-bottom: none; }
+    .mdns-page .mdns-table tbody tr:hover td { background: rgba(255,255,255,.025); }
+    .mdns-page .actions-cell { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; justify-content: flex-end; }
+
+    .mdns-page .text-input, .mdns-page .search-input { background: #07101b; border: 1px solid #2b3d55; color: #eaf2ff; border-radius: 10px; padding: 9px 10px; outline: none; width: 100%; font-family: Consolas, Monaco, monospace; }
+    .mdns-page .text-input:focus, .mdns-page .search-input:focus { border-color: #1AEBFF; box-shadow: 0 0 0 3px rgba(26,235,255,.12); }
+    .mdns-page .search-input { min-width: 280px; max-width: 420px; }
+    .mdns-page .badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; padding: 5px 8px; font-size: 10px; font-weight: 900; white-space: nowrap; }
+    .mdns-page .badge-ok { background: rgba(76,175,80,.15); color: #98f2a2; border: 1px solid rgba(76,175,80,.28); }
+    .mdns-page .badge-no { background: rgba(244,67,54,.13); color: #ff9e9e; border: 1px solid rgba(244,67,54,.27); }
+    .mdns-page .badge-info { background: rgba(26,235,255,.11); color: #9debff; border: 1px solid rgba(26,235,255,.25); }
+    .mdns-page .badge-warn { background: rgba(249,168,37,.14); color: #ffd089; border: 1px solid rgba(249,168,37,.28); }
+    .mdns-page .hint { color: #91a6bd; font-size: 12px; line-height: 1.45; margin-top: 8px; }
+    .mdns-page .alert { padding: 12px 14px; border-radius: 13px; border: 1px solid rgba(244,67,54,.45); background: rgba(244,67,54,.12); color: #ffd4d4; margin-bottom: 14px; font-family: Consolas, Monaco, monospace; white-space: pre-wrap; }
+    .mdns-page .status-box { border-radius: 13px; padding: 10px 12px; line-height: 1.45; border: 1px solid #2b394d; background: #0c121b; color: #dce6ef; margin-bottom: 10px; }
+    .mdns-page .status-box[hidden] { display: none !important; }
+    .mdns-page .status-box.is-info { border-color: #2b394d; background: #0c121b; color: #dce6ef; }
+    .mdns-page .status-box.is-running { border-color: rgba(26,235,255,.34); background: rgba(26,235,255,.08); color: #c9f7ff; }
+    .mdns-page .status-box.is-success { border-color: rgba(76,175,80,.48); background: rgba(76,175,80,.14); color: #b9ffbf; }
+    .mdns-page .status-box.is-error { border-color: rgba(244,67,54,.58); background: rgba(244,67,54,.14); color: #ffd2d2; }
+    .mdns-page .mdns-inline-busy { min-height: 32px; display: inline-flex; align-items: center; gap: 9px; color: #9fb2c8; font-size: 12px; font-weight: 800; }
+    .mdns-page .mdns-ajax-spinner { display: none; width: 18px; height: 18px; border-radius: 50%; border: 3px solid rgba(255,255,255,.18); border-top-color: #1AEBFF; animation: mdnsSpin .75s linear infinite; }
+    .mdns-page.mdns-ajax-running .mdns-ajax-spinner { display: inline-block; }
+    .mdns-page .mdns-ajax-busy-text:empty { display: none; }
+    .mdns-page.mdns-ajax-running .yoleo-btn { cursor: progress; }
+    @keyframes mdnsSpin { to { transform: rotate(360deg); } }
+    .mdns-page .code-box { width: 100%; min-height: 330px; background: #05080d; border: 1px solid #243246; color: #d9e7f5; padding: 12px; border-radius: 14px; resize: vertical; font-family: Consolas, Monaco, monospace; line-height: 1.42; white-space: pre-wrap; overflow: auto; }
+    .mdns-page .details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+
+    #mdns-actionModal { position: fixed; inset: 0; background: rgba(0,0,0,.78); z-index: 9999; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); padding: 16px; }
+    #mdns-actionModal .modal-box { background: #152033; border: 1px solid #30435b; border-radius: 18px; width: min(980px, 96vw); padding: 18px; box-shadow: 0 22px 50px rgba(0,0,0,.55); }
+    #mdns-actionModal .modal-title { color: #fff; font-size: 20px; font-weight: 900; margin: 0 0 10px 0; }
+    #mdns-actionModal .modal-log { margin-top: 12px; background: #05080d; border: 1px solid #26364b; color: #d9e7f5; border-radius: 12px; padding: 10px; height: min(54vh, 520px); overflow: auto; white-space: pre-wrap; font-family: Consolas, Monaco, monospace; font-size: 12px; }
+    #mdns-actionModal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
+    @media (max-width: 900px) {
+        .mdns-page .topbar { grid-template-columns: 1fr; }
+        .mdns-page .toolbar { justify-content: stretch; }
+        .mdns-page .btn, .mdns-page .search-input { width: 100%; max-width: none; }
+        .mdns-page { padding: 10px; }
+        .mdns-page .mdns-tab-panel { padding: 10px; }
+        .mdns-page .summary-grid { grid-template-columns: repeat(2, minmax(110px, 1fr)); }
+    }
+
+    #mdns-actionModal .btn { border: 0; cursor: pointer; font-weight: 900; border-radius: 10px; padding: 9px 12px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; }
+    #mdns-actionModal .btn-gray { background: #26364a; color: #eaf2ff; border: 1px solid #344861; }
+    #mdns-actionModal .status-box { border-radius: 13px; padding: 10px 12px; line-height: 1.45; border: 1px solid #2b394d; background: #0c121b; color: #dce6ef; margin-bottom: 10px; }
+
+/* ===== Module LAN : routes Flask + style commun ===== */
+* { box-sizing: border-box; }
+.lan-page { padding: 10px 12px 28px; display: flex; justify-content: center; }
+    .lan-content-section { padding-top: 10px; }

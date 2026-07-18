@@ -1,0 +1,194 @@
+/* ------------------------------------------------------------------
+   Tables auto-ajustables
+   Objectif : quand la sidebar est élargie/réduite, les tableaux doivent
+   se compresser et revenir à la ligne au lieu de créer un ascenseur horizontal
+   ou de masquer les colonnes à droite.
+   ------------------------------------------------------------------ */
+
+:where(
+    .table-wrap,
+    .system-table-wrap,
+    .terminal-table-wrap,
+    .desktop-table-wrap,
+    .docker-stack-table-wrap,
+    .browser-table-wrap
+) {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden !important;
+}
+
+:where(
+    .table-wrap,
+    .system-table-wrap,
+    .terminal-table-wrap,
+    .desktop-table-wrap,
+    .docker-stack-table-wrap,
+    .browser-table-wrap
+) > table,
+:where(
+    .yoleo-table,
+    .mini-table,
+    .system-table,
+    .system-info-table,
+    .share-table,
+    .build-table,
+    .lan-table,
+    .mdns-table,
+    .archive-table,
+    .cache-table,
+    .compact-table,
+    .info-table,
+    .lu-table,
+    .fm-table,
+    .terminal-table,
+    .docker-run-table,
+    .docker-stack-table,
+    .docker-env-table,
+    .raid-table,
+    .snapraid-table
+) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+}
+
+:where(
+    .yoleo-table,
+    .mini-table,
+    .system-table,
+    .system-info-table,
+    .share-table,
+    .build-table,
+    .lan-table,
+    .mdns-table,
+    .archive-table,
+    .cache-table,
+    .compact-table,
+    .info-table,
+    .lu-table,
+    .fm-table,
+    .terminal-table,
+    .docker-run-table,
+    .docker-stack-table,
+    .docker-env-table,
+    .raid-table,
+    .snapraid-table
+) th,
+:where(
+    .yoleo-table,
+    .mini-table,
+    .system-table,
+    .system-info-table,
+    .share-table,
+    .build-table,
+    .lan-table,
+    .mdns-table,
+    .archive-table,
+    .cache-table,
+    .compact-table,
+    .info-table,
+    .lu-table,
+    .fm-table,
+    .terminal-table,
+    .docker-run-table,
+    .docker-stack-table,
+    .docker-env-table,
+    .raid-table,
+    .snapraid-table
+) td {
+    min-width: 0 !important;
+    max-width: 100%;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Les actions restent compactes mais peuvent passer sur deux lignes si la
+   sidebar prend plus de place. */
+:where(.actions-line, .toolbar, .docker-state-tools, .docker-compose-inline-actions) {
+    max-width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    white-space: normal !important;
+}
+
+/* Les petits éléments UI doivent rester lisibles et ne pas se découper lettre
+   par lettre. */
+:where(.yoleo-btn, .status-pill, .badge, .pill, .state-pill, .refresh-pill) {
+    white-space: nowrap !important;
+}
+
+/* Les chemins, images, noms longs et aperçus Docker doivent se casser proprement
+   au lieu de pousser la table hors écran. */
+:where(
+    .docker-ellipsis,
+    .docker-run-preview,
+    .docker-run-file-name,
+    .model-main,
+    .model-sub,
+    .mount-path,
+    .ellipsis-cell,
+    .code-line,
+    .code,
+    .mono,
+    .path-pill span
+) {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Docker Run : l'ancien min-width forçait un ascenseur horizontal. */
+.docker-run-library .table-wrap {
+    overflow-x: hidden !important;
+}
+
+.docker-run-table {
+    min-width: 0 !important;
+    table-layout: fixed;
+}
+
+.docker-run-icon-col {
+    width: 58px !important;
+}
+
+.docker-run-actions-col {
+    width: 118px !important;
+}
+
+.docker-run-progress-cell {
+    min-width: 0 !important;
+}
+
+.docker-run-progress {
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* Docker Images : l'ancien correctif imposait encore 980px. */
+.docker-images-maintenance > .table-wrap .yoleo-table {
+    min-width: 0 !important;
+    table-layout: fixed;
+}
+
+/* Les tableaux disques/maintenance avaient une règle globale à 1260px ; elle
+   doit être neutralisée par le patch d'auto-ajustement. */
+.table-wrap .yoleo-table {
+    min-width: 0 !important;
+}
+
+/* Sur très petits écrans, on garde la même logique : pas d'ascenseur horizontal,
+   les cellules acceptent le retour à la ligne. */
+@media (max-width: 900px) {
+    :where(.table-wrap, .system-table-wrap, .terminal-table-wrap, .desktop-table-wrap, .docker-stack-table-wrap) {
+        overflow-x: hidden !important;
+    }
+
+    :where(.yoleo-table, .mini-table, .system-table, .share-table, .build-table, .lan-table, .mdns-table, .archive-table, .cache-table, .compact-table, .lu-table, .terminal-table) {
+        min-width: 0 !important;
+    }
+}

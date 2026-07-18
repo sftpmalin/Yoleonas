@@ -1,0 +1,325 @@
+/* ------------------------------------------------------------------
+   VM mobile : garder le résumé du haut et remplacer les mosaïques par
+   une vraie liste compacte. Ciblé uniquement sur le module VM.
+   ------------------------------------------------------------------ */
+
+@media (max-width: 900px) {
+    .vm-page {
+        padding-top: 8px !important;
+    }
+
+    .vm-page .card {
+        padding: 10px !important;
+        border-radius: 14px !important;
+    }
+
+    .vm-page .vm-summary-actions {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        align-items: start !important;
+        gap: 8px !important;
+        margin-bottom: 10px !important;
+    }
+
+    .vm-page .summary-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 7px !important;
+        margin: 0 !important;
+    }
+
+    .vm-page .summary-card {
+        min-width: 0 !important;
+        padding: 8px 9px !important;
+        border-radius: 10px !important;
+    }
+
+    .vm-page .summary-value {
+        font-size: 16px !important;
+        line-height: 1.1 !important;
+    }
+
+    .vm-page .summary-note {
+        font-size: 10px !important;
+        line-height: 1.15 !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    .vm-page .vm-main-actions {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        gap: 6px !important;
+    }
+
+    .vm-page .vm-main-actions .vm-icon-btn-main {
+        width: 34px !important;
+        min-width: 34px !important;
+        height: 32px !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .vm-page .vm-mobile-list-wrap,
+    .vm-page .vm-mobile-list-wrap {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+        padding: 6px !important;
+        border: 1px solid #26364b !important;
+        border-radius: 13px !important;
+        background: #0c131e !important;
+        box-sizing: border-box !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .vm-page .vm-mobile-list-wrap + .yoleo-mobile-table-grid,
+    .vm-page .vm-mobile-list-wrap + .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .vm-page .vm-mobile-list-table,
+    .vm-page .vm-mobile-list-table thead,
+    .vm-page .vm-mobile-list-table tbody,
+    .vm-page .vm-mobile-list-table tr,
+    .vm-page .vm-mobile-list-table th,
+    .vm-page .vm-mobile-list-table td {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .vm-page .vm-mobile-list-table {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: auto !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+    }
+
+    .vm-page .vm-mobile-list-table thead {
+        display: none !important;
+    }
+
+    .vm-page .vm-mobile-list-table tbody {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 7px !important;
+        width: 100% !important;
+    }
+
+    .vm-page .vm-mobile-list-table tr {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        grid-auto-rows: auto !important;
+        gap: 8px 10px !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 10px !important;
+        border: 1px solid #26364b !important;
+        border-left-width: 4px !important;
+        border-radius: 12px !important;
+        background: rgba(15, 24, 36, .96) !important;
+        box-shadow: none !important;
+    }
+
+    .vm-page .vm-mobile-list-table td {
+        display: block !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        vertical-align: middle !important;
+        font-size: 12px !important;
+        line-height: 1.25 !important;
+        overflow: hidden !important;
+    }
+
+    .vm-page .vm-main-table td:nth-child(2),
+    .vm-page .vm-console-table td:nth-child(2),
+    .vm-page .vm-xml-table td:nth-child(1) {
+        grid-column: 1 / -1 !important;
+        grid-row: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .vm-page .vm-main-table td:nth-child(1),
+    .vm-page .vm-console-table td:nth-child(1),
+    .vm-page .vm-xml-table td:nth-child(2) {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+        min-width: 0 !important;
+    }
+
+    .vm-page .vm-main-table td:nth-child(3),
+    .vm-page .vm-console-table td:nth-child(3),
+    .vm-page .vm-xml-table td:nth-child(3) {
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+        min-width: 0 !important;
+        justify-self: stretch !important;
+    }
+
+    .vm-page .vm-main-table td:nth-child(4),
+    .vm-page .vm-console-table td:nth-child(4),
+    .vm-page .vm-xml-table td:nth-child(4) {
+        grid-column: 1 / -1 !important;
+        grid-row: 3 !important;
+        justify-self: stretch !important;
+        align-self: stretch !important;
+        width: 100% !important;
+        max-width: none !important;
+        overflow: visible !important;
+    }
+
+    .vm-page .vm-main-table td:nth-child(1),
+    .vm-page .vm-main-table td:nth-child(3) {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        min-height: 26px !important;
+    }
+
+    .vm-page .vm-main-table td:nth-child(3) {
+        justify-content: flex-end !important;
+        flex-wrap: wrap !important;
+    }
+
+    .vm-page .vm-mobile-list-table .name-main {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 13px !important;
+        line-height: 1.2 !important;
+    }
+
+    .vm-page .vm-mobile-list-table .name-sub,
+    .vm-page .vm-mobile-list-table .code {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 10px !important;
+        line-height: 1.2 !important;
+        margin-top: 1px !important;
+    }
+
+    .vm-page .vm-mobile-list-table .badge {
+        max-width: 100% !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        min-height: 18px !important;
+        padding: 2px 6px !important;
+        border-radius: 999px !important;
+        font-size: 10px !important;
+        line-height: 1.1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .vm-page .vm-mobile-list-table .actions-cell {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(31px, 1fr)) !important;
+        justify-content: stretch !important;
+        align-items: stretch !important;
+        gap: 6px !important;
+        width: 100% !important;
+        max-width: none !important;
+        padding-top: 2px !important;
+        overflow: visible !important;
+    }
+
+    .vm-page .vm-mobile-list-table .actions-cell .yoleo-btn,
+    .vm-page .vm-mobile-list-table .actions-cell .vm-icon-btn {
+        width: 100% !important;
+        min-width: 0 !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        padding: 0 !important;
+        border-radius: 9px !important;
+        font-size: 13px !important;
+        line-height: 1 !important;
+        justify-content: center !important;
+    }
+
+    .vm-page .vm-console-table .actions-cell,
+    .vm-page .vm-xml-table .actions-cell {
+        grid-template-columns: 74px !important;
+        max-width: 78px !important;
+    }
+
+    .vm-page .vm-console-table .actions-cell .yoleo-btn,
+    .vm-page .vm-xml-table .actions-cell .yoleo-btn {
+        width: 74px !important;
+        min-width: 74px !important;
+        font-size: 10px !important;
+    }
+
+    .vm-page .vm-mobile-list-table tr.vm-mobile-state-running,
+    .vm-page .vm-mobile-list-table tr[data-mobile-state="running"],
+    .vm-page .vm-mobile-list-table tr:has(.badge-running) {
+        border-color: rgba(72, 213, 151, .72) !important;
+        box-shadow: inset 0 0 0 1px rgba(72, 213, 151, .16) !important;
+    }
+
+    .vm-page .vm-mobile-list-table tr.vm-mobile-state-stopped,
+    .vm-page .vm-mobile-list-table tr[data-mobile-state="stopped"],
+    .vm-page .vm-mobile-list-table tr:has(.badge-stopped) {
+        border-color: rgba(255, 93, 115, .72) !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 93, 115, .16) !important;
+    }
+
+    .vm-page .vm-mobile-list-table tr.vm-mobile-state-paused,
+    .vm-page .vm-mobile-list-table tr[data-mobile-state="paused"],
+    .vm-page .vm-mobile-list-table tr:has(.badge-paused) {
+        border-color: rgba(249, 168, 37, .76) !important;
+        box-shadow: inset 0 0 0 1px rgba(249, 168, 37, .18) !important;
+    }
+
+    .vm-page .vm-mobile-list-table tr.selected-row,
+    .vm-page .vm-mobile-list-table tr.keyboard-selected-row {
+        background: linear-gradient(90deg, rgba(139, 92, 246, .35), rgba(15, 24, 36, .98)) !important;
+    }
+
+    .vm-page .vm-mobile-list-table tr.selected-row td,
+    .vm-page .vm-mobile-list-table tr.keyboard-selected-row td {
+        color: inherit !important;
+        background: transparent !important;
+    }
+}
+
+@media (max-width: 420px) {
+    .vm-page .vm-summary-actions {
+        gap: 6px !important;
+    }
+
+    .vm-page .summary-card {
+        padding: 7px 8px !important;
+    }
+
+    .vm-page .summary-label {
+        font-size: 8px !important;
+    }
+
+    .vm-page .summary-value {
+        font-size: 15px !important;
+    }
+
+    .vm-page .vm-mobile-list-table tr {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        padding: 8px !important;
+    }
+
+    .vm-page .vm-main-table td:nth-child(4) {
+        max-width: none !important;
+    }
+
+    .vm-page .vm-main-table .actions-cell {
+        grid-template-columns: repeat(auto-fit, minmax(30px, 1fr)) !important;
+        max-width: none !important;
+    }
+}

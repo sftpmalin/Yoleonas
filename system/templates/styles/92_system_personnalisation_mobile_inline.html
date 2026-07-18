@@ -1,0 +1,239 @@
+/* Personnalisation > Mobile : affichage lecture + édition inline façon Accueil */
+.pers-mobile-status {
+    position: fixed;
+    top: 126px;
+    left: min(24vw, 360px);
+    z-index: 5000;
+    display: none !important;
+    margin: 0;
+    max-width: min(720px, calc(100vw - 48px));
+    min-height: 0;
+    pointer-events: none;
+}
+.pers-mobile-status.is-visible {
+    display: block !important;
+}
+.pers-mobile-card {
+    gap: 14px;
+}
+.pers-mobile-head h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pers-mobile-view {
+    display: grid;
+    gap: 16px;
+}
+.pers-mobile-icon-block {
+    display: grid;
+    grid-template-columns: 62px minmax(0, max-content);
+    align-items: center;
+    gap: 14px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(64, 142, 203, .22);
+    border-radius: 16px;
+    background: rgba(5, 14, 26, .30);
+}
+.pers-mobile-icon-preview {
+    width: 58px;
+    height: 58px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 210, 255, .35);
+    background: rgba(0, 120, 255, .10);
+    font-size: 28px;
+    line-height: 1;
+}
+.pers-mobile-icon-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.pers-mobile-app-name {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 900;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.pers-mobile-app-desc {
+    margin-top: 3px;
+    color: #b9c9d9;
+    font-size: 12px;
+    line-height: 1.25;
+    max-width: 32ch;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pers-mobile-values {
+    display: grid;
+    gap: 10px;
+    align-items: start;
+}
+.pers-mobile-main-row,
+.pers-mobile-tech-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+}
+.pers-mobile-value {
+    flex: 0 1 auto;
+    min-width: 0;
+    width: fit-content;
+    max-width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(120, 170, 220, .20);
+    border-radius: 14px;
+    background: rgba(5, 12, 24, .38);
+    transition: border-color .15s ease, background .15s ease;
+}
+.pers-mobile-name-short { max-width: 18ch; }
+.pers-mobile-name-full { max-width: 24ch; }
+.pers-mobile-description { max-width: 34ch; }
+.pers-mobile-icon-value { max-width: 36ch; }
+.pers-mobile-display-mode { max-width: 18ch; }
+.pers-mobile-color-box { max-width: 15ch; }
+.pers-mobile-label {
+    display: block;
+    margin-bottom: 5px;
+    color: #9dc6df;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.pers-mobile-value strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 100%;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 850;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pers-mobile-description strong,
+.pers-mobile-icon-value strong {
+    max-width: 31ch;
+}
+.pers-mobile-swatch {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    flex: 0 0 14px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.35);
+    box-shadow: 0 0 0 2px rgba(0,0,0,.22) inset;
+}
+.pers-mobile-edit-input,
+.pers-mobile-color-edit,
+.pers-mobile-icon-edit {
+    display: none;
+}
+#mobileAppCard.is-editing .pers-mobile-inline-box > strong {
+    display: none;
+}
+#mobileAppCard.is-editing .pers-mobile-inline-box > .pers-mobile-edit-input,
+#mobileAppCard.is-editing .pers-mobile-color-edit,
+#mobileAppCard.is-editing .pers-mobile-icon-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+}
+#mobileAppCard.is-editing .pers-mobile-value {
+    border-color: rgba(0, 210, 255, .34);
+    background: rgba(0, 30, 48, .28);
+}
+.pers-mobile-edit-input.input {
+    min-width: 7ch;
+    max-width: min(56vw, 34ch);
+    width: auto;
+}
+.pers-mobile-name-short .pers-mobile-edit-input.input { max-width: 18ch; }
+.pers-mobile-name-full .pers-mobile-edit-input.input { max-width: 24ch; }
+.pers-mobile-description .pers-mobile-edit-input.input { max-width: 34ch; }
+.pers-mobile-select.input {
+    width: auto;
+    min-width: 13ch;
+    max-width: 17ch;
+}
+.pers-mobile-color-text.input {
+    width: 9ch !important;
+    max-width: 9ch;
+    text-transform: uppercase;
+}
+.pers-mobile-color-edit input[type="color"] {
+    width: 34px;
+    height: 30px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid rgba(120, 170, 220, .30);
+    background: transparent;
+}
+.pers-mobile-icon-edit {
+    max-width: 100%;
+}
+.pers-mobile-icon-input.input {
+    max-width: min(44vw, 34ch);
+}
+.pers-mobile-mini-preview {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+}
+@media (max-width: 900px) {
+    .pers-mobile-status {
+        left: 12px;
+        right: 12px;
+        max-width: none;
+        top: 112px;
+    }
+    .pers-mobile-main-row {
+        width: 100%;
+    }
+    .pers-mobile-value,
+    .pers-mobile-name-short,
+    .pers-mobile-name-full,
+    .pers-mobile-description,
+    .pers-mobile-icon-value,
+    .pers-mobile-display-mode,
+    .pers-mobile-color-box {
+        max-width: 100%;
+    }
+}
+@media (max-width: 560px) {
+    .pers-mobile-icon-block {
+        width: 100%;
+        grid-template-columns: 50px minmax(0, 1fr);
+    }
+    .pers-mobile-icon-preview {
+        width: 50px;
+        height: 50px;
+    }
+    .pers-mobile-main-row {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+    .pers-mobile-value {
+        width: 100%;
+    }
+    .pers-mobile-edit-input.input,
+    .pers-mobile-icon-input.input {
+        max-width: 100%;
+    }
+}

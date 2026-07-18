@@ -1,0 +1,30 @@
+<section class="card partage-samba-global-simple-card-v6">
+                    <div class="topbar">
+                        <div class="title-block">
+                            <h1>Réglages globaux Samba</h1>
+                        </div>
+                    </div>
+                    <div id="sambaGlobalForm" class="form-grid partage-samba-global-simple-v6" data-samba-simplified="1">
+                        <div class="field">
+                            <label>Workgroup</label>
+                            <input class="text-input" data-global="workgroup" value="{{ sg.workgroup or 'WORKGROUP' }}">
+                        </div>
+                        <div class="field">
+                            <label>Nom de votre Samba</label>
+                            <input class="text-input" data-global="netbios_name" data-samba-merged-name="1" value="{{ sg.netbios_name or sg.wsdd_name or 'Samba' }}">
+                        </div>
+                        <input type="hidden" data-global="server_string" value="Samba Partage">
+                        <input type="hidden" data-global="wsdd_name" value="{{ sg.netbios_name or sg.wsdd_name or 'Samba' }}">
+                        <input type="hidden" data-global="interface" value="{{ sg.interface }}">
+                        <input type="hidden" data-global="max_log_size" value="{{ sg.max_log_size }}">
+                        <input type="hidden" data-global="min_protocol" value="SMB2">
+                        <input type="hidden" data-global="enable_wsdd" value="yes">
+                        <input type="hidden" data-global="create_missing_dirs" value="yes">
+                        <div class="field partage-samba-global-ok-field-v6">
+                            <label>&nbsp;</label>
+                            <button type="button"
+                                    class="yoleo-btn yoleo-btn-mini yoleo-btn-primary partage-samba-global-ok-v4 partage-samba-global-ok-v6"
+                                    onclick="sambaApplyGlobalFormNow(this)">OK</button>
+                        </div>
+                    </div>
+                </section>

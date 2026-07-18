@@ -1,0 +1,329 @@
+{% extends "menu.html" %}
+
+{% set section = terminal_section|default('terminal') %}
+
+{% block title %}Terminal - Yoleo{% endblock %}
+
+{% block page_title %}
+{% if section == 'config' %}Terminal · Paramètres{% elif section == 'logs' %}Terminal · Logs{% else %}Terminal{% endif %}
+{% endblock %}
+
+{% block page_subtitle %}
+{% if section == 'config' %}Configuration ttyd · état · chemins · fichier conf{% elif section == 'logs' %}Journal ttyd · {{ status.log_file }}{% else %}Shell web ttyd{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="terminal-page {% if section == 'terminal' %}terminal-page-full{% endif %}">
+    {% if section == 'terminal' %}
+    <section class="terminal-card terminal-card-full">
+        <div class="terminal-card-head terminal-card-head-compact">
+            <div>
+                <p><span id="terminalStatusBadge" class="terminal-badge {{ 'is-ok' if status.running else 'is-ko' }}">{{ 'démarré' if status.running else 'arrêté' }}</span> <span class="terminal-muted">{{ status.public_url }}</span></p>
+            </div>
+        </div>
+        <div class="terminal-frame-wrap">
+            <iframe id="terminalFrame" class="terminal-frame" src="{{ status.public_url }}" title="Terminal ttyd"></iframe>
+        </div>
+    </section>
+    {% elif section == 'config' %}
+    <section class="terminal-card">
+        <div class="terminal-table-wrap terminal-status-wrap">
+            <table class="terminal-table terminal-status-table">
+                <tbody>
+                    <tr>
+                        <th>État</th><td id="terminalStatusText">{{ 'démarré' if status.running else 'arrêté' }}</td>
+                        <th>PID</th><td id="terminalStatusPid">{{ status.pid or '—' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Port</th><td id="terminalStatusPort">{{ status.port }}</td>
+                        <th>Écoute</th><td>{{ status.listen }}</td>
+                    </tr>
+                    <tr>
+                        <th>URL iframe</th><td colspan="3">{{ status.public_url }}</td>
+                    </tr>
+                    <tr>
+                        <th>Dossier</th><td id="terminalStatusStartDir">{{ status.start_dir }}</td>
+                        <th>Shell</th><td>{{ status.shell }}</td>
+                    </tr>
+                    <tr>
+                        <th>Binaire</th><td colspan="3">{{ status.binary }} · trouvé : {{ 'oui' if status.binary_ok else 'non' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Log</th><td colspan="3">{{ status.log_file }}</td>
+                    </tr>
+                    <tr>
+                        <th>Déconnexion inactive</th><td id="terminalStatusIdle">{{ status.disconnection_minutes }} min</td>
+                        <th>Conf</th><td>{{ status.config_file }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        {% if not status.binary_ok %}
+        <div class="terminal-notice terminal-notice-warning">⚠️ Binaire ttyd introuvable. Copie <b>ttyd.x86_64</b> et <b>ttyd.aarch64</b> dans <span class="terminal-code">../bin</span>. Chemin attendu : <span class="terminal-code">{{ conf.TERMINAL_BIN_DIR_RESOLVED }}</span></div>
+        {% endif %}
+
+        <form id="terminalConfigForm" class="terminal-form terminal-form-compact">
+            <section class="terminal-form-section">
+                <div class="terminal-section-head"><h3>Général</h3></div>
+                <div class="terminal-table-wrap">
+                    <table class="terminal-table terminal-config-table">
+                        <tbody>
+                            <tr><th>Titre</th><td><input name="TERMINAL_TITLE" value="{{ conf.TERMINAL_TITLE }}"></td><td>Nom affiché dans la page Terminal.</td></tr>
+                            <tr><th>Port ttyd</th><td><input inputmode="numeric" name="TERMINAL_PORT" value="{{ conf.TERMINAL_PORT }}"></td><td>Port du terminal web.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="terminal-form-section">
+                <div class="terminal-section-head"><h3>Shell</h3></div>
+                <div class="terminal-table-wrap">
+                    <table class="terminal-table terminal-config-table">
+                        <tbody>
+                            <tr><th>Dossier de démarrage</th><td><input name="TERMINAL_START_DIR" value="{{ conf.TERMINAL_START_DIR }}"></td><td>Exemples : /root, /dockers, /mnt/user.</td></tr>
+                            <tr><th>Shell</th><td><input name="TERMINAL_SHELL" value="{{ conf.TERMINAL_SHELL }}"></td><td>Exemple : /bin/bash.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="terminal-form-section">
+                <div class="terminal-section-head"><h3>Accès</h3></div>
+                <div class="terminal-table-wrap">
+                    <table class="terminal-table terminal-config-table">
+                        <tbody>
+                            <tr><th>Mot de passe ttyd</th><td><select name="TERMINAL_LOGIN_REQUIRED"><option value="0" {{ 'selected' if conf.TERMINAL_LOGIN_REQUIRED != '1' else '' }}>Non</option><option value="1" {{ 'selected' if conf.TERMINAL_LOGIN_REQUIRED == '1' else '' }}>Oui</option></select></td><td>À laisser non si Flask protège déjà l’interface.</td></tr>
+                            <tr><th>Utilisateur ttyd</th><td><input name="TERMINAL_LOGIN_USER" value="{{ conf.TERMINAL_LOGIN_USER }}"></td><td>Compte demandé par ttyd si le mot de passe est activé.</td></tr>
+                            <tr><th>Mot de passe</th><td><input name="TERMINAL_LOGIN_PASSWORD" value="{{ conf.TERMINAL_LOGIN_PASSWORD }}"></td><td>Mot de passe ttyd.</td></tr>
+                            <tr><th>Terminal écrivable</th><td><select name="TERMINAL_WRITABLE"><option value="1" {{ 'selected' if conf.TERMINAL_WRITABLE != '0' else '' }}>Oui</option><option value="0" {{ 'selected' if conf.TERMINAL_WRITABLE == '0' else '' }}>Non</option></select></td><td>Désactive la saisie si non.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="terminal-form-section">
+                <div class="terminal-section-head"><h3>Comportement</h3></div>
+                <div class="terminal-table-wrap">
+                    <table class="terminal-table terminal-config-table">
+                        <tbody>
+                            <tr><th>Autostart page</th><td><select name="TERMINAL_AUTOSTART_ON_PAGE"><option value="1" {{ 'selected' if conf.TERMINAL_AUTOSTART_ON_PAGE != '0' else '' }}>Oui</option><option value="0" {{ 'selected' if conf.TERMINAL_AUTOSTART_ON_PAGE == '0' else '' }}>Non</option></select></td><td>Démarre ttyd à l’ouverture de la page terminal.</td></tr>
+                            <tr><th>Reconnect</th><td><select name="TERMINAL_RECONNECT"><option value="1" {{ 'selected' if conf.TERMINAL_RECONNECT != '0' else '' }}>Oui</option><option value="0" {{ 'selected' if conf.TERMINAL_RECONNECT == '0' else '' }}>Non</option></select></td><td>Reconnexion automatique ttyd.</td></tr>
+                            <tr><th>Confirmation navigateur</th><td><select name="TERMINAL_DISABLE_LEAVE_ALERT"><option value="1" {{ 'selected' if conf.TERMINAL_DISABLE_LEAVE_ALERT != '0' else '' }}>Supprimée</option><option value="0" {{ 'selected' if conf.TERMINAL_DISABLE_LEAVE_ALERT == '0' else '' }}>Conservée</option></select></td><td>Option ttyd disableLeaveAlert.</td></tr>
+                            <tr><th>Déconnexion inactive</th><td><input inputmode="numeric" name="TERMINAL_DISCONNECTION_MINUTES" value="{{ conf.TERMINAL_DISCONNECTION_MINUTES }}"></td><td>Minutes. 0 = désactivé.</td></tr>
+                            <tr><th>Clients max</th><td><input inputmode="numeric" name="TERMINAL_MAX_CLIENTS" value="{{ conf.TERMINAL_MAX_CLIENTS }}"></td><td>Nombre de clients ttyd.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="terminal-form-section">
+                <div class="terminal-section-head"><h3>Couleurs</h3></div>
+                <div class="terminal-table-wrap">
+                    <table class="terminal-table terminal-config-table">
+                        <tbody>
+                            <tr><th>Fond</th><td><div class="terminal-color-row"><input type="color" value="{{ conf.TERMINAL_THEME_BACKGROUND }}" data-terminal-color-picker><input name="TERMINAL_THEME_BACKGROUND" value="{{ conf.TERMINAL_THEME_BACKGROUND }}" data-terminal-color-text></div></td><td>Couleur de fond.</td></tr>
+                            <tr><th>Texte</th><td><div class="terminal-color-row"><input type="color" value="{{ conf.TERMINAL_THEME_FOREGROUND }}" data-terminal-color-picker><input name="TERMINAL_THEME_FOREGROUND" value="{{ conf.TERMINAL_THEME_FOREGROUND }}" data-terminal-color-text></div></td><td>Couleur du texte.</td></tr>
+                            <tr><th>Curseur</th><td><div class="terminal-color-row"><input type="color" value="{{ conf.TERMINAL_THEME_CURSOR }}" data-terminal-color-picker><input name="TERMINAL_THEME_CURSOR" value="{{ conf.TERMINAL_THEME_CURSOR }}" data-terminal-color-text></div></td><td>Couleur du curseur.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </form>
+    </section>
+    {% elif section == 'logs' %}
+    <section class="terminal-card terminal-card-log">
+        <div class="terminal-card-head terminal-card-head-compact">
+            <div>
+                <h2>Logs ttyd</h2>
+                <p>Fichier : <span class="terminal-code">{{ status.log_file }}</span></p>
+            </div>
+            <div class="terminal-actions"><button type="button" class="yoleo-btn" data-terminal-load-log>⟳ Rafraîchir</button></div>
+        </div>
+        <pre id="terminalLog" class="terminal-log">Chargement…</pre>
+    </section>
+    {% endif %}
+</div>
+
+<div class="modal-overlay" id="terminalModal" hidden>
+    <div class="modal-box terminal-modal-box">
+        <div class="modal-header">
+            <span id="terminalModalTitle">Terminal</span>
+            <button type="button" class="modal-close" data-terminal-close-modal>✕</button>
+        </div>
+        <div class="modal-body"><pre id="terminalModalLog" class="terminal-modal-log"></pre></div>
+        <div class="modal-footer"><button type="button" class="yoleo-btn" data-terminal-close-modal>Fermer</button></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const modal = document.getElementById('terminalModal');
+    const modalTitle = document.getElementById('terminalModalTitle');
+    const modalLog = document.getElementById('terminalModalLog');
+
+    function showTerminalModal(title, text) {
+        if (!modal || !modalTitle || !modalLog) return;
+        modalTitle.textContent = title || 'Terminal';
+        modalLog.textContent = text || '';
+        modal.hidden = false;
+    }
+
+    function closeTerminalModal() {
+        if (modal) modal.hidden = true;
+    }
+
+    function updateTerminalStatus(st) {
+        if (!st) return;
+        const runningText = st.running ? 'démarré' : 'arrêté';
+        const badge = document.getElementById('terminalStatusBadge');
+        if (badge) {
+            badge.textContent = runningText;
+            badge.className = 'terminal-badge ' + (st.running ? 'is-ok' : 'is-ko');
+        }
+        const text = document.getElementById('terminalStatusText');
+        if (text) text.textContent = runningText;
+        const pid = document.getElementById('terminalStatusPid');
+        if (pid) pid.textContent = st.pid || '—';
+        const port = document.getElementById('terminalStatusPort');
+        if (port) port.textContent = st.port || '';
+        const startDir = document.getElementById('terminalStatusStartDir');
+        if (startDir) startDir.textContent = st.start_dir || '';
+        const idle = document.getElementById('terminalStatusIdle');
+        if (idle) {
+            const minutes = st.disconnection_minutes || 0;
+            if (!minutes) idle.textContent = 'désactivé';
+            else if (st.running && st.idle_remaining_seconds !== undefined) {
+                idle.textContent = Math.max(0, Math.ceil(st.idle_remaining_seconds / 60)) + ' min restantes';
+            } else {
+                idle.textContent = minutes + ' min';
+            }
+        }
+    }
+
+    async function terminalAction(action) {
+        try {
+            const res = await fetch('/terminal/api/' + action, {method: 'POST'});
+            const data = await res.json();
+            updateTerminalStatus(data.status);
+            showTerminalModal(data.ok ? 'OK' : 'Erreur', data.message || '');
+            if (data.ok && (action === 'start' || action === 'restart')) {
+                setTimeout(reloadTerminalFrame, 450);
+            }
+        } catch (err) {
+            showTerminalModal('Erreur', String(err));
+        }
+    }
+
+    function reloadTerminalFrame() {
+        const frame = document.getElementById('terminalFrame');
+        if (!frame) return;
+        const src = frame.getAttribute('src') || frame.src;
+        frame.setAttribute('src', 'about:blank');
+        setTimeout(() => frame.setAttribute('src', src), 120);
+    }
+
+    async function saveTerminalConfig(restart) {
+        const form = document.getElementById('terminalConfigForm');
+        if (!form) return;
+        const payload = {};
+        new FormData(form).forEach((value, key) => { payload[key] = value; });
+        try {
+            const res = await fetch('/terminal/api/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            updateTerminalStatus(data.status);
+            if (restart) {
+                const restartRes = await fetch('/terminal/api/restart', {method: 'POST'});
+                const restartData = await restartRes.json();
+                updateTerminalStatus(restartData.status);
+                showTerminalModal(restartData.ok ? 'Configuration sauvegardée + redémarrage' : 'Erreur', (data.message || '') + '\n' + (restartData.message || ''));
+                if (restartData.ok) setTimeout(() => location.reload(), 700);
+            } else {
+                showTerminalModal(data.ok ? 'Configuration sauvegardée' : 'Erreur', data.message || '');
+            }
+        } catch (err) {
+            showTerminalModal('Erreur', String(err));
+        }
+    }
+
+    async function loadTerminalLog() {
+        const pre = document.getElementById('terminalLog');
+        if (!pre) return;
+        pre.textContent = 'Chargement…';
+        try {
+            const res = await fetch('/terminal/api/log');
+            const data = await res.json();
+            pre.textContent = data.log || '';
+            pre.scrollTop = pre.scrollHeight;
+        } catch (err) {
+            pre.textContent = 'Erreur : ' + err;
+        }
+    }
+
+    async function sendTerminalPresence() {
+        // Le terminal doit rester vivant même si l'onglet n'est pas au premier plan.
+        // Avant, on ne pingait que document.visibilityState === 'visible', donc
+        // l'auto-stop pouvait tuer ttyd pendant qu'on consultait un autre onglet.
+        try { await fetch('/terminal/api/presence', {method: 'POST', keepalive: true}); } catch (err) {}
+    }
+
+    function sendTerminalPresenceBeacon() {
+        try {
+            const data = new Blob(['1'], {type: 'text/plain'});
+            navigator.sendBeacon('/terminal/api/presence', data);
+        } catch (err) {}
+    }
+
+    function detachTerminalFrame() {
+        const frame = document.getElementById('terminalFrame');
+        if (frame) frame.setAttribute('src', 'about:blank');
+    }
+
+    document.querySelectorAll('[data-terminal-action]').forEach(button => {
+        button.addEventListener('click', () => terminalAction(button.dataset.terminalAction));
+    });
+    document.querySelectorAll('[data-terminal-close-modal]').forEach(button => button.addEventListener('click', closeTerminalModal));
+    document.querySelectorAll('[data-terminal-reload-frame]').forEach(button => button.addEventListener('click', reloadTerminalFrame));
+    document.querySelectorAll('[data-terminal-load-log]').forEach(button => button.addEventListener('click', loadTerminalLog));
+    window.terminalAction = terminalAction;
+    window.reloadTerminalFrame = reloadTerminalFrame;
+    window.terminalSaveConfig = saveTerminalConfig;
+    document.querySelectorAll('[data-terminal-save]').forEach(button => button.addEventListener('click', () => saveTerminalConfig(false)));
+    document.querySelectorAll('[data-terminal-save-restart]').forEach(button => button.addEventListener('click', () => saveTerminalConfig(true)));
+
+    document.querySelectorAll('.terminal-color-row').forEach(row => {
+        const picker = row.querySelector('[data-terminal-color-picker]');
+        const text = row.querySelector('[data-terminal-color-text]');
+        if (!picker || !text) return;
+        picker.addEventListener('input', () => { text.value = picker.value; });
+        text.addEventListener('input', () => { picker.value = text.value; });
+    });
+
+    if (document.getElementById('terminalLog')) loadTerminalLog();
+    if (document.getElementById('terminalFrame')) {
+        sendTerminalPresence();
+        setInterval(sendTerminalPresence, 30000);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') sendTerminalPresence();
+        });
+        window.addEventListener('pagehide', () => {
+            sendTerminalPresenceBeacon();
+            detachTerminalFrame();
+        });
+    }
+    if (document.querySelector('.terminal-page')) {
+        setInterval(async () => {
+            try {
+                const res = await fetch('/terminal/api/status');
+                const data = await res.json();
+                updateTerminalStatus(data.status);
+            } catch (err) {}
+        }, 5000);
+    }
+})();
+</script>
+{% endblock %}

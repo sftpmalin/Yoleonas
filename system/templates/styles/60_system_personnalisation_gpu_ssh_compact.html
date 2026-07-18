@@ -1,0 +1,132 @@
+
+    /* Système > Personnalisation > Accueil : bloc GPU SSH compact sur une ligne. */
+    .pers-home-ssh-group {
+        display: grid;
+        grid-template-columns: 285px minmax(0, 1fr);
+        column-gap: 12px;
+        row-gap: 8px;
+        align-items: start;
+    }
+
+    .pers-home-ssh-group .home-group-head {
+        grid-column: 1 / -1;
+    }
+
+    .pers-home-ssh-toggle-row {
+        grid-column: 1;
+        grid-row: 2 / span 2;
+        max-width: none;
+        margin: 0;
+    }
+
+    .pers-home-ssh-toggle-row .home-toggle {
+        min-height: 54px;
+        padding: 8px 42px 8px 9px;
+        grid-template-columns: 32px minmax(0, 1fr);
+        gap: 9px;
+    }
+
+    .pers-home-ssh-toggle-row .home-toggle-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        font-size: 16px;
+    }
+
+    .pers-home-ssh-toggle-row .home-toggle input {
+        width: 1px !important;
+        min-width: 1px;
+        height: 1px !important;
+        min-height: 1px;
+    }
+
+    .pers-home-ssh-toggle-row .home-toggle-title {
+        font-size: 11.5px;
+        line-height: 1.15;
+    }
+
+    .pers-home-ssh-toggle-row .home-toggle-desc {
+        margin-top: 2px;
+        font-size: 10.5px;
+        line-height: 1.18;
+    }
+
+    .pers-home-ssh-note {
+        grid-column: 2;
+        grid-row: 2;
+        margin: 0;
+        padding: 5px 8px;
+        border-radius: 9px;
+        font-size: 10.5px;
+        line-height: 1.2;
+        font-weight: 700;
+    }
+
+    .pers-home-ssh-grid {
+        grid-column: 2;
+        grid-row: 3;
+        display: grid;
+        grid-template-columns: minmax(110px, .75fr) 78px minmax(130px, .9fr) minmax(190px, 1.15fr);
+        gap: 8px;
+        align-items: end;
+    }
+
+    .pers-home-ssh-grid .field-box {
+        padding: 7px 8px;
+        border-radius: 10px;
+    }
+
+    .pers-home-ssh-grid .field-label {
+        font-size: 9px;
+        line-height: 1.1;
+        margin-bottom: 5px;
+        letter-spacing: .035em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .pers-home-ssh-grid .input {
+        min-height: 31px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        font-size: 12px;
+    }
+
+    .pers-home-ssh-key-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 30px;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .pers-home-ssh-key-row .yoleo-btn {
+        width: 30px;
+        min-width: 30px;
+        min-height: 30px;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    @media (max-width: 1180px) {
+        .pers-home-ssh-group {
+            grid-template-columns: 1fr;
+        }
+
+        .pers-home-ssh-toggle-row,
+        .pers-home-ssh-note,
+        .pers-home-ssh-grid {
+            grid-column: 1;
+            grid-row: auto;
+        }
+
+        .pers-home-ssh-grid {
+            grid-template-columns: repeat(2, minmax(160px, 1fr));
+        }
+    }
+
+    @media (max-width: 760px) {
+        .pers-home-ssh-grid {
+            grid-template-columns: 1fr;
+        }
+    }

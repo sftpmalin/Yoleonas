@@ -1,0 +1,1335 @@
+<div class="modal-backdrop" id="docker-action-confirm-modal">
+        <div class="modal">
+            <div class="modal-head">
+                <div><div class="modal-title">Confirmation Docker</div><div class="hint" id="docker-action-confirm-subtitle">Action conteneur</div></div>
+                <button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="dockerCloseActionModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-danger-text" id="docker-action-confirm-text"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="yoleo-btn yoleo-btn-muted" type="button" data-docker-modal-button onclick="dockerCloseActionModal()">Annuler</button>
+                <button class="yoleo-btn yoleo-btn-red" type="button" data-docker-modal-button id="docker-action-confirm-yes">Confirmer</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="docker-action-result-modal">
+        <div class="modal">
+            <div class="modal-head">
+                <div><div class="modal-title" id="docker-action-result-title">Action Docker</div><div class="hint">Retour serveur</div></div>
+                <button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="dockerCloseResultModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <pre class="docker-log-box" id="docker-action-result-text"></pre>
+            </div>
+            <div class="modal-actions">
+                <button class="yoleo-btn yoleo-btn-primary" type="button" data-docker-modal-button onclick="dockerCloseResultModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+    <div class="docker-ttyd-modal" id="dockerTtydModal" hidden aria-hidden="true">
+        <div class="docker-ttyd-modal-backdrop" onclick="dockerCloseTtydModal()"></div>
+        <section class="docker-ttyd-modal-box" role="dialog" aria-modal="true" aria-labelledby="dockerTtydModalTitle">
+            <header class="docker-ttyd-modal-header">
+                <strong id="dockerTtydModalTitle">Terminal Docker</strong>
+                <button type="button" class="docker-ttyd-modal-close" onclick="dockerCloseTtydModal()" aria-label="Fermer">×</button>
+            </header>
+            <iframe class="docker-ttyd-modal-frame" id="dockerTtydFrame" title="Terminal Docker ttyd"></iframe>
+        </section>
+    </div>
+
+
+<script>
+(function () {
+    'use strict';
+
+    const dockerActionMessages = {
+        start: 'Démarrage du conteneur...',
+        stop: 'Arrêt du conteneur...',
+        restart: 'Redémarrage du conteneur...',
+        rm: 'Suppression du conteneur...',
+        rmi: 'Suppression du conteneur et de son image...',
+        start_all: 'Démarrage de tous les conteneurs...',
+        stop_all: 'Arrêt de tous les conteneurs...',
+        start_docker_service: 'Démarrage du service Docker...',
+        restart_docker_service: 'Redémarrage du service Docker...',
+        stop_docker_service: 'Arrêt du service Docker...'
+    };
+
+    const dockerQuietActions = new Set(['start_all', 'stop_all', 'start_docker_service', 'restart_docker_service', 'stop_docker_service']);
+    const dockerDangerActions = new Set(['rm', 'rmi']);
+    let dockerPendingAction = null;
+    let dockerPendingLanForm = null;
+    let dockerKeyboardRow = 0;
+    let dockerKeyboardAction = 0;
+    let dockerModalButton = 0;
+    let dockerStatusTimer = null;
+
+    function dockerStatusBox() {
+        let box = document.getElementById('docker-action-status');
+        const page = document.querySelector('.docker-page');
+        if (!box && page) {
+            box = document.createElement('div');
+            box.id = 'docker-action-status';
+            box.className = 'action-message docker-floating-message';
+            box.textContent = 'Prêt.';
+            box.hidden = true;
+            page.appendChild(box);
+        }
+        return box;
+    }
+
+    function dockerSetStatus(message, ok = null) {
+        const box = dockerStatusBox();
+        if (!box) return;
+        if (dockerStatusTimer) {
+            clearTimeout(dockerStatusTimer);
+            dockerStatusTimer = null;
+        }
+        box.hidden = false;
+        box.textContent = message || 'Prêt.';
+        box.classList.remove('docker-flash-hiding');
+        box.classList.toggle('ok', ok === true);
+        box.classList.toggle('bad', ok === false);
+        if (ok === true) {
+            dockerStatusTimer = setTimeout(() => {
+                box.classList.add('docker-flash-hiding');
+                setTimeout(() => { box.hidden = true; }, 220);
+            }, 750);
+        }
+    }
+
+    function dockerSetComposeStatus(message, ok = null) {
+        const boxes = Array.from(document.querySelectorAll('[data-docker-compose-status]'));
+        if (!boxes.length) {
+            dockerSetStatus(message, ok);
+            return;
+        }
+        boxes.forEach(box => {
+            box.hidden = !message;
+            box.textContent = message || '';
+            box.classList.toggle('ok', ok === true);
+            box.classList.toggle('bad', ok === false);
+        });
+    }
+
+    function dockerSetButtonRunning(button, running) {
+        if (!button) return;
+        if (running) {
+            if (!button.dataset.originalHtml) button.dataset.originalHtml = button.innerHTML;
+            const label = (button.textContent || '').trim();
+            const isIcon = button.classList.contains('yoleo-btn-icon');
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            button.classList.add('is-running');
+            button.innerHTML = '<span class="yoleo-btn-spinner" aria-hidden="true"></span>' + (isIcon ? '' : '<span class="yoleo-btn-running-label">' + label + '</span>');
+            return;
+        }
+        if (button.dataset.originalHtml) {
+            button.innerHTML = button.dataset.originalHtml;
+            delete button.dataset.originalHtml;
+        }
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        button.classList.remove('is-running');
+    }
+
+    function dockerActionLabel(action, form) {
+        const name = form.querySelector('[name="docker_name"]')?.value || '';
+        if (action === 'rm') return 'Supprimer le conteneur ' + name + ' ?';
+        if (action === 'rmi') return 'Supprimer le conteneur ' + name + ' et son image ?';
+        if (action === 'stop_all') return 'Arrêter tous les conteneurs Docker ?';
+        if (action === 'stop_docker_service') return 'Arrêter le service Docker ?';
+        return 'Confirmer cette action Docker ?';
+    }
+
+    function dockerActionUrl(form) {
+        return form.getAttribute('action') || '/docker/action';
+    }
+
+    function dockerTtydModalElements() {
+        return {
+            modal: document.getElementById('dockerTtydModal'),
+            frame: document.getElementById('dockerTtydFrame'),
+            title: document.getElementById('dockerTtydModalTitle')
+        };
+    }
+
+    window.dockerCloseTtydModal = function () {
+        const {modal, frame} = dockerTtydModalElements();
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('docker-ttyd-modal-open');
+        if (frame) frame.src = 'about:blank';
+    };
+
+    window.dockerOpenContainerTtyd = async function (kind, containerName) {
+        if (!containerName) return;
+        dockerSetStatus((kind === 'exec' ? 'Ouverture du terminal Docker...' : 'Ouverture des logs Docker...'));
+        try {
+            const url = new URL('/docker/containers/ttyd', window.location.origin);
+            url.searchParams.set('kind', kind || 'logs');
+            url.searchParams.set('container', containerName);
+            const response = await fetch(url.toString(), {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            const data = await response.json().catch(() => ({ok: false, message: 'Réponse serveur illisible.'}));
+            if (!response.ok || !data.ok || !data.url) throw new Error(data.message || 'Impossible d’ouvrir ttyd Docker.');
+
+            const {modal, frame, title} = dockerTtydModalElements();
+            if (!modal || !frame) {
+                window.open(data.url, 'yoleo_docker_ttyd_' + String(kind || 'logs'), 'width=1200,height=760,resizable=yes,scrollbars=yes');
+                return;
+            }
+            if (title) title.textContent = data.title || 'Terminal Docker';
+            frame.src = data.url;
+            modal.hidden = false;
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('docker-ttyd-modal-open');
+            dockerSetStatus(data.reused ? 'Terminal Docker déjà ouvert.' : 'Terminal Docker ouvert.', true);
+        } catch (error) {
+            dockerSetStatus(error.message || String(error), false);
+        }
+    };
+
+    function dockerModalButtons() {
+        const active = document.querySelector('#docker-action-confirm-modal.active, #docker-action-result-modal.active');
+        if (!active) return [];
+        return Array.from(active.querySelectorAll('[data-docker-modal-button], button')).filter(button => {
+            if (button.disabled) return false;
+            const style = window.getComputedStyle(button);
+            return style.display !== 'none' && style.visibility !== 'hidden';
+        });
+    }
+
+    function dockerPaintModalButton(index = dockerModalButton) {
+        document.querySelectorAll('.modal-button-selected').forEach(el => el.classList.remove('modal-button-selected'));
+        const buttons = dockerModalButtons();
+        if (!buttons.length) return null;
+        dockerModalButton = Math.max(0, Math.min(index, buttons.length - 1));
+        const button = buttons[dockerModalButton];
+        button.classList.add('modal-button-selected');
+        try { button.focus({preventScroll: true}); }
+        catch (error) { button.focus(); }
+        return button;
+    }
+
+    function dockerOpenActionModal(form, action, submitter) {
+        dockerPendingAction = {form, action, submitter};
+        document.getElementById('docker-action-confirm-subtitle').textContent = dockerActionMessages[action] || 'Action Docker';
+        document.getElementById('docker-action-confirm-text').textContent = dockerActionLabel(action, form);
+        document.getElementById('docker-action-confirm-modal')?.classList.add('active');
+        dockerModalButton = 1;
+        setTimeout(() => dockerPaintModalButton(1), 40);
+    }
+
+    window.dockerCloseActionModal = function () {
+        document.getElementById('docker-action-confirm-modal')?.classList.remove('active');
+        document.querySelectorAll('.modal-button-selected').forEach(el => el.classList.remove('modal-button-selected'));
+        dockerPendingAction = null;
+        dockerPendingLanForm = null;
+    };
+
+    function dockerOpenResultModal(title, message, ok) {
+        const modal = document.getElementById('docker-action-result-modal');
+        document.getElementById('docker-action-result-title').textContent = title || (ok ? 'Action Docker OK' : 'Erreur Docker');
+        document.getElementById('docker-action-result-text').textContent = message || '';
+        modal?.classList.toggle('docker-modal-ok', ok === true);
+        modal?.classList.toggle('docker-modal-error', ok === false);
+        modal?.classList.add('active');
+        dockerModalButton = 0;
+        setTimeout(() => dockerPaintModalButton(0), 40);
+    }
+
+    window.dockerCloseResultModal = function () {
+        document.getElementById('docker-action-result-modal')?.classList.remove('active');
+        document.querySelectorAll('.modal-button-selected').forEach(el => el.classList.remove('modal-button-selected'));
+        dockerRefreshContainers(true);
+    };
+
+    async function dockerRefreshContainers(force = false) {
+        if (!force && document.querySelector('.modal-backdrop.active')) return false;
+        const live = document.getElementById('docker-live-area');
+        if (!live) return false;
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('_', String(Date.now()));
+            const response = await fetch(url.toString(), {cache: 'no-store'});
+            const html = await response.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const fresh = doc.getElementById('docker-live-area');
+            if (!fresh) return false;
+            live.replaceWith(fresh);
+            dockerBindActionForms();
+            dockerInitKeyboard(true);
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    async function dockerSendAction(form, action, submitter) {
+        const formData = new FormData(form);
+        formData.set('action', action);
+        const quietAction = dockerQuietActions.has(action);
+        dockerSetButtonRunning(submitter, true);
+        dockerSetStatus(dockerActionMessages[action] || 'Action Docker en cours...');
+
+        try {
+            const response = await fetch(dockerActionUrl(form), {method: 'POST', body: formData, headers: {'Accept': 'application/json'}});
+            const data = await response.json().catch(() => ({status: 'error', message: 'Réponse serveur illisible.'}));
+            if (!response.ok || data.status === 'error') throw new Error(data.message || 'Action Docker impossible.');
+            dockerSetStatus(data.message || 'Action Docker terminée.', true);
+            await dockerRefreshContainers(true);
+            if (!quietAction && ['start_all', 'stop_all', 'start_docker_service', 'restart_docker_service', 'stop_docker_service'].includes(action)) {
+                dockerOpenResultModal('Action Docker', data.message || 'Action terminée.', true);
+            }
+        } catch (error) {
+            dockerSetStatus(error.message || String(error), false);
+            if (!quietAction) {
+                dockerOpenResultModal('Erreur Docker', error.message || String(error), false);
+            }
+        } finally {
+            dockerSetButtonRunning(submitter, false);
+        }
+    }
+
+    window.dockerRunDockerAction = async function (action, button) {
+        const formData = new FormData();
+        formData.set('action', action);
+        dockerSetButtonRunning(button, true);
+        dockerSetStatus(dockerActionMessages[action] || 'Action Docker en cours...');
+        try {
+            const response = await fetch('/docker/action', {
+                method: 'POST',
+                body: formData,
+                headers: {'Accept': 'application/json'}
+            });
+            const data = await response.json().catch(() => ({status: 'error', message: 'Réponse serveur illisible.'}));
+            if (!response.ok || data.status === 'error') throw new Error(data.message || 'Action Docker impossible.');
+            dockerSetStatus(data.message || 'Action Docker terminée.', true);
+            await dockerRefreshContainers(true);
+        } catch (error) {
+            dockerSetStatus(error.message || String(error), false);
+        } finally {
+            dockerSetButtonRunning(button, false);
+        }
+    };
+
+    async function dockerSubmitAction(event) {
+        const form = event.currentTarget;
+        const submitter = event.submitter || document.activeElement;
+        const action = submitter?.value || form.querySelector('[name="action"]')?.value || '';
+        if (!action) return;
+
+        event.preventDefault();
+        if (dockerDangerActions.has(action)) {
+            dockerOpenActionModal(form, action, submitter);
+            return;
+        }
+        dockerSendAction(form, action, submitter);
+    }
+
+    document.getElementById('docker-action-confirm-yes')?.addEventListener('click', function () {
+        const pending = dockerPendingAction;
+        const lanForm = dockerPendingLanForm;
+        dockerCloseActionModal();
+        if (lanForm) {
+            lanForm.submit();
+            return;
+        }
+        if (!pending) return;
+        dockerSendAction(pending.form, pending.action, pending.submitter);
+    });
+
+    function dockerBindActionForms() {
+        document.querySelectorAll('form[action$="/docker/action"], #docker-live-area form').forEach(form => {
+            if (form.dataset.dockerActionBound === '1') return;
+            form.dataset.dockerActionBound = '1';
+            form.addEventListener('submit', dockerSubmitAction);
+        });
+    }
+
+    function dockerRows() {
+        return Array.from(document.querySelectorAll('#docker-live-area .docker-container-row'));
+    }
+
+    function dockerRowButtons(row) {
+        return Array.from(row?.querySelectorAll('button[name="action"]') || []).filter(button => !button.disabled);
+    }
+
+    function dockerClearKeyboard() {
+        document.querySelectorAll('.keyboard-selected-row').forEach(row => row.classList.remove('keyboard-selected-row'));
+        document.querySelectorAll('.keyboard-action-focus').forEach(button => button.classList.remove('keyboard-action-focus'));
+    }
+
+    function dockerKeepRowVisible(row) {
+        if (!row) return;
+        const scrollX = window.scrollX || window.pageXOffset || 0;
+        row.scrollIntoView({block: 'nearest', inline: 'nearest'});
+        if ((window.scrollX || window.pageXOffset || 0) !== scrollX) {
+            window.scrollTo(scrollX, window.scrollY || window.pageYOffset || 0);
+        }
+    }
+
+    function dockerSelectRow(index, actionIndex = dockerKeyboardAction, focus = true) {
+        const rows = dockerRows();
+        if (!rows.length) return null;
+        dockerKeyboardRow = Math.max(0, Math.min(index, rows.length - 1));
+        const row = rows[dockerKeyboardRow];
+        dockerClearKeyboard();
+        row.classList.add('keyboard-selected-row');
+        const buttons = dockerRowButtons(row);
+        if (buttons.length) {
+            dockerKeyboardAction = Math.max(0, Math.min(actionIndex, buttons.length - 1));
+            buttons[dockerKeyboardAction].classList.add('keyboard-action-focus');
+            if (focus) {
+                try { buttons[dockerKeyboardAction].focus({preventScroll: true}); }
+                catch (error) { buttons[dockerKeyboardAction].focus(); }
+            }
+        }
+        if (focus) dockerKeepRowVisible(row);
+        return row;
+    }
+
+    function dockerInitKeyboard(preserve = false) {
+        dockerRows().forEach((row, index) => {
+            if (row.dataset.dockerKeyboardBound === '1') return;
+            row.dataset.dockerKeyboardBound = '1';
+            row.setAttribute('tabindex', '-1');
+            row.addEventListener('click', event => {
+                const buttons = dockerRowButtons(row);
+                const button = event.target.closest('button[name="action"]');
+                const actionIndex = button ? Math.max(0, buttons.indexOf(button)) : 0;
+                dockerSelectRow(index, actionIndex, false);
+            });
+        });
+        if (dockerRows().length) dockerSelectRow(preserve ? dockerKeyboardRow : 0, preserve ? dockerKeyboardAction : 0, false);
+    }
+
+    function dockerHandleKeyboard(event) {
+        const modalButtons = dockerModalButtons();
+        if (modalButtons.length) {
+            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter', ' ', 'Escape'].includes(event.key)) return;
+            event.preventDefault();
+            if (event.key === 'Escape') { dockerCloseActionModal(); dockerCloseResultModal(); return; }
+            if (event.key === 'Home') dockerPaintModalButton(0);
+            else if (event.key === 'End') dockerPaintModalButton(modalButtons.length - 1);
+            else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') dockerPaintModalButton((dockerModalButton + 1) % modalButtons.length);
+            else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') dockerPaintModalButton((dockerModalButton - 1 + modalButtons.length) % modalButtons.length);
+            else if (event.key === 'Enter' || event.key === ' ') dockerPaintModalButton(dockerModalButton)?.click();
+            return;
+        }
+
+        if (!document.getElementById('docker-live-area')) return;
+        if (event.target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '].includes(event.key)) return;
+        const rows = dockerRows();
+        if (!rows.length) return;
+        event.preventDefault();
+        if (event.key === 'ArrowDown') dockerSelectRow(dockerKeyboardRow + 1, 0, true);
+        else if (event.key === 'ArrowUp') dockerSelectRow(dockerKeyboardRow - 1, 0, true);
+        else if (event.key === 'Home') dockerSelectRow(0, 0, true);
+        else if (event.key === 'End') dockerSelectRow(rows.length - 1, 0, true);
+        else if (event.key === 'ArrowRight') dockerSelectRow(dockerKeyboardRow, dockerKeyboardAction + 1, true);
+        else if (event.key === 'ArrowLeft') dockerSelectRow(dockerKeyboardRow, dockerKeyboardAction - 1, true);
+        else if (event.key === 'Enter' || event.key === ' ') dockerRowButtons(rows[dockerKeyboardRow])[dockerKeyboardAction]?.click();
+    }
+
+    dockerBindActionForms();
+    dockerInitKeyboard(false);
+    document.addEventListener('keydown', dockerHandleKeyboard);
+
+    window.openYoleoBrowser = function (mode, target, start) {
+        const url = '/browser/' + encodeURIComponent(mode || 'folder') + '?target=' + encodeURIComponent(target || '') + '&path=' + encodeURIComponent(start || '/');
+        window.open(url, 'yoleo_browser_' + String(target || 'path'), 'width=980,height=720,resizable=yes,scrollbars=yes');
+    };
+
+    function dockerComposeProgress(percent, message, failed = false) {
+        const value = Math.max(0, Math.min(100, Number(percent) || 0));
+        const label = message || (value + '%');
+        const wraps = Array.from(document.querySelectorAll('[data-docker-compose-progress]'));
+        const fillLegacy = document.getElementById('docker-compose-progress-fill');
+        const textLegacy = document.getElementById('docker-compose-progress-text');
+        if (!wraps.length) {
+            const legacyWrap = document.getElementById('docker-compose-progress');
+            if (legacyWrap) wraps.push(legacyWrap);
+        }
+        if (fillLegacy) fillLegacy.style.width = value + '%';
+        if (textLegacy) textLegacy.textContent = label;
+        wraps.forEach(wrap => {
+            const fill = wrap.querySelector('[data-docker-compose-progress-fill]');
+            const text = wrap.querySelector('[data-docker-compose-progress-text]');
+            if (fill) fill.style.width = value + '%';
+            if (text) text.textContent = label;
+            wrap.classList.toggle('is-ok', value >= 100 && !failed);
+            wrap.classList.toggle('is-bad', !!failed);
+        });
+    }
+
+    function dockerParseProgressLine(line) {
+        if (!line || !line.startsWith('@@PROGRESS')) return null;
+        try { return JSON.parse(line.replace(/^@@PROGRESS\s*/, '')); }
+        catch (error) { return null; }
+    }
+
+    function dockerLineMeansFailure(line) {
+        const clean = String(line || '').trim();
+        if (!clean) return false;
+        if (clean.startsWith('@@PROGRESS')) {
+            const progress = dockerParseProgressLine(clean);
+            return Number(progress?.failed || 0) > 0;
+        }
+        // Ne pas transformer le résumé final en erreur quand le compteur indique 0.
+        // Exemple : "Stacks erreur : 0" ou un ancien log avec "❌ Stacks erreur : 0".
+        if (/stacks?\s+erreurs?\s*:\s*0\b/i.test(clean) || /erreurs?\s*:\s*0\b/i.test(clean) || /failed["']?\s*:\s*0\b/i.test(clean)) {
+            return false;
+        }
+        return /❌/.test(clean) || /\b(erreur|erreurs|failed|failure|error)\b/i.test(clean);
+    }
+
+    function dockerShowComposeLogButton(failed) {
+        const buttons = Array.from(document.querySelectorAll('[data-docker-compose-log-open]'));
+        const legacy = document.getElementById('docker-compose-log-open');
+        if (legacy && !buttons.includes(legacy)) buttons.push(legacy);
+        buttons.forEach(logButton => {
+            logButton.hidden = false;
+            logButton.classList.toggle('is-bad', !!failed);
+            logButton.classList.toggle('is-ok', !failed);
+            logButton.title = failed ? 'Erreur Compose : ouvrir le vrai log ttyd' : 'Ouvrir le log Compose ttyd';
+        });
+    }
+
+    window.dockerOpenComposeTtyd = async function () {
+        dockerSetComposeStatus('Ouverture du vrai log Compose...');
+        try {
+            const response = await fetch('/docker/compose/ttyd', {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            const data = await response.json().catch(() => ({ok: false, message: 'Réponse serveur illisible.'}));
+            if (!response.ok || !data.ok || !data.url) throw new Error(data.message || 'Impossible d’ouvrir ttyd Compose.');
+            const {modal, frame, title} = dockerTtydModalElements();
+            if (!modal || !frame) {
+                window.open(data.url, 'yoleo_docker_compose_log', 'width=1200,height=760,resizable=yes,scrollbars=yes');
+                return;
+            }
+            if (title) title.textContent = data.title || 'Logs Docker Compose';
+            frame.src = data.url;
+            modal.hidden = false;
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('docker-ttyd-modal-open');
+            dockerSetComposeStatus('Log Compose ouvert.', true);
+        } catch (error) {
+            dockerSetComposeStatus(error.message || String(error), false);
+        }
+    };
+
+    window.dockerRunStream = async function (action, button) {
+        const log = document.getElementById('docker-stream-log');
+        const logButtons = Array.from(document.querySelectorAll('[data-docker-compose-log-open]'));
+        const attachOnly = action === '__attach';
+        let failed = false;
+        let lastProgress = 0;
+        let composeFailedCount = null;
+        let tail = '';
+        const visibleLog = log && !log.classList.contains('docker-compose-inline-log');
+        if (log) {
+            log.hidden = !visibleLog;
+            log.style.display = visibleLog ? 'block' : 'none';
+            log.textContent = attachOnly ? 'Reprise du suivi Compose...\n' : 'Lancement...\n';
+        }
+        logButtons.forEach(logButton => {
+            logButton.hidden = false;
+            logButton.classList.remove('is-bad', 'is-ok');
+        });
+        if (!attachOnly) dockerComposeProgress(0, '0%');
+        dockerSetComposeStatus(attachOnly ? 'Suivi Compose en cours...' : 'Lancement Compose...');
+        dockerSetButtonRunning(button, true);
+        try {
+            const response = await fetch('/docker/run_stream?action=' + encodeURIComponent(action), {cache: 'no-store'});
+            if (!response.ok) failed = true;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const chunk = await reader.read();
+                if (chunk.done) break;
+                const text = decoder.decode(chunk.value, {stream: true});
+                if (log) {
+                    log.textContent += text;
+                    log.scrollTop = log.scrollHeight;
+                }
+                tail += text;
+                const lines = tail.split(/\r?\n/);
+                tail = lines.pop() || '';
+                for (const line of lines) {
+                    const progress = dockerParseProgressLine(line);
+                    if (progress) {
+                        lastProgress = Number(progress.percent || 0);
+                        composeFailedCount = Number(progress.failed || 0);
+                        const label = progress.total ? `${progress.percent || 0}% · ${progress.current || 0}/${progress.total || 0}` : `${progress.percent || 0}%`;
+                        dockerComposeProgress(lastProgress, label, composeFailedCount > 0);
+                        if (composeFailedCount > 0) failed = true;
+                        continue;
+                    }
+                    if (dockerLineMeansFailure(line)) failed = true;
+                }
+            }
+            if (tail && dockerLineMeansFailure(tail)) failed = true;
+            if (composeFailedCount !== null) failed = composeFailedCount > 0;
+
+            const finalProgress = (!failed && lastProgress < 100) ? 100 : (lastProgress || 100);
+            dockerComposeProgress(finalProgress, failed ? 'Erreur' : '100%', failed);
+
+            // Après un pull/start/list Compose, on rafraîchit la zone Docker automatiquement :
+            // les nouveaux conteneurs apparaissent sans F5, puis on restaure l'état de la jauge.
+            await dockerRefreshContainers(true);
+            dockerComposeProgress(finalProgress, failed ? 'Erreur' : '100%', failed);
+            dockerShowComposeLogButton(failed);
+            dockerSetComposeStatus(failed ? 'Erreur Compose. Clique sur 📜 pour ouvrir le vrai log.' : 'Action Compose terminée correctement.', !failed);
+        } catch (error) {
+            failed = true;
+            if (log) log.textContent += '\nErreur : ' + error;
+            dockerComposeProgress(100, 'Erreur', true);
+            logButtons.forEach(logButton => {
+                logButton.hidden = false;
+                logButton.classList.add('is-bad');
+            });
+            dockerSetComposeStatus('Erreur Compose : ' + (error.message || String(error)), false);
+        } finally {
+            dockerSetButtonRunning(button, false);
+        }
+    };
+
+    async function dockerAutoAttachComposeStream() {
+        if (!document.querySelector('[data-docker-compose-progress]')) return;
+        try {
+            const response = await fetch('/docker/run_status', {cache: 'no-store'});
+            if (!response.ok) return;
+            const data = await response.json().catch(() => null);
+            if (!data) return;
+            const progress = data.progress || {};
+            if (progress && progress.percent !== undefined) {
+                const failed = Number(progress.failed || 0) > 0;
+                const label = progress.total ? `${progress.percent || 0}% · ${progress.current || 0}/${progress.total || 0}` : `${progress.percent || 0}%`;
+                dockerComposeProgress(Number(progress.percent || 0), label, failed);
+                dockerShowComposeLogButton(failed);
+            }
+            if (!data.running) return;
+            dockerSetComposeStatus('Suivi Compose en cours...');
+            window.dockerRunStream('__attach');
+        } catch (error) {}
+    }
+
+    dockerAutoAttachComposeStream();
+
+    window.dockerAddEnvRow = function () {
+        const body = document.getElementById('docker-env-body');
+        if (!body) return;
+        const tr = document.createElement('tr');
+        tr.className = 'docker-env-kv-row';
+        tr.innerHTML = '<td colspan="2"><div class="docker-env-pair"><input type="hidden" name="env_row_type[]" value="kv"><input type="hidden" name="env_raw[]"><input class="yoleo-input mono docker-env-input" name="env_key[]"><span class="docker-env-separator">—</span><input class="yoleo-input mono docker-env-input" name="env_value[]"></div></td><td class="docker-env-action-cell"><button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+        body.appendChild(tr);
+        const input = tr.querySelector('input[name="env_key[]"]');
+        if (input) input.focus();
+    };
+
+    window.dockerAddEnvComment = function () {
+        const body = document.getElementById('docker-env-body');
+        if (!body) return;
+        const tr = document.createElement('tr');
+        tr.className = 'docker-env-comment-row';
+        tr.innerHTML = '<td colspan="2"><div class="docker-env-comment-line"><input type="hidden" name="env_row_type[]" value="raw"><input class="yoleo-input mono docker-env-comment-input" name="env_raw[]" value="# Nouveau groupe" placeholder="# Nouveau groupe"><input type="hidden" name="env_key[]"><input type="hidden" name="env_value[]"></div></td><td class="docker-env-action-cell docker-env-comment-actions"><button class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" type="button" onclick="dockerMoveEnvGroup(this, -1)" title="Monter le groupe">↑</button><button class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" type="button" onclick="dockerMoveEnvGroup(this, 1)" title="Descendre le groupe">↓</button><button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+        body.appendChild(tr);
+        const input = tr.querySelector('input[name="env_raw[]"]');
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    };
+
+    window.dockerMoveEnvGroup = function (button, direction) {
+        const start = button ? button.closest('tr') : null;
+        const body = start ? start.parentElement : null;
+        if (!start || !body || !start.classList.contains('docker-env-comment-row')) return;
+
+        const rows = Array.from(body.children);
+        const isGroupStart = row => row && row.classList && row.classList.contains('docker-env-comment-row');
+        const startIndex = rows.indexOf(start);
+        if (startIndex < 0) return;
+
+        let endIndex = startIndex + 1;
+        while (endIndex < rows.length && !isGroupStart(rows[endIndex])) endIndex++;
+
+        if (direction < 0) {
+            let previousStart = -1;
+            for (let i = startIndex - 1; i >= 0; i--) {
+                if (isGroupStart(rows[i])) {
+                    previousStart = i;
+                    break;
+                }
+            }
+            if (previousStart < 0) return;
+            const fragment = document.createDocumentFragment();
+            rows.slice(startIndex, endIndex).forEach(row => fragment.appendChild(row));
+            body.insertBefore(fragment, rows[previousStart]);
+            return;
+        }
+
+        if (endIndex >= rows.length || !isGroupStart(rows[endIndex])) return;
+        let nextEnd = endIndex + 1;
+        while (nextEnd < rows.length && !isGroupStart(rows[nextEnd])) nextEnd++;
+        const fragment = document.createDocumentFragment();
+        rows.slice(endIndex, nextEnd).forEach(row => fragment.appendChild(row));
+        body.insertBefore(fragment, start);
+    };
+
+    function renumberStacks() {
+        document.querySelectorAll('.docker-stack-item').forEach((stack, index) => {
+            stack.dataset.stackIndex = String(index);
+            stack.querySelectorAll('input[name="yml_stack[]"]').forEach(input => { input.value = String(index); });
+            stack.querySelectorAll('.docker-yml-row').forEach((row, rowIndex) => {
+                const num = row.querySelector('.docker-stack-num');
+                if (num) num.textContent = String(rowIndex + 1);
+            });
+            const tbody = stack.querySelector('.docker-yml-list');
+            if (tbody && !tbody.querySelector('.docker-yml-row')) {
+                tbody.innerHTML = '<tr class="docker-yml-empty"><td colspan="3">Aucun YAML déclaré pour ce stack. Utilise le bouton ＋.</td></tr>';
+            }
+        });
+    }
+
+    function dockerYmlRowHtml(stackIndex, value) {
+        return '<tr class="docker-yml-row">' +
+            '<td class="docker-stack-num mono"></td>' +
+            '<td><input type="hidden" name="yml_stack[]" value="' + dockerEscapeHtml(stackIndex) + '">' +
+            '<input class="yoleo-input mono docker-stack-yml-input" name="yml_file[]" value="' + dockerEscapeHtml(value || '') + '" placeholder="docker-compose.yml"></td>' +
+            '<td class="actions-line docker-stack-action-col">' +
+            '<button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon" type="button" onclick="dockerOpenYmlPicker(this)" title="Parcourir">📁</button>' +
+            '<button class="yoleo-btn yoleo-btn-red yoleo-btn-icon" type="button" onclick="dockerRemoveYml(this)" title="Retirer">✕</button>' +
+            '</td></tr>';
+    }
+
+    function dockerStackHtml(index) {
+        return '<article class="docker-stack-item" data-stack-index="' + index + '">' +
+            '<div class="docker-stack-head">' +
+            '<label class="docker-stack-name"><span class="label-mini">Nom du stack</span><input class="yoleo-input" name="stack_name[]" value="" placeholder="base"></label>' +
+            '<div class="actions-line docker-stack-actions">' +
+            '<button class="yoleo-btn yoleo-btn-primary yoleo-btn-icon docker-stack-add-stack-btn" type="button" onclick="dockerAddStack()" title="Ajouter un stack">＋S</button>' +
+            '<button class="yoleo-btn yoleo-btn-green yoleo-btn-icon" type="button" onclick="dockerAddYml(this)" title="Ajouter un YAML">＋</button>' +
+            '<button class="yoleo-btn yoleo-btn-red yoleo-btn-icon" type="button" onclick="dockerRemoveStack(this)" title="Supprimer ce stack">✕</button>' +
+            '</div></div>' +
+            '<div class="docker-stack-table-wrap"><table class="yoleo-table docker-stack-table">' +
+            '<thead><tr><th class="docker-stack-num">#</th><th>Fichier YAML</th><th class="docker-stack-action-col">Actions</th></tr></thead>' +
+            '<tbody class="docker-yml-list"><tr class="docker-yml-empty"><td colspan="3">Aucun YAML déclaré pour ce stack. Utilise le bouton ＋.</td></tr></tbody>' +
+            '</table></div></article>';
+    }
+
+    window.dockerAddStack = function () {
+        const list = document.getElementById('docker-stack-list');
+        if (!list) return;
+        const index = document.querySelectorAll('.docker-stack-item').length;
+        list.insertAdjacentHTML('beforeend', dockerStackHtml(index));
+        renumberStacks();
+    };
+
+    window.dockerRemoveStack = function (button) {
+        const card = button.closest('.docker-stack-item');
+        if (card) card.remove();
+        renumberStacks();
+    };
+
+    window.dockerAddYml = function (button) {
+        const card = button.closest('.docker-stack-item');
+        const tbody = card ? card.querySelector('.docker-yml-list') : null;
+        if (!tbody) return;
+        tbody.querySelectorAll('.docker-yml-empty').forEach(row => row.remove());
+        tbody.insertAdjacentHTML('beforeend', dockerYmlRowHtml(card.dataset.stackIndex || '0', ''));
+        renumberStacks();
+        const input = tbody.querySelector('.docker-yml-row:last-child input[name="yml_file[]"]');
+        if (input) input.focus();
+    };
+
+    window.dockerRemoveYml = function (button) {
+        const row = button.closest('.docker-yml-row');
+        if (row) row.remove();
+        renumberStacks();
+    };
+
+    let dockerYmlPickerInput = null;
+
+    window.dockerOpenYmlPicker = function (button) {
+        const row = button.closest('.docker-yml-row');
+        dockerYmlPickerInput = row ? row.querySelector('input[name="yml_file[]"]') : null;
+        openYoleoBrowser('file', 'docker-stack-yml-picker', {{ conf.YML_FOLDER|tojson }});
+    };
+
+    window.addEventListener('message', event => {
+        const payload = event.data || {};
+        if (payload.type !== 'yoleo-browser-select' || payload.target !== 'docker-stack-yml-picker') return;
+        if (!dockerYmlPickerInput || !payload.path) return;
+        const base = String({{ conf.YML_FOLDER|tojson }} || '').replace(/\/+$/, '');
+        let selected = String(payload.path || '');
+        if (base && selected.startsWith(base + '/')) {
+            selected = selected.slice(base.length + 1);
+        }
+        dockerYmlPickerInput.value = selected;
+        dockerYmlPickerInput.dispatchEvent(new Event('input', {bubbles: true}));
+        dockerYmlPickerInput.dispatchEvent(new Event('change', {bubbles: true}));
+    });
+
+    function dockerYmlStatus(message, isError) {
+        const status = document.getElementById('docker-yml-status');
+        if (!status) return;
+        status.textContent = message || 'Prêt.';
+        status.classList.toggle('bad', !!isError);
+        status.classList.toggle('ok', !isError && !!message && !String(message).startsWith('Prêt'));
+    }
+
+    function dockerSetYmlActive(name) {
+        document.querySelectorAll('#docker-yml-files .docker-file-item').forEach(btn => {
+            btn.classList.toggle('is-active', btn.dataset.name === name);
+        });
+    }
+
+    function dockerFormatFileSize(bytes) {
+        const value = Number(bytes) || 0;
+        if (value >= 1024 * 1024) return (value / 1024 / 1024).toFixed(1) + ' Mo';
+        if (value >= 1024) return (value / 1024).toFixed(1) + ' Ko';
+        return value + ' o';
+    }
+
+    function dockerEscapeHtml(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'}[c]));
+    }
+
+    function dockerRenderYmlFileList(files) {
+        const list = document.getElementById('docker-yml-files');
+        if (!list) return;
+        if (!Array.isArray(files) || files.length === 0) {
+            list.innerHTML = '<div class="empty-state">Aucun fichier YAML dans ce dossier.</div>';
+            return;
+        }
+        list.innerHTML = files.map(file => {
+            const name = String(file.name || '');
+            return `
+                <button type="button" class="docker-file-item" data-name="${dockerEscapeHtml(name)}" data-size="${Number(file.size) || 0}" data-mtime="${Number(file.mtime) || 0}" onclick="dockerLoadYml(this.dataset.name)">
+                    <span class="docker-yml-file-name">📝 ${dockerEscapeHtml(name)}</span>
+                    <span class="docker-yml-file-meta">${dockerFormatFileSize(file.size)}</span>
+                </button>`;
+        }).join('');
+        dockerFilterYmlFiles();
+    }
+
+    window.dockerRefreshYmlFiles = async function () {
+        dockerYmlStatus('Rechargement de la liste YAML...');
+        try {
+            const res = await fetch('/docker/yml/files', {cache: 'no-store'});
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Liste impossible');
+            dockerRenderYmlFileList(data.files || []);
+            dockerYmlStatus('Liste YAML rechargée.');
+        } catch (error) {
+            dockerYmlStatus('Erreur liste YAML : ' + error.message, true);
+        }
+    };
+
+    window.dockerFilterYmlFiles = function () {
+        const input = document.getElementById('docker-yml-search');
+        const needle = (input ? input.value : '').trim().toLowerCase();
+        document.querySelectorAll('#docker-yml-files .docker-file-item').forEach(btn => {
+            const name = (btn.dataset.name || '').toLowerCase();
+            btn.hidden = !!needle && !name.includes(needle);
+        });
+    };
+
+    window.dockerSubmitYmlImport = function (input) {
+        if (!input || !input.files || !input.files.length) return;
+        const form = document.getElementById('docker-yml-import-form');
+        dockerYmlStatus('Import de ' + input.files.length + ' fichier(s) YAML...');
+        if (form) form.submit();
+    };
+
+    window.dockerSyncYml = function () {
+        const text = document.getElementById('docker-yml-editor');
+        const hidden = document.getElementById('docker-yml-content');
+        if (text && hidden) hidden.value = text.value;
+    };
+
+    window.dockerBeforeYmlSubmit = function () {
+        dockerSyncYml();
+        const name = document.getElementById('docker-yml-name')?.value.trim();
+        if (!name) {
+            dockerYmlStatus('Nom de fichier obligatoire avant sauvegarde.', true);
+            return false;
+        }
+        return true;
+    };
+
+    window.dockerNewYml = function () {
+        const name = document.getElementById('docker-yml-name');
+        const original = document.getElementById('docker-yml-original-name');
+        const del = document.getElementById('docker-yml-delete-name');
+        const editor = document.getElementById('docker-yml-editor');
+        const badge = document.getElementById('docker-yml-open-badge');
+        if (name) name.value = 'nouveau.yml';
+        if (original) original.value = '';
+        if (del) del.value = '';
+        if (editor) editor.value = 'services:\n';
+        if (badge) badge.textContent = 'Nouveau fichier';
+        dockerSetYmlActive('');
+        dockerYmlStatus('Nouveau fichier YAML prêt à enregistrer.');
+        // Ne pas focaliser directement le grand éditeur : à faible zoom, Firefox recentre
+        // automatiquement le textarea et donne l'impression que le carré noir descend.
+        // On garde donc la page en haut et on place le curseur sur le nom du fichier.
+        if (name) {
+            try {
+                name.focus({preventScroll: true});
+                name.select();
+            } catch (e) {
+                name.focus();
+                name.select();
+            }
+        }
+    };
+
+    window.dockerCloseYml = function () {
+        const name = document.getElementById('docker-yml-name');
+        const original = document.getElementById('docker-yml-original-name');
+        const del = document.getElementById('docker-yml-delete-name');
+        const editor = document.getElementById('docker-yml-editor');
+        const badge = document.getElementById('docker-yml-open-badge');
+        if (name) name.value = '';
+        if (original) original.value = '';
+        if (del) del.value = '';
+        if (editor) editor.value = '';
+        if (badge) badge.textContent = 'Aucun fichier ouvert';
+        dockerSetYmlActive('');
+        dockerYmlStatus('Fichier fermé.');
+    };
+
+    window.dockerLoadYml = async function (name) {
+        if (!name) return;
+        try {
+            dockerYmlStatus('Chargement de ' + name + '...');
+            const res = await fetch('/docker/yml/read?filename=' + encodeURIComponent(name), {cache: 'no-store'});
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Lecture impossible');
+            const safeName = data.filename || name;
+            document.getElementById('docker-yml-name').value = safeName;
+            document.getElementById('docker-yml-original-name').value = safeName;
+            document.getElementById('docker-yml-delete-name').value = safeName;
+            document.getElementById('docker-yml-editor').value = data.content || '';
+            const badge = document.getElementById('docker-yml-open-badge');
+            if (badge) badge.textContent = 'Fichier ouvert : ' + safeName;
+            dockerSetYmlActive(safeName);
+            dockerYmlStatus('Fichier ouvert : ' + safeName);
+        } catch (error) {
+            dockerYmlStatus('Erreur lecture YAML : ' + error.message, true);
+        }
+    };
+
+    window.dockerValidateYml = async function () {
+        dockerSyncYml();
+        const content = document.getElementById('docker-yml-content')?.value || '';
+        const form = new FormData();
+        form.append('content', content);
+        try {
+            dockerYmlStatus('Validation YAML...');
+            const res = await fetch('/docker/yml/validate', {method: 'POST', body: form});
+            const data = await res.json();
+            dockerYmlStatus(data.message || (data.ok ? 'YAML valide.' : 'YAML invalide.'), !data.ok);
+        } catch (error) {
+            dockerYmlStatus('Erreur validation YAML : ' + error.message, true);
+        }
+    };
+
+    window.dockerDeleteYml = function () {
+        const name = document.getElementById('docker-yml-original-name')?.value || '';
+        if (!name) {
+            dockerYmlStatus('Aucun fichier YAML existant ouvert à supprimer.', true);
+            return;
+        }
+        if (!confirm('Supprimer définitivement ' + name + ' ?')) return;
+        document.getElementById('docker-yml-delete-name').value = name;
+        document.getElementById('docker-yml-delete-form').submit();
+    };
+
+    function dockerImageConfirm(action, title, text, extra = {}) {
+        const modal = document.getElementById('docker-image-confirm-modal');
+        if (!modal) return;
+        document.getElementById('docker-image-confirm-action').value = action;
+        document.getElementById('docker-image-confirm-title').textContent = title;
+        document.getElementById('docker-image-confirm-text').textContent = text;
+        document.getElementById('docker-image-confirm-id').value = extra.id || '';
+        document.getElementById('docker-image-confirm-tag-hidden').value = extra.tag || '';
+        document.getElementById('docker-image-maintenance-action').value = extra.maintenance || '';
+        modal.classList.add('active');
+    }
+
+    window.dockerCloseImageModals = function () {
+        document.querySelectorAll('#docker-image-detail-modal, #docker-image-confirm-modal').forEach(modal => {
+            modal.classList.remove('active');
+        });
+    };
+
+    window.dockerOpenDeleteOneImage = function (id, tag) {
+        dockerImageConfirm(
+            'delete_one',
+            'Supprimer cette image ?',
+            'Image ciblée : ' + String(tag || id || 'inconnue'),
+            {id: id, tag: tag}
+        );
+    };
+
+    window.dockerOpenDeleteUnusedImages = function () {
+        dockerImageConfirm(
+            'delete_unused_all',
+            'Supprimer toutes les images inutilisées ?',
+            'Cette action tente de supprimer les images Docker non utilisées par un conteneur.'
+        );
+    };
+
+    window.dockerOpenMaintenance = function (maintenanceAction, title, text) {
+        dockerImageConfirm('docker_maintenance', title, text, {maintenance: maintenanceAction});
+    };
+
+    function dockerImagesFlash(message, ok = true) {
+        const text = String(message || '').trim();
+        if (!text) return;
+        const stack = document.createElement('section');
+        stack.className = 'docker-flash-stack docker-floating-flash-stack';
+        const msg = document.createElement('div');
+        msg.className = 'action-message ' + (ok ? 'ok' : 'bad');
+        msg.textContent = text;
+        stack.appendChild(msg);
+        document.body.appendChild(stack);
+    }
+
+    function dockerImagesImportFlashes(doc) {
+        const messages = Array.from(doc.querySelectorAll('.docker-flash-stack > .action-message'));
+        if (!messages.length) return false;
+        messages.forEach(item => dockerImagesFlash(item.textContent || '', !item.classList.contains('bad')));
+        return true;
+    }
+
+    function dockerImagesRefreshFromDocument(doc) {
+        const replacements = [
+            ['.docker-page .summary-grid', '.docker-page .summary-grid'],
+            ['.docker-images-maintenance', '.docker-images-maintenance']
+        ];
+        replacements.forEach(([oldSelector, newSelector]) => {
+            const current = document.querySelector(oldSelector);
+            const fresh = doc.querySelector(newSelector);
+            if (current && fresh) current.replaceWith(document.importNode(fresh, true));
+        });
+        if (typeof dockerBindImageConfirmAjax === 'function') dockerBindImageConfirmAjax();
+        if (typeof dockerBindImageKeyboard === 'function') dockerBindImageKeyboard();
+    }
+
+    function dockerCanonicalActionUrl(rawUrl, fallbackPath = '/docker/images_docker') {
+        const url = new URL(rawUrl || fallbackPath, window.location.origin);
+        if (url.pathname.startsWith('/dockers/')) {
+            url.pathname = url.pathname.replace(/^\/dockers/, '/docker');
+        } else if (url.pathname === '/dockers') {
+            url.pathname = '/docker';
+        }
+        return url.toString();
+    }
+
+    async function dockerSubmitImageConfirmAjax(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        if (!form || form.dataset.ajaxRunning === '1') return;
+        form.dataset.ajaxRunning = '1';
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const cancelBtn = form.querySelector('button[type="button"]');
+        if (submitBtn) submitBtn.disabled = true;
+        if (cancelBtn) cancelBtn.disabled = true;
+        try {
+            const targetUrl = dockerCanonicalActionUrl(form.getAttribute('action'), '/docker/images_docker');
+            const res = await fetch(targetUrl, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                credentials: 'same-origin',
+                redirect: 'follow'
+            });
+            const html = await res.text();
+            if (!res.ok) throw new Error('Erreur HTTP ' + res.status);
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            dockerCloseImageModals();
+            dockerImagesRefreshFromDocument(doc);
+            if (!dockerImagesImportFlashes(doc)) dockerImagesFlash('Action Docker terminée.', true);
+        } catch (error) {
+            dockerImagesFlash('Erreur Ajax Images Docker : ' + error.message, false);
+        } finally {
+            form.dataset.ajaxRunning = '0';
+            if (submitBtn) submitBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = false;
+        }
+    }
+
+    window.dockerBindImageConfirmAjax = function () {
+        const form = document.querySelector('#docker-image-confirm-modal form');
+        if (!form || form.dataset.ajaxBound === '1') return;
+        form.dataset.ajaxBound = '1';
+        form.addEventListener('submit', dockerSubmitImageConfirmAjax);
+    };
+
+    dockerBindImageConfirmAjax();
+
+    let dockerDetailImage = null;
+
+    window.dockerOpenImageDetails = function (id, tag, icon, used, size, stack) {
+        dockerDetailImage = {id: id, tag: tag, used: !!used};
+        const modal = document.getElementById('docker-image-detail-modal');
+        if (!modal) return;
+        const iconEl = document.getElementById('docker-image-detail-icon');
+        if (iconEl) iconEl.src = icon || '/static/logo/docker1.png';
+        document.getElementById('docker-image-detail-name').textContent = tag || id || 'Image Docker';
+        document.getElementById('docker-image-detail-meta').textContent = [size, stack].filter(Boolean).join(' · ');
+        document.getElementById('docker-image-detail-status').textContent = used ? 'Image utilisée par un conteneur : suppression verrouillée.' : 'Image inutilisée : suppression disponible.';
+        document.getElementById('docker-image-detail-delete').disabled = !!used;
+        modal.classList.add('active');
+    };
+
+    window.dockerDeleteImageFromDetails = function () {
+        if (!dockerDetailImage || dockerDetailImage.used) return;
+        dockerCloseImageModals();
+        dockerOpenDeleteOneImage(dockerDetailImage.id, dockerDetailImage.tag);
+    };
+
+    document.querySelectorAll('#docker-image-detail-modal, #docker-image-confirm-modal').forEach(modal => {
+        modal.addEventListener('click', event => {
+            if (event.target === modal) dockerCloseImageModals();
+        });
+    });
+
+    let dockerImageKeyboardRow = 0;
+    let dockerImageKeyboardAction = 0;
+
+    function dockerImageRowsList() {
+        return Array.from(document.querySelectorAll('.docker-page[data-active-tab="images"] .docker-image-keyboard-row'));
+    }
+
+    function dockerImageButtons(row) {
+        return Array.from(row?.querySelectorAll('.docker-image-action-btn:not(:disabled)') || []);
+    }
+
+    function dockerPaintImageKeyboard(rowIndex = dockerImageKeyboardRow, actionIndex = dockerImageKeyboardAction, focus = true) {
+        const rows = dockerImageRowsList();
+        if (!rows.length) return;
+        document.querySelectorAll('.keyboard-selected-row').forEach(row => row.classList.remove('keyboard-selected-row'));
+        document.querySelectorAll('.keyboard-action-focus').forEach(button => button.classList.remove('keyboard-action-focus'));
+        dockerImageKeyboardRow = Math.max(0, Math.min(rowIndex, rows.length - 1));
+        const row = rows[dockerImageKeyboardRow];
+        row.classList.add('keyboard-selected-row');
+        const buttons = dockerImageButtons(row);
+        if (buttons.length) {
+            dockerImageKeyboardAction = Math.max(0, Math.min(actionIndex, buttons.length - 1));
+            const button = buttons[dockerImageKeyboardAction];
+            button.classList.add('keyboard-action-focus');
+            if (focus) {
+                try { button.focus({preventScroll: true}); }
+                catch (error) { button.focus(); }
+            }
+        }
+        if (focus) dockerKeepRowVisible(row);
+    }
+
+    function dockerBindImageKeyboard() {
+        dockerImageRowsList().forEach((row, index) => {
+            if (row.dataset.imageKeyboardBound === '1') return;
+            row.dataset.imageKeyboardBound = '1';
+            row.addEventListener('click', event => {
+                const buttons = dockerImageButtons(row);
+                const button = event.target.closest('.docker-image-action-btn');
+                const actionIndex = button ? Math.max(0, buttons.indexOf(button)) : 0;
+                dockerPaintImageKeyboard(index, actionIndex, false);
+            });
+        });
+        dockerPaintImageKeyboard(0, 0, false);
+    }
+
+    function dockerHandleImageKeyboard(event) {
+        if (!document.querySelector('.docker-page[data-active-tab="images"]')) return;
+        if (document.querySelector('.modal-backdrop.active')) return;
+        if (event.target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '].includes(event.key)) return;
+        const rows = dockerImageRowsList();
+        if (!rows.length) return;
+        event.preventDefault();
+        if (event.key === 'ArrowDown') dockerPaintImageKeyboard(dockerImageKeyboardRow + 1, 0, true);
+        else if (event.key === 'ArrowUp') dockerPaintImageKeyboard(dockerImageKeyboardRow - 1, 0, true);
+        else if (event.key === 'ArrowRight') dockerPaintImageKeyboard(dockerImageKeyboardRow, dockerImageKeyboardAction + 1, true);
+        else if (event.key === 'ArrowLeft') dockerPaintImageKeyboard(dockerImageKeyboardRow, dockerImageKeyboardAction - 1, true);
+        else if (event.key === 'Home') dockerPaintImageKeyboard(0, 0, true);
+        else if (event.key === 'End') dockerPaintImageKeyboard(rows.length - 1, 0, true);
+        else if (event.key === 'Enter' || event.key === ' ') dockerImageButtons(rows[dockerImageKeyboardRow])[dockerImageKeyboardAction]?.click();
+    }
+
+    dockerBindImageKeyboard();
+    document.addEventListener('keydown', dockerHandleImageKeyboard);
+
+    const dockerLanDefaults = {{ docker_lan_defaults|default({})|tojson }};
+    const dockerLanRows = {{ docker_lan_networks|default([])|tojson }};
+
+    function dockerLanSetValue(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.value = value ?? '';
+    }
+
+    window.dockerOpenLanModal = function (row = null) {
+        const modal = document.getElementById('docker-lan-modal');
+        if (!modal) return;
+        const data = row || {
+            name: '',
+            enabled: true,
+            driver: dockerLanDefaults.driver || 'macvlan',
+            mode: dockerLanDefaults.mode || 'bridge',
+            parent: dockerLanDefaults.parent || '',
+            subnet: dockerLanDefaults.subnet || '',
+            netmask: dockerLanDefaults.netmask || '255.255.255.0',
+            gateway: dockerLanDefaults.gateway || '',
+            ip_range: ''
+        };
+        document.getElementById('docker-lan-modal-title').textContent = row ? 'Modifier le réseau Docker' : 'Ajouter un réseau Docker';
+        dockerLanSetValue('lan-old-name', row ? data.name : '');
+        dockerLanSetValue('lan-name', data.name || '');
+        dockerLanSetValue('lan-enabled', data.enabled === false ? '0' : '1');
+        dockerLanSetValue('lan-driver', data.driver || 'macvlan');
+        dockerLanSetValue('lan-mode', data.mode || (data.driver === 'ipvlan' ? 'l2' : 'bridge'));
+        dockerLanSetValue('lan-parent', data.parent || '');
+        dockerLanSetValue('lan-subnet', data.subnet || '');
+        dockerLanSetValue('lan-netmask', data.netmask || '');
+        dockerLanSetValue('lan-gateway', data.gateway || '');
+        dockerLanSetValue('lan-ip-range', data.ip_range || '');
+        modal.classList.add('active');
+        setTimeout(() => document.getElementById('lan-name')?.focus(), 30);
+    };
+
+    window.dockerOpenLanModalByName = function (name) {
+        const row = dockerLanRows.find(item => item && item.name === name);
+        dockerOpenLanModal(row || {name: name});
+    };
+
+    window.dockerCloseLanModal = function () {
+        document.getElementById('docker-lan-modal')?.classList.remove('active');
+    };
+
+    window.dockerFillLanDefaults = function () {
+        dockerLanSetValue('lan-driver', dockerLanDefaults.driver || 'macvlan');
+        dockerLanSetValue('lan-mode', dockerLanDefaults.mode || 'bridge');
+        dockerLanSetValue('lan-parent', dockerLanDefaults.parent || '');
+        dockerLanSetValue('lan-subnet', dockerLanDefaults.subnet || '');
+        dockerLanSetValue('lan-netmask', dockerLanDefaults.netmask || '255.255.255.0');
+        dockerLanSetValue('lan-gateway', dockerLanDefaults.gateway || '');
+    };
+
+    document.getElementById('docker-lan-modal')?.addEventListener('click', event => {
+        if (event.target.id === 'docker-lan-modal') dockerCloseLanModal();
+    });
+
+    function dockerLanRowsList() {
+        return Array.from(document.querySelectorAll('.docker-lan-row'));
+    }
+
+    function dockerLanButtons(row) {
+        return Array.from(row?.querySelectorAll('.docker-lan-action-btn:not(:disabled)') || []);
+    }
+
+    let dockerLanKeyboardRow = 0;
+    let dockerLanKeyboardButton = 0;
+
+    function dockerPaintLanKeyboard(rowIndex = dockerLanKeyboardRow, buttonIndex = dockerLanKeyboardButton, focus = true) {
+        const rows = dockerLanRowsList();
+        if (!rows.length) return;
+        document.querySelectorAll('.keyboard-selected-row').forEach(row => row.classList.remove('keyboard-selected-row'));
+        document.querySelectorAll('.keyboard-action-focus').forEach(button => button.classList.remove('keyboard-action-focus'));
+        dockerLanKeyboardRow = Math.max(0, Math.min(rowIndex, rows.length - 1));
+        const row = rows[dockerLanKeyboardRow];
+        row.classList.add('keyboard-selected-row');
+        const buttons = dockerLanButtons(row);
+        if (buttons.length) {
+            dockerLanKeyboardButton = Math.max(0, Math.min(buttonIndex, buttons.length - 1));
+            const button = buttons[dockerLanKeyboardButton];
+            button.classList.add('keyboard-action-focus');
+            if (focus) {
+                try { button.focus({preventScroll: true}); }
+                catch (error) { button.focus(); }
+            }
+        }
+        if (focus) dockerKeepRowVisible(row);
+    }
+
+    function dockerBindLanForms() {
+        document.querySelectorAll('form[data-lan-confirm]').forEach(form => {
+            if (form.dataset.lanConfirmBound === '1') return;
+            form.dataset.lanConfirmBound = '1';
+            form.addEventListener('submit', event => {
+                event.preventDefault();
+                dockerPendingLanForm = form;
+                dockerPendingAction = null;
+                document.getElementById('docker-action-confirm-subtitle').textContent = 'Action réseau Docker';
+                document.getElementById('docker-action-confirm-text').textContent = form.dataset.lanConfirm || 'Confirmer cette action réseau ?';
+                document.getElementById('docker-action-confirm-modal')?.classList.add('active');
+                dockerModalButton = 1;
+                setTimeout(() => dockerPaintModalButton(1), 40);
+            });
+        });
+
+        dockerLanRowsList().forEach((row, index) => {
+            if (row.dataset.lanKeyboardBound === '1') return;
+            row.dataset.lanKeyboardBound = '1';
+            row.addEventListener('click', event => {
+                const buttons = dockerLanButtons(row);
+                const button = event.target.closest('.docker-lan-action-btn');
+                dockerLanKeyboardButton = button ? Math.max(0, buttons.indexOf(button)) : 0;
+                dockerPaintLanKeyboard(index, dockerLanKeyboardButton, false);
+            });
+        });
+    }
+
+    function dockerHandleLanKeyboard(event) {
+        if (!document.querySelector('.docker-page[data-active-tab="docker_lan"]')) return;
+        if (document.querySelector('.modal-backdrop.active')) return;
+        if (event.target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '].includes(event.key)) return;
+        const rows = dockerLanRowsList();
+        if (!rows.length) return;
+        event.preventDefault();
+        if (event.key === 'ArrowDown') dockerPaintLanKeyboard(dockerLanKeyboardRow + 1, 0, true);
+        else if (event.key === 'ArrowUp') dockerPaintLanKeyboard(dockerLanKeyboardRow - 1, 0, true);
+        else if (event.key === 'ArrowRight') dockerPaintLanKeyboard(dockerLanKeyboardRow, dockerLanKeyboardButton + 1, true);
+        else if (event.key === 'ArrowLeft') dockerPaintLanKeyboard(dockerLanKeyboardRow, dockerLanKeyboardButton - 1, true);
+        else if (event.key === 'Home') dockerPaintLanKeyboard(0, 0, true);
+        else if (event.key === 'End') dockerPaintLanKeyboard(rows.length - 1, 0, true);
+        else if (event.key === 'Enter' || event.key === ' ') dockerLanButtons(rows[dockerLanKeyboardRow])[dockerLanKeyboardButton]?.click();
+    }
+
+    dockerBindLanForms();
+    dockerPaintLanKeyboard(0, 0, false);
+    document.addEventListener('keydown', dockerHandleLanKeyboard);
+
+    {% include "dockers/run_scripts.html" %}
+
+    function dockerAutoHideSuccessFlashes() {
+        document.querySelectorAll('.docker-flash-stack .action-message.ok').forEach(message => {
+            if (message.dataset.autoHideBound === '1') return;
+            message.dataset.autoHideBound = '1';
+            window.setTimeout(() => {
+                message.classList.add('docker-flash-hiding');
+                window.setTimeout(() => {
+                    message.remove();
+                    document.querySelectorAll('.docker-flash-stack').forEach(stack => {
+                        if (!stack.querySelector('.action-message')) stack.remove();
+                    });
+                }, 260);
+            }, 10000);
+        });
+    }
+
+    dockerAutoHideSuccessFlashes();
+})();
+</script>

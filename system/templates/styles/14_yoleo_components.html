@@ -1,0 +1,165 @@
+    /* ------------------------------------------------------------------
+       Composants génériques Yoleo
+       À réutiliser dans les modules au lieu de créer des variantes locales.
+       ------------------------------------------------------------------ */
+    .yoleo-card {
+        min-width: 0;
+        border: 1px solid var(--yoleo-border);
+        border-radius: var(--yoleo-radius);
+        background: rgba(18, 26, 36, .88);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, .18);
+    }
+
+    .yoleo-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 34px;
+        padding: 8px 12px;
+        border: 1px solid #39485d;
+        border-radius: 10px;
+        background: #263242;
+        color: var(--yoleo-text);
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+
+    .yoleo-btn:hover:not(:disabled) {
+        border-color: var(--yoleo-accent-2);
+        background: var(--yoleo-accent-2);
+        color: #000;
+    }
+
+    .yoleo-btn:disabled {
+        opacity: .6;
+        cursor: not-allowed;
+    }
+
+    .yoleo-btn-primary {
+        border-color: var(--yoleo-accent-2);
+        background: var(--yoleo-accent-2);
+        color: #000;
+        font-weight: 900;
+    }
+
+    .yoleo-btn-green {
+        border-color: rgba(72, 213, 151, .55);
+        background: rgba(72, 213, 151, .18);
+        color: #dbfff0;
+        font-weight: 850;
+    }
+
+    .yoleo-btn-orange {
+        border-color: rgba(255, 181, 92, .55);
+        background: rgba(255, 181, 92, .18);
+        color: #ffe8c6;
+        font-weight: 850;
+    }
+
+    .yoleo-btn-red {
+        border-color: rgba(255, 93, 115, .55);
+        background: rgba(255, 93, 115, .14);
+        color: #ffd9df;
+        font-weight: 850;
+    }
+
+    .yoleo-btn-muted {
+        border-color: var(--yoleo-border);
+        background: rgba(18, 26, 36, .78);
+        color: #dce6ef;
+    }
+
+    .yoleo-btn-small {
+        min-height: 30px;
+        padding: 6px 9px;
+        border-radius: 8px;
+        font-size: 12px;
+    }
+
+    .yoleo-btn-mini {
+        min-height: 28px;
+        padding: 5px 8px;
+        border-radius: 8px;
+        font-size: 11px;
+    }
+
+    .yoleo-btn-icon {
+        width: 34px;
+        min-width: 34px;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .yoleo-btn.keyboard-focus,
+    .yoleo-btn:focus-visible {
+        outline: 2px solid var(--yoleo-accent-2);
+        outline-offset: 2px;
+    }
+
+    .yoleo-btn.is-running {
+        opacity: .82;
+        cursor: progress;
+    }
+
+    .yoleo-btn.is-ok {
+        box-shadow: 0 0 0 3px rgba(72, 213, 151, .18);
+    }
+
+    .yoleo-btn.is-fail {
+        box-shadow: 0 0 0 3px rgba(255, 93, 115, .18);
+    }
+
+    .yoleo-input {
+        min-width: 0;
+        padding: 8px 10px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 10px;
+        outline: none;
+        background: rgba(4, 7, 11, .92);
+        color: var(--yoleo-text);
+        font: inherit;
+    }
+
+    .yoleo-input:focus {
+        border-color: var(--yoleo-accent);
+        box-shadow: 0 0 0 2px rgba(139, 92, 246, .24);
+    }
+
+    .yoleo-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    .yoleo-table th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        padding: 8px 7px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        background: #1c2633;
+        color: #9fdfff;
+        text-align: left;
+        user-select: none;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        font-size: 11px;
+    }
+
+    .yoleo-table td {
+        padding: 8px 7px;
+        border-bottom: 1px solid rgba(255, 255, 255, .05);
+        white-space: nowrap;
+    }
+
+    .yoleo-table tr:hover td {
+        background: rgba(255, 255, 255, .035);
+    }
+
+
+

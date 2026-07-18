@@ -1,0 +1,240 @@
+{% extends "build_base.html" %}
+
+{% block route_content %}
+
+    <style>
+    .build-options-actions-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-self: start;
+        grid-column: 2 / -1;
+        padding-top: 10px;
+    }
+    @media (max-width: 920px) {
+        .build-options-actions-row {
+            grid-column: 1 / -1;
+            justify-content: flex-start;
+        }
+    }
+
+    .registry-options-toolbar {
+        display:flex;
+        align-items:center;
+        justify-content:flex-end;
+        gap:8px;
+        flex-wrap:wrap;
+        margin:0 0 10px;
+    }
+    .registry-options-toolbar .yoleo-btn {
+        white-space:nowrap;
+    }
+    body.yoleo-has-page-settings .registry-options-toolbar {
+        display:none;
+    }
+    .registry-options-details {
+        margin-top:14px;
+    }
+    @media (max-width: 920px) {
+        .registry-options-toolbar {
+            justify-content:flex-start;
+        }
+    }
+    </style>
+<div id="tab-options" class="tab-panel active">
+                    <section class="card">
+                        <div class="registry-options-toolbar" aria-label="Actions registre">
+                            <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-small" onclick="runRegistryService('registry_service_install', this)">🛠 Installer le service</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-small" onclick="runRegistryService('registry_service_remove', this)">🗑 Supprimer service</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="runRegistryService('registry_service_start', this)">▶ Démarrer</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-orange yoleo-btn-small" onclick="runRegistryService('registry_service_restart', this)">🔁 Redémarrer</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-small" onclick="runRegistryService('registry_service_stop', this)">⏹ Arrêter</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="runRegistryService('registry_service_generate_yaml', this)">🧩 Régénérer la configuration (YAML)</button>
+                        </div>
+
+                        <div class="summary-grid">
+                            <div class="summary-card">
+                                <div class="summary-label">Processus</div>
+                                <div class="summary-value"><span id="rsvc-running" class="badge {{ 'badge-ok' if registry_service.running else 'badge-no' }}">{{ 'Actif' if registry_service.running else 'Arrêté' }}</span></div>
+                                <div class="name-sub">PID : <span id="rsvc-pid">{{ registry_service.pid or '—' }}</span></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Systemd</div>
+                                <div class="summary-value"><span id="rsvc-systemd" class="badge {{ 'badge-ok' if registry_service.service_active == 'active' else 'badge-muted' }}">{{ registry_service.service_active }}</span></div>
+                                <div class="name-sub">Installé : <span id="rsvc-installed">{{ 'oui' if registry_service.service_installed else 'non' }}</span></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Boot</div>
+                                <div class="summary-value"><span id="rsvc-enabled" class="badge {{ 'badge-ok' if registry_service.service_enabled == 'enabled' else 'badge-muted' }}">{{ registry_service.service_enabled }}</span></div>
+                                <div class="name-sub">Service : {{ registry_service.paths.service_name }}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Port</div>
+                                <div class="summary-value"><span id="rsvc-port">{{ registry_service.port or '—' }}</span></div>
+                                <div class="name-sub">Bind : <span id="rsvc-bind">{{ registry_service.bind_addr or '—' }}</span></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Stockage</div>
+                                <div class="summary-value"><span id="rsvc-storage" class="badge {{ 'badge-ok' if registry_service.storage_ready else 'badge-no' }}">{{ 'Prêt' if registry_service.storage_ready else 'Non prêt' }}</span></div>
+                                <div class="name-sub">Data : <span id="rsvc-data">{{ registry_service.data_dir or '—' }}</span></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Config</div>
+                                <div class="summary-value"><span id="rsvc-conf" class="badge {{ 'badge-ok' if not registry_service.conf_error else 'badge-no' }}">{{ 'OK' if not registry_service.conf_error else 'Erreur' }}</span></div>
+                                <div class="name-sub" id="rsvc-conf-error">{{ registry_service.conf_error or '../conf/registry.conf' }}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">Binaire</div>
+                                <div class="summary-value"><span id="rsvc-bin" class="badge {{ 'badge-ok' if registry_service.source_bin_ok else 'badge-no' }}">{{ 'Source OK' if registry_service.source_bin_ok else 'Source absente' }}</span></div>
+                                <div class="name-sub">Runtime : <span id="rsvc-runtime">{{ 'oui' if registry_service.runtime_bin_ok else 'non' }}</span></div>
+                            </div>
+                        </div>
+                        <form method="post" action="{{ url_for('builds_bp.builds_options_route') }}" id="buildOptionsForm" target="_top">
+                            <input type="hidden" name="form_action" value="save_options">
+                            <input type="hidden" name="build_cache_file" value="../conf/build.jdom">
+                            <input type="hidden" name="log_level" value="{{ build_options.log_level }}">
+
+                            <div class="options-grid">
+
+                                <div class="options-card">
+                                    <div class="options-title">Dossiers Build / TAR</div>
+                                    <div class="field-grid">
+                                        <div class="field-row">
+                                            <label for="buildsDirInput">Dossier builds Docker</label>
+                                            <div class="path-input-row">
+                                                <input class="text-input" id="buildsDirInput" type="text" name="builds_dir" value="{{ build_options.builds_dir }}" placeholder="../docker_buils">
+                                                <button type="button" class="yoleo-btn yoleo-btn-muted" title="Parcourir" aria-label="Parcourir" onclick="openBuildPathBrowser('buildsDirInput', 'Dossier builds Docker')">📁</button>
+                                            </div>
+                                            <div class="hint">Dossier contenant les contextes Docker. Si absent, Flask le crée à l'enregistrement.</div>
+                                        </div>
+                                        <div class="field-row">
+                                            <label for="tarDirInput">Dossier TAR</label>
+                                            <div class="path-input-row">
+                                                <input class="text-input" id="tarDirInput" type="text" name="tar_dir" value="{{ build_options.tar_dir }}" placeholder="../tar">
+                                                <button type="button" class="yoleo-btn yoleo-btn-muted" title="Parcourir" aria-label="Parcourir" onclick="openBuildPathBrowser('tarDirInput', 'Dossier TAR')">📁</button>
+                                            </div>
+                                            <div class="hint">Dossier de sortie des TAR. Si absent, Flask le crée à l'enregistrement.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="options-card">
+                                    <div class="options-title">Registre local</div>
+                                    <div class="field-grid">
+                                        <div class="field-row">
+                                            <label for="registryHostInput">Adresse IP / host</label>
+                                            <input class="text-input" id="registryHostInput" type="text" name="registry_host" value="{{ build_options.registry_host }}" data-auto-ip="{{ build_options.host_ip }}">
+                                        </div>
+                                        <div class="field-row">
+                                            <label for="registryPortInput">Port registre</label>
+                                            <input class="text-input" id="registryPortInput" type="number" min="1" max="65535" name="registry_port" value="{{ build_options.registry_port }}" oninput="refreshBuildOptionsPreview()">
+                                        </div>
+                                        <label class="check-row">
+                                            <input type="checkbox" name="auto_ip" value="1" onchange="if(this.checked) fillBuildOptionsAutoIp();">
+                                            <span>Utiliser automatiquement l'IP host</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="options-card">
+                                    <div class="options-title">Registry host</div>
+                                    <div class="field-grid">
+                                        <div class="field-row">
+                                            <label for="bindAddrInput">Bind address</label>
+                                            <input class="text-input" id="bindAddrInput" type="text" name="bind_addr" value="{{ build_options.bind_addr }}">
+                                        </div>
+                                        <div class="field-row">
+                                            <label for="dataDirInput">Data dir</label>
+                                            <input class="text-input" id="dataDirInput" type="text" name="data_dir" value="{{ build_options.data_dir }}">
+                                        </div>
+                                        <label class="check-row">
+                                            <input type="checkbox" name="delete_enabled" value="true" {{ 'checked' if build_options.delete_enabled == 'true' else '' }}>
+                                            <span>Suppression des tags active</span>
+                                        </label>
+                                        <div class="hint">À l'enregistrement, Yoleo régénère le YAML, installe le service, active le boot et démarre le registre automatiquement.</div>
+                                        <input type="hidden" name="http_secret" value="{{ build_options.http_secret }}">
+                                    </div>
+                                </div>
+
+                                <div class="options-card">
+                                    <div class="options-title">Login registre</div>
+                                    <div class="field-grid">
+                                        <div class="field-row">
+                                            <label for="loginHostInput">REGISTRY_HOST</label>
+                                            <input class="text-input" id="loginHostInput" type="text" name="login_host" value="{{ build_options.login_host }}">
+                                        </div>
+                                        <div class="field-row">
+                                            <label for="loginUserInput">REGISTRY_USER</label>
+                                            <input class="text-input" id="loginUserInput" type="text" name="login_user" value="{{ build_options.login_user }}">
+                                        </div>
+                                        <div class="field-row">
+                                            <label for="loginPassInput">REGISTRY_PASS</label>
+                                            <input class="text-input" id="loginPassInput" type="password" name="login_password" value="" placeholder="laisser vide pour conserver">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="options-card">
+                                    <div class="options-title">Docker HTTP</div>
+                                    <div class="field-grid">
+                                        <label class="check-row">
+                                            <input type="checkbox" name="apply_http" value="1" checked>
+                                            <span>Appliquer dans /etc/docker/daemon.json et redemarrer Docker</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="build-options-actions-row">
+                                    <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="fillBuildOptionsAutoIp()">IP auto</button>
+                                    <button type="submit" class="yoleo-btn yoleo-btn-green">Enregistrer les options</button>
+                                </div>
+
+                            </div>
+                        </form>
+
+                        <div class="card registry-options-details">
+                            <div class="topbar">
+                                <div class="title-block">
+                                    <h2>Détails</h2>
+                                    <div class="subtitle">Même logique que le script host : PID dans <b>/var/run/registry_labo_host.pid</b>, process <b>/tmp/registry-host-labo serve registry.yml</b>, conf humaine obligatoire.</div>
+                                </div>
+                            </div>
+                            <pre class="code-line" id="rsvc-detail">{{ registry_service.detail }}</pre>
+                            {% if registry_service.port_listen %}
+                            <div class="hint" style="margin-top:10px;">Port vu par ss :</div>
+                            <pre class="code-line" id="rsvc-port-listen">{{ registry_service.port_listen }}</pre>
+                            {% else %}
+                            <pre class="code-line" id="rsvc-port-listen">Port non vu par ss.</pre>
+                            {% endif %}
+                        </div>
+                    </section>
+                </div>
+
+    <script>
+    function openBuildPathBrowser(targetInputId, title) {
+        const input = document.getElementById(targetInputId);
+        const start = input && input.value ? input.value : '/';
+        const params = new URLSearchParams({target: targetInputId, path: start});
+        const url = '/browser/folder?' + params.toString();
+        const safeTarget = String(targetInputId || 'build').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const popup = window.open(
+            url,
+            'yoleo_build_browser_folder_' + safeTarget,
+            'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+        );
+        if (popup) popup.focus();
+    }
+    window.addEventListener('message', function(event) {
+        const data = event.data || {};
+        if (data.type !== 'yoleo-browser-select' || data.mode !== 'folder' || !data.target) return;
+        const input = document.getElementById(data.target);
+        if (!input) return;
+        input.value = data.path || '';
+        input.dispatchEvent(new Event('input', {bubbles: true}));
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+    });
+    </script>
+{% endblock %}

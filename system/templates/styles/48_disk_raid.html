@@ -1,0 +1,155 @@
+.disk-raid-page.raid-clean-page {
+  display: grid;
+  gap: 14px;
+}
+.disk-raid-page .raid-clean-card {
+  margin: 0;
+  overflow: hidden;
+}
+.disk-raid-page .raid-clean-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 12px 10px;
+}
+.disk-raid-page .raid-clean-head h3 {
+  margin: 0 0 5px 0;
+  line-height: 1.22;
+}
+.disk-raid-page .raid-note {
+  color: var(--muted);
+  font-size: .86rem;
+  line-height: 1.35;
+}
+.disk-raid-page .raid-clean-actions {
+  justify-content: flex-end;
+  white-space: nowrap;
+  align-items: center;
+}
+.disk-raid-page .raid-counter {
+  color: var(--accent);
+  font-weight: 800;
+  white-space: nowrap;
+}
+.disk-raid-page .raid-selected-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid rgba(26, 235, 255, .22);
+  border-radius: 999px;
+  background: rgba(26, 235, 255, .08);
+  color: #dffbff;
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.disk-raid-page .raid-table th,
+.disk-raid-page .raid-table td {
+  vertical-align: middle;
+}
+.disk-raid-page .raid-select-col {
+  width: 58px;
+  text-align: center;
+}
+.disk-raid-page .raid-empty-table .raid-select-col input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.disk-raid-page .raid-action-col {
+  width: 90px;
+  text-align: center;
+}
+.disk-raid-page .raid-delete-btn {
+  min-width: 34px;
+  padding-inline: 9px;
+  font-weight: 900;
+}
+.disk-raid-page .raid-delete-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  filter: grayscale(.3);
+}
+.disk-raid-page .raid-flash {
+  margin: 2px 12px 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(26, 235, 255, .25);
+  background: rgba(26, 235, 255, .08);
+  color: #cfffff;
+}
+.disk-raid-page .raid-flash.bad {
+  border-color: rgba(255, 93, 115, .4);
+  background: rgba(255, 93, 115, .12);
+  color: #ffd9df;
+}
+.disk-raid-page .raid-flash.ok {
+  border-color: rgba(72, 213, 151, .35);
+  background: rgba(72, 213, 151, .12);
+  color: #dbfff0;
+}
+.raid-create-modal-box {
+  width: min(500px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.raid-create-modal-box .modal-head,
+.raid-create-modal-box .modal-actions {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+}
+.raid-create-modal-box .modal-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 12px;
+  gap: 7px;
+}
+.raid-create-modal-box .form-row {
+  gap: 4px;
+}
+.raid-create-modal-box .maintenance-note,
+.raid-create-modal-box .hint {
+  font-size: 10px;
+  line-height: 1.28;
+}
+.raid-create-modal-box input,
+.raid-create-modal-box select {
+  min-height: 34px;
+  padding-block: 6px;
+}
+.raid-selected-devices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 28px;
+  align-items: center;
+  padding: 4px 7px;
+  border: 1px solid var(--yoleo-border);
+  border-radius: 10px;
+  background: rgba(10, 15, 22, .72);
+}
+.raid-selected-devices .mount-path {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(26, 235, 255, .08);
+  border: 1px solid rgba(26, 235, 255, .18);
+}
+@media (max-width: 900px) {
+  .disk-raid-page .raid-clean-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .disk-raid-page .raid-clean-actions {
+    justify-content: flex-start;
+  }
+}

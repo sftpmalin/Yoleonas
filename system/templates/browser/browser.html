@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0e1218">
+    {% set effective_dashboard_config = system_dashboard_config if system_dashboard_config is defined and system_dashboard_config else (dashboard_config if dashboard_config is defined else none) %}
+    {% set yoleo_nav_icon = (effective_dashboard_config.nav_icons if effective_dashboard_config and effective_dashboard_config.nav_icons else '/static/logo/dashboard_flask.png') %}
+    <link rel="icon" type="image/png" href="{{ yoleo_nav_icon }}">
+    <link rel="shortcut icon" href="{{ yoleo_nav_icon }}">
+    <title>{{ mode_label }} - Yoleo</title>
+    {% include "style.html" %}
+</head>
+<body class="yoleo-browser-window yoleo-browser-window-bottom-actions-v4">
+<main class="browser-page" tabindex="-1" data-browser-mode="{{ mode }}" data-browser-target="{{ target }}" data-browser-start="{{ start_path }}">
+    <section class="yoleo-card browser-panel">
+        <header class="browser-toolbar">
+            <button type="button" class="yoleo-btn" id="browser-root">Racine</button>
+            <button type="button" class="yoleo-btn" id="browser-parent">Parent</button>
+            <label class="browser-path-label" for="browser-path">Chemin</label>
+            <input id="browser-path" class="yoleo-input browser-path-input" type="text" value="{{ start_path }}" autocomplete="off">
+            <button type="button" class="yoleo-btn" id="browser-refresh">Actualiser</button>
+            <div class="browser-view-toggle" role="group" aria-label="Mode d’affichage">
+                <button type="button" class="yoleo-btn browser-view-btn" id="browser-view-list" data-view="list">Liste</button>
+                <button type="button" class="yoleo-btn browser-view-btn" id="browser-view-grid" data-view="grid">Mosaïque</button>
+            </div>
+        </header>
+
+        <div class="browser-status" id="browser-status" aria-live="polite"></div>
+
+        <div class="browser-grid-wrap" id="browser-grid-wrap" hidden>
+            <div class="browser-grid" id="browser-grid"></div>
+        </div>
+
+        <div class="browser-table-wrap" id="browser-table-wrap">
+            <table class="yoleo-table browser-table">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Type</th>
+                        <th>Taille</th>
+                        <th>Droits</th>
+                        <th>Propriétaire</th>
+                        <th>Modifié</th>
+                    </tr>
+                </thead>
+                <tbody id="browser-rows">
+                    <tr>
+                        <td colspan="6">Chargement…</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="browser-footer">
+            <div class="browser-selection">
+                <span>Sélection :</span>
+                <strong id="browser-selection-text">Aucune</strong>
+            </div>
+            <div class="browser-actions">
+                <button type="button" class="yoleo-btn" id="browser-cancel">Annuler</button>
+                {% if mode == 'folder' %}
+                <button type="button" class="yoleo-btn" id="browser-select-current">Choisir ce dossier</button>
+                {% endif %}
+                <button type="button" class="yoleo-btn yoleo-btn-primary" id="browser-validate" disabled>Valider</button>
+            </div>
+        </footer>
+    </section>
+</main>
+
+<script>
+(function () {
+    'use strict';
+
+    const page = document.querySelector('.browser-page');
+    if (!page) return;
+
+    const mode = page.dataset.browserMode || 'file';
+    const target = page.dataset.browserTarget || '';
+    const startPath = page.dataset.browserStart || '/';
+    const pathInput = document.getElementById('browser-path');
+    const rows = document.getElementById('browser-rows');
+    const tableWrap = document.getElementById('browser-table-wrap');
+    const gridWrap = document.getElementById('browser-grid-wrap');
+    const grid = document.getElementById('browser-grid');
+    const status = document.getElementById('browser-status');
+    const selectionText = document.getElementById('browser-selection-text');
+    const validateButton = document.getElementById('browser-validate');
+    const selectCurrentButton = document.getElementById('browser-select-current');
+    const parentButton = document.getElementById('browser-parent');
+    const rootButton = document.getElementById('browser-root');
+    const refreshButton = document.getElementById('browser-refresh');
+    const cancelButton = document.getElementById('browser-cancel');
+    const viewButtons = Array.from(document.querySelectorAll('.browser-view-btn'));
+
+    const viewStoreKey = 'yoleo.browser.view.' + mode;
+    let currentPath = startPath;
+    let parentPath = '/';
+    let selected = null;
+    let currentEntries = [];
+    let currentView = localStorage.getItem(viewStoreKey) || (mode === 'image' ? 'grid' : 'list');
+
+    function text(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'}[c]));
+    }
+
+    function iconFor(item) {
+        if (item.is_dir) return '📁';
+        if (item.is_image) return '🖼️';
+        return '📄';
+    }
+
+    function setStatus(message, isError) {
+        status.textContent = message || '';
+        status.classList.toggle('is-error', Boolean(isError));
+    }
+
+    function clearSelection() {
+        selected = null;
+        selectionText.textContent = 'Aucune';
+        validateButton.disabled = true;
+        document.querySelectorAll('.browser-row.is-selected, .browser-grid-card.is-selected').forEach(item => item.classList.remove('is-selected'));
+    }
+
+    function setSelection(item) {
+        selected = item;
+        document.querySelectorAll('.browser-row.is-selected, .browser-grid-card.is-selected').forEach(active => active.classList.remove('is-selected'));
+        document.querySelectorAll('[data-browser-index="' + String(currentEntries.indexOf(item)) + '"]').forEach(active => active.classList.add('is-selected'));
+        selectionText.textContent = item && item.path ? item.path : 'Aucune';
+        validateButton.disabled = !(item && item.selectable);
+    }
+
+    function activeIndex() {
+        const index = currentEntries.indexOf(selected);
+        return index >= 0 ? index : -1;
+    }
+
+    function scrollSelectionIntoView(index) {
+        const root = currentView === 'grid' ? grid : rows;
+        const active = root.querySelector('[data-browser-index="' + String(index) + '"]');
+        if (active) {
+            active.scrollIntoView({block: 'nearest', inline: 'nearest'});
+        }
+    }
+
+    function selectIndex(index, scroll) {
+        if (!currentEntries.length) return;
+        const safeIndex = Math.max(0, Math.min(currentEntries.length - 1, index));
+        setSelection(currentEntries[safeIndex]);
+        if (scroll !== false) {
+            scrollSelectionIntoView(safeIndex);
+        }
+    }
+
+    function moveSelection(delta) {
+        if (!currentEntries.length) return;
+        const index = activeIndex();
+        if (index < 0) {
+            selectIndex(delta < 0 ? currentEntries.length - 1 : 0);
+            return;
+        }
+        selectIndex(index + delta);
+    }
+
+    function focusBrowser(force) {
+        requestAnimationFrame(() => {
+            const active = document.activeElement;
+            if (!force && active && /^(INPUT|TEXTAREA|SELECT)$/i.test(active.tagName)) return;
+            page.focus({preventScroll: true});
+        });
+    }
+
+    function openEntry(item) {
+        if (item.is_dir) {
+            loadPath(item.path);
+            return;
+        }
+        if (item.selectable) {
+            returnSelection(item.path);
+        }
+    }
+
+    function renderPreview(item) {
+        if (item.is_image && item.preview_url) {
+            return '<img src="' + text(item.preview_url) + '" alt="' + text(item.name) + '" loading="lazy">';
+        }
+        return '<div class="browser-grid-icon">' + iconFor(item) + '</div>';
+    }
+
+    function renderTable(entries) {
+        if (!entries.length) {
+            rows.innerHTML = '<tr><td colspan="6">Aucun élément affichable dans ce mode.</td></tr>';
+            return;
+        }
+        rows.innerHTML = entries.map((item, index) => `
+            <tr class="browser-row ${item.selectable ? 'is-selectable' : ''}" data-browser-index="${index}">
+                <td class="browser-name-cell"><span class="browser-file-icon">${iconFor(item)}</span>${text(item.name)}</td>
+                <td>${text(item.type)}</td>
+                <td>${text(item.size)}</td>
+                <td><code>${text(item.perms)}</code></td>
+                <td>${text(item.owner)}</td>
+                <td>${text(item.mtime)}</td>
+            </tr>`).join('');
+
+        rows.querySelectorAll('.browser-row').forEach(row => {
+            const item = currentEntries[Number(row.dataset.browserIndex)];
+            row.addEventListener('click', () => {
+                setSelection(item);
+                focusBrowser();
+            });
+            row.addEventListener('dblclick', () => openEntry(item));
+        });
+    }
+
+    function renderGrid(entries) {
+        if (!entries.length) {
+            grid.innerHTML = '<div class="browser-grid-empty">Aucun élément affichable dans ce mode.</div>';
+            return;
+        }
+        grid.innerHTML = entries.map((item, index) => `
+            <button type="button" class="browser-grid-card ${item.selectable ? 'is-selectable' : ''}" data-browser-index="${index}">
+                <span class="browser-grid-thumb">${renderPreview(item)}</span>
+                <span class="browser-grid-name">${text(item.name)}</span>
+                <span class="browser-grid-meta">${text(item.type)} · ${text(item.size)}</span>
+            </button>`).join('');
+
+        grid.querySelectorAll('.browser-grid-card').forEach(card => {
+            const item = currentEntries[Number(card.dataset.browserIndex)];
+            card.addEventListener('click', () => {
+                setSelection(item);
+                focusBrowser();
+            });
+            card.addEventListener('dblclick', () => openEntry(item));
+        });
+    }
+
+    function renderEntries(entries) {
+        currentEntries = entries || [];
+        renderTable(currentEntries);
+        renderGrid(currentEntries);
+    }
+
+    function applyView(view) {
+        currentView = view === 'grid' ? 'grid' : 'list';
+        localStorage.setItem(viewStoreKey, currentView);
+        const isGrid = currentView === 'grid';
+        tableWrap.hidden = isGrid;
+        gridWrap.hidden = !isGrid;
+        viewButtons.forEach(button => {
+            const active = button.dataset.view === currentView;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+    }
+
+    async function loadPath(path) {
+        const nextPath = path || pathInput.value || '/';
+        setStatus('Chargement…', false);
+        rows.innerHTML = '<tr><td colspan="6">Chargement…</td></tr>';
+        grid.innerHTML = '<div class="browser-grid-empty">Chargement…</div>';
+        clearSelection();
+
+        try {
+            const params = new URLSearchParams({mode, path: nextPath});
+            const response = await fetch('/browser/api/list?' + params.toString(), {cache: 'no-store'});
+            const data = await response.json();
+            if (!data.ok) {
+                rows.innerHTML = '<tr><td colspan="6">' + text(data.error || 'Erreur') + '</td></tr>';
+                grid.innerHTML = '<div class="browser-grid-empty">' + text(data.error || 'Erreur') + '</div>';
+                setStatus(data.error || 'Erreur de lecture', true);
+                return;
+            }
+
+            currentPath = data.path || nextPath;
+            parentPath = data.parent || '/';
+            pathInput.value = currentPath;
+            if (data.warning) {
+                setStatus(data.warning, false);
+            } else {
+                setStatus(data.entries.length + ' élément(s)', false);
+            }
+            renderEntries(data.entries || []);
+            applyView(currentView);
+            focusBrowser(true);
+        } catch (error) {
+            rows.innerHTML = '<tr><td colspan="6">Erreur de chargement.</td></tr>';
+            grid.innerHTML = '<div class="browser-grid-empty">Erreur de chargement.</div>';
+            setStatus(String(error), true);
+        }
+    }
+
+    function returnSelection(path) {
+        const payload = {type: 'yoleo-browser-select', mode, target, path};
+
+        try {
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage(payload, '*');
+                if (target && window.opener.document) {
+                    const openerDoc = window.opener.document;
+                    let field = openerDoc.getElementById(target);
+                    if (!field) {
+                        field = openerDoc.querySelector('[name="' + target.replace(/"/g, '\\"') + '"]');
+                    }
+                    if (field) {
+                        field.value = path;
+                        field.dispatchEvent(new Event('input', {bubbles: true}));
+                        field.dispatchEvent(new Event('change', {bubbles: true}));
+                    }
+                }
+                window.close();
+                return;
+            }
+        } catch (error) {}
+
+        try {
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage(payload, '*');
+                return;
+            }
+        } catch (error) {}
+
+        selectionText.textContent = path;
+        setStatus('Chemin sélectionné : ' + path, false);
+    }
+
+    pathInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            loadPath(pathInput.value);
+        }
+    });
+
+    document.addEventListener('keydown', event => {
+        const active = document.activeElement;
+        const isControl = active && active.closest && active.closest('input, textarea, select, button, a');
+        if (isControl) return;
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            moveSelection(1);
+            return;
+        }
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            moveSelection(-1);
+            return;
+        }
+        if (event.key === 'PageDown') {
+            event.preventDefault();
+            moveSelection(10);
+            return;
+        }
+        if (event.key === 'PageUp') {
+            event.preventDefault();
+            moveSelection(-10);
+            return;
+        }
+        if (event.key === 'Home') {
+            event.preventDefault();
+            selectIndex(0);
+            return;
+        }
+        if (event.key === 'End') {
+            event.preventDefault();
+            selectIndex(currentEntries.length - 1);
+            return;
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'Backspace') {
+            event.preventDefault();
+            loadPath(parentPath);
+            return;
+        }
+        if (event.key === 'ArrowRight') {
+            if (selected && selected.is_dir) {
+                event.preventDefault();
+                openEntry(selected);
+            }
+            return;
+        }
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            if (selected && mode === 'folder' && selected.selectable) {
+                returnSelection(selected.path);
+            } else if (selected) {
+                openEntry(selected);
+            } else if (mode === 'folder') {
+                returnSelection(currentPath);
+            }
+            return;
+        }
+        if ((event.key === ' ' || event.key === 'Spacebar') && selected && selected.selectable) {
+            event.preventDefault();
+            returnSelection(selected.path);
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            cancelButton.click();
+        }
+    });
+
+    viewButtons.forEach(button => {
+        button.addEventListener('click', () => applyView(button.dataset.view));
+    });
+    parentButton.addEventListener('click', () => loadPath(parentPath));
+    rootButton.addEventListener('click', () => loadPath('/'));
+    refreshButton.addEventListener('click', () => loadPath(pathInput.value));
+    cancelButton.addEventListener('click', () => {
+        if (window.opener && !window.opener.closed) {
+            window.close();
+            return;
+        }
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({type: 'yoleo-browser-close'}, '*');
+            return;
+        }
+        history.back();
+    });
+    validateButton.addEventListener('click', () => {
+        if (selected && selected.selectable) returnSelection(selected.path);
+    });
+    if (selectCurrentButton) {
+        selectCurrentButton.addEventListener('click', () => returnSelection(currentPath));
+    }
+
+    applyView(currentView);
+    focusBrowser();
+    loadPath(startPath);
+})();
+</script>
+</body>
+</html>

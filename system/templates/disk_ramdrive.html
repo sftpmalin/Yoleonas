@@ -1,0 +1,230 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-ramdrive" class="disk-section disk-ramdrive-page">
+    <section class="summary-grid ramdrive-summary-grid">
+        <div class="summary-card yoleo-card"><div class="summary-label">RAMDrives</div><div class="summary-value cyan" id="ramdrive-count">—</div></div>
+        <div class="summary-card yoleo-card"><div class="summary-label">Montés</div><div class="summary-value green" id="ramdrive-mounted">—</div></div>
+        <div class="summary-card yoleo-card"><div class="summary-label">Fstab</div><div class="summary-value" id="ramdrive-persistent">—</div></div>
+        <div class="summary-card yoleo-card ramdrive-base-card"><div class="summary-label">Base</div><div class="summary-value ramdrive-base" id="ramdrive-base">—</div></div>
+    </section>
+
+    <section class="yoleo-card table-card ramdrive-card">
+        <div id="ramdrive-message" class="ramdrive-inline-message" hidden></div>
+        <div class="table-wrap disk-table-compact ramdrive-table-wrap" data-yoleo-context-zone="disk-ramdrive-table">
+            <table class="yoleo-table ramdrive-table">
+                <thead>
+                    <tr>
+                        <th class="ramdrive-name-col">Nom</th>
+                        <th class="ramdrive-path-col">Point de montage</th>
+                        <th class="ramdrive-size-col">Taille</th>
+                        <th class="ramdrive-state-col">État</th>
+                        <th class="ramdrive-fstab-col">Fstab</th>
+                        <th class="ramdrive-actions-col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="ramdrive-tbody"><tr><td colspan="6" class="empty-state">Chargement RAMDrive...</td></tr></tbody>
+            </table>
+        </div>
+        <div class="ramdrive-mobile-list" id="ramdrive-mobile" hidden></div>
+        <pre class="output-box ramdrive-output" id="ramdrive-output" hidden></pre>
+    </section>
+</div>
+
+<div class="modal-backdrop" id="ramdrive-modal">
+    <div class="modal ramdrive-modal-box">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title">Créer un RAMDrive</div>
+                <div class="hint">tmpfs : très rapide, temporaire, contenu perdu au démontage ou redémarrage.</div>
+            </div>
+            <button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('ramdrive-modal')">✕</button>
+        </div>
+        <div class="modal-body ramdrive-modal-body">
+            <div class="ramdrive-form-grid">
+                <div class="form-row ramdrive-name-field"><label>Nom</label><input id="ramdrive-name" value="ram1" placeholder="ram1"></div>
+                <div class="form-row ramdrive-size-field"><label>Taille en Go</label><input id="ramdrive-size" type="number" min="0.1" step="0.1" value="1"></div>
+            </div>
+            <div class="form-row ramdrive-mount-field">
+                <label>Point de montage</label>
+                <input id="ramdrive-mountpoint" placeholder="/mnt/ramdrive/ram1">
+            </div>
+            <div class="ramdrive-options-line">
+                <button type="button" class="yoleo-btn yoleo-btn-small" onclick="ramdriveSetBase('/mnt/ramdrive')">/mnt/ramdrive</button>
+                <button type="button" class="yoleo-btn yoleo-btn-small" onclick="ramdriveSetBase('/mnt')">/mnt</button>
+                <button type="button" class="yoleo-btn yoleo-btn-small" onclick="openBrowserFor('ramdrive-mountpoint','ramdrive-browser-box','ramdrive-browser-current','ramdrive-browser-list')">📁 Parcourir</button>
+                <label class="check-row ramdrive-inline-check"><input type="checkbox" id="ramdrive-mount-now" checked> Monter maintenant</label>
+                <label class="check-row ramdrive-inline-check"><input type="checkbox" id="ramdrive-add-fstab"> Fstab</label>
+            </div>
+            <div class="browser-box" id="ramdrive-browser-box" hidden>
+                <div class="browser-current" id="ramdrive-browser-current">/</div>
+                <div class="browser-list" id="ramdrive-browser-list"></div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('ramdrive-modal')">Annuler</button>
+            <button class="yoleo-btn yoleo-btn-small yoleo-btn-green" id="ramdrive-submit-btn" onclick="submitRamdriveCreate()">OK</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let ramdriveData = null;
+let ramdriveBusy = false;
+let ramdriveTimer = null;
+
+function ramdriveMsg(message, ok = true, sticky = false) {
+    const box = $('ramdrive-message');
+    if (!box) return;
+    box.hidden = false;
+    box.className = 'ramdrive-inline-message ' + (ok ? 'ok' : 'bad');
+    box.textContent = message || '';
+    window.clearTimeout(box._hideTimer);
+    if (ok && !sticky) box._hideTimer = window.setTimeout(() => { box.hidden = true; box.textContent = ''; }, 2800);
+}
+function ramdriveOutput(text) {
+    const out = $('ramdrive-output');
+    if (!out) return;
+    out.textContent = text || '';
+    out.hidden = !text;
+}
+function ramdriveNameSafe(value) {
+    return String(value || 'ram1').trim().replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^[._-]+|[._-]+$/g, '') || 'ram1';
+}
+function ramdriveBase() {
+    return String(ramdriveData?.base_path || '/mnt/ramdrive').replace(/\/$/, '');
+}
+function ramdriveSetBase(base) {
+    const name = ramdriveNameSafe($('ramdrive-name')?.value || 'ram1');
+    const target = String(base || '/mnt/ramdrive').replace(/\/$/, '') + '/' + name;
+    if ($('ramdrive-mountpoint')) $('ramdrive-mountpoint').value = target;
+}
+function ramdriveSyncMountpoint(force = false) {
+    const mp = $('ramdrive-mountpoint');
+    if (!mp) return;
+    const base = ramdriveBase();
+    const name = ramdriveNameSafe($('ramdrive-name')?.value || 'ram1');
+    const current = String(mp.value || '').trim();
+    if (force || !current || current === base || current.startsWith(base + '/ram')) mp.value = base + '/' + name;
+}
+function openRamdriveModal() {
+    if ($('ramdrive-name')) $('ramdrive-name').value = 'ram1';
+    if ($('ramdrive-size')) $('ramdrive-size').value = '1';
+    if ($('ramdrive-mount-now')) $('ramdrive-mount-now').checked = true;
+    if ($('ramdrive-add-fstab')) $('ramdrive-add-fstab').checked = false;
+    ramdriveSyncMountpoint(true);
+    const browser = $('ramdrive-browser-box');
+    if (browser) browser.hidden = true;
+    openModal('ramdrive-modal');
+}
+function ramdriveBadge(text, kind) {
+    const cls = kind === 'ok' ? 'badge-temp-ok' : (kind === 'bad' ? 'badge-temp-crit' : 'badge-muted');
+    return `<span class="badge ${cls}">${esc(text || '—')}</span>`;
+}
+function ramdriveState(row) {
+    return row.mounted ? ramdriveBadge('monté', 'ok') : ramdriveBadge('arrêté', 'muted');
+}
+function ramdriveFstab(row) {
+    return row.from_fstab ? ramdriveBadge('oui', 'ok') : ramdriveBadge('non', 'muted');
+}
+function ramdriveActionButtons(row) {
+    const mp = esc(row.mountpoint || '');
+    const main = row.mounted
+        ? `<button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-orange yoleo-btn-mini" data-mountpoint="${mp}" onclick="ramdriveAction('unmount', this.dataset.mountpoint)">■ Démonter</button>`
+        : `<button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-green yoleo-btn-mini" data-mountpoint="${mp}" onclick="ramdriveAction('mount', this.dataset.mountpoint)">▶ Monter</button>`;
+    return `<div class="actions-line ramdrive-actions-line">${main}<button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-red yoleo-btn-mini yoleo-btn-icon" title="Supprimer" data-mountpoint="${mp}" onclick="ramdriveDelete(this.dataset.mountpoint)">🗑️</button></div>`;
+}
+function renderRamdrive(rows) {
+    const tbody = $('ramdrive-tbody');
+    const mobile = $('ramdrive-mobile');
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Aucun RAMDrive.</td></tr>';
+        if (mobile) { mobile.hidden = false; mobile.innerHTML = '<div class="empty-state">Aucun RAMDrive.</div>'; }
+        return;
+    }
+    if (tbody) tbody.innerHTML = list.map(row => `<tr data-mountpoint="${esc(row.mountpoint || '')}">
+        <td><div class="disk-name">${esc(row.name || 'RAMDrive')}</div></td>
+        <td><span class="mount-path" title="${esc(row.mountpoint || '')}">${esc(row.mountpoint || '—')}</span></td>
+        <td>${esc(row.size_label || '—')}</td>
+        <td>${ramdriveState(row)}</td>
+        <td>${ramdriveFstab(row)}</td>
+        <td class="actions-col">${ramdriveActionButtons(row)}</td>
+    </tr>`).join('');
+    if (mobile) {
+        mobile.hidden = false;
+        mobile.innerHTML = list.map(row => `<article class="ramdrive-mobile-card ${row.mounted ? 'is-mounted' : 'is-stopped'}">
+            <div class="ramdrive-mobile-top"><strong>${esc(row.name || 'RAMDrive')}</strong>${ramdriveState(row)}</div>
+            <div class="ramdrive-mobile-line"><span>Montage</span><b>${esc(row.mountpoint || '—')}</b></div>
+            <div class="ramdrive-mobile-line"><span>Taille</span><b>${esc(row.size_label || '—')}</b></div>
+            <div class="ramdrive-mobile-line"><span>Fstab</span><b>${row.from_fstab ? 'oui' : 'non'}</b></div>
+            <div class="ramdrive-mobile-actions">${ramdriveActionButtons(row)}</div>
+        </article>`).join('');
+    }
+}
+async function loadRamdrive(showMessage = false) {
+    try {
+        const response = await fetch('/disk/api/ramdrive', {cache: 'no-store'});
+        const data = await response.json();
+        if (!response.ok || data.ok === false) throw new Error(data.message || ('HTTP ' + response.status));
+        ramdriveData = data || {};
+        const s = data.summary || {};
+        if ($('ramdrive-count')) $('ramdrive-count').textContent = s.profiles ?? '0';
+        if ($('ramdrive-mounted')) $('ramdrive-mounted').textContent = s.mounted ?? '0';
+        if ($('ramdrive-persistent')) $('ramdrive-persistent').textContent = s.persistent ?? '0';
+        if ($('ramdrive-base')) $('ramdrive-base').textContent = data.base_path || '—';
+        if (!$('ramdrive-mountpoint')?.value) ramdriveSyncMountpoint(true);
+        renderRamdrive(data.rows || []);
+        if (showMessage) ramdriveMsg('RAMDrive actualisé.', true, false);
+    } catch (err) {
+        ramdriveMsg('Erreur RAMDrive : ' + err.message, false, true);
+    }
+}
+async function ramdrivePost(url, payload, busyText) {
+    if (ramdriveBusy) return;
+    ramdriveBusy = true;
+    document.querySelectorAll('.ramdrive-card button, #ramdrive-submit-btn').forEach(btn => btn.disabled = true);
+    ramdriveMsg(busyText || 'Action RAMDrive en cours...', true, true);
+    try {
+        const response = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload || {})});
+        const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+        ramdriveMsg(data.message || (data.ok ? 'Action terminée.' : 'Erreur RAMDrive.'), !!data.ok, !data.ok);
+        ramdriveOutput(data.output || '');
+        await loadRamdrive(false);
+    } catch (err) {
+        ramdriveMsg('Erreur Ajax : ' + err.message, false, true);
+    } finally {
+        ramdriveBusy = false;
+        document.querySelectorAll('.ramdrive-card button, #ramdrive-submit-btn').forEach(btn => btn.disabled = false);
+    }
+}
+async function submitRamdriveCreate() {
+    const payload = {
+        name: $('ramdrive-name')?.value || 'ram1',
+        size_gb: $('ramdrive-size')?.value || '1',
+        mountpoint: $('ramdrive-mountpoint')?.value || '',
+        mount_now: !!$('ramdrive-mount-now')?.checked,
+        add_fstab: !!$('ramdrive-add-fstab')?.checked,
+    };
+    if (!String(payload.mountpoint || '').startsWith('/')) { ramdriveMsg('Point de montage absolu obligatoire.', false, true); return; }
+    if (!payload.mount_now && !payload.add_fstab) { ramdriveMsg('Coche Monter maintenant ou Ajouter dans /etc/fstab.', false, true); return; }
+    closeModal('ramdrive-modal');
+    await ramdrivePost('/disk/api/action/ramdrive/create', payload, 'Création RAMDrive en cours...');
+}
+async function ramdriveAction(action, mountpoint) {
+    await ramdrivePost('/disk/api/action/ramdrive/' + action, {mountpoint}, action === 'mount' ? 'Montage RAMDrive en cours...' : 'Démontage RAMDrive en cours...');
+}
+async function ramdriveDelete(mountpoint) {
+    const ok = await showConfirm('Supprimer le RAMDrive', 'Supprimer ' + mountpoint + ' ? S’il est monté, il sera démonté avant suppression. Le dossier local sera supprimé seulement s’il est vide.', 'Supprimer', true);
+    if (!ok) return;
+    await ramdrivePost('/disk/api/action/ramdrive/delete', {mountpoint}, 'Suppression RAMDrive en cours...');
+}
+document.addEventListener('DOMContentLoaded', function () {
+    const nameInput = $('ramdrive-name');
+    if (nameInput) nameInput.addEventListener('input', () => ramdriveSyncMountpoint(false));
+    loadRamdrive(false);
+    window.clearInterval(ramdriveTimer);
+    ramdriveTimer = window.setInterval(() => { if (!ramdriveBusy) loadRamdrive(false); }, 2500);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,6 @@
+{% extends "system_base.html" %}
+
+{# Compatibilite seulement : les routes Python rendent directement les fichiers system_*.html. #}
+{% block system_content %}
+<p class="empty-state">Page systeme legacy. Utilise les routes dediees comme /system/info, /system/services ou /system/personnalisation.</p>
+{% endblock %}

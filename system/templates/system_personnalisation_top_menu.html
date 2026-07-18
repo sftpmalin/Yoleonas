@@ -1,0 +1,574 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<div class="pers-page pers-menu-page pers-top-menu-page">
+    {% include "partials/system_personnalisation_subnav.html" %}
+
+    <div id="topMenuStatus" class="status-line personal-menu-status-top" hidden></div>
+
+    <div class="card pers-menu-card personal-browser-card top-menu-personal-card">
+        <div class="card-body pers-menu-card-body">
+            <div class="personal-browser-head">
+                <div>
+                    <div class="pers-menu-section-title">Menu cranté personnalisé</div>
+                    <div id="topMenuCounter" class="personal-browser-counter"></div>
+                    <div id="topMenuCrumbs" class="personal-browser-crumbs"></div>
+                </div>
+                <div class="personal-browser-actions">
+                    <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="topMenuAddCommand()">+ Commande</button>
+                </div>
+            </div>
+
+            <section class="top-menu-category-box" aria-label="Réglages de cette roue crantée">
+                <div class="top-menu-category-title">
+                    <span class="top-menu-category-icon" id="topMenuSectionPreview">⚙️</span>
+                    <div>
+                        <div class="top-menu-category-heading">Menu cranté</div>
+                        <div class="top-menu-category-sub">Icône, nom et route(s) qui déclenchent ce menu. Séparer plusieurs routes avec <code>||</code>.</div>
+                    </div>
+                </div>
+                <div class="top-menu-category-fields">
+                    <label class="top-menu-enabled-check" title="Active ou désactive cette roue crantée">
+                        <input type="checkbox" id="topMenuSectionEnabled">
+                        <span>Actif</span>
+                    </label>
+                    <input class="input top-menu-section-label" id="topMenuSectionLabel" placeholder="Nom du menu">
+                    <input class="input top-menu-section-icon" id="topMenuSectionIcon" placeholder="Emoji ou /static/logo.png">
+                    <button type="button" class="personal-tile-action" title="Parcourir" onclick="openStaticBrowser('topMenuSectionIcon')">📂</button>
+                    <input class="input top-menu-section-match" id="topMenuSectionMatch" placeholder="/terminal ou /docker||/dockers" title="Route(s) qui affichent ce menu. Plusieurs routes possibles avec ||">
+                </div>
+            </section>
+
+            <div id="topMenuBrowser" class="personal-browser-list top-menu-browser-list"></div>
+        </div>
+    </div>
+</div>
+
+<div id="topMenuConfirmModal" class="top-menu-confirm-overlay" hidden>
+    <div class="top-menu-confirm-box" role="dialog" aria-modal="true" aria-labelledby="topMenuConfirmTitle">
+        <h2 class="top-menu-confirm-title" id="topMenuConfirmTitle">Confirmation</h2>
+        <div class="top-menu-confirm-body" id="topMenuConfirmBody"></div>
+        <div class="top-menu-confirm-actions">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" id="topMenuConfirmCancel">Annuler</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red" id="topMenuConfirmOk">Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.pers-top-menu-page { display:flex; flex-direction:column; gap:10px; }
+.top-menu-personal-card .card-body { display:flex; flex-direction:column; gap:14px; }
+.top-menu-category-box { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; width:fit-content; max-width:100%; margin-left:auto; margin-right:auto; align-self:center; padding:10px 12px; border:1px solid rgba(34,211,238,.20); border-radius:14px; background:rgba(2,6,23,.22); }
+.top-menu-category-title { display:flex; align-items:center; gap:10px; min-width:0; }
+.top-menu-category-icon { width:40px; height:40px; display:grid; place-items:center; flex:0 0 40px; border-radius:10px; border:1px solid rgba(148,163,184,.22); background:rgba(2,6,23,.42); font-size:26px; overflow:hidden; }
+.top-menu-category-icon img, .personal-edit-icon img, .personal-tile-icon img { max-width:100%; max-height:100%; object-fit:contain; }
+.top-menu-category-heading { color:#fff; font-weight:900; line-height:1.15; }
+.top-menu-category-sub { color:#9fb3c8; font-size:.78rem; margin-top:2px; }
+.top-menu-category-fields { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.top-menu-category-fields input { width:auto; }
+.top-menu-section-label { min-width:14ch; max-width:32ch; }
+.top-menu-section-icon { min-width:8ch; max-width:34ch; }
+.top-menu-section-match { min-width:24ch; max-width:min(72vw, 70ch); font-family:ui-monospace, SFMono-Regular, Consolas, monospace; }
+.top-menu-category-sub code { color:#8edcff; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; }
+.top-menu-enabled-check { padding:7px 9px; border:1px solid rgba(148,163,184,.20); border-radius:10px; background:rgba(15,23,42,.50); }
+.top-menu-browser-list { align-items:center; }
+.top-menu-route-note { color:#8edcff; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; }
+.personal-menu-status-top {
+    position: fixed;
+    top: 126px;
+    left: min(24vw, 360px);
+    z-index: 5000;
+    display: none !important;
+    margin: 0;
+    max-width: min(720px, calc(100vw - 48px));
+    min-height: 0;
+    pointer-events: none;
+    padding:7px 11px;
+    border-radius:10px;
+    font-size:.84rem;
+}
+.personal-menu-status-top.is-visible { display:block !important; }
+.personal-menu-status-top[hidden] { display:none !important; }
+.personal-menu-status-top.ok { border:1px solid rgba(34,197,94,.45); background:rgba(22,163,74,.13); color:#bbf7d0; }
+.personal-menu-status-top.bad { border:1px solid rgba(244,63,94,.5); background:rgba(127,29,29,.18); color:#fecdd3; }
+.personal-browser-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.personal-browser-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.personal-browser-counter { margin-top:4px; color:#b8c7dc; font-size:.84rem; }
+.personal-browser-crumbs { margin-top:8px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; color:#a7f3d0; font-size:.84rem; }
+.personal-browser-crumbs button { border:1px solid rgba(34,211,238,.26); border-radius:999px; background:rgba(2,6,23,.54); color:#dbeafe; padding:4px 9px; cursor:pointer; }
+.personal-browser-list { display:flex; flex-direction:column; gap:8px; min-height:210px; padding:2px; }
+.personal-browser-empty { width:100%; box-sizing:border-box; padding:26px; border:1px dashed rgba(148,163,184,.28); border-radius:14px; color:#9fb3c8; text-align:center; background:rgba(2,6,23,.22); }
+.personal-tile { position:relative; min-height:64px; width:fit-content; max-width:100%; min-width:min(420px, 100%); display:grid; grid-template-columns:48px minmax(180px, max-content) auto; grid-template-rows:auto auto; align-items:center; column-gap:12px; row-gap:2px; padding:9px 10px; border:1px solid rgba(168,85,247,.28); border-radius:12px; background:linear-gradient(180deg, rgba(15,23,42,.74), rgba(15,23,42,.46)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.018); cursor:pointer; user-select:none; }
+.personal-tile:hover { border-color:rgba(168,85,247,.58); background:linear-gradient(180deg, rgba(18,31,54,.82), rgba(15,23,42,.54)); }
+.personal-tile:focus-visible { outline:2px solid rgba(34,211,238,.95); outline-offset:2px; border-color:rgba(34,211,238,.72); }
+.personal-tile-icon { grid-column:1; grid-row:1 / span 2; width:42px; height:42px; display:grid; place-items:center; border-radius:10px; font-size:25px; background:rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.18); overflow:hidden; }
+.personal-tile-label { grid-column:2; grid-row:1; min-width:0; max-width:clamp(180px, 35vw, 620px); color:#fff; font-weight:800; font-size:.94rem; line-height:1.18; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.personal-tile-sub { grid-column:2; grid-row:2; min-width:0; max-width:clamp(180px, 35vw, 620px); min-height:16px; color:#8edcff; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:.73rem; line-height:1.2; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.personal-tile-actions { grid-column:3; grid-row:1 / span 2; margin-left:auto; display:flex; align-items:center; justify-content:flex-end; gap:5px; flex-wrap:nowrap; }
+.personal-tile-action { width:27px; height:27px; flex:0 0 27px; display:grid; place-items:center; border:1px solid rgba(148,163,184,.28); border-radius:8px; background:rgba(15,23,42,.78); color:#dbeafe; cursor:pointer; font-size:13px; padding:0; }
+.personal-tile-action:hover { border-color:rgba(34,211,238,.62); color:#fff; }
+.personal-tile-action.is-danger { border-color:rgba(244,63,94,.45); color:#fecdd3; }
+.personal-tile-edit { grid-column:2; grid-row:1 / span 2; min-width:0; display:flex; align-items:center; justify-content:center; gap:7px; }
+.personal-edit-icon { width:36px; height:36px; flex:0 0 36px; display:grid; place-items:center; border-radius:9px; border:1px solid rgba(148,163,184,.22); background:rgba(2,6,23,.42); overflow:hidden; font-size:22px; }
+.personal-command-edit { display:flex; gap:6px; flex:0 0 auto; min-width:0; align-items:center; flex-wrap:wrap; }
+.personal-command-edit input { width:auto; transition:width .08s ease; }
+.personal-command-edit .personal-name-input { min-width:14ch; max-width:min(38vw, 36ch); }
+.personal-command-edit .personal-url-input { min-width:24ch; max-width:min(70vw, 84ch); }
+.top-menu-confirm-overlay {
+    position:fixed;
+    inset:0;
+    z-index:9000;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:rgba(2,6,23,.62);
+    backdrop-filter:blur(3px);
+}
+.top-menu-confirm-overlay.is-open { display:flex; }
+.top-menu-confirm-overlay[hidden] { display:none !important; }
+.top-menu-confirm-box {
+    width:min(440px, calc(100vw - 40px));
+    border:1px solid rgba(244,63,94,.36);
+    border-radius:16px;
+    background:linear-gradient(180deg, rgba(15,23,42,.98), rgba(2,6,23,.98));
+    box-shadow:0 24px 80px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.03);
+    padding:16px;
+}
+.top-menu-confirm-title { margin:0 0 8px 0; color:#fff; font-size:1.05rem; font-weight:900; }
+.top-menu-confirm-body { color:#cbd5e1; font-size:.92rem; line-height:1.35; word-break:break-word; }
+.top-menu-confirm-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; flex-wrap:wrap; }
+@media (max-width: 860px) {
+    .top-menu-category-box { width:100%; }
+    .top-menu-category-fields { width:100%; }
+    .personal-browser-list { align-items:stretch; }
+    .personal-tile { width:100%; min-width:0; grid-template-columns:44px minmax(0, 1fr) auto; }
+    .personal-tile-action { width:25px; height:25px; flex-basis:25px; }
+}
+</style>
+
+<script>
+let topMenuSections = {{ menu_top_sections|tojson }};
+const topMenuInitialSectionId = {{ request.args.get('section', '')|tojson }};
+const topMenuInitialMatch = {{ request.args.get('match', '')|tojson }};
+const topMenuInitialLabel = {{ request.args.get('label', '')|tojson }};
+const topMenuInitialIcon = {{ request.args.get('icon', '')|tojson }};
+const topMenuInitialFolder = {{ request.args.get('folder', '')|tojson }};
+let topMenuInitialCreate = ['1','true','yes','oui','on','new'].includes(String({{ request.args.get('create', '')|tojson }}).trim().toLowerCase());
+let topMenuCurrentIndex = -1;
+let topMenuEditingIndex = -1;
+let topMenuStatusTimer = null;
+let topMenuConfirmResolver = null;
+
+function topMenuEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function topMenuSlug(value, fallback='menu') {
+    let text = String(value || '').trim().toLowerCase();
+    text = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    text = text.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    return text || fallback;
+}
+function topMenuIconHtml(value, fallback='⚙️') {
+    value = String(value || '').trim();
+    if (value.startsWith('/static') || value.startsWith('static/')) {
+        const src = value.startsWith('/') ? value : '/' + value;
+        return `<img src="${topMenuEscape(src)}" alt="">`;
+    }
+    return topMenuEscape(value || fallback);
+}
+function topMenuSplitMatch(value) {
+    return String(value || '').replace(/\n/g, '||').split('||').map(x => x.trim()).filter(Boolean);
+}
+function topMenuPathMatches(path, matchValue) {
+    const current = '/' + String(path || '/').trim().replace(/^\/+/, '');
+    for (let prefix of topMenuSplitMatch(matchValue)) {
+        if (prefix.startsWith('http://') || prefix.startsWith('https://')) {
+            if (current === prefix) return true;
+            continue;
+        }
+        prefix = '/' + prefix.replace(/^\/+/, '').replace(/\/+$/, '');
+        if (prefix === '') prefix = '/';
+        if (current === prefix || (prefix !== '/' && current.startsWith(prefix + '/'))) return true;
+    }
+    return false;
+}
+function topMenuFindOrCreateSection() {
+    if (!Array.isArray(topMenuSections)) topMenuSections = [];
+    const wantedId = String(topMenuInitialSectionId || '').trim();
+    if (wantedId) {
+        const exactIndex = topMenuSections.findIndex(section => String(section?.id || '') === wantedId);
+        if (exactIndex >= 0) return exactIndex;
+    }
+    const wanted = String(topMenuInitialMatch || '').trim();
+    const wantedFolder = String(topMenuInitialFolder || '').trim();
+    const forceCreate = !!topMenuInitialCreate;
+    let bestIndex = -1;
+    let bestLen = -1;
+    if (wanted && !forceCreate) {
+        topMenuSections.forEach((section, idx) => {
+            if (wantedFolder && String(section.group || section.folder || '') !== wantedFolder) return;
+            const match = String(section.match || '');
+            if (topMenuPathMatches(wanted, match)) {
+                const longest = Math.max(0, ...topMenuSplitMatch(match).map(x => x.length));
+                if (longest > bestLen) { bestLen = longest; bestIndex = idx; }
+            }
+        });
+    }
+    if (bestIndex >= 0) return bestIndex;
+    const label = topMenuInitialLabel || wanted || 'Nouveau menu';
+    const newSectionId = wantedId ? topMenuSlug(wantedId, 'menu_top_' + (topMenuSections.length + 1)) : topMenuSlug((topMenuInitialFolder ? topMenuInitialFolder + '_' : '') + label, 'menu_top_' + (topMenuSections.length + 1));
+    topMenuSections.push({
+        id: newSectionId,
+        enabled: false,
+        icon: topMenuInitialIcon || '⚙️',
+        label: label,
+        match: wanted || (topMenuInitialFolder ? '/' + String(topMenuInitialFolder).replace(/^\/+|\/+$/g, '') : '/'),
+        group: topMenuInitialFolder || '',
+        folder: topMenuInitialFolder || '',
+        file_name: '',
+        storage: topMenuInitialFolder ? 'dir' : '',
+        items: []
+    });
+    // create=1 doit seulement forcer la création au premier affichage.
+    // Ensuite, les sauvegardes Ajax doivent suivre le bloc créé, sinon le
+    // formulaire recrée « Nouveau menu top » après chaque blur/clic.
+    topMenuInitialCreate = false;
+    return topMenuSections.length - 1;
+}
+function topMenuSection() {
+    if (topMenuCurrentIndex < 0) topMenuCurrentIndex = topMenuFindOrCreateSection();
+    const section = topMenuSections[topMenuCurrentIndex];
+    section.items = Array.isArray(section.items) ? section.items : [];
+    return section;
+}
+function topMenuConfirm(title, body, okLabel='Valider') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('topMenuConfirmModal');
+        const titleEl = document.getElementById('topMenuConfirmTitle');
+        const bodyEl = document.getElementById('topMenuConfirmBody');
+        const okEl = document.getElementById('topMenuConfirmOk');
+        if (!modal || !titleEl || !bodyEl || !okEl) {
+            topMenuSetStatus('Boîte de confirmation indisponible.', false);
+            resolve(false);
+            return;
+        }
+        titleEl.textContent = title || 'Confirmation';
+        bodyEl.textContent = body || '';
+        okEl.textContent = okLabel || 'Valider';
+        topMenuConfirmResolver = resolve;
+        modal.removeAttribute('hidden');
+        modal.classList.add('is-open');
+        setTimeout(() => okEl.focus(), 20);
+    });
+}
+function topMenuSettleConfirm(value) {
+    const modal = document.getElementById('topMenuConfirmModal');
+    if (modal) {
+        modal.classList.remove('is-open');
+        modal.setAttribute('hidden', 'hidden');
+    }
+    if (topMenuConfirmResolver) topMenuConfirmResolver(value === true);
+    topMenuConfirmResolver = null;
+}
+function topMenuBindConfirmModal() {
+    document.getElementById('topMenuConfirmCancel')?.addEventListener('click', () => topMenuSettleConfirm(false));
+    document.getElementById('topMenuConfirmOk')?.addEventListener('click', () => topMenuSettleConfirm(true));
+    document.getElementById('topMenuConfirmModal')?.addEventListener('click', (event) => {
+        if (event.target && event.target.id === 'topMenuConfirmModal') topMenuSettleConfirm(false);
+    });
+    document.addEventListener('keydown', (event) => {
+        const modal = document.getElementById('topMenuConfirmModal');
+        if (event.key === 'Escape' && modal && modal.classList.contains('is-open')) {
+            event.preventDefault();
+            topMenuSettleConfirm(false);
+        }
+    });
+}
+function topMenuHideStatus() {
+    const el = document.getElementById('topMenuStatus');
+    if (!el) return;
+    el.textContent = '';
+    el.className = 'status-line personal-menu-status-top';
+    el.classList.remove('is-visible');
+    el.setAttribute('hidden', 'hidden');
+    el.style.display = 'none';
+}
+function topMenuSetStatus(message, ok=true) {
+    const el = document.getElementById('topMenuStatus');
+    if (!el) return;
+    if (topMenuStatusTimer) clearTimeout(topMenuStatusTimer);
+    if (!message) { topMenuHideStatus(); return; }
+    el.textContent = message;
+    el.className = 'status-line personal-menu-status-top ' + (ok ? 'ok' : 'bad');
+    el.classList.add('is-visible');
+    el.removeAttribute('hidden');
+    el.style.display = 'block';
+    if (ok) topMenuStatusTimer = setTimeout(topMenuHideStatus, 1000);
+}
+function topMenuAutosize(input) {
+    if (!input) return;
+    const len = Math.max(8, String(input.value || input.placeholder || '').length + 3);
+    input.style.width = Math.min(Math.max(len, 10), 90) + 'ch';
+}
+function topMenuRefreshHeader() {
+    const section = topMenuSection();
+    const enabled = document.getElementById('topMenuSectionEnabled');
+    const label = document.getElementById('topMenuSectionLabel');
+    const icon = document.getElementById('topMenuSectionIcon');
+    const match = document.getElementById('topMenuSectionMatch');
+    const preview = document.getElementById('topMenuSectionPreview');
+    if (enabled) enabled.checked = !!section.enabled;
+    if (label) { label.value = section.label || ''; topMenuAutosize(label); }
+    if (icon) { icon.value = section.icon || '⚙️'; topMenuAutosize(icon); }
+    if (match) { match.value = section.match || topMenuInitialMatch || '/'; topMenuAutosize(match); }
+    if (preview) preview.innerHTML = topMenuIconHtml(section.icon, '⚙️');
+}
+function topMenuReadHeader() {
+    const section = topMenuSection();
+    const enabledInput = document.getElementById('topMenuSectionEnabled');
+    if (enabledInput) section.enabled = !!enabledInput.checked;
+    section.label = (document.getElementById('topMenuSectionLabel')?.value || section.label || 'Menu').trim() || 'Menu';
+    section.icon = (document.getElementById('topMenuSectionIcon')?.value || section.icon || '⚙️').trim() || '⚙️';
+    section.match = (document.getElementById('topMenuSectionMatch')?.value || section.match || topMenuInitialMatch || '/').trim() || '/';
+    const folder = String(section.group || section.folder || topMenuInitialFolder || '').trim();
+    if (folder) {
+        section.group = folder;
+        section.folder = folder;
+        section.storage = 'dir';
+        section.file_name = section.file_name || '';
+    }
+    section.id = section.id || topMenuSlug((folder ? folder + '_' : '') + section.label, 'menu_top_' + (topMenuCurrentIndex + 1));
+}
+function topMenuRenderCrumbs() {
+    const box = document.getElementById('topMenuCrumbs');
+    if (!box) return;
+    const section = topMenuSection();
+    const label = topMenuInitialLabel || section.label || 'Menu';
+    const folder = String(section.group || section.folder || topMenuInitialFolder || '').trim();
+    const back = folder ? `/system/personnalisation/menu-top?folder=${encodeURIComponent(folder)}` : '/system/personnalisation/menu-top';
+    const folderPart = folder ? `<span>›</span><button type="button" onclick="window.location.href='${back}'">${topMenuEscape(folder)}</button>` : '';
+    box.innerHTML = `<button type="button" onclick="window.location.href='${back}'">↩ Retour</button><span>›</span><button type="button" onclick="window.location.href='/system/personnalisation/menu-top'">Menus crantés</button>${folderPart}<span>›</span><button type="button">${topMenuEscape(label)}</button><span class="top-menu-route-note">${topMenuEscape(section.match || '')}</span>`;
+}
+function topMenuRenderCounter() {
+    const el = document.getElementById('topMenuCounter');
+    if (!el) return;
+    const section = topMenuSection();
+    const count = (section.items || []).length;
+    el.textContent = `${count} commande(s) · ${section.enabled ? 'roue crantée active' : 'roue crantée désactivée'}`;
+}
+function topMenuTile(item, index) {
+    return `<article class="personal-tile" tabindex="0" data-top-index="${index}" onclick="topMenuTileClick(event, ${index})" onkeydown="topMenuTileKey(event, ${index})">
+        <span class="personal-tile-icon">${topMenuIconHtml(item.icon, '•')}</span>
+        <span class="personal-tile-label">${topMenuEscape(item.label || 'Commande')}</span>
+        <span class="personal-tile-sub">${topMenuEscape(item.url || '#')}</span>
+        <span class="personal-tile-actions" onclick="event.stopPropagation()">
+            <button type="button" class="personal-tile-action" title="Modifier" onclick="topMenuEditIndex(${index})">✎</button>
+            <button type="button" class="personal-tile-action" title="Monter" onclick="topMenuMoveIndex(${index}, -1)">▲</button>
+            <button type="button" class="personal-tile-action" title="Descendre" onclick="topMenuMoveIndex(${index}, 1)">▼</button>
+            <button type="button" class="personal-tile-action is-danger" title="Supprimer" onclick="topMenuDeleteIndex(${index})">×</button>
+        </span>
+    </article>`;
+}
+function topMenuRender() {
+    topMenuEditingIndex = -1;
+    topMenuRefreshHeader();
+    topMenuRenderCrumbs();
+    topMenuRenderCounter();
+    const box = document.getElementById('topMenuBrowser');
+    const items = topMenuSection().items || [];
+    if (!box) return;
+    if (!items.length) {
+        box.innerHTML = '<div class="personal-browser-empty">Aucune commande dans ce menu cranté.</div>';
+        return;
+    }
+    box.innerHTML = items.map(topMenuTile).join('');
+}
+async function topMenuTileClick(event, index) {
+    if (event.target.closest('.personal-tile-actions') || event.target.closest('input') || event.target.closest('button')) return;
+    await topMenuEditIndex(index);
+}
+function topMenuTileKey(event, index) {
+    if (event.target && event.target.closest && event.target.closest('input, textarea, select, button')) return;
+    if (event.key === 'Enter' || event.key === 'F2' || event.key === ' ') { event.preventDefault(); topMenuEditIndex(index); }
+    if (event.key === 'Delete') { event.preventDefault(); topMenuDeleteIndex(index); }
+}
+async function topMenuEditIndex(index) {
+    if (topMenuEditingIndex === index) return;
+    if (topMenuEditingIndex >= 0 && topMenuEditingIndex !== index) {
+        const previousIndex = topMenuEditingIndex;
+        await topMenuCommitEdit(previousIndex);
+        if (topMenuEditingIndex >= 0) return;
+    }
+    const section = topMenuSection();
+    const item = section.items[index];
+    if (!item) return;
+    topMenuEditingIndex = index;
+    const tile = document.querySelector(`[data-top-index="${index}"]`);
+    if (!tile) return;
+    tile.classList.add('is-editing');
+    const prefix = `top_menu_edit_${index}`;
+    tile.innerHTML = `<span class="personal-tile-icon">${topMenuIconHtml(item.icon, '•')}</span>
+        <span class="personal-tile-edit">
+            <span class="personal-edit-icon" id="${prefix}_preview">${topMenuIconHtml(item.icon, '•')}</span>
+            <div class="personal-command-edit">
+                <input class="input personal-name-input" id="${prefix}_label" value="${topMenuEscape(item.label || '')}" placeholder="Nom">
+                <input class="input personal-url-input" id="${prefix}_url" value="${topMenuEscape(item.url || '')}" placeholder="/route ou https://...">
+                <input class="input personal-icon-input" id="${prefix}_icon" value="${topMenuEscape(item.icon || '•')}" placeholder="Icône">
+                <button type="button" class="personal-tile-action" title="Parcourir" onclick="openStaticBrowser('${prefix}_icon')">📂</button>
+                <input class="input personal-onclick-input" id="${prefix}_onclick" value="${topMenuEscape(item.onclick || '')}" placeholder="onclick optionnel">
+            </div>
+        </span>
+        <span class="personal-tile-actions" onclick="event.stopPropagation()">
+            <button type="button" class="personal-tile-action" title="Valider" onclick="topMenuCommitEdit(${index})">✓</button>
+            <button type="button" class="personal-tile-action" title="Annuler" onclick="topMenuRender()">↩</button>
+        </span>`;
+    for (const id of [`${prefix}_label`, `${prefix}_url`, `${prefix}_icon`, `${prefix}_onclick`]) {
+        const input = document.getElementById(id);
+        if (!input) continue;
+        topMenuAutosize(input);
+        input.addEventListener('input', () => {
+            topMenuAutosize(input);
+            if (id.endsWith('_icon')) document.getElementById(`${prefix}_preview`).innerHTML = topMenuIconHtml(input.value, '•');
+        });
+        input.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); topMenuCommitEdit(index); }
+            if (ev.key === 'Escape') { ev.preventDefault(); topMenuRender(); }
+        });
+    }
+    setTimeout(() => document.getElementById(`${prefix}_label`)?.focus(), 20);
+}
+async function topMenuCommitEdit(index) {
+    const section = topMenuSection();
+    const prefix = `top_menu_edit_${index}`;
+    const item = section.items[index];
+    if (!item) return;
+    item.label = (document.getElementById(`${prefix}_label`)?.value || 'Commande').trim() || 'Commande';
+    item.url = (document.getElementById(`${prefix}_url`)?.value || '#').trim() || '#';
+    item.icon = (document.getElementById(`${prefix}_icon`)?.value || '•').trim() || '•';
+    item.onclick = (document.getElementById(`${prefix}_onclick`)?.value || '').trim();
+    await topMenuSave(true);
+    topMenuRender();
+}
+function topMenuAddCommand() {
+    const section = topMenuSection();
+    section.items.push({icon:'•', label:'Nouvelle commande', url:section.match || '#', onclick:''});
+    topMenuRender();
+    topMenuEditIndex(section.items.length - 1);
+}
+async function topMenuDeleteIndex(index) {
+    const ok = await topMenuConfirm('Supprimer ?', `Commande : ${(topMenuSection().items[index] || {}).label || ''}`, 'Supprimer');
+    if (!ok) return;
+    topMenuSection().items.splice(index, 1);
+    await topMenuSave(true);
+    topMenuRender();
+}
+async function topMenuMoveIndex(index, direction) {
+    const items = topMenuSection().items;
+    const next = Math.max(0, Math.min(items.length - 1, index + Number(direction || 1)));
+    if (next === index) return;
+    const [item] = items.splice(index, 1);
+    items.splice(next, 0, item);
+    await topMenuSave(true);
+    topMenuRender();
+}
+async function topMenuSave(flashOk=false) {
+    topMenuReadHeader();
+    const currentBeforeSave = topMenuSection();
+    const currentIdBeforeSave = String(currentBeforeSave.id || '').trim();
+    const currentFileBeforeSave = String(currentBeforeSave.file_name || '').trim();
+    const currentGroupBeforeSave = String(currentBeforeSave.group || currentBeforeSave.folder || topMenuInitialFolder || '').trim();
+    const currentLabelBeforeSave = String(currentBeforeSave.label || '').trim();
+    const currentMatchBeforeSave = String(currentBeforeSave.match || '').trim();
+    const currentIconBeforeSave = String(currentBeforeSave.icon || '').trim();
+    topMenuInitialCreate = false;
+    topMenuSections = topMenuSections.map((section, index) => ({
+        ...section,
+        id: section.id || topMenuSlug(((section.group || section.folder || topMenuInitialFolder || '') ? (section.group || section.folder || topMenuInitialFolder || '') + '_' : '') + section.label, 'menu_top_' + (index + 1))
+    }));
+    try {
+        const res = await fetch('/system/personnalisation/top-menu', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({sections: topMenuSections})
+        });
+        const payload = await res.json();
+        if (!res.ok || payload.ok === false) throw new Error(payload.message || 'Enregistrement impossible.');
+        topMenuSections = payload.sections || topMenuSections;
+        let savedIndex = currentIdBeforeSave ? topMenuSections.findIndex(section => String(section?.id || '') === currentIdBeforeSave) : -1;
+        if (savedIndex < 0 && currentFileBeforeSave) {
+            savedIndex = topMenuSections.findIndex(section =>
+                String(section?.file_name || '') === currentFileBeforeSave &&
+                String(section?.group || section?.folder || '') === currentGroupBeforeSave
+            );
+        }
+        if (savedIndex < 0) {
+            savedIndex = topMenuSections.findIndex(section =>
+                String(section?.group || section?.folder || '') === currentGroupBeforeSave &&
+                String(section?.label || '') === currentLabelBeforeSave &&
+                String(section?.match || '') === currentMatchBeforeSave &&
+                String(section?.icon || '') === currentIconBeforeSave
+            );
+        }
+        if (savedIndex < 0) {
+            savedIndex = topMenuSections.findIndex(section =>
+                String(section?.group || section?.folder || '') === currentGroupBeforeSave &&
+                String(section?.label || '') === currentLabelBeforeSave &&
+                String(section?.match || '') === currentMatchBeforeSave
+            );
+        }
+        topMenuCurrentIndex = savedIndex >= 0 ? savedIndex : Math.max(0, Math.min(topMenuCurrentIndex, topMenuSections.length - 1));
+        if (flashOk) topMenuSetStatus('Enregistré', true);
+    } catch (error) {
+        topMenuSetStatus(String(error && error.message ? error.message : error), false);
+    }
+}
+function topMenuBindHeader() {
+    const enabled = document.getElementById('topMenuSectionEnabled');
+    const label = document.getElementById('topMenuSectionLabel');
+    const icon = document.getElementById('topMenuSectionIcon');
+    const match = document.getElementById('topMenuSectionMatch');
+    for (const input of [label, icon, match]) {
+        if (!input) continue;
+        input.addEventListener('input', () => {
+            topMenuAutosize(input);
+            if (input === icon) document.getElementById('topMenuSectionPreview').innerHTML = topMenuIconHtml(input.value, '⚙️');
+            if (input === match) { topMenuReadHeader(); topMenuRenderCrumbs(); }
+        });
+        input.addEventListener('keydown', async (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); await topMenuSave(true); topMenuRender(); } });
+        input.addEventListener('blur', async () => { await topMenuSave(true); topMenuRender(); });
+    }
+    if (enabled) enabled.addEventListener('change', async () => { await topMenuSave(true); topMenuRender(); });
+}
+function openYoleoSystemBrowser(mode, targetId, title, fallbackPath) {
+    const safeTarget = String(targetId || '').trim();
+    if (!safeTarget) return;
+    const params = new URLSearchParams();
+    if (fallbackPath) params.set('path', fallbackPath);
+    params.set('target', safeTarget);
+    const browserMode = mode || 'file';
+    const url = '/browser/' + browserMode + '?' + params.toString();
+    window.open(url, 'yoleo_system_browser_' + browserMode + '_' + safeTarget, 'width=980,height=700,resizable=yes,scrollbars=yes');
+}
+function openStaticBrowser(targetId) {
+    openYoleoSystemBrowser('image', targetId, 'Parcourir une image', '/static');
+}
+window.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type !== 'yoleo-browser-select') return;
+    const target = String(data.target || '').trim();
+    if (!target) return;
+    const input = document.getElementById(target);
+    if (!input) return;
+    input.value = data.path || data.url || '';
+    input.dispatchEvent(new Event('input', {bubbles:true}));
+    input.focus();
+});
+document.addEventListener('DOMContentLoaded', () => {
+    topMenuCurrentIndex = topMenuFindOrCreateSection();
+    topMenuBindHeader();
+    topMenuBindConfirmModal();
+    topMenuRender();
+});
+</script>
+{% endblock %}

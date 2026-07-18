@@ -1,0 +1,173 @@
+/* Virtual Disk - page Stockage */
+.disk-virtual-disk-page .virtualdisk-summary-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.disk-virtual-disk-page .virtualdisk-base,
+.disk-virtual-disk-page .virtualdisk-image-path {
+    font-size: 13px;
+    line-height: 1.2;
+    word-break: break-all;
+}
+.virtualdisk-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.virtualdisk-table-toolbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+.virtualdisk-table-toolbar h3 {
+    margin: 0 0 4px 0;
+}
+.virtualdisk-table-toolbar p,
+.virtualdisk-help {
+    margin: 0;
+    color: var(--muted, #8b98a7);
+    font-size: 13px;
+}
+.virtualdisk-inline-message {
+    position: fixed;
+    top: 92px;
+    right: 24px;
+    z-index: 9999;
+    max-width: min(520px, calc(100vw - 48px));
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-weight: 700;
+    box-shadow: 0 14px 38px rgba(0, 0, 0, .34);
+    pointer-events: none;
+}
+.virtualdisk-inline-message.ok {
+    background: rgba(22, 163, 74, .14);
+    color: #86efac;
+    border: 1px solid rgba(34, 197, 94, .28);
+}
+.virtualdisk-inline-message.bad {
+    background: rgba(220, 38, 38, .14);
+    color: #fca5a5;
+    border: 1px solid rgba(248, 113, 113, .32);
+}
+.virtualdisk-output {
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+}
+.virtualdisk-modal {
+    width: min(680px, 100%);
+}
+.virtualdisk-modal-body {
+    gap: 10px;
+}
+.virtualdisk-add-note {
+    margin: 0;
+}
+.virtualdisk-modal-row {
+    display: grid;
+    grid-template-columns: 120px minmax(220px, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+}
+.virtualdisk-modal-row label {
+    color: var(--yoleo-accent-2, #1AEBFF);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .35px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.virtualdisk-modal-row input {
+    width: 100%;
+    min-width: 0;
+}
+.virtualdisk-options-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.virtualdisk-inline-check {
+    margin-left: auto;
+    white-space: nowrap;
+}
+.virtualdisk-table th:nth-child(1) { width: 140px; }
+.virtualdisk-table th:nth-child(4) { width: 110px; }
+.virtualdisk-table th:nth-child(5),
+.virtualdisk-table th:nth-child(6),
+.virtualdisk-table th:nth-child(7) { width: 92px; }
+.virtualdisk-table th:nth-child(8),
+.virtualdisk-table th:nth-child(9),
+.virtualdisk-table th:nth-child(10) { width: 78px; }
+.virtualdisk-table td:nth-child(5),
+.virtualdisk-table td:nth-child(6),
+.virtualdisk-table td:nth-child(7) {
+    white-space: nowrap;
+    font-weight: 700;
+}
+.virtualdisk-mobile-list {
+    display: none;
+}
+@media (max-width: 900px) {
+    .disk-virtual-disk-page .virtualdisk-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .virtualdisk-table-toolbar {
+        flex-wrap: wrap;
+    }
+    .virtualdisk-modal-row {
+        grid-template-columns: 1fr;
+    }
+    .virtualdisk-inline-check {
+        margin-left: 0;
+    }
+    .virtualdisk-table-wrap {
+        display: none;
+    }
+    .virtualdisk-mobile-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .virtualdisk-mobile-card {
+        border: 1px solid rgba(148, 163, 184, .18);
+        border-radius: 14px;
+        padding: 12px;
+        background: rgba(15, 23, 42, .55);
+    }
+    .virtualdisk-mobile-top,
+    .virtualdisk-mobile-line,
+    .virtualdisk-mobile-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+    }
+    .virtualdisk-mobile-line {
+        align-items: flex-start;
+        margin-top: 8px;
+    }
+    .virtualdisk-mobile-line span {
+        color: var(--muted, #8b98a7);
+        min-width: 70px;
+    }
+    .virtualdisk-mobile-line b {
+        text-align: right;
+        word-break: break-all;
+        font-weight: 600;
+    }
+    .virtualdisk-mobile-actions {
+        justify-content: flex-end;
+        margin-top: 10px;
+    }
+}
+
+@media (max-width: 900px) {
+    .virtualdisk-inline-message {
+        top: 76px;
+        right: 12px;
+        left: 12px;
+        max-width: none;
+    }
+}

@@ -1,0 +1,15 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-logs" class="disk-section">
+                <section class="yoleo-card disk-card">
+                    <div class="disk-card-actions">
+                        <div class="refresh-pill">
+                            <span id="logs-update">Chargement...</span>
+                            <button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="loadLogs()">↻ Actualiser</button>
+                        </div>
+                    </div>
+                    <textarea class="log-output" id="log-output" spellcheck="false" readonly></textarea>
+                </section>
+            </div>
+{% endblock %}

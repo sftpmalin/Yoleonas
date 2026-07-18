@@ -1,0 +1,23 @@
+{% extends "menu.html" %}
+
+{% block title %}VM - Yoleo{% endblock %}
+{% block page_title %}{{ vm_current_title[0] if vm_current_title is defined else 'VM' }}{% endblock %}
+{% block page_subtitle %}{{ vm_current_title[1] if vm_current_title is defined else 'Machines virtuelles libvirt/KVM' }}{% endblock %}
+
+{% block content %}
+<div class="vm-page">
+    <div class="vm-panel">
+        <div id="statusBox" class="status-box" style="display:none;"></div>
+        {% if error %}<div class="status-box error">{{ error }}</div>{% endif %}
+
+        <div class="vm-content-shell">
+            {% include "vm/panel_general.html" %}
+{% include "vm/panel_storage.html" %}
+{% include "vm/panel_network.html" %}
+{% include "vm/panel_logs.html" %}
+        </div>
+    </div>
+</div>
+
+{% include "vm/common_modals_scripts.html" %}
+{% endblock %}

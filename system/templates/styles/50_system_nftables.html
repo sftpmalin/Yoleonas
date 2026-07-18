@@ -1,0 +1,294 @@
+/* System / nftables firewall ------------------------------------------------
+   Page alignée sur les composants communs du module Système : mini-page,
+   card, card-head, summary-grid, table-wrap, mini-table, toolbar et yoleo-btn.
+---------------------------------------------------------------------------- */
+
+.nft-fw-panel {
+    width: 100%;
+    max-width: 1420px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.nft-fw-card-head {
+    align-items: flex-start;
+}
+
+.nft-fw-actions {
+    flex: 0 1 auto;
+    max-width: 720px;
+}
+
+.nft-fw-topline {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(130px, 1fr)) minmax(220px, 1.4fr);
+    gap: 10px;
+    align-items: stretch;
+}
+
+.nft-fw-top-card .summary-value.small {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+}
+
+.nft-fw-port-pill {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    padding: 12px 14px;
+    border: 1px solid rgba(26, 235, 255, .16);
+    border-radius: 14px;
+    background: rgba(8, 17, 28, .58);
+    color: #eaf2ff;
+}
+
+.nft-fw-port-pill b {
+    color: #9ddfff;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.nft-fw-port-pill span {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.nft-fw-badge,
+.nft-fw-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    border-radius: 999px;
+    padding: 5px 9px;
+    border: 1px solid rgba(26, 235, 255, .25);
+    background: rgba(26, 235, 255, .10);
+    color: #9debff;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.nft-fw-badge.is-ok,
+.nft-fw-pill.is-auto {
+    border-color: rgba(76, 175, 80, .30);
+    background: rgba(76, 175, 80, .15);
+    color: #98f2a2;
+}
+
+.nft-fw-badge.is-warn {
+    border-color: rgba(249, 168, 37, .30);
+    background: rgba(249, 168, 37, .14);
+    color: #ffd089;
+}
+
+.nft-fw-badge.is-bad,
+.nft-fw-pill.is-manual {
+    border-color: rgba(244, 67, 54, .30);
+    background: rgba(244, 67, 54, .13);
+    color: #ff9e9e;
+}
+
+.nft-fw-info-grid {
+    margin-bottom: 0;
+}
+
+.nft-fw-info-box .summary-value.small {
+    color: #dbe7f3;
+    line-height: 1.38;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    font-family: inherit;
+    font-weight: 700;
+}
+
+.nft-fw-message {
+    margin: 0;
+    min-height: 34px;
+}
+
+.nft-fw-message-top {
+    margin: 0 0 10px 0;
+}
+
+.nft-fw-message:empty {
+    display: none;
+}
+
+.nft-fw-message-ok:not(:empty) {
+    color: #9ff0a3;
+    border-color: rgba(76, 175, 80, .32);
+}
+
+.nft-fw-message-error:not(:empty) {
+    color: #ffaaa4;
+    border-color: rgba(244, 67, 54, .32);
+}
+
+.nft-fw-rules-card {
+    margin-bottom: 0;
+}
+
+.nft-fw-table {
+    min-width: 760px;
+}
+
+.nft-fw-table .col-actions {
+    width: 150px;
+    text-align: right;
+}
+
+.nft-fw-table td.col-actions {
+    text-align: right;
+}
+
+.nft-fw-empty {
+    color: #99acc2;
+    padding: 22px 10px !important;
+    text-align: center !important;
+}
+
+.nft-fw-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, .78);
+    backdrop-filter: blur(4px);
+}
+
+.nft-fw-modal-backdrop.is-open {
+    display: flex;
+}
+
+.nft-fw-modal {
+    width: min(680px, 96vw);
+    max-height: calc(100vh - 36px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #121d2b;
+    border: 1px solid #33475f;
+    border-radius: 18px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .58);
+}
+
+.nft-fw-modal-head,
+.nft-fw-modal-actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #0f1724;
+}
+
+.nft-fw-modal-head {
+    border-bottom: 1px solid #2b3d55;
+}
+
+.nft-fw-modal-actions {
+    align-items: center;
+    justify-content: flex-end;
+    border-top: 1px solid #2b3d55;
+}
+
+.nft-fw-modal-head h3 {
+    margin: 0;
+    color: #1AEBFF;
+    font-size: 19px;
+    font-weight: 900;
+}
+
+.nft-fw-modal-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px;
+    background: #121d2b;
+    overflow: auto;
+}
+
+.nft-fw-modal-body label {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+    color: #cfe1f5;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.nft-fw-modal-body input,
+.nft-fw-modal-body select {
+    width: 100%;
+    min-height: 38px;
+    padding: 9px 10px;
+    border: 1px solid #2b3d55;
+    border-radius: 10px;
+    outline: none;
+    background: #07101b;
+    color: #eaf2ff;
+    font: inherit;
+}
+
+.nft-fw-modal-body input:focus,
+.nft-fw-modal-body select:focus {
+    border-color: #1AEBFF;
+    box-shadow: 0 0 0 3px rgba(26, 235, 255, .12);
+}
+
+@media (max-width: 980px) {
+    .nft-fw-actions {
+        justify-content: flex-start;
+        max-width: none;
+    }
+
+    .nft-fw-topline {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 620px) {
+    .nft-fw-topline,
+    .nft-fw-modal-body {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* Pare-feu : message d'action flottant, sans réserver une ligne. */
+.nft-fw-message-top:not(:empty) {
+    position: fixed !important;
+    top: 128px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 2147482300 !important;
+    width: min(860px, calc(100vw - 34px)) !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    box-shadow: 0 18px 48px rgba(0,0,0,.38) !important;
+    pointer-events: none !important;
+}
+.nft-fw-message-error:not(:empty) {
+    pointer-events: auto !important;
+}
+@media (max-width: 720px) {
+    .nft-fw-message-top:not(:empty) {
+        top: 78px !important;
+        width: calc(100vw - 20px) !important;
+    }
+}

@@ -1,0 +1,56 @@
+{% extends "partage_samba_base.html" %}
+
+{% block samba_content %}
+{% set samba_state = namespace(total=0, active=0) %}
+{% set wsdd_state = namespace(exists=false, active=false, refresh=false) %}
+{% for svc in state.services %}
+    {% if svc.name in ['smbd.service', 'nmbd.service'] and svc.exists %}
+        {% set samba_state.total = samba_state.total + 1 %}
+        {% if svc.active == 'active' %}
+            {% set samba_state.active = samba_state.active + 1 %}
+        {% endif %}
+    {% endif %}
+    {% if svc.name in ['wsdd2.service', 'wsdd.service'] and svc.exists %}
+        {% set wsdd_state.exists = true %}
+        {% if svc.active == 'active' %}
+            {% set wsdd_state.active = true %}
+        {% endif %}
+    {% endif %}
+    {% if svc.name == 'samba-wsdd-refresh.timer' and svc.active == 'active' %}
+        {% set wsdd_state.refresh = true %}
+    {% endif %}
+{% endfor %}
+{% set samba_start_disabled = samba_state.total > 0 and samba_state.active == samba_state.total %}
+{% set samba_stop_disabled = samba_state.active == 0 %}
+<div id="tab-samba-main" class="tab-panel active">
+                <section class="card partage-samba-services-v4 partage-samba-services-main-v4">
+                    <div id="sambaServicesSummary" class="summary-grid partage-service-summary-v4 partage-service-summary-compact-v4">
+                        {% for svc in state.services %}
+                        {% if 'nfs' not in svc.name %}
+                        <div class="summary-card partage-service-card-compact-v4">
+                            <div class="summary-label">{{ svc.name }}</div>
+                            <div class="summary-value partage-service-badges-compact-v4">
+                                {% if svc.active == 'active' %}<span class="badge badge-ok">active</span>{% elif svc.active in ['inactive','failed'] %}<span class="badge badge-no">{{ svc.active }}</span>{% else %}<span class="badge badge-warn">{{ svc.active }}</span>{% endif %}
+                                <span class="badge badge-info">{{ svc.enabled }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        <div class="summary-card partage-service-card-compact-v4 partage-info-inline-card-v4">
+                            <div class="summary-label">Users SMB</div>
+                            <div class="summary-value">{{ state.samba.users|length }}</div>
+                        </div>
+                        <div class="summary-card partage-service-card-compact-v4 partage-info-inline-card-v4">
+                            <div class="summary-label">Partages</div>
+                            <div class="summary-value">{{ state.samba.shares|length }}</div>
+                        </div>
+                        <div class="summary-card partage-service-card-compact-v4 partage-info-inline-card-v4">
+                            <div class="summary-label">Découverte</div>
+                            <div class="summary-value">{% if not sg.enable_wsdd %}WSDD non{% elif wsdd_state.active and wsdd_state.refresh %}WSDD actif + refresh{% elif wsdd_state.active %}WSDD actif{% elif wsdd_state.exists %}WSDD arrêté{% else %}WSDD absent{% endif %}</div>
+                        </div>
+                    </div>
+                </section>
+
+                {% include "partage/_samba_settings_section.html" %}
+            </div>
+{% endblock %}

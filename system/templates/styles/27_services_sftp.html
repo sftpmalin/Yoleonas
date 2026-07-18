@@ -1,0 +1,833 @@
+    .sftp-panel { width:100%; max-width:1240px; }
+    .page-title { color:#1AEBFF; text-align:center; margin:0; font-size:26px; }
+    .page-subtitle { text-align:center; color:#95a2b1; margin:6px 0 14px; }
+
+    .card { background:#151c27; border:1px solid #333; border-radius:13px; padding:12px; margin-bottom:12px; box-shadow:0 8px 20px rgba(0,0,0,.14); }
+    .card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; border-bottom:1px solid #2b394d; padding-bottom:9px; margin-bottom:10px; }
+    .card-title { color:#1AEBFF; margin:0; font-size:17px; }
+    .hint { color:#93a4b6; font-size:11px; line-height:1.35; margin-top:5px; }
+
+    .flash-stack { display:grid; gap:8px; margin-bottom:12px; }
+    .flash { border-radius:10px; padding:10px 12px; white-space:pre-wrap; border:1px solid #2b394d; background:#10161f; }
+    .flash.success { color:#caffd2; border-color:rgba(76,175,80,.45); background:rgba(76,175,80,.12); }
+    .flash.error { color:#ffd0d0; border-color:rgba(244,67,54,.45); background:rgba(244,67,54,.12); }
+    .error-box { color:#ffd0d0; border:1px solid rgba(244,67,54,.45); background:rgba(244,67,54,.12); border-radius:12px; padding:12px; font-family:Consolas, Monaco, monospace; white-space:pre-wrap; }
+
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+    .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; }
+    .summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(105px,1fr)); gap:8px; margin-bottom:12px; }
+    .summary-card { background:#10161f; border:1px solid #2b394d; border-radius:11px; padding:8px 10px; }
+    .summary-label { color:#8da3b7; font-size:10px; text-transform:uppercase; letter-spacing:.25px; }
+    .summary-value { font-size:18px; color:#fff; font-weight:900; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    label { display:block; color:#9fdfff; font-size:10px; text-transform:uppercase; letter-spacing:.25px; font-weight:800; margin-bottom:4px; }
+    input, select { width:100%; background:#0a0a0a; border:1px solid #333; color:#fff; padding:7px 8px; border-radius:8px; outline:none; min-height:34px; }
+    select { padding-right:28px; }
+    input:focus, select:focus { border-color:#1AEBFF; box-shadow:0 0 0 3px rgba(26,235,255,.12); }
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; align-items:center; }
+
+    .sftp-ssh-grid {
+        display:flex;
+        align-items:flex-end;
+        justify-content:flex-start;
+        gap:10px 12px;
+        flex-wrap:wrap;
+    }
+    .sftp-ssh-field { flex:0 0 145px; max-width:145px; }
+    .sftp-ssh-key-field { flex-basis:220px; max-width:220px; }
+    .sftp-ssh-field select { width:100%; }
+    .sftp-ssh-save-row { margin-top:12px; justify-content:flex-end; }
+    body.yoleo-has-page-settings .sftp-topmenu-fallback { display:none !important; }
+
+
+    .table-wrap { border:1px solid #2b394d; border-radius:12px; overflow:auto; background:#0f141b; }
+    .info-split { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+    .info-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+    .info-table th { width:165px; background:#10161f; color:#9fdfff; font-size:10px; text-transform:uppercase; letter-spacing:.25px; text-align:left; padding:8px 9px; border-bottom:1px solid rgba(255,255,255,.06); }
+    .info-table td { padding:8px 9px; border-bottom:1px solid rgba(255,255,255,.06); color:#dbe7f3; word-break:break-all; }
+    .info-table tr:last-child th, .info-table tr:last-child td { border-bottom:none; }
+
+    table { width:100%; border-collapse:collapse; table-layout:fixed; }
+    .compact-table th { background:#1c2633; color:#9fdfff; font-size:10px; text-transform:uppercase; letter-spacing:.25px; text-align:left; padding:7px 6px; border-bottom:1px solid #2b394d; }
+    .compact-table td { padding:5px 6px; border-bottom:1px solid rgba(255,255,255,.06); vertical-align:middle; }
+    .compact-table tr:last-child td { border-bottom:none; }
+    .compact-table tr:hover td { background:rgba(255,255,255,.025); }
+    .compact-table input, .compact-table select { padding:5px 7px; min-height:30px; font-size:12px; }
+
+    .sftp-users-head-actions {
+        justify-content:flex-start;
+        margin-bottom:10px;
+    }
+    .sftp-users-table-wrap {
+        overflow:visible;
+        display:flex;
+        justify-content:center;
+        padding:0;
+    }
+    .users-table {
+        width:auto;
+        min-width:0;
+        max-width:900px;
+        table-layout:auto;
+    }
+    .users-table th:nth-child(1), .users-table td:nth-child(1) { width:190px; }
+    .users-table th:nth-child(2), .users-table td:nth-child(2) { width:540px; }
+    .users-table th:nth-child(3), .users-table td:nth-child(3) { width:44px; }
+    .users-table .sftp-linux-user-select {
+        width:auto;
+        min-width:150px;
+        max-width:230px;
+    }
+    .users-table .host-path {
+        width:500px;
+        max-width:52vw;
+        min-width:260px;
+    }
+    .users-table td:nth-child(2) { padding-right:2px; }
+    .users-table td:nth-child(3) { padding-left:2px; }
+    .col-actions { width:44px; text-align:left; white-space:nowrap; }
+    .inline { display:flex; gap:5px; align-items:center; justify-content:flex-start; }
+    .inline input { min-width:0; }
+    .users-table .yoleo-btn-mini { min-width:32px; width:34px; padding-left:0 !important; padding-right:0 !important; justify-content:center; }
+    .sftp-users-form .toolbar {
+        max-width:820px;
+        margin-left:auto;
+        margin-right:auto;
+    }
+    .mono { font-family:Consolas, Monaco, monospace; color:#dbe7f3; }
+    .badge { display:inline-flex; align-items:center; padding:4px 7px; border-radius:999px; font-size:10px; font-weight:900; border:1px solid rgba(26,235,255,.25); background:rgba(26,235,255,.10); color:#a8f2ff; }
+    .sftp-status-pill { display:inline-flex; align-items:center; max-width:100%; padding:4px 8px; border-radius:999px; font-size:11px; font-weight:900; line-height:1.15; border:1px solid rgba(26,235,255,.25); background:rgba(26,235,255,.10); color:#a8f2ff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .sftp-status-ok { color:#98f2a2; border-color:rgba(76,175,80,.32); background:rgba(76,175,80,.15); }
+    .sftp-status-ko { color:#ffd0d0; border-color:rgba(244,67,54,.38); background:rgba(244,67,54,.13); }
+    .sftp-status-neutral { color:#cfe9ff; border-color:rgba(115,153,192,.34); background:rgba(115,153,192,.12); }
+    .summary-value.small .sftp-status-pill, .sftp-shortcuts-table .sftp-status-pill { max-width:100%; }
+    .sftp-shortcuts-table th { width:150px; }
+    .sftp-shortcuts-table td:last-child { width:88px; text-align:right; }
+    .sftp-shortcuts-table a { text-decoration:none; justify-content:center; }
+
+
+    .sftp-yaml-picker-row {
+        display:flex;
+        align-items:flex-end;
+        justify-content:center;
+        gap:8px;
+        flex-wrap:wrap;
+        width:100%;
+        margin-top:2px;
+    }
+    .sftp-yaml-field {
+        flex:0 1 560px;
+        max-width:56%;
+        min-width:280px;
+    }
+    .sftp-yaml-field input {
+        width:100%;
+    }
+    .sftp-yaml-actions {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:7px;
+        padding-bottom:0;
+    }
+    .yoleo-btn.sftp-icon-btn {
+        width:38px;
+        min-width:38px;
+        height:34px;
+        padding:0 !important;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        font-size:16px;
+        line-height:1;
+    }
+
+
+    .sftp-card-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+
+    .sftp-yaml-detected-cell {
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex-wrap:wrap;
+    }
+
+
+    .sftp-auto-yaml-row {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:10px;
+        flex-wrap:wrap;
+        width:100%;
+        margin-top:4px;
+    }
+    .sftp-auto-yaml-info {
+        flex:0 1 620px;
+        max-width:68%;
+        min-width:280px;
+        padding:9px 12px;
+        border:1px solid rgba(80,120,160,.36);
+        border-radius:12px;
+        background:rgba(4,12,22,.45);
+    }
+    .sftp-setup-line {
+        font-weight:800;
+        line-height:1.45;
+        margin:2px 0;
+    }
+    .sftp-setup-line.ok { color:#b6ffc0; }
+    .sftp-setup-line.ko { color:#ffd0d0; }
+
+    .terminal {
+        margin-top:10px;
+        display:none;
+        background:#05080d;
+        border:1px solid #2b394d;
+        border-radius:12px;
+        padding:10px;
+        color:#dceeff;
+        white-space:pre-wrap;
+        overflow-wrap:anywhere;
+        word-break:break-word;
+        font-family:Consolas, Monaco, monospace;
+        font-size:12px;
+        max-height:none;
+        overflow:visible;
+    }
+    .modal-overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.82); backdrop-filter:blur(4px); z-index:3000; padding:18px; }
+    .modal-box { width:100%; max-width:760px; max-height:86vh; background:#151c27; border:1px solid #1AEBFF; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.48); overflow:hidden; display:flex; flex-direction:column; }
+    .modal-head { padding:14px 16px; border-bottom:1px solid #2b394d; background:#111822; display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .modal-title { color:#1AEBFF; font-weight:900; }
+    .browse-path { color:#c6d5e5; word-break:break-all; font-size:12px; margin-top:6px; }
+    .modal-body { padding:14px; overflow:auto; }
+    .dir-row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 11px; border:1px solid #2b394d; border-radius:10px; margin-bottom:8px; background:#10161f; cursor:pointer; }
+    .dir-row:hover { border-color:#1AEBFF; background:#17202d; }
+    .modal-footer { padding:12px 14px; border-top:1px solid #2b394d; display:flex; gap:10px; justify-content:flex-end; background:#111822; }
+    .toast { position:fixed; right:18px; bottom:18px; z-index:4000; display:none; max-width:480px; padding:12px 14px; border-radius:12px; border:1px solid #2b394d; background:#10161f; color:#e9eef5; box-shadow:0 16px 40px rgba(0,0,0,.45); }
+
+    @media (max-width:980px) {
+        .sftp-wrap { padding:10px; }
+        .grid-2, .grid-4, .info-split { grid-template-columns:1fr; }
+        .sftp-ssh-field, .sftp-ssh-key-field { flex:1 1 100%; max-width:100%; }
+        .users-table { min-width:720px; }
+        .toolbar { justify-content:stretch; }
+        .toolbar .yoleo-btn { width:100%; justify-content:center; }
+    }
+
+.backup-page { padding: 16px 18px 34px; display: flex; justify-content: center; }
+
+/* Correctif mobile SFTP : pas de mosaïque sur les formulaires et le résumé.
+   - Utilisateurs : les champs restent visibles dans le vrai tableau, avec scroll horizontal.
+   - Résumé Docker/YAML/.env : affichage en liste/table simple, pas en blocs mosaïque. */
+@media (max-width: 900px) {
+    .sftp-mobile-classic,
+    .sftp-mobile-classic .card,
+    .sftp-mobile-classic .service-sub-panel {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .sftp-mobile-classic .sftp-users-table-wrap,
+    body.yoleo-mobile-mosaic-ready .sftp-mobile-classic .sftp-users-table-wrap.yoleo-mobile-source-wrap,
+    .sftp-mobile-classic .sftp-users-table-wrap {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sftp-mobile-classic .sftp-users-table-wrap + .yoleo-mobile-table-grid,
+    .sftp-mobile-classic .sftp-users-table-wrap .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table {
+        display: table !important;
+        visibility: visible !important;
+        width: max-content !important;
+        min-width: 720px !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table thead { display: table-header-group !important; }
+    .sftp-mobile-classic #usersTable.sftp-users-table tbody { display: table-row-group !important; }
+    .sftp-mobile-classic #usersTable.sftp-users-table tr { display: table-row !important; }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table th,
+    .sftp-mobile-classic #usersTable.sftp-users-table td {
+        display: table-cell !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        vertical-align: middle !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table input,
+    .sftp-mobile-classic #usersTable.sftp-users-table select,
+    .sftp-mobile-classic #usersTable.sftp-users-table .inline,
+    .sftp-mobile-classic #usersTable.sftp-users-table .yoleo-btn {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table input,
+    .sftp-mobile-classic #usersTable.sftp-users-table select {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+        color: #fff !important;
+        -webkit-text-fill-color: #fff !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table .inline {
+        gap: 5px !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .sftp-mobile-classic .sftp-info-table-wrap,
+    body.yoleo-mobile-mosaic-ready .sftp-mobile-classic .sftp-info-table-wrap.yoleo-mobile-source-wrap,
+    .sftp-mobile-classic .sftp-info-table-wrap {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+    }
+
+    .sftp-mobile-classic .sftp-info-table-wrap + .yoleo-mobile-table-grid,
+    .sftp-mobile-classic .sftp-info-list .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .sftp-mobile-classic .sftp-info-list {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .sftp-mobile-classic .sftp-info-table {
+        display: table !important;
+        visibility: visible !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+    }
+
+    .sftp-mobile-classic .sftp-info-table tbody { display: table-row-group !important; }
+    .sftp-mobile-classic .sftp-info-table tr { display: table-row !important; }
+    .sftp-mobile-classic .sftp-info-table th,
+    .sftp-mobile-classic .sftp-info-table td {
+        display: table-cell !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+        vertical-align: top !important;
+    }
+
+    .sftp-mobile-classic .sftp-info-table th {
+        width: 96px !important;
+        min-width: 96px !important;
+        padding: 8px 8px !important;
+    }
+
+    .sftp-mobile-classic .sftp-info-table td {
+        padding: 8px 8px !important;
+        line-height: 1.35 !important;
+    }
+}
+
+/* SFTP access editor: folders and Docker SSH options on one compact work page. */
+.sftp-wrap label {
+    letter-spacing: 0;
+}
+
+.sftp-access-form {
+    display: block;
+}
+
+.sftp-form-card {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 8px;
+    border-color: #26384f;
+    background: linear-gradient(180deg, #121b27 0%, #101721 100%);
+}
+
+.sftp-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(104, 148, 194, .22);
+    background: rgba(8, 14, 22, .34);
+}
+
+.sftp-card-kicker {
+    color: #8edff0;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0;
+}
+
+.sftp-card-title {
+    margin: 3px 0 0;
+    color: #eef7ff;
+    font-size: 16px;
+    line-height: 1.25;
+    font-weight: 900;
+}
+
+.sftp-card-subtitle {
+    margin-top: 3px;
+    color: #94a9bf;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.sftp-card-subtitle span {
+    color: #cfeeff;
+    font-family: Consolas, Monaco, monospace;
+}
+
+.sftp-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sftp-count-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 5px 9px;
+    border: 1px solid rgba(142, 223, 240, .24);
+    border-radius: 999px;
+    background: rgba(37, 101, 128, .18);
+    color: #bdefff;
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.sftp-users-table-wrap {
+    display: block;
+    justify-content: initial;
+    overflow-x: auto;
+    overflow-y: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.users-table {
+    width: 100%;
+    max-width: none;
+    min-width: 820px;
+    table-layout: fixed;
+}
+
+.users-table th:nth-child(1),
+.users-table td:nth-child(1) {
+    width: 230px;
+}
+
+.users-table th:nth-child(2),
+.users-table td:nth-child(2) {
+    width: auto;
+}
+
+.users-table th:nth-child(3),
+.users-table td:nth-child(3) {
+    width: 68px;
+}
+
+.users-table th {
+    padding: 9px 12px;
+    background: #172232;
+    letter-spacing: 0;
+}
+
+.users-table td {
+    padding: 8px 12px;
+}
+
+.users-table .sftp-linux-user-select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+.users-table .host-path {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+}
+
+.sftp-field-stack {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.sftp-user-meta,
+.sftp-path-meta {
+    color: #7f95ab;
+    font-size: 11px;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sftp-path-meta {
+    margin-top: 4px;
+    font-family: Consolas, Monaco, monospace;
+}
+
+.sftp-path-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px;
+    gap: 6px;
+    align-items: center;
+}
+
+.users-table .sftp-browse-btn,
+.users-table .sftp-delete-btn {
+    width: 34px;
+    min-width: 34px;
+    height: 32px;
+    padding: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.users-table .col-actions {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.users-table td.col-actions {
+    vertical-align: top;
+    padding-top: 8px;
+}
+
+.sftp-ssh-layout {
+    display: grid;
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px;
+    align-items: start;
+}
+
+.sftp-ssh-key-block {
+    min-width: 0;
+}
+
+.sftp-ssh-key-block select {
+    min-height: 38px;
+}
+
+.sftp-switch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+    gap: 8px;
+}
+
+.sftp-toggle-field {
+    position: relative;
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-height: 42px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid rgba(104, 148, 194, .28);
+    border-radius: 8px;
+    background: rgba(8, 14, 22, .46);
+    color: #d9e9f8;
+    font-size: 12px;
+    font-weight: 850;
+    text-transform: none;
+    cursor: pointer;
+}
+
+.sftp-toggle-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sftp-toggle-visual {
+    position: relative;
+    width: 34px;
+    height: 20px;
+    border: 1px solid rgba(133, 159, 184, .42);
+    border-radius: 999px;
+    background: #263242;
+    transition: background .16s ease, border-color .16s ease;
+}
+
+.sftp-toggle-visual::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #aebed0;
+    transition: transform .16s ease, background .16s ease;
+}
+
+.sftp-toggle-input:checked + .sftp-toggle-visual {
+    border-color: rgba(26, 235, 255, .62);
+    background: rgba(10, 150, 164, .45);
+}
+
+.sftp-toggle-input:checked + .sftp-toggle-visual::after {
+    transform: translateX(14px);
+    background: #d8ffff;
+}
+
+.sftp-toggle-input:focus-visible + .sftp-toggle-visual {
+    box-shadow: 0 0 0 3px rgba(26, 235, 255, .16);
+}
+
+.sftp-toggle-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sftp-form-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #26384f;
+    border-radius: 8px;
+    background: rgba(8, 14, 22, .58);
+}
+
+.sftp-form-context {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    color: #8fa6bd;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.sftp-form-context strong {
+    min-width: 0;
+    color: #dcecff;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+    .sftp-card-header,
+    .sftp-form-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .sftp-card-actions {
+        justify-content: flex-start;
+    }
+
+    .sftp-ssh-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .sftp-switch-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .users-table {
+        min-width: 760px;
+    }
+}
+
+
+@media (max-width: 900px) {
+    .sftp-yaml-picker-row {
+        justify-content:stretch !important;
+    }
+    .sftp-yaml-field {
+        flex:1 1 100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+    }
+    .sftp-yaml-actions {
+        width:100%;
+        justify-content:center !important;
+    }
+
+    .sftp-auto-yaml-row {
+        justify-content:stretch !important;
+    }
+    .sftp-auto-yaml-info {
+        flex:1 1 100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+    }
+}
+
+/* Mobile SFTP users: convert the top table into stacked rows.
+   The SSH section below keeps its existing responsive grid. */
+@media (max-width: 900px) {
+    body.yoleo-mobile-mosaic-ready .sftp-mobile-classic .sftp-users-table-wrap,
+    body.yoleo-mobile-mosaic-ready .sftp-mobile-classic .sftp-users-table-wrap.yoleo-mobile-source-wrap,
+    .sftp-mobile-classic .sftp-users-table-wrap {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 10px !important;
+        overflow: visible !important;
+        border: 0 !important;
+        background: transparent !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        table-layout: auto !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table thead {
+        display: none !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table tbody {
+        display: grid !important;
+        gap: 10px !important;
+        width: 100% !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table tr {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 9px !important;
+        width: 100% !important;
+        padding: 10px !important;
+        border: 1px solid rgba(104, 148, 194, .28) !important;
+        border-radius: 8px !important;
+        background: rgba(8, 14, 22, .40) !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table th,
+    .sftp-mobile-classic #usersTable.sftp-users-table td {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+        border: 0 !important;
+        overflow: visible !important;
+        white-space: normal !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table td::before {
+        display: block;
+        margin-bottom: 5px;
+        color: #8edff0;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1.15;
+        text-transform: uppercase;
+        letter-spacing: 0;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table td:nth-child(1)::before {
+        content: "Compte Linux";
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table td:nth-child(2)::before {
+        content: "Dossier hote publie";
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table td.col-actions {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        padding-top: 0 !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table td.col-actions::before {
+        content: "Actions";
+        margin: 0 auto 0 0;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table input[type="hidden"] {
+        display: none !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table input:not([type="hidden"]),
+    .sftp-mobile-classic #usersTable.sftp-users-table select {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table .sftp-path-control {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) 36px !important;
+        width: 100% !important;
+        gap: 6px !important;
+        align-items: center !important;
+    }
+
+    .sftp-mobile-classic #usersTable.sftp-users-table .sftp-user-meta,
+    .sftp-mobile-classic #usersTable.sftp-users-table .sftp-path-meta {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+    }
+
+    .sftp-mobile-classic .sftp-users-card .sftp-card-header {
+        padding: 11px 12px !important;
+    }
+
+    .sftp-mobile-classic .sftp-users-card .sftp-card-title {
+        font-size: 15px !important;
+    }
+}

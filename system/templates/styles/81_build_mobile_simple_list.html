@@ -1,0 +1,496 @@
+/* ------------------------------------------------------------------
+   Build mobile : liste simplifiée au lieu des tuiles/mosaïques.
+   Cible uniquement Build → TAR, TAR → Registre et Registre.
+   Le clic conserve la popup de détails/actions déjà fournie par la
+   mosaïque mobile globale ou par la popup registre existante.
+   ------------------------------------------------------------------ */
+
+@media (max-width: 900px) {
+    body.yoleo-mobile-mosaic-ready .builds-page .build-mobile-simple-list .table-wrap.yoleo-mobile-source-wrap {
+        display: none !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .builds-page .build-mobile-simple-list .table-wrap + .yoleo-mobile-table-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        grid-template-columns: none !important;
+        gap: 7px !important;
+        width: 100% !important;
+        padding: 4px 0 !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .builds-page .build-mobile-simple-list .yoleo-mobile-table-tile {
+        width: 100% !important;
+        min-height: 48px !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        grid-template-rows: auto auto !important;
+        align-items: center !important;
+        justify-items: stretch !important;
+        gap: 2px 10px !important;
+        padding: 9px 12px !important;
+        text-align: left !important;
+        border-radius: 11px !important;
+        background: rgba(18, 26, 36, .94) !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .builds-page .build-mobile-simple-list .yoleo-mobile-table-tile::after {
+        content: "›";
+        grid-column: 2;
+        grid-row: 1 / 3;
+        align-self: center;
+        color: var(--yoleo-accent-2);
+        font-size: 22px;
+        font-weight: 900;
+        line-height: 1;
+        opacity: .9;
+    }
+
+    body.yoleo-mobile-mosaic-ready .builds-page .build-mobile-simple-list .yoleo-mobile-table-tile .yoleo-mobile-tile-icon {
+        display: none !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .builds-page .build-mobile-simple-list .yoleo-mobile-table-tile .yoleo-mobile-tile-title {
+        grid-column: 1;
+        grid-row: 1;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        color: #fff;
+        font-size: 14px !important;
+        font-weight: 900 !important;
+        line-height: 1.25 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        text-align: left !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .builds-page .build-mobile-simple-list .yoleo-mobile-table-tile .yoleo-mobile-tile-sub {
+        grid-column: 1;
+        grid-row: 2;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        color: var(--yoleo-muted);
+        font-size: 11px !important;
+        line-height: 1.25 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        text-align: left !important;
+    }
+
+    .builds-page .build-mobile-simple-list .table-tools,
+    .builds-page .build-mobile-simple-list .tar-registry-toolbar,
+    .builds-page #tab-builds_tar.build-mobile-simple-list .topbar {
+        margin-bottom: 10px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    #tab-registry-browser.build-registry-mobile-simple-list .grid-container {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 7px !important;
+        width: 100% !important;
+    }
+
+    #tab-registry-browser.build-registry-mobile-simple-list .grid-item {
+        width: 100% !important;
+        min-height: 48px !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        grid-template-rows: auto auto !important;
+        align-items: center !important;
+        justify-items: stretch !important;
+        gap: 2px 10px !important;
+        padding: 9px 12px !important;
+        text-align: left !important;
+        border-radius: 11px !important;
+        background: rgba(18, 26, 36, .94) !important;
+        border: 1px solid var(--yoleo-border) !important;
+        box-sizing: border-box !important;
+    }
+
+    #tab-registry-browser.build-registry-mobile-simple-list .grid-item::after {
+        content: "›";
+        grid-column: 2;
+        grid-row: 1 / 3;
+        align-self: center;
+        color: var(--yoleo-accent-2);
+        font-size: 22px;
+        font-weight: 900;
+        line-height: 1;
+        opacity: .9;
+    }
+
+    #tab-registry-browser.build-registry-mobile-simple-list .grid-name {
+        grid-column: 1;
+        grid-row: 1;
+        width: auto !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        color: #fff !important;
+        font-size: 14px !important;
+        font-weight: 900 !important;
+        line-height: 1.25 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        text-align: left !important;
+    }
+
+    #tab-registry-browser.build-registry-mobile-simple-list .grid-count {
+        grid-column: 1;
+        grid-row: 2;
+        margin: 0 !important;
+        color: var(--yoleo-muted) !important;
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        line-height: 1.25 !important;
+        text-align: left !important;
+    }
+}
+
+/* ------------------------------------------------------------------
+   Build Main mobile : vraies lignes épaisses, plus informatives.
+   On garde le bureau inchangé et on désactive seulement la mosaïque
+   automatique pour /build/main.
+   ------------------------------------------------------------------ */
+@media (max-width: 900px) {
+    body.yoleo-mobile-mosaic-ready .builds-page .build-main-mobile-list .table-wrap.yoleo-mobile-source-wrap,
+    .builds-page .build-main-mobile-list .table-wrap.yoleo-mobile-source-wrap,
+    .builds-page .build-main-mobile-list .table-wrap {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+        padding: 6px !important;
+        border: 1px solid #26364b !important;
+        border-radius: 13px !important;
+        background: #0c131e !important;
+        box-sizing: border-box !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .builds-page .build-main-mobile-list .table-wrap + .yoleo-mobile-table-grid,
+    .builds-page .build-main-mobile-list .table-wrap + .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table,
+    .builds-page .build-main-mobile-list .build-table thead,
+    .builds-page .build-main-mobile-list .build-table tbody,
+    .builds-page .build-main-mobile-list .build-table tr,
+    .builds-page .build-main-mobile-list .build-table th,
+    .builds-page .build-main-mobile-list .build-table td {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: auto !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table thead {
+        display: none !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table tbody {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table tr {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) 74px !important;
+        grid-template-rows: auto auto auto auto !important;
+        gap: 3px 9px !important;
+        align-items: center !important;
+        width: 100% !important;
+        margin: 0 !important;
+        min-height: 86px !important;
+        padding: 10px 9px !important;
+        border: 1px solid #26364b !important;
+        border-left: 4px solid rgba(0, 221, 255, .70) !important;
+        border-radius: 12px !important;
+        background: rgba(15, 24, 36, .97) !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .025) !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table tr:has(.build-main-registry-status.badge-ok) {
+        border-left-color: rgba(72, 213, 151, .78) !important;
+        box-shadow: inset 0 0 0 1px rgba(72, 213, 151, .12) !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table tr:has(.build-main-registry-status.badge-warn),
+    .builds-page .build-main-mobile-list .build-table tr:has(.badge-no) {
+        border-left-color: rgba(255, 184, 77, .82) !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table td {
+        display: block !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        vertical-align: middle !important;
+        font-size: 11px !important;
+        line-height: 1.22 !important;
+        overflow: hidden !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table td:nth-child(1) {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table td:nth-child(2) {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+        min-width: 0 !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table td:nth-child(3) {
+        grid-column: 1 !important;
+        grid-row: 3 !important;
+        min-width: 0 !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table td:nth-child(4) {
+        grid-column: 1 !important;
+        grid-row: 4 !important;
+        min-width: 0 !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table td:nth-child(5) {
+        grid-column: 1 !important;
+        grid-row: 5 !important;
+        min-width: 0 !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table td:nth-child(6) {
+        grid-column: 2 !important;
+        grid-row: 1 / span 5 !important;
+        justify-self: end !important;
+        align-self: center !important;
+        width: 74px !important;
+        max-width: 74px !important;
+        overflow: visible !important;
+    }
+
+    .builds-page .build-main-mobile-list .dock-cell {
+        display: block !important;
+        min-width: 0 !important;
+    }
+
+    .builds-page .build-main-mobile-list .name-main {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 14px !important;
+        line-height: 1.15 !important;
+        font-weight: 900 !important;
+    }
+
+    .builds-page .build-main-mobile-list .name-sub,
+    .builds-page .build-main-mobile-list .tag-val {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 10px !important;
+        line-height: 1.18 !important;
+        margin-top: 1px !important;
+    }
+
+    .builds-page .build-main-mobile-list td:nth-child(2) .actions-cell {
+        display: flex !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+        gap: 5px !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    .builds-page .build-main-mobile-list td:nth-child(2)::before,
+    .builds-page .build-main-mobile-list td:nth-child(3)::before,
+    .builds-page .build-main-mobile-list td:nth-child(4)::before,
+    .builds-page .build-main-mobile-list td:nth-child(5)::before {
+        display: inline-block !important;
+        margin-right: 5px !important;
+        color: var(--yoleo-muted) !important;
+        font-size: 9px !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        letter-spacing: .04em !important;
+    }
+
+    .builds-page .build-main-mobile-list td:nth-child(2)::before { content: "Dossier"; }
+    .builds-page .build-main-mobile-list td:nth-child(3)::before { content: "Arch"; }
+    .builds-page .build-main-mobile-list td:nth-child(4)::before { content: "TAR"; }
+    .builds-page .build-main-mobile-list td:nth-child(5)::before { content: "Registre"; }
+
+    .builds-page .build-main-mobile-list .arch-row,
+    .builds-page .build-main-mobile-list .build-main-tar-line {
+        display: inline-flex !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        vertical-align: middle !important;
+    }
+
+    .builds-page .build-main-mobile-list .badge {
+        max-width: 100% !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        min-height: 18px !important;
+        padding: 2px 6px !important;
+        border-radius: 999px !important;
+        font-size: 9px !important;
+        line-height: 1.1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        vertical-align: middle !important;
+    }
+
+    .builds-page .build-main-mobile-list td:nth-child(5) .name-sub {
+        display: inline-block !important;
+        width: calc(100% - 58px) !important;
+        margin-left: 4px !important;
+        vertical-align: middle !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-row-actions {
+        display: grid !important;
+        grid-template-columns: 28px 42px !important;
+        grid-auto-rows: 27px !important;
+        justify-content: end !important;
+        align-items: center !important;
+        gap: 5px !important;
+        width: 74px !important;
+        max-width: 74px !important;
+        overflow: visible !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-row-actions .yoleo-btn {
+        height: 27px !important;
+        min-height: 27px !important;
+        padding: 0 5px !important;
+        border-radius: 8px !important;
+        font-size: 10px !important;
+        line-height: 1 !important;
+        justify-content: center !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-row-actions .build-db-option-btn {
+        width: 28px !important;
+        min-width: 28px !important;
+        padding: 0 !important;
+        font-size: 11px !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-row-actions .smart-action-button {
+        width: 42px !important;
+        min-width: 42px !important;
+        overflow: hidden !important;
+        text-overflow: clip !important;
+        white-space: nowrap !important;
+    }
+
+    .builds-page .build-main-mobile-list td:nth-child(2) .yoleo-btn-mini {
+        width: 23px !important;
+        min-width: 23px !important;
+        height: 22px !important;
+        min-height: 22px !important;
+        padding: 0 !important;
+        font-size: 10px !important;
+        border-radius: 7px !important;
+    }
+
+    .builds-page .build-main-mobile-list .smart-status {
+        grid-column: 1 / -1 !important;
+        width: 100% !important;
+        justify-content: center !important;
+        font-size: 9px !important;
+    }
+}
+
+
+/* Correctif mobile Build Main : l'action ne doit jamais dépasser à droite.
+   Les boutons passent en petite colonne icône, comme les boutons VM mobile. */
+@media (max-width: 900px) {
+    .builds-page .build-main-mobile-list .build-table tr {
+        grid-template-columns: minmax(0, 1fr) 34px !important;
+        gap: 3px 6px !important;
+        padding-right: 7px !important;
+        overflow: hidden !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-table td:nth-child(6) {
+        width: 34px !important;
+        max-width: 34px !important;
+        min-width: 34px !important;
+        overflow: hidden !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-row-actions {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: flex-end !important;
+        gap: 5px !important;
+        width: 34px !important;
+        max-width: 34px !important;
+        min-width: 34px !important;
+        overflow: hidden !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-row-actions .yoleo-btn,
+    .builds-page .build-main-mobile-list .build-row-actions .build-db-option-btn,
+    .builds-page .build-main-mobile-list .build-row-actions .smart-action-button {
+        width: 30px !important;
+        min-width: 30px !important;
+        max-width: 30px !important;
+        height: 27px !important;
+        min-height: 27px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        white-space: nowrap !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-row-actions .smart-action-button {
+        font-size: 0 !important;
+        text-indent: 0 !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-row-actions .smart-action-button::after {
+        content: "▶";
+        font-size: 12px !important;
+        line-height: 1 !important;
+        font-weight: 900 !important;
+    }
+
+    .builds-page .build-main-mobile-list .build-row-actions .smart-action-button:disabled::after {
+        content: "✓";
+    }
+
+    .builds-page .build-main-mobile-list .smart-status {
+        display: none !important;
+    }
+}

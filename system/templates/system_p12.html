@@ -1,0 +1,223 @@
+{% extends "system_base.html" %}
+
+{% block title %}Certificats P12 - Yoleo{% endblock %}
+{% block page_title %}Certificats P12{% endblock %}
+{% block page_subtitle %}Génération P12 avec dossier de sortie choisi{% endblock %}
+
+{% block system_content %}
+<main class="su-page su-p12-page">
+    <section class="su-p12-grid">
+        <form class="su-panel su-p12-form" onsubmit="event.preventDefault(); generateP12();">
+            <div class="su-panel-head">
+                <div>
+                    <h2>Générer un certificat</h2>
+                    <p>Fichiers .key, .crt, .p12 et _comp.p12 dans le dossier choisi.</p>
+                </div>
+            </div>
+
+            <div class="su-form-grid su-grid-2">
+                <label>Nom du fichier
+                    <input type="text" id="p12-name" class="yoleo-input" placeholder="ex: mon_certif" required>
+                    <span>Les fichiers générés s’appelleront nom.p12 et nom_comp.p12.</span>
+                </label>
+                <label>Domaine / CN
+                    <input type="text" id="p12-url" class="yoleo-input" placeholder="ex: sftpmalin.com" required>
+                    <span>Domaine simple, sous-domaine ou wildcard du style *.mondomaine.com.</span>
+                </label>
+                <label>Mot de passe P12
+                    <input type="password" id="p12-pwd" class="yoleo-input" placeholder="Optionnel">
+                    <span>Laisse vide si tu veux un P12 sans mot de passe.</span>
+                </label>
+                <label>Format de clé
+                    <select id="p12-key-size" class="yoleo-input">
+                        <option value="2048">RSA 2048</option>
+                        <option value="3072" selected>RSA 3072</option>
+                        <option value="4096">RSA 4096</option>
+                        <option value="ed25519">Ed25519</option>
+                    </select>
+                    <span id="p12-algoHint">RSA 3072 est un bon compromis sécurité / compatibilité.</span>
+                </label>
+                <label class="su-wide">Dossier de sortie P12
+                    <div class="su-path-row">
+                        <input type="text" id="p12-output-dir" class="yoleo-input" value="{{ p12_output_dir }}" placeholder="Choisis un dossier de sortie..." autocomplete="off">
+                        <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="openP12Browser()" title="Parcourir" aria-label="Parcourir">📁</button>
+                    </div>
+                    <span>Chemin absolu accepté, ou relatif au dossier conf. Exemple : ../p12.</span>
+                    <strong id="p12-output-state" class="su-output-state"></strong>
+                </label>
+            </div>
+
+            <div class="su-form-actions">
+                <button type="submit" id="p12-generate-btn" class="yoleo-btn yoleo-btn-primary" {% if not allow_actions %}disabled{% endif %}>🚀 Générer le P12</button>
+            </div>
+            <pre id="p12-result" class="su-result" hidden></pre>
+        </form>
+
+        <aside class="su-side-stack">
+            <section class="su-panel su-info-card">
+                <h2>Résumé rapide</h2>
+                <div class="su-summary-box">
+                    <div><b>Dossier choisi :</b> <code id="p12-summary-output">{{ p12_output_dir or '—' }}</code></div>
+                    <div><b>Chemin réel :</b> <code id="p12-summary-output-resolved">{{ p12_output_dir_resolved or '—' }}</code></div>
+                    <div><b>Fichier de conf :</b> <code id="p12-summary-conf">{{ p12_config_file }}</code></div>
+                    <div><b>Durée certificat :</b> 3650 jours</div>
+                    <div><b>Fichiers générés :</b> .key + .crt + .p12 + _comp.p12</div>
+                </div>
+            </section>
+
+            <section class="su-panel su-info-card">
+                <h2>Conseils</h2>
+                <div class="su-summary-box">
+                    <div><span class="su-chip">Compatibilité</span></div>
+                    <div>RSA 3072 reste le meilleur choix par défaut pour éviter les surprises avec certains clients.</div>
+                    <div><span class="su-chip">Nom de fichier</span></div>
+                    <div>Le nom est nettoyé automatiquement pour éviter les caractères gênants dans les chemins.</div>
+                </div>
+            </section>
+        </aside>
+    </section>
+</main>
+
+<script>
+    const allowActions = {{ allow_actions | tojson }};
+    const initialP12OutputDir = {{ p12_output_dir | tojson }};
+    const initialP12OutputDirResolved = {{ p12_output_dir_resolved | tojson }};
+
+    function showResult(message, isError=false) {
+        const el = document.getElementById('p12-result');
+        if (!el) return;
+        el.hidden = false;
+        el.classList.toggle('is-error', !!isError);
+        el.textContent = message;
+    }
+
+    function p12OutputValue() {
+        const input = document.getElementById('p12-output-dir');
+        return input ? input.value.trim() : '';
+    }
+
+    function updateP12Summary(outputDir, outputDirResolved, configFile) {
+        const rawEl = document.getElementById('p12-summary-output');
+        const realEl = document.getElementById('p12-summary-output-resolved');
+        const confEl = document.getElementById('p12-summary-conf');
+        if (rawEl && outputDir !== undefined) rawEl.textContent = outputDir || '—';
+        if (realEl && outputDirResolved !== undefined) realEl.textContent = outputDirResolved || '—';
+        if (confEl && configFile) confEl.textContent = configFile;
+    }
+
+    function updateP12OutputState() {
+        const value = p12OutputValue();
+        const state = document.getElementById('p12-output-state');
+        const btn = document.getElementById('p12-generate-btn');
+        if (btn) {
+            btn.disabled = !allowActions || !value;
+            btn.title = value ? '' : 'Choisis d’abord un dossier de sortie P12.';
+        }
+        if (!state) return;
+        state.classList.toggle('is-error', !value);
+        state.textContent = value ? `Dossier sélectionné : ${value}` : 'Dossier de sortie obligatoire : génération P12 bloquée.';
+        updateP12Summary(value, undefined, undefined);
+    }
+
+    async function saveP12OutputDir(value) {
+        const outputDir = String(value || '').trim();
+        if (!outputDir) { updateP12OutputState(); return false; }
+        try {
+            const response = await fetch('/api/users/p12/output', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+                body: JSON.stringify({p12_output_dir: outputDir})
+            });
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                showResult(data.error || 'Erreur pendant l’enregistrement du dossier P12.', true);
+                return false;
+            }
+            updateP12Summary(data.output_dir, data.output_dir_resolved, data.config_file);
+            updateP12OutputState();
+            return true;
+        } catch (err) {
+            showResult('Erreur pendant l’enregistrement du dossier P12.', true);
+            return false;
+        }
+    }
+
+    function updateP12AlgoHint() {
+        const select = document.getElementById('p12-key-size');
+        const hint = document.getElementById('p12-algoHint');
+        if (!select || !hint) return;
+        const texts = {
+            '2048': 'RSA 2048 maximise la compatibilité mais est un peu moins costaud.',
+            '3072': 'RSA 3072 est un bon compromis sécurité / compatibilité.',
+            '4096': 'RSA 4096 est plus lourd à générer et pas forcément utile partout.',
+            'ed25519': 'Ed25519 est moderne et léger, mais vérifie la compatibilité côté client.'
+        };
+        hint.textContent = texts[select.value] || texts['3072'];
+    }
+
+    function openP12Browser() {
+        const start = p12OutputValue() || initialP12OutputDirResolved || '/';
+        const params = new URLSearchParams({target: 'p12-output-dir', path: start});
+        const popup = window.open('/browser/folder?' + params.toString(), 'yoleo_browser_p12_output_dir', 'width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+        if (popup) popup.focus();
+    }
+
+    window.addEventListener('message', async (event) => {
+        const data = event.data || {};
+        if (data.type !== 'yoleo-browser-select' || data.mode !== 'folder' || data.target !== 'p12-output-dir') return;
+        const input = document.getElementById('p12-output-dir');
+        if (!input) return;
+        input.value = data.path || '';
+        updateP12OutputState();
+        await saveP12OutputDir(data.path || '');
+    });
+
+    async function generateP12() {
+        const payload = {
+            p12_name: document.getElementById('p12-name').value.trim(),
+            p12_url: document.getElementById('p12-url').value.trim(),
+            p12_pwd: document.getElementById('p12-pwd').value,
+            key_size: document.getElementById('p12-key-size').value,
+            p12_output_dir: p12OutputValue()
+        };
+        if (!payload.p12_output_dir) {
+            updateP12OutputState();
+            showResult('Choisis d’abord un dossier de sortie P12.', true);
+            return;
+        }
+        if (!payload.p12_name || !payload.p12_url) {
+            showResult('Nom du fichier et domaine / CN obligatoires.', true);
+            return;
+        }
+        showResult('Génération P12 en cours...');
+        try {
+            const response = await fetch('/api/users/p12/generate', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                showResult(data.error || 'Erreur pendant la génération P12.', true);
+                return;
+            }
+            updateP12Summary(data.output_dir, data.output_dir_resolved, data.config_file);
+            showResult(`✅ ${data.message}\n\nDossier : ${data.output_dir_resolved}\nP12 : ${data.p12_path}\nP12 compatible : ${data.p12_compat_path}\nCertificat : ${data.cert_path}\nClé : ${data.key_path}`);
+        } catch (err) {
+            showResult('Erreur pendant la génération P12.', true);
+        }
+    }
+
+    const keySelect = document.getElementById('p12-key-size');
+    if (keySelect) {
+        keySelect.addEventListener('change', updateP12AlgoHint);
+        updateP12AlgoHint();
+    }
+    const outputInput = document.getElementById('p12-output-dir');
+    if (outputInput) {
+        outputInput.addEventListener('input', updateP12OutputState);
+        outputInput.addEventListener('blur', () => saveP12OutputDir(outputInput.value));
+    }
+    updateP12OutputState();
+</script>
+{% endblock %}

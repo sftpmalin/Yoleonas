@@ -1,0 +1,167 @@
+/* Petit correctif Maintenance : tableau des volumes RAID logiques. */
+.disk-maintenance-raid-card {
+    margin-bottom: 12px;
+}
+
+.disk-maintenance-raid-card .table-wrap .yoleo-table {
+    min-width: 1160px;
+}
+
+.disk-maintenance-raid-card .yoleo-table th:nth-child(1),
+.disk-maintenance-raid-card .yoleo-table td:nth-child(1) {
+    width: 105px;
+}
+
+.disk-maintenance-raid-card .yoleo-table th:nth-child(2),
+.disk-maintenance-raid-card .yoleo-table td:nth-child(2) {
+    width: 170px;
+}
+
+.disk-maintenance-raid-card .yoleo-table th:nth-child(3),
+.disk-maintenance-raid-card .yoleo-table td:nth-child(3) {
+    width: 255px;
+}
+
+.disk-maintenance-raid-card .yoleo-table th:nth-child(4),
+.disk-maintenance-raid-card .yoleo-table td:nth-child(4) {
+    width: 112px;
+}
+
+.disk-maintenance-raid-card .yoleo-table th:nth-child(5),
+.disk-maintenance-raid-card .yoleo-table td:nth-child(5) {
+    width: 92px;
+}
+
+.disk-maintenance-raid-card .yoleo-table th:nth-child(6),
+.disk-maintenance-raid-card .yoleo-table td:nth-child(6) {
+    width: 150px;
+}
+
+.disk-maintenance-raid-card .yoleo-table th:nth-child(7),
+.disk-maintenance-raid-card .yoleo-table td:nth-child(7) {
+    width: 270px;
+}
+
+.maintenance-raid-head {
+    padding-top: 10px;
+    align-items: flex-start;
+}
+
+.maintenance-raid-head h3 {
+    margin: 0 0 4px 0;
+}
+
+.maintenance-raid-note {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.maintenance-raid-row .disk-sub,
+.maintenance-raid-row .model-sub {
+    font-size: 11px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Maintenance : boutons d'action compacts sur PC, lisibles sur mobile. */
+.maintenance-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    min-width: 0;
+}
+
+.maintenance-actions .maintenance-icon-btn {
+    width: 30px;
+    min-width: 30px;
+    height: 28px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    line-height: 1;
+}
+
+.maintenance-actions .action-ico {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    min-width: 18px;
+    line-height: 1;
+}
+
+.maintenance-actions .action-label {
+    display: none;
+}
+
+.disk-table-compact .actions-col {
+    min-width: 118px;
+}
+
+@media (max-width: 900px) {
+    .maintenance-actions {
+        justify-content: flex-start;
+        gap: 6px;
+    }
+
+    .maintenance-actions .maintenance-icon-btn {
+        width: auto;
+        min-width: 88px;
+        height: 32px;
+        padding: 5px 8px;
+        gap: 5px;
+    }
+
+    .maintenance-actions .action-label {
+        display: inline;
+        font-size: 11px;
+        font-weight: 800;
+    }
+}
+
+
+/* ------------------------------------------------------------------
+   Maintenance disques : respiration standard dans les cartes.
+   Le titre "Volumes RAID logiques" et les colonnes ne doivent pas
+   coller au bord gauche de la carte.
+   ------------------------------------------------------------------ */
+#tab-maintenance .maintenance-raid-head {
+    padding: 14px 18px 10px !important;
+}
+
+#tab-maintenance .maintenance-raid-head h3 {
+    margin: 0 0 5px 0 !important;
+}
+
+#tab-maintenance .maintenance-raid-note {
+    max-width: 980px;
+    line-height: 1.35;
+}
+
+#tab-maintenance .disk-table-compact .yoleo-table th:first-child,
+#tab-maintenance .disk-table-compact .yoleo-table td:first-child {
+    padding-left: 14px !important;
+}
+
+#tab-maintenance .disk-table-compact .yoleo-table th:last-child,
+#tab-maintenance .disk-table-compact .yoleo-table td:last-child {
+    padding-right: 14px !important;
+}
+
+@media (max-width: 900px) {
+    #tab-maintenance .maintenance-raid-head {
+        padding: 12px 14px 9px !important;
+    }
+
+    #tab-maintenance .disk-table-compact .yoleo-table th:first-child,
+    #tab-maintenance .disk-table-compact .yoleo-table td:first-child {
+        padding-left: 10px !important;
+    }
+}

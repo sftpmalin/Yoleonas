@@ -1,0 +1,1113 @@
+{% extends "services_base.html" %}
+
+{% block route_content %}
+<div class="cache-page cache-mobile-simple-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+            <div class="cache-panel">
+              {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+              <div class="flash-stack">
+                {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% endwith %}
+
+              {% if error %}
+                <div class="error-box">{{ error }}</div>
+              {% else %}
+              <form method="post" action="{{ url_for('services_bp.cache_save') }}" id="cacheProfilesForm">
+                <div class="service-section-shell">
+                  <div id="cache-tab-general" class="cache-tab-panel {{ 'active' if active_subtab == 'general' else '' }}">
+                    <section class="card">
+                      <div class="cache-general-control-row">
+                        <div class="summary-grid cache-summary-inline">
+                          <div class="summary-card"><div class="summary-label">Profils</div><div class="summary-value">{{ cache_blocks|length }}</div></div>
+                          <div class="summary-card"><div class="summary-label">Actifs</div><div class="summary-value">{{ active_count }}</div></div>
+                          <div class="summary-card"><div class="summary-label">Dans --all</div><div class="summary-value">{{ all_count }}</div></div>
+                          <div class="summary-card"><div class="summary-label">Commandes</div><div class="summary-value">{{ command_count }}</div></div>
+                        </div>
+                        <div class="cache-v4-run-all-group cache-run-all-right">
+                          <button id="cacheRunAllButton" data-cache-run-button="__all__" type="button" class="yoleo-btn yoleo-btn-green" onclick="runCache('__all__', 'start', this)">▶️ Vider tout le cache</button>
+                          <div id="cacheAllProgress" class="cache-v4-progress cache-v4-progress-idle" aria-live="polite">
+                            <div class="cache-v4-progress-track"><span></span></div>
+                            <div class="cache-v4-progress-label">Prêt</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div id="cacheInlineStatus" class="cache-v4-inline-status" hidden></div>
+
+                      <div class="table-tools cache-table-tools-compact">
+                        <input class="search-input" id="cacheGeneralSearch" type="text" placeholder="Filtrer : media, Yoan, Nextcloud..." oninput="filterCacheTable('cacheGeneralTable', this.value)">
+                      </div>
+
+                      <div class="table-wrap cache-mobile-simple-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" data-yoleo-service-context-zone="cache">
+                        <table class="cache-table cache-mobile-simple-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" id="cacheGeneralTable">
+                          <thead>
+                            <tr>
+                              <th style="width:18%;">Profil</th>
+                              <th style="width:10%;">Statut</th>
+                              <th style="width:18%;">Source</th>
+                              <th style="width:17%;">Destination</th>
+                              <th style="width:9%;">État</th>
+                              <th style="width:16%;">Progression</th>
+                              <th style="width:12%; text-align:right;">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody id="cacheGeneralRows">
+                            {% if not cache_blocks %}
+                            <tr id="cacheEmptyRow"><td colspan="7"><div class="empty-state">Aucun profil cache configuré.</div></td></tr>
+                            {% endif %}
+                            {% for block in cache_blocks %}
+                            <tr data-cache-row data-cache-edit-row data-cache-index="{{ loop.index0 }}" data-cache-row-key="{{ block.key|e }}" data-filter="{{ block.key|lower }} {{ block.title|lower }} {{ block.source|lower }} {{ block.destination|lower }} {{ block.aliases|lower }}">
+                              <td><div class="name-main" data-cache-summary="title">{{ block.title or block.key }}</div><div class="name-sub mono" data-cache-summary="key">[{{ block.key }}]{% if block.aliases %} · {{ block.aliases }}{% endif %}</div></td>
+                              <td><span class="badge {{ block.cache_status_class }}" data-cache-summary="cache_status" title="{{ block.cache_status_hint }}">{{ block.cache_status_label }}</span></td>
+                              <td><span class="tag-val" data-cache-summary="source">{{ block.source or '—' }}</span></td>
+                              <td><span class="tag-val" data-cache-summary="destination">{{ block.destination or '—' }}</span></td>
+                              <td>
+                                <span class="badge {{ 'badge-ok' if block.is_enabled else 'badge-no' }}" data-cache-summary="enabled">{{ 'actif' if block.is_enabled else 'désactivé' }}</span>
+                                <span class="badge {{ 'badge-info' if block.is_all else 'badge-muted' }}" data-cache-summary="include_in_all">{{ '--all' if block.is_all else 'manuel' }}</span>
+                              </td>
+                              <td class="cache-v4-progress-cell">
+                                <div class="cache-v4-progress cache-v4-progress-idle" data-cache-row-progress="{{ block.key|e }}" aria-live="polite">
+                                  <div class="cache-v4-progress-track"><span></span></div>
+                                  <div class="cache-v4-progress-label">Prêt</div>
+                                </div>
+                              </td>
+                              <td><div class="actions-cell">
+                                <button type="button" data-cache-run-button="{{ block.key|e }}" class="yoleo-btn yoleo-btn-mini yoleo-btn-green" onclick='runCache({{ block.key|tojson }}, "start", this)'>▶ Vider</button>
+                                <button type="button" data-cache-stop-button="{{ block.key|e }}" class="yoleo-btn yoleo-btn-mini yoleo-btn-red cache-v4-row-stop" title="Arrêter ce cache" aria-label="Arrêter ce cache" hidden onclick='stopCacheJobForTarget({{ block.key|tojson }}, this)'>⏹</button>
+                                <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" title="Modifier" aria-label="Modifier" onclick="openCacheProfileModal('{{ loop.index0 }}')">✏️</button>
+                                <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red" title="Supprimer" aria-label="Supprimer" onclick="deleteCacheProfile('{{ loop.index0 }}')">✕</button>
+                              </div></td>
+                            </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+
+                  </div>
+
+                  <div id="cacheProfileStores">
+                    {% for block in cache_blocks %}
+                    <div class="cache-store" data-cache-store data-cache-index="{{ loop.index0 }}">
+                      <input type="hidden" name="cache_original[]" value="{{ block.key }}" data-cache-field="original">
+                      <input type="hidden" name="cache_key[]" value="{{ block.key }}" data-cache-field="key">
+                      <input type="hidden" name="cache_title[]" value="{{ block.title }}" data-cache-field="title">
+                      <input type="hidden" name="cache_source[]" value="{{ block.source }}" data-cache-field="source">
+                      <input type="hidden" name="cache_destination[]" value="{{ block.destination }}" data-cache-field="destination">
+                      <input type="hidden" name="cache_command_start[]" value="{{ block.command_start }}" data-cache-field="command_start">
+                      <input type="hidden" name="cache_command_end[]" value="{{ block.command_end }}" data-cache-field="command_end">
+                      <input type="hidden" name="cache_aliases[]" value="{{ block.aliases }}" data-cache-field="aliases">
+                      <input type="hidden" name="cache_enabled[]" value="{{ 'true' if block.is_enabled else 'false' }}" data-cache-field="enabled">
+                      <input type="hidden" name="cache_include_in_all[]" value="{{ 'true' if block.is_all else 'false' }}" data-cache-field="include_in_all">
+                      <input type="hidden" name="cache_delete[]" value="{{ block.key }}" data-cache-field="delete" disabled>
+                    </div>
+                    {% endfor %}
+                  </div>
+
+                  <div id="cache-tab-info" class="cache-tab-panel {{ 'active' if active_subtab == 'info' else '' }}">
+                    <section class="card">
+                      <div class="topbar">
+                        <div class="title-block">
+                          <h2>Info Cache</h2>
+                          <div class="subtitle">Informations techniques du module Cache. Les chemins cachés sont enregistrés automatiquement dans services.conf.</div>
+                        </div>
+                      </div>
+
+                      <div class="path-grid">
+                        <div class="path-pill"><b>services.conf</b><span>{{ config_file }}</span></div>
+                        <div class="path-pill"><b>cache.conf</b><span>{{ real_conf }}</span></div>
+                        <div class="path-pill"><b>logs</b><span>{{ log_dir }}</span></div>
+                      </div>
+
+                    </section>
+                  </div>
+
+                  <div id="cache-tab-logs" class="cache-tab-panel {{ 'active' if active_subtab == 'logs' else '' }}">
+                    <section class="card">
+                      <div class="topbar">
+                        <div class="title-block">
+                          <h2>Logs Cache</h2>
+                          <div class="subtitle">Sortie du moteur Cache intégré et suivi du job en cours.</div>
+                        </div>
+                        <div class="toolbar">
+                          <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="clearCacheLog()">Nettoyer</button>
+                        </div>
+                      </div>
+                      <pre id="cacheLogOutput" class="terminal">Aucun cache lancé pour le moment.</pre>
+                    </section>
+                  </div>
+                </div>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="modal-overlay" id="cacheProfileModal">
+            <div class="modal-box">
+              <div class="modal-head">
+                <div>
+                  <h3 class="modal-title" id="cacheProfileModalTitle">Modifier le profil cache</h3>
+                  <div class="hint">Le bouton Appliquer enregistre directement le profil dans cache.conf.</div>
+                </div>
+                <button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="closeCacheProfileModal()">✕</button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" id="cache_modal_index">
+                <div class="modal-grid">
+                  <div><label>Nom du bloc</label><input id="cache_modal_key" data-cache-modal-field="key" placeholder="media"></div>
+                  <div><label>Titre</label><input id="cache_modal_title" data-cache-modal-field="title" placeholder="Media"></div>
+                  <div class="modal-span-2">
+                    <label>Source</label>
+                    <div class="path-edit">
+                      <input id="cache_modal_source" data-cache-modal-field="source" placeholder="/mnt/cache/Media">
+                      <button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" type="button" onclick="openCacheStandardBrowser('cache_modal_source')">📁</button>
+                    </div>
+                  </div>
+                  <div class="modal-span-2">
+                    <label>Destination</label>
+                    <div class="path-edit">
+                      <input id="cache_modal_destination" data-cache-modal-field="destination" placeholder="/mnt/disk4/Media">
+                      <button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" type="button" onclick="openCacheStandardBrowser('cache_modal_destination')">📁</button>
+                    </div>
+                  </div>
+                  <div class="modal-span-2"><label>command_start</label><input id="cache_modal_command_start" data-cache-modal-field="command_start" placeholder="docker stop nextcloud"></div>
+                  <div class="modal-span-2"><label>command_end</label><input id="cache_modal_command_end" data-cache-modal-field="command_end" placeholder="docker start nextcloud"></div>
+                  <div><label>Aliases</label><input id="cache_modal_aliases" data-cache-modal-field="aliases" placeholder="media, films"></div>
+                  <div>
+                    <label>Options</label>
+                    <div class="cache-switches">
+                      <label class="cache-check"><input id="cache_modal_enabled" type="checkbox" data-cache-modal-field="enabled"> actif</label>
+                      <label class="cache-check"><input id="cache_modal_include_in_all" type="checkbox" data-cache-modal-field="include_in_all"> dans --all</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeCacheProfileModal()">Annuler</button>
+                <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="saveCacheProfileModal()">💾 Enregistrer</button>
+              </div>
+            </div>
+          </div>
+
+          <script>
+          let cacheCurrentJobId = null;
+          let cachePollTimer = null;
+          let cacheStatusRefreshJobId = null;
+          let cacheNewCounter = 0;
+          let cachePendingNewIndex = '';
+          let cacheBrowseTargetId = '';
+          const cacheModalFields = ['key','title','source','destination','command_start','command_end','aliases','enabled','include_in_all'];
+
+          function switchCacheTab(tab) {
+              if (tab === 'profiles') tab = 'general';
+              document.querySelectorAll('[data-cache-tab-target]').forEach(btn => btn.classList.toggle('active', btn.dataset.cacheTabTarget === tab));
+              document.querySelectorAll('.cache-tab-panel').forEach(panel => panel.classList.toggle('active', panel.id === 'cache-tab-' + tab));
+              try {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('subtab', tab);
+                  history.replaceState(null, '', url.toString());
+              } catch (e) {}
+          }
+
+          function filterCacheTable(tableId, value) {
+              const needle = String(value || '').trim().toLowerCase();
+              const table = document.getElementById(tableId);
+              if (!table) return;
+              table.querySelectorAll('tbody tr').forEach(row => {
+                  const hay = (row.dataset.filter || row.textContent || '').toLowerCase();
+                  row.style.display = hay.includes(needle) ? '' : 'none';
+              });
+          }
+
+          function cacheStatusLabel(status) {
+              const labels = {queued:'en file', running:'en cours', stopping:'arrêt demandé', stopped:'arrêté', success:'terminé OK', error:'erreur'};
+              return labels[status] || status || 'inconnu';
+          }
+
+          const CACHE_LOGS_URL = {{ url_for('services_bp.services_section', service='cache', subtab='logs')|tojson }};
+          const CACHE_IS_LOGS_PAGE = {{ 'true' if active_subtab == 'logs' else 'false' }};
+          const CACHE_LOG_TEXT_KEY = 'yoleo.cache.log.text';
+          const CACHE_LOG_JOB_KEY = 'yoleo.cache.log.job_id';
+          let cacheUiMessageTimer = null;
+          let cacheActiveUiTarget = null;
+
+          function cacheNormalizeTarget(target) {
+              const raw = String(target || '').trim();
+              return ['__all__', '--all', 'all'].includes(raw) ? '__all__' : raw;
+          }
+
+          function cacheRememberLog(text, jobId) {
+              try {
+                  sessionStorage.setItem(CACHE_LOG_TEXT_KEY, text || '');
+                  if (arguments.length > 1) {
+                      if (jobId) sessionStorage.setItem(CACHE_LOG_JOB_KEY, jobId);
+                      else sessionStorage.removeItem(CACHE_LOG_JOB_KEY);
+                  }
+              } catch (e) {}
+          }
+
+          function cacheGoToLogs() {
+              if (!CACHE_IS_LOGS_PAGE) {
+                  window.location.href = CACHE_LOGS_URL;
+              }
+          }
+
+          function setCacheLog(text, jobId) {
+              const out = document.getElementById('cacheLogOutput');
+              if (out) {
+                  out.style.display = 'block';
+                  out.textContent = text || '';
+              }
+              const tech = document.getElementById('cacheTechOutput');
+              if (tech && text) {
+                  tech.style.display = 'block';
+                  tech.textContent = text;
+              }
+              if (arguments.length > 1) cacheRememberLog(text || '', jobId || '');
+              else cacheRememberLog(text || '');
+          }
+
+          function setCacheLogAndOpenLogs(text, jobId) {
+              setCacheLog(text, jobId || '');
+          }
+
+          function cacheShowStatus(type, text, autoHide) {
+              const box = document.getElementById('cacheInlineStatus');
+              if (!box) return;
+              if (cacheUiMessageTimer) {
+                  clearTimeout(cacheUiMessageTimer);
+                  cacheUiMessageTimer = null;
+              }
+              box.hidden = false;
+              box.className = 'cache-v4-inline-status cache-v4-inline-' + (type || 'info');
+              box.textContent = text || '';
+              if ((autoHide || type === 'success') && type !== 'error') {
+                  cacheUiMessageTimer = setTimeout(() => {
+                      box.hidden = true;
+                  }, 780);
+              }
+          }
+
+          function cacheAutoHideGreenMessages() {
+              document.querySelectorAll('.flash.success, .flash.message').forEach(el => {
+                  setTimeout(() => {
+                      el.style.display = 'none';
+                  }, 780);
+              });
+          }
+
+          function isCacheRunning(status) {
+              return ['queued', 'running', 'stopping'].includes(status || '');
+          }
+
+          function formatCacheJobText(job) {
+              return (job.log || '') + '\n\n---\nStatut : ' + cacheStatusLabel(job.status) +
+                  (job.returncode !== null && job.returncode !== undefined ? ' · code ' + job.returncode : '') +
+                  (job.log_file ? '\nLog : ' + job.log_file : '');
+          }
+
+          function cacheSetButtonLoading(button, loading) {
+              if (!button) return;
+              if (!button.dataset.cacheOriginalText) {
+                  button.dataset.cacheOriginalText = button.textContent;
+              }
+              button.disabled = !!loading;
+              button.classList.toggle('cache-v4-button-loading', !!loading);
+              if (!loading) {
+                  button.textContent = button.dataset.cacheOriginalText || button.textContent;
+              }
+          }
+
+          function cacheRunButtonForTarget(target) {
+              const key = cacheNormalizeTarget(target);
+              const selector = '[data-cache-run-button="' + CSS.escape(key) + '"]';
+              return document.querySelector(selector);
+          }
+
+          function cacheSetRunButtonsDisabled(disabled, activeTarget) {
+              const activeKey = cacheNormalizeTarget(activeTarget || '');
+              document.querySelectorAll('[data-cache-run-button]').forEach(button => {
+                  const key = cacheNormalizeTarget(button.dataset.cacheRunButton || '');
+                  button.disabled = !!disabled;
+                  button.classList.toggle('cache-v4-button-loading', !!disabled && key === activeKey);
+              });
+          }
+
+          function cacheStopButtonForTarget(target) {
+              const key = cacheNormalizeTarget(target);
+              if (!key || key === '__all__') return null;
+              return document.querySelector('[data-cache-stop-button="' + CSS.escape(key) + '"]');
+          }
+
+          function cacheHideRowStopButtons() {
+              document.querySelectorAll('[data-cache-stop-button]').forEach(button => {
+                  button.hidden = true;
+                  button.disabled = false;
+                  button.classList.remove('cache-v4-button-loading');
+              });
+          }
+
+          function cacheShowRowStopButton(target, visible) {
+              const button = cacheStopButtonForTarget(target);
+              if (!button) return;
+              button.hidden = !visible;
+              button.disabled = false;
+          }
+
+          function cacheUpdateRowStopButtons(job) {
+              cacheHideRowStopButtons();
+              if (!job || !isCacheRunning(job.status)) return;
+              const target = cacheNormalizeTarget(job.target || '');
+              const progressTarget = cacheNormalizeTarget(job.progress_target || '');
+              const rows = job.progress_rows || {};
+              Object.keys(rows).forEach(key => {
+                  const item = rows[key] || {};
+                  if ((item.state || '') === 'running') cacheShowRowStopButton(key, true);
+              });
+              if (target && target !== '__all__') cacheShowRowStopButton(target, true);
+              if (progressTarget && progressTarget !== '__all__') cacheShowRowStopButton(progressTarget, true);
+          }
+
+          function cacheProgressElements(target) {
+              const key = cacheNormalizeTarget(target);
+              if (key === '__all__') {
+                  const all = document.getElementById('cacheAllProgress');
+                  return all ? [all] : [];
+              }
+              const row = document.querySelector('[data-cache-row-progress="' + CSS.escape(key) + '"]');
+              return row ? [row] : [];
+          }
+
+          function cacheSetProgress(el, state, percent, label, phase) {
+              if (!el) return;
+              const pct = Number.isFinite(Number(percent)) ? Math.max(0, Math.min(100, Number(percent))) : null;
+              const isRunning = state === 'running';
+              const isIndeterminate = isRunning && pct === null;
+              el.classList.remove(
+                  'cache-v4-progress-idle', 'cache-v4-progress-running', 'cache-v4-progress-success', 'cache-v4-progress-error',
+                  'cache-v4-progress-indeterminate', 'cache-v4-progress-determinate'
+              );
+              Array.from(el.classList).forEach(cls => {
+                  if (cls.indexOf('cache-v4-progress-phase-') === 0) el.classList.remove(cls);
+              });
+              el.classList.add('cache-v4-progress-' + (state || 'idle'));
+              el.classList.add(isIndeterminate ? 'cache-v4-progress-indeterminate' : 'cache-v4-progress-determinate');
+              if (phase) el.classList.add('cache-v4-progress-phase-' + String(phase).replace(/[^a-zA-Z0-9_-]/g, '_'));
+              const bar = el.querySelector('.cache-v4-progress-track span');
+              const text = el.querySelector('.cache-v4-progress-label');
+              if (bar) {
+                  if (isIndeterminate) bar.style.width = '55%';
+                  else bar.style.width = (pct === null ? 0 : pct) + '%';
+              }
+              if (text) {
+                  if (label) text.textContent = label;
+                  else if (isRunning) {
+                      if (phase === 'calcul') text.textContent = 'Calcul…';
+                      else if (phase === 'copy') text.textContent = pct === null ? 'Copie…' : Math.round(pct) + ' %';
+                      else if (phase === 'dry_run') text.textContent = 'Simulation…';
+                      else text.textContent = pct === null ? 'En cours…' : Math.round(pct) + ' %';
+                  }
+                  else if (state === 'success') text.textContent = 'Terminé';
+                  else if (state === 'error') text.textContent = 'Erreur';
+                  else text.textContent = 'Prêt';
+              }
+          }
+
+          function cacheSetTargetProgress(target, state, percent, label, phase) {
+              cacheProgressElements(target).forEach(el => cacheSetProgress(el, state, percent, label, phase));
+          }
+
+          function cacheResetIdleProgress() {
+              const all = document.getElementById('cacheAllProgress');
+              if (all) cacheSetProgress(all, 'idle', 0, 'Prêt', 'idle');
+              document.querySelectorAll('[data-cache-row-progress]').forEach(el => cacheSetProgress(el, 'idle', 0, 'Prêt', 'idle'));
+              cacheHideRowStopButtons();
+          }
+
+          function cacheJobProgress(job) {
+              if (job && job.status === 'success') return 100;
+              if (job && job.status === 'stopped') return 100;
+              if (job && job.status === 'error') return 100;
+              if (job && job.progress_percent !== null && job.progress_percent !== undefined && job.progress_percent !== '') {
+                  const n = Number(job.progress_percent);
+                  if (Number.isFinite(n)) return n;
+              }
+              if (job && isCacheRunning(job.status)) return null;
+              return 0;
+          }
+
+          function cacheProgressStateFromPayload(payload, fallbackStatus) {
+              const state = payload && payload.state ? payload.state : '';
+              if (state === 'success') return 'success';
+              if (state === 'error') return 'error';
+              if (['success', 'stopped'].includes(fallbackStatus || '')) return 'success';
+              if ((fallbackStatus || '') === 'error') return 'error';
+              if (isCacheRunning(fallbackStatus)) return 'running';
+              return 'idle';
+          }
+
+          async function cacheRefreshStatusBadges() {
+              try {
+                  const res = await fetch('{{ url_for('services_bp.cache_api_status') }}', {cache: 'no-store'});
+                  const data = await res.json();
+                  if (!res.ok || !data.ok || !Array.isArray(data.rows)) return;
+                  data.rows.forEach(item => {
+                      const key = String(item.key || '');
+                      if (!key) return;
+                      const row = document.querySelector('[data-cache-edit-row][data-cache-row-key="' + CSS.escape(key) + '"]');
+                      if (!row) return;
+                      const badge = row.querySelector('[data-cache-summary="cache_status"]');
+                      if (!badge) return;
+                      badge.textContent = item.cache_status_label || 'vide';
+                      badge.className = 'badge ' + (item.cache_status_class || 'badge-ok');
+                      badge.title = item.cache_status_hint || '';
+                  });
+              } catch (e) {}
+          }
+
+          function cacheApplyJobUi(job) {
+              if (!job) return;
+              const target = cacheNormalizeTarget(job.target || cacheActiveUiTarget || '__all__');
+              const running = isCacheRunning(job.status);
+              const percent = cacheJobProgress(job);
+              const progressTarget = cacheNormalizeTarget(job.progress_target || target);
+              const uiTarget = target === '__all__' ? '__all__' : progressTarget;
+              const phase = job.progress_phase || '';
+              let state = 'idle';
+              let label = '';
+
+              if (running) {
+                  state = 'running';
+                  if (job.progress_label) label = job.progress_label;
+                  else if (phase === 'calcul') label = 'Calcul du volume…';
+                  else if (phase === 'copy') label = percent === null ? 'Copie rsync…' : Math.round(percent) + ' %';
+                  else if (phase === 'dry_run') label = 'Simulation…';
+                  else label = percent === null ? 'En cours…' : Math.round(percent) + ' %';
+                  cacheSetRunButtonsDisabled(true, target);
+              } else if (job.status === 'success') {
+                  state = 'success';
+                  label = 'Terminé';
+                  cacheShowStatus('success', 'Terminé : ' + (job.label || target), true);
+                  cacheSetRunButtonsDisabled(false, '');
+                  cacheSetButtonLoading(document.getElementById('cacheStopButton'), false);
+              } else if (job.status === 'stopped') {
+                  state = 'error';
+                  label = 'Arrêté';
+                  cacheSetRunButtonsDisabled(false, '');
+                  cacheSetButtonLoading(document.getElementById('cacheStopButton'), false);
+              } else if (job.status === 'error') {
+                  state = 'error';
+                  label = 'Erreur';
+                  cacheShowStatus('error', 'Erreur Cache. Le détail est disponible dans l’onglet Logs.', false);
+                  cacheSetRunButtonsDisabled(false, '');
+                  cacheSetButtonLoading(document.getElementById('cacheStopButton'), false);
+              } else {
+                  cacheSetRunButtonsDisabled(false, '');
+              }
+
+              cacheSetTargetProgress(uiTarget, state, percent, label, phase);
+
+              const rows = job.progress_rows || {};
+              Object.keys(rows).forEach(key => {
+                  const item = rows[key] || {};
+                  const p = item.percent !== null && item.percent !== undefined && item.percent !== '' ? Number(item.percent) : null;
+                  const rowState = cacheProgressStateFromPayload(item, job.status);
+                  cacheSetTargetProgress(key, rowState, Number.isFinite(p) ? p : null, item.label || '', item.phase || phase);
+              });
+
+              if (!running && target !== '__all__') {
+                  cacheSetTargetProgress(progressTarget, state, 100, label, phase);
+              }
+              if (job.status === 'success' && target === '__all__') {
+                  document.querySelectorAll('[data-cache-row-progress]').forEach(el => {
+                      if (!el.classList.contains('cache-v4-progress-error')) cacheSetProgress(el, 'success', 100, 'Termine', 'done');
+                  });
+              }
+              cacheUpdateRowStopButtons(job);
+              if (!running && job.id && cacheStatusRefreshJobId !== job.id) {
+                  cacheStatusRefreshJobId = job.id;
+                  cacheRefreshStatusBadges();
+              }
+          }
+
+          function clearCacheLog() {
+              cacheCurrentJobId = null;
+              if (cachePollTimer) {
+                  clearInterval(cachePollTimer);
+                  cachePollTimer = null;
+              }
+              try {
+                  sessionStorage.removeItem(CACHE_LOG_TEXT_KEY);
+                  sessionStorage.removeItem(CACHE_LOG_JOB_KEY);
+              } catch (e) {}
+              setCacheLog('Aucun cache lancé pour le moment.');
+          }
+
+          async function runCache(target, action, button) {
+              const key = cacheNormalizeTarget(target);
+              cacheActiveUiTarget = key;
+              const label = key === '__all__' ? '--all' : key;
+              cacheResetIdleProgress();
+              cacheSetTargetProgress(key, 'running', null, 'Démarrage…');
+              cacheSetRunButtonsDisabled(true, key);
+              cacheShowStatus('info', 'Démarrage du cache mover : ' + label, false);
+              setCacheLog('Démarrage du cache mover côté Flask...\nCible : ' + label);
+              try {
+                  const res = await fetch('{{ url_for('services_bp.cache_api_run') }}', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({target: target, action: action || 'start'})
+                  });
+                  const data = await res.json();
+                  if (!res.ok || !data.ok) {
+                      const text = (data.error || data.message || 'Erreur lancement cache') + '\n\n' + (data.job && data.job.log ? data.job.log : '');
+                      setCacheLog(text, data.job && data.job.id ? data.job.id : '');
+                      cacheSetTargetProgress(key, 'error', 100, 'Erreur');
+                      cacheShowStatus('error', 'Erreur Cache. Le détail est disponible dans l’onglet Logs.', false);
+                      cacheSetRunButtonsDisabled(false, '');
+                      if (data.job && data.job.id) {
+                          cacheCurrentJobId = data.job.id;
+                          cacheApplyJobUi(data.job);
+                          startCachePolling(cacheCurrentJobId);
+                      } else {
+                          await restoreActiveCacheJob();
+                      }
+                      return;
+                  }
+                  cacheCurrentJobId = data.job.id;
+                  setCacheLog(data.job.log || ('Job cache lancé : ' + cacheCurrentJobId), cacheCurrentJobId);
+                  cacheApplyJobUi(data.job);
+                  startCachePolling(cacheCurrentJobId);
+              } catch (e) {
+                  setCacheLog('Erreur Cache : ' + e);
+                  cacheSetTargetProgress(key, 'error', 100, 'Erreur');
+                  cacheShowStatus('error', 'Erreur Cache : ' + e, false);
+                  cacheSetRunButtonsDisabled(false, '');
+              }
+          }
+
+          function startCachePolling(jobId) {
+              if (cachePollTimer) clearInterval(cachePollTimer);
+              pollCacheJob(jobId);
+              cachePollTimer = setInterval(() => pollCacheJob(jobId), 1200);
+          }
+
+          async function pollCacheJob(jobId) {
+              if (!jobId) return;
+              try {
+                  const res = await fetch('{{ url_for('services_bp.cache_api_log') }}?job_id=' + encodeURIComponent(jobId));
+                  const data = await res.json();
+                  if (!data.ok || !data.job) return;
+                  const job = data.job;
+                  setCacheLog(formatCacheJobText(job), job.id);
+                  cacheApplyJobUi(job);
+                  if (!isCacheRunning(job.status) && cachePollTimer) {
+                      clearInterval(cachePollTimer);
+                      cachePollTimer = null;
+                  }
+              } catch (e) {
+                  setCacheLog('Erreur lecture log Cache : ' + e);
+              }
+          }
+
+          async function restoreActiveCacheJob() {
+              try {
+                  const res = await fetch('{{ url_for('services_bp.cache_api_log') }}');
+                  if (res.status === 404) return false;
+                  const data = await res.json();
+                  if (!res.ok || !data.ok || !data.job) return false;
+                  const job = data.job;
+                  cacheCurrentJobId = job.id;
+                  setCacheLog(formatCacheJobText(job), job.id);
+                  cacheApplyJobUi(job);
+                  if (isCacheRunning(job.status)) {
+                      startCachePolling(job.id);
+                  }
+                  return true;
+              } catch (e) {
+                  return false;
+              }
+          }
+
+          async function stopCacheJob(button, target) {
+              const stopTarget = cacheNormalizeTarget(target || cacheActiveUiTarget || '');
+              const payload = cacheCurrentJobId ? {job_id: cacheCurrentJobId, target: stopTarget} : {target: stopTarget};
+              cacheSetButtonLoading(button || document.getElementById('cacheStopButton'), true);
+              const stopLabel = stopTarget && stopTarget !== '__all__' ? stopTarget : 'cache mover';
+              cacheShowStatus('info', 'Demande d’arrêt : ' + stopLabel + '…', false);
+              if (stopTarget && stopTarget !== '__all__') {
+                  cacheSetTargetProgress(stopTarget, 'running', null, 'Arrêt demandé…', 'stopping');
+              }
+              setCacheLog('Demande d’arrêt du cache mover...' + (stopTarget ? '\nCible : ' + stopTarget : ''), cacheCurrentJobId || '');
+              try {
+                  const res = await fetch('{{ url_for('services_bp.cache_api_stop') }}', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify(payload)
+                  });
+                  const data = await res.json();
+                  if (!res.ok || !data.ok) {
+                      setCacheLog(data.error || 'Aucun cache mover en cours.');
+                      cacheShowStatus('error', data.error || 'Aucun cache mover en cours.', false);
+                      cacheSetButtonLoading(button || document.getElementById('cacheStopButton'), false);
+                      return;
+                  }
+                  cacheCurrentJobId = data.job.id;
+                  setCacheLog(data.job.log || 'Arrêt demandé.', cacheCurrentJobId);
+                  cacheApplyJobUi(data.job);
+                  startCachePolling(cacheCurrentJobId);
+              } catch (e) {
+                  setCacheLog('Erreur arrêt Cache : ' + e);
+                  cacheShowStatus('error', 'Erreur arrêt Cache : ' + e, false);
+                  cacheSetButtonLoading(button || document.getElementById('cacheStopButton'), false);
+              }
+          }
+
+          function stopCacheJobForTarget(target, button) {
+              cacheActiveUiTarget = cacheNormalizeTarget(target || cacheActiveUiTarget || '');
+              return stopCacheJob(button, cacheActiveUiTarget);
+          }
+
+          async function checkCacheConf(button) {
+              cacheSetButtonLoading(button, true);
+              cacheShowStatus('info', 'Vérification de cache.conf…', false);
+              try {
+                  const res = await fetch('{{ url_for('services_bp.cache_check') }}', {method:'POST'});
+                  const data = await res.json();
+                  const text = (data.ok ? 'OK\n\n' : 'ERREUR code ' + data.code + '\n\n') + (data.output || '');
+                  setCacheLog(text);
+                  if (data.ok) {
+                      cacheShowStatus('success', 'OK : cache.conf vérifié.', true);
+                  } else {
+                      cacheShowStatus('error', 'Erreur cache.conf. Le détail est disponible dans l’onglet Logs.', false);
+                  }
+              } catch (e) {
+                  setCacheLog('Erreur vérification Cache : ' + e);
+                  cacheShowStatus('error', 'Erreur vérification Cache : ' + e, false);
+              } finally {
+                  cacheSetButtonLoading(button, false);
+              }
+          }
+
+          function escapeCacheHtml(text) {
+              return String(text || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+          }
+
+          function cacheStore(index) {
+              return document.querySelector(`[data-cache-store][data-cache-index="${CSS.escape(String(index))}"]`);
+          }
+
+          function cacheStoreValue(store, field) {
+              const input = store ? store.querySelector(`[data-cache-field="${field}"]`) : null;
+              return input ? input.value : '';
+          }
+
+          function setCacheStoreValue(store, field, value) {
+              const input = store ? store.querySelector(`[data-cache-field="${field}"]`) : null;
+              if (input) input.value = value == null ? '' : String(value);
+          }
+
+          function cacheNormalizeKey(text, fallback) {
+              let key = String(text || fallback || 'cache').trim().replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^[._-]+|[._-]+$/g, '');
+              return key || 'cache';
+          }
+
+          function cacheUsedKeys(ignoreIndex) {
+              const used = new Set();
+              document.querySelectorAll('[data-cache-store]').forEach(store => {
+                  if (String(store.dataset.cacheIndex) === String(ignoreIndex)) return;
+                  if (store.dataset.deleted === '1') return;
+                  const key = cacheStoreValue(store, 'key').trim().toLowerCase();
+                  if (key) used.add(key);
+              });
+              return used;
+          }
+
+          function cacheMakeUniqueKey(base, ignoreIndex) {
+              const used = cacheUsedKeys(ignoreIndex);
+              const root = cacheNormalizeKey(base || 'cache', 'cache').slice(0, 60);
+              let key = root;
+              let n = 2;
+              while (used.has(key.toLowerCase())) {
+                  key = root + '_' + n;
+                  n += 1;
+              }
+              return key;
+          }
+
+          function cacheHasDuplicateKey(key, ignoreIndex) {
+              return cacheUsedKeys(ignoreIndex).has(String(key || '').trim().toLowerCase());
+          }
+
+          function cacheCleanPath(value) {
+              let text = String(value || '').trim();
+              if (!text) return '';
+              text = text.replace(/\\+/g, '/').replace(/\/+$/g, '');
+              return text || '/';
+          }
+
+          function cachePathBasename(value) {
+              const path = cacheCleanPath(value);
+              if (!path || path === '/') return '';
+              const parts = path.split('/').filter(Boolean);
+              return parts.length ? parts[parts.length - 1] : '';
+          }
+
+          function cacheJoinPath(parent, child) {
+              const base = cacheCleanPath(parent);
+              const name = String(child || '').trim().replace(/^\/+|\/+$/g, '');
+              if (!base || !name) return base || name;
+              return base === '/' ? '/' + name : base + '/' + name;
+          }
+
+          function cacheParentPath(value) {
+              const path = cacheCleanPath(value);
+              if (!path || path === '/') return '';
+              const i = path.lastIndexOf('/');
+              if (i <= 0) return '/';
+              return path.slice(0, i);
+          }
+
+          function cacheLooksLikeDestinationRoot(value) {
+              const path = cacheCleanPath(value);
+              return path === '/mnt/user0' || /^\/mnt\/disk[^/]*$/i.test(path);
+          }
+
+          function cachePrimeDestinationAutoSuffix() {
+              const sourceEl = document.getElementById('cache_modal_source');
+              const destEl = document.getElementById('cache_modal_destination');
+              if (!sourceEl || !destEl) return;
+              const sourceName = cachePathBasename(sourceEl.value);
+              const destName = cachePathBasename(destEl.value);
+              destEl.dataset.cacheAutoSuffix = sourceName && destName === sourceName ? sourceName : '';
+          }
+
+          function cacheAutoCompleteDestination(options) {
+              const opts = options || {};
+              const sourceEl = document.getElementById('cache_modal_source');
+              const destEl = document.getElementById('cache_modal_destination');
+              if (!sourceEl || !destEl) return;
+              const sourceName = cachePathBasename(sourceEl.value);
+              if (!sourceName) {
+                  destEl.dataset.cacheAutoSuffix = '';
+                  return;
+              }
+
+              let dest = cacheCleanPath(destEl.value);
+              const previousSuffix = destEl.dataset.cacheAutoSuffix || '';
+
+              if (!dest) {
+                  if (!opts.allowDefault) return;
+                  destEl.value = cacheJoinPath('/mnt/user0', sourceName);
+                  destEl.dataset.cacheAutoSuffix = sourceName;
+                  return;
+              }
+
+              const destName = cachePathBasename(dest);
+              if (destName === sourceName) {
+                  destEl.value = dest;
+                  destEl.dataset.cacheAutoSuffix = sourceName;
+                  return;
+              }
+
+              if (previousSuffix && destName === previousSuffix) {
+                  destEl.value = cacheJoinPath(cacheParentPath(dest), sourceName);
+                  destEl.dataset.cacheAutoSuffix = sourceName;
+                  return;
+              }
+
+              if (opts.forceAppend || cacheLooksLikeDestinationRoot(dest)) {
+                  destEl.value = cacheJoinPath(dest, sourceName);
+                  destEl.dataset.cacheAutoSuffix = sourceName;
+              }
+          }
+
+          function initCacheDestinationAutoFill() {
+              const sourceEl = document.getElementById('cache_modal_source');
+              const destEl = document.getElementById('cache_modal_destination');
+              if (!sourceEl || !destEl || sourceEl.dataset.cacheAutoDestinationReady === '1') return;
+              sourceEl.dataset.cacheAutoDestinationReady = '1';
+              sourceEl.addEventListener('input', function(){ cacheAutoCompleteDestination({allowDefault:true}); });
+              sourceEl.addEventListener('change', function(){ cacheAutoCompleteDestination({allowDefault:true}); });
+              destEl.addEventListener('change', function(){ cacheAutoCompleteDestination({forceAppend:true}); });
+              destEl.addEventListener('blur', function(){ cacheAutoCompleteDestination({forceAppend:true}); });
+          }
+
+          function cacheCommandSummary(store) {
+              const start = cacheStoreValue(store, 'command_start').trim();
+              const end = cacheStoreValue(store, 'command_end').trim();
+              const parts = [];
+              if (start) parts.push('debut');
+              if (end) parts.push('fin');
+              return parts.length ? parts.join(' + ') : 'aucune';
+          }
+
+          function refreshCacheProfileRow(index) {
+              const store = cacheStore(index);
+              const row = document.querySelector(`[data-cache-edit-row][data-cache-index="${CSS.escape(String(index))}"]`);
+              if (!store || !row) return;
+              const key = cacheStoreValue(store, 'key') || 'nouveau_cache';
+              const title = cacheStoreValue(store, 'title') || key;
+              const source = cacheStoreValue(store, 'source') || '—';
+              const destination = cacheStoreValue(store, 'destination') || '—';
+              const aliases = cacheStoreValue(store, 'aliases');
+              const enabled = cacheStoreValue(store, 'enabled') !== 'false';
+              const inAll = cacheStoreValue(store, 'include_in_all') !== 'false';
+              row.dataset.filter = [key, title, source, destination, aliases].join(' ').toLowerCase();
+              row.dataset.cacheRowKey = key;
+              const progress = row.querySelector('[data-cache-row-progress]');
+              if (progress) progress.dataset.cacheRowProgress = key;
+              const runButton = row.querySelector('[data-cache-run-button]');
+              if (runButton) {
+                  runButton.dataset.cacheRunButton = key;
+                  runButton.onclick = function(){ return runCache(key, 'start', runButton); };
+              }
+              row.querySelector('[data-cache-summary="title"]').textContent = title;
+              row.querySelector('[data-cache-summary="key"]').textContent = '[' + key + ']' + (aliases ? ' · ' + aliases : '');
+              row.querySelector('[data-cache-summary="source"]').textContent = source;
+              row.querySelector('[data-cache-summary="destination"]').textContent = destination;
+              const enabledEl = row.querySelector('[data-cache-summary="enabled"]');
+              enabledEl.textContent = enabled ? 'actif' : 'désactivé';
+              enabledEl.className = 'badge ' + (enabled ? 'badge-ok' : 'badge-no');
+              const allEl = row.querySelector('[data-cache-summary="include_in_all"]');
+              allEl.textContent = inAll ? '--all' : 'manuel';
+              allEl.className = 'badge ' + (inAll ? 'badge-info' : 'badge-muted');
+              const statusEl = row.querySelector('[data-cache-summary="cache_status"]');
+              if (statusEl) {
+                  statusEl.textContent = 'vide';
+                  statusEl.className = 'badge badge-ok';
+                  statusEl.title = 'État recalculé après enregistrement.';
+              }
+          }
+
+          function openCacheProfileModal(index) {
+              const store = cacheStore(index);
+              if (!store) return;
+              document.getElementById('cache_modal_index').value = index;
+              cacheModalFields.forEach(field => {
+                  const el = document.querySelector(`[data-cache-modal-field="${field}"]`);
+                  if (!el) return;
+                  const value = cacheStoreValue(store, field);
+                  if (el.type === 'checkbox') el.checked = value !== 'false';
+                  else el.value = value;
+              });
+              document.getElementById('cacheProfileModalTitle').textContent = 'Modifier [' + (cacheStoreValue(store, 'key') || 'nouveau') + ']';
+              cachePrimeDestinationAutoSuffix();
+              cacheAutoCompleteDestination({allowDefault:false});
+              document.getElementById('cacheProfileModal').style.display = 'flex';
+          }
+
+          function closeCacheProfileModal() {
+              const indexEl = document.getElementById('cache_modal_index');
+              const index = indexEl ? indexEl.value : '';
+              document.getElementById('cacheProfileModal').style.display = 'none';
+              const store = index ? cacheStore(index) : null;
+              if (store && store.dataset.pendingNew === '1') {
+                  discardPendingCacheProfile(index);
+              }
+          }
+
+          function restoreCacheEmptyRowIfNeeded() {
+              const rows = document.getElementById('cacheGeneralRows');
+              if (!rows) return;
+              if (!rows.querySelector('tr[data-cache-edit-row]')) {
+                  rows.innerHTML = '<tr id="cacheEmptyRow"><td colspan="7"><div class="empty-state">Aucun profil cache configuré.</div></td></tr>';
+              }
+          }
+
+          function discardPendingCacheProfile(index) {
+              const store = cacheStore(index);
+              const row = document.querySelector(`[data-cache-edit-row][data-cache-index="${CSS.escape(String(index))}"]`);
+              if (store && store.dataset.pendingNew === '1') store.remove();
+              if (row && row.dataset.pendingNew === '1') row.remove();
+              if (String(cachePendingNewIndex) === String(index)) cachePendingNewIndex = '';
+              restoreCacheEmptyRowIfNeeded();
+          }
+
+          function submitCacheProfilesForm() {
+              const form = document.getElementById('cacheProfilesForm');
+              if (!form) return;
+              if (form.requestSubmit) form.requestSubmit();
+              else form.submit();
+          }
+
+          async function cacheValidateProfileValues(values) {
+              const res = await fetch('{{ url_for('services_bp.cache_api_validate_profile') }}', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({
+                      source: values.source || '',
+                      destination: values.destination || ''
+                  })
+              });
+              let data = {};
+              try { data = await res.json(); } catch (e) {}
+              if (!res.ok || !data.ok) {
+                  throw new Error(data.error || 'Profil cache incompatible.');
+              }
+              return data;
+          }
+
+          async function saveCacheProfileModal() {
+              cacheAutoCompleteDestination({allowDefault:true});
+              const index = document.getElementById('cache_modal_index').value;
+              const store = cacheStore(index);
+              if (!store) return;
+              const values = {};
+              cacheModalFields.forEach(field => {
+                  const el = document.querySelector(`[data-cache-modal-field="${field}"]`);
+                  if (!el) return;
+                  values[field] = el.type === 'checkbox' ? (el.checked ? 'true' : 'false') : el.value;
+              });
+              let key = cacheNormalizeKey(values.key, values.title || 'cache');
+              const original = cacheStoreValue(store, 'original');
+              if (cacheHasDuplicateKey(key, index)) {
+                  if (!original) {
+                      key = cacheMakeUniqueKey(key, index);
+                  } else {
+                      alert('Nom de profil déjà utilisé : ' + key);
+                      return;
+                  }
+              }
+              values.key = key;
+              try {
+                  await cacheValidateProfileValues(values);
+              } catch (e) {
+                  const msg = 'Profil cache refuse : ' + (e && e.message ? e.message : e);
+                  cacheShowStatus('error', msg, false);
+                  alert(msg);
+                  return;
+              }
+              cacheModalFields.forEach(field => {
+                  setCacheStoreValue(store, field, values[field] || '');
+              });
+              if (store.dataset.pendingNew === '1') {
+                  delete store.dataset.pendingNew;
+                  const row = document.querySelector(`[data-cache-edit-row][data-cache-index="${CSS.escape(String(index))}"]`);
+                  if (row) delete row.dataset.pendingNew;
+                  if (String(cachePendingNewIndex) === String(index)) cachePendingNewIndex = '';
+              }
+              refreshCacheProfileRow(index);
+              closeCacheProfileModal();
+              submitCacheProfilesForm();
+          }
+
+          function cacheStoreHtml(index, key) {
+              const values = {
+                  original:'', key:key, title:'Nouveau cache', source:'', destination:'',
+                  command_start:'', command_end:'', aliases:'', enabled:'true', include_in_all:'true'
+              };
+              let html = `<div class="cache-store" data-cache-store data-cache-index="${escapeCacheHtml(index)}">`;
+              html += `<input type="hidden" name="cache_original[]" value="" data-cache-field="original">`;
+              ['key','title','source','destination','command_start','command_end','aliases','enabled','include_in_all'].forEach(field => {
+                  html += `<input type="hidden" name="cache_${field}[]" value="${escapeCacheHtml(values[field])}" data-cache-field="${field}">`;
+              });
+              html += `<input type="hidden" name="cache_delete[]" value="" data-cache-field="delete" disabled></div>`;
+              return html;
+          }
+
+          function cacheProfileRowHtml(index, key) {
+              const safeIndex = escapeCacheHtml(index);
+              const safeKey = escapeCacheHtml(key);
+              const jsKey = escapeCacheHtml(JSON.stringify(String(key)));
+              return `
+                <tr data-cache-row data-cache-edit-row data-cache-index="${safeIndex}" data-cache-row-key="${safeKey}" data-filter="${safeKey}">
+                  <td><div class="name-main" data-cache-summary="title">Nouveau cache</div><div class="name-sub mono" data-cache-summary="key">[${safeKey}]</div></td>
+                  <td><span class="badge badge-ok" data-cache-summary="cache_status" title="État recalculé après enregistrement.">vide</span></td>
+                  <td><span class="tag-val" data-cache-summary="source">—</span></td>
+                  <td><span class="tag-val" data-cache-summary="destination">—</span></td>
+                  <td><span class="badge badge-ok" data-cache-summary="enabled">actif</span> <span class="badge badge-info" data-cache-summary="include_in_all">--all</span></td>
+                  <td class="cache-v4-progress-cell"><div class="cache-v4-progress cache-v4-progress-idle" data-cache-row-progress="${safeKey}" aria-live="polite"><div class="cache-v4-progress-track"><span></span></div><div class="cache-v4-progress-label">Prêt</div></div></td>
+                  <td><div class="actions-cell"><button type="button" data-cache-run-button="${safeKey}" class="yoleo-btn yoleo-btn-mini yoleo-btn-green" onclick='runCache(${jsKey}, "start", this)'>▶ Vider</button><button type="button" data-cache-stop-button="${safeKey}" class="yoleo-btn yoleo-btn-mini yoleo-btn-red cache-v4-row-stop" title="Arrêter ce cache" aria-label="Arrêter ce cache" hidden onclick='stopCacheJobForTarget(${jsKey}, this)'>⏹</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" title="Modifier" aria-label="Modifier" onclick="openCacheProfileModal('${safeIndex}')">✏️</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red" title="Supprimer" aria-label="Supprimer" onclick="deleteCacheProfile('${safeIndex}')">✕</button></div></td>
+                </tr>`;
+          }
+
+          function addCacheProfile() {
+              cacheNewCounter += 1;
+              const index = 'new_' + Date.now() + '_' + cacheNewCounter;
+              const key = cacheMakeUniqueKey('nouveau_cache_' + cacheNewCounter, index);
+              const stores = document.getElementById('cacheProfileStores');
+              const rows = document.getElementById('cacheGeneralRows');
+              if (!stores || !rows) {
+                  alert('Table Cache introuvable : impossible d’ajouter un profil.');
+                  return;
+              }
+              const empty = document.getElementById('cacheEmptyRow');
+              if (empty) empty.remove();
+              stores.insertAdjacentHTML('beforeend', cacheStoreHtml(index, key));
+              rows.insertAdjacentHTML('beforeend', cacheProfileRowHtml(index, key));
+              const store = cacheStore(index);
+              const row = document.querySelector(`[data-cache-edit-row][data-cache-index="${CSS.escape(String(index))}"]`);
+              if (store) store.dataset.pendingNew = '1';
+              if (row) row.dataset.pendingNew = '1';
+              cachePendingNewIndex = index;
+              requestAnimationFrame(() => openCacheProfileModal(index));
+          }
+
+          function deleteCacheProfile(index) {
+              const store = cacheStore(index);
+              const row = document.querySelector(`[data-cache-edit-row][data-cache-index="${CSS.escape(String(index))}"]`);
+              if (!store) return;
+              const original = cacheStoreValue(store, 'original');
+              if (original) {
+                  const del = store.querySelector('[data-cache-field="delete"]');
+                  del.value = original;
+                  del.disabled = false;
+                  store.dataset.deleted = '1';
+              } else {
+                  store.remove();
+              }
+              if (row) row.remove();
+              submitCacheProfilesForm();
+          }
+
+          function openCacheStandardBrowser(targetId) {
+              cacheBrowseTargetId = targetId;
+              const input = document.getElementById(targetId);
+              const start = input && input.value ? input.value : '{{ allowed_roots[0] if allowed_roots else "/mnt" }}';
+              const params = new URLSearchParams({path: start || '/', target: ''});
+              window.open('/browser/folder?' + params.toString(), 'yoleo_services_cache_browser', 'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+          }
+
+          window.addEventListener('message', function(event) {
+              const data = event.data || {};
+              if (data.type !== 'yoleo-browser-select' || data.mode !== 'folder') return;
+              if (!cacheBrowseTargetId) return;
+              const input = document.getElementById(cacheBrowseTargetId);
+              if (!input) return;
+              input.value = data.path || '';
+              if (cacheBrowseTargetId === 'cache_modal_destination') {
+                  cacheAutoCompleteDestination({forceAppend:true});
+              }
+              input.dispatchEvent(new Event('input', {bubbles:true}));
+              input.dispatchEvent(new Event('change', {bubbles:true}));
+          });
+
+          function initCacheJobRestore() {
+              initCacheDestinationAutoFill();
+              cacheAutoHideGreenMessages();
+              let storedJobId = '';
+              try {
+                  const storedText = sessionStorage.getItem(CACHE_LOG_TEXT_KEY) || '';
+                  storedJobId = sessionStorage.getItem(CACHE_LOG_JOB_KEY) || '';
+                  if (storedText) setCacheLog(storedText, storedJobId);
+              } catch (e) {}
+              if (storedJobId) {
+                  cacheCurrentJobId = storedJobId;
+                  startCachePolling(storedJobId);
+              } else {
+                  restoreActiveCacheJob();
+              }
+          }
+
+          if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', initCacheJobRestore);
+          } else {
+              initCacheJobRestore();
+          }
+          </script>
+{% endblock %}

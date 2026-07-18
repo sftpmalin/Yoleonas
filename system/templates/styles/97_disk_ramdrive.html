@@ -1,0 +1,221 @@
+/* RAMDrive / tmpfs - correctif UI compact dans le standard Stockage */
+.yoleo-content > .disk-page .disk-ramdrive-page {
+    min-width: 0;
+}
+.disk-ramdrive-page .ramdrive-summary-grid {
+    grid-template-columns: repeat(3, minmax(120px, 1fr)) minmax(220px, 1.35fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.disk-ramdrive-page .ramdrive-base-card .summary-value,
+.disk-ramdrive-page .ramdrive-base {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.disk-ramdrive-page .ramdrive-card {
+    overflow: hidden;
+}
+.ramdrive-inline-message {
+    margin: 0 0 10px 0;
+    border: 1px solid rgba(30, 190, 215, .35);
+    border-radius: 12px;
+    background: rgba(5, 110, 130, .14);
+    color: #7fefff;
+    padding: 9px 12px;
+    font-size: 12px;
+    font-weight: 800;
+}
+.ramdrive-inline-message.bad {
+    border-color: rgba(255, 82, 101, .55);
+    background: rgba(80, 12, 20, .32);
+    color: #ffd1d8;
+}
+.ramdrive-inline-message.ok {
+    border-color: rgba(32, 210, 100, .36);
+    background: rgba(6, 68, 38, .24);
+    color: #baffca;
+}
+.ramdrive-table-wrap .yoleo-table,
+.ramdrive-table {
+    min-width: 980px !important;
+    table-layout: fixed;
+}
+.ramdrive-table th,
+.ramdrive-table td {
+    vertical-align: middle;
+}
+.ramdrive-table .ramdrive-name-col { width: 170px; }
+.ramdrive-table .ramdrive-path-col { width: 380px; }
+.ramdrive-table .ramdrive-size-col { width: 110px; }
+.ramdrive-table .ramdrive-state-col { width: 120px; }
+.ramdrive-table .ramdrive-fstab-col { width: 95px; }
+.ramdrive-table .ramdrive-actions-col { width: 210px; }
+.ramdrive-table .mount-path {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ramdrive-actions-line {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+.ramdrive-output {
+    margin-top: 10px;
+    max-height: 180px;
+    overflow: auto;
+}
+.ramdrive-modal-box {
+    max-width: 720px;
+}
+.ramdrive-form-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(140px, .45fr);
+    gap: 12px;
+}
+.ramdrive-shortcuts,
+.ramdrive-checks {
+    margin-top: 10px;
+}
+.ramdrive-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.ramdrive-mobile-list {
+    display: none;
+}
+@media (max-width: 900px) {
+    .disk-ramdrive-page .ramdrive-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .ramdrive-table-wrap {
+        display: none;
+    }
+    .ramdrive-mobile-list {
+        display: grid;
+        gap: 10px;
+    }
+    .ramdrive-mobile-card {
+        border: 1px solid rgba(130, 148, 170, .38);
+        border-radius: 14px;
+        background: rgba(14, 23, 35, .92);
+        padding: 12px;
+        box-shadow: 0 10px 24px rgba(0,0,0,.18);
+    }
+    .ramdrive-mobile-card.is-mounted {
+        border-color: rgba(53, 215, 129, .72);
+    }
+    .ramdrive-mobile-card.is-stopped {
+        border-color: rgba(255, 82, 101, .60);
+    }
+    .ramdrive-mobile-top,
+    .ramdrive-mobile-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+    .ramdrive-mobile-top {
+        margin-bottom: 10px;
+    }
+    .ramdrive-mobile-line {
+        padding: 6px 0;
+        border-top: 1px solid rgba(255,255,255,.06);
+        font-size: 12px;
+    }
+    .ramdrive-mobile-line span {
+        color: #8fb4d6;
+        font-weight: 900;
+        text-transform: uppercase;
+        font-size: 10px;
+    }
+    .ramdrive-mobile-line b {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        text-align: right;
+    }
+    .ramdrive-mobile-actions {
+        margin-top: 10px;
+    }
+    .ramdrive-mobile-actions .ramdrive-actions-line {
+        justify-content: stretch;
+    }
+    .ramdrive-mobile-actions .yoleo-btn {
+        flex: 1 1 auto;
+    }
+    .ramdrive-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* RAMDrive - popup compacte */
+.ramdrive-modal-box {
+    width: min(620px, calc(100vw - 32px)) !important;
+    max-width: 620px !important;
+}
+.ramdrive-modal-box .modal-body.ramdrive-modal-body {
+    padding-bottom: 14px;
+}
+.ramdrive-modal-box .modal-actions {
+    padding-top: 10px;
+}
+.ramdrive-form-grid {
+    grid-template-columns: 260px 110px !important;
+    justify-content: center;
+    align-items: end;
+    gap: 12px;
+}
+.ramdrive-mount-field {
+    width: min(460px, 100%);
+    margin: 10px auto 0 auto;
+}
+.ramdrive-options-line {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px 10px;
+    margin-top: 10px;
+}
+.ramdrive-options-line .yoleo-btn,
+.ramdrive-options-line .check-row {
+    flex: 0 0 auto;
+    margin: 0;
+}
+.ramdrive-options-line .check-row {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 2px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.ramdrive-options-line .check-row input {
+    margin-right: 7px;
+}
+.ramdrive-modal-box .browser-box {
+    width: min(460px, 100%);
+    margin: 10px auto 0 auto;
+}
+@media (max-width: 700px) {
+    .ramdrive-modal-box {
+        width: calc(100vw - 22px) !important;
+    }
+    .ramdrive-form-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .ramdrive-mount-field,
+    .ramdrive-modal-box .browser-box {
+        width: 100%;
+    }
+    .ramdrive-options-line {
+        justify-content: stretch;
+    }
+    .ramdrive-options-line .yoleo-btn {
+        flex: 1 1 auto;
+    }
+}

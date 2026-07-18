@@ -1,0 +1,330 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<div class="pers-page">
+
+    {% include "partials/system_personnalisation_subnav.html" %}
+
+    <div id="mobileTopStatus" class="status-line pers-mobile-status" hidden></div>
+
+    <div class="card pers-home-card">
+        <div class="card-body">
+            <section id="mobileAppCard" class="home-config-group pers-mobile-card" tabindex="0" aria-label="Application mobile">
+                <div class="home-group-head pers-mobile-head">
+                    <span class="home-group-icon">📱</span>
+                    <div class="home-group-title">
+                        <h3>Application mobile
+                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small pers-mobile-edit-btn" title="Modifier" aria-label="Modifier l’application mobile" onclick="beginMobileEdit()">✏️</button>
+                        </h3>
+                        <p>Manifest PWA, nom, icône, couleurs et URL de démarrage.</p>
+                    </div>
+                </div>
+
+                <form id="mobileConfigForm" class="pers-mobile-view" method="post" action="/system/personnalisation/mobile">
+                    <div class="pers-mobile-icon-block">
+                        <div class="pers-mobile-icon-preview" id="mobileIconMainView">
+                            {% set icon_src = mobile_config.get('ICON_SRC','') %}
+                            {% if icon_src.startswith('/static') or icon_src.startswith('static/') %}
+                            <img src="{{ icon_src if icon_src.startswith('/') else '/' ~ icon_src }}" alt="Icône application">
+                            {% else %}
+                            <span>📱</span>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div class="pers-mobile-app-name" id="mobileAppNameView">{{ mobile_config.get('NAME','Yoleo NAS OS') }}</div>
+                            <div class="pers-mobile-app-desc" id="mobileAppDescView">{{ mobile_config.get('DESCRIPTION','Interface NAS Debian') }}</div>
+                        </div>
+                    </div>
+
+                    <div class="pers-mobile-values">
+                        <div class="pers-mobile-main-row" aria-label="Paramètres principaux">
+                            <div class="pers-mobile-value pers-mobile-inline-box pers-mobile-name-short">
+                                <span class="pers-mobile-label">Nom court</span>
+                                <strong data-mobile-view="SHORT_NAME">{{ mobile_config.get('SHORT_NAME','Yoleo NAS OS') }}</strong>
+                                <input class="input pers-mobile-edit-input pers-mobile-autosize" data-mobile-field="SHORT_NAME" name="SHORT_NAME" value="{{ mobile_config.get('SHORT_NAME','Yoleo NAS OS') }}" data-original="{{ mobile_config.get('SHORT_NAME','Yoleo NAS OS') }}" placeholder="Yoleo" autocomplete="off">
+                            </div>
+
+                            <div class="pers-mobile-value pers-mobile-inline-box pers-mobile-name-full">
+                                <span class="pers-mobile-label">Nom complet</span>
+                                <strong data-mobile-view="NAME">{{ mobile_config.get('NAME','Yoleo NAS OS') }}</strong>
+                                <input class="input pers-mobile-edit-input pers-mobile-autosize" data-mobile-field="NAME" name="NAME" value="{{ mobile_config.get('NAME','Yoleo NAS OS') }}" data-original="{{ mobile_config.get('NAME','Yoleo NAS OS') }}" placeholder="Yoleo NAS OS" autocomplete="off">
+                            </div>
+
+                            <div class="pers-mobile-value pers-mobile-inline-box pers-mobile-description">
+                                <span class="pers-mobile-label">Description</span>
+                                <strong data-mobile-view="DESCRIPTION">{{ mobile_config.get('DESCRIPTION','Interface NAS Debian') }}</strong>
+                                <input class="input pers-mobile-edit-input pers-mobile-autosize" data-mobile-field="DESCRIPTION" name="DESCRIPTION" value="{{ mobile_config.get('DESCRIPTION','Interface NAS Debian') }}" data-original="{{ mobile_config.get('DESCRIPTION','Interface NAS Debian') }}" placeholder="Interface NAS Debian" autocomplete="off">
+                            </div>
+
+                            <div class="pers-mobile-value pers-mobile-inline-box pers-mobile-icon-value">
+                                <span class="pers-mobile-label">Icône application</span>
+                                <strong data-mobile-view="ICON_SRC">{{ mobile_config.get('ICON_SRC','/static/logo.png') }}</strong>
+                                <div class="pers-mobile-icon-edit">
+                                    <span class="menu-icon-preview-box pers-mobile-mini-preview" id="mobile_icon_preview">
+                                        {% if icon_src.startswith('/static') or icon_src.startswith('static/') %}
+                                        <img src="{{ icon_src if icon_src.startswith('/') else '/' ~ icon_src }}" alt="">
+                                        {% else %}
+                                        📱
+                                        {% endif %}
+                                    </span>
+                                    <input class="input pers-mobile-edit-input pers-mobile-icon-input" id="mobile_icon_src" data-mobile-field="ICON_SRC" name="ICON_SRC" value="{{ mobile_config.get('ICON_SRC','/static/logo.png') }}" data-original="{{ mobile_config.get('ICON_SRC','/static/logo.png') }}" placeholder="/static/logo.png" autocomplete="off" oninput="refreshMobileIconPreview(); autosizeMobileInput(this)">
+                                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir dans static" onclick="openStaticBrowser('mobile_icon_src')">📂</button>
+                                </div>
+                            </div>
+
+                            <div class="pers-mobile-value pers-mobile-inline-box pers-mobile-color-box">
+                                <span class="pers-mobile-label">Fond</span>
+                                <strong data-mobile-view="BACKGROUND_COLOR"><span class="pers-mobile-swatch" data-mobile-swatch="BACKGROUND_COLOR" style="background: {{ mobile_config.get('BACKGROUND_COLOR','#000000') }}"></span>{{ mobile_config.get('BACKGROUND_COLOR','#000000') }}</strong>
+                                <div class="pers-mobile-color-edit">
+                                    <input class="input pers-mobile-edit-input pers-mobile-color-text" id="mobile_background_color" data-mobile-field="BACKGROUND_COLOR" name="BACKGROUND_COLOR" value="{{ mobile_config.get('BACKGROUND_COLOR','#000000') }}" data-original="{{ mobile_config.get('BACKGROUND_COLOR','#000000') }}" placeholder="#000000" maxlength="7" autocomplete="off" oninput="syncMobileColor('mobile_background_picker','mobile_background_color'); autosizeMobileInput(this)">
+                                    <input type="color" id="mobile_background_picker" value="{{ mobile_config.get('BACKGROUND_COLOR','#000000') }}" title="Palette" oninput="syncMobileColor('mobile_background_color','mobile_background_picker'); updateMobileViewFromInputs()">
+                                </div>
+                            </div>
+
+                            <div class="pers-mobile-value pers-mobile-inline-box pers-mobile-color-box">
+                                <span class="pers-mobile-label">Thème</span>
+                                <strong data-mobile-view="THEME_COLOR"><span class="pers-mobile-swatch" data-mobile-swatch="THEME_COLOR" style="background: {{ mobile_config.get('THEME_COLOR','#000000') }}"></span>{{ mobile_config.get('THEME_COLOR','#000000') }}</strong>
+                                <div class="pers-mobile-color-edit">
+                                    <input class="input pers-mobile-edit-input pers-mobile-color-text" id="mobile_theme_color" data-mobile-field="THEME_COLOR" name="THEME_COLOR" value="{{ mobile_config.get('THEME_COLOR','#000000') }}" data-original="{{ mobile_config.get('THEME_COLOR','#000000') }}" placeholder="#000000" maxlength="7" autocomplete="off" oninput="syncMobileColor('mobile_theme_picker','mobile_theme_color'); autosizeMobileInput(this)">
+                                    <input type="color" id="mobile_theme_picker" value="{{ mobile_config.get('THEME_COLOR','#000000') }}" title="Palette" oninput="syncMobileColor('mobile_theme_color','mobile_theme_picker'); updateMobileViewFromInputs()">
+                                </div>
+                            </div>
+
+                            <div class="pers-mobile-value pers-mobile-inline-box pers-mobile-display-mode">
+                                <span class="pers-mobile-label">Affichage</span>
+                                <strong data-mobile-view="DISPLAY">{{ mobile_config.get('DISPLAY','standalone') }}</strong>
+                                <select class="input pers-mobile-edit-input pers-mobile-select" data-mobile-field="DISPLAY" name="DISPLAY" data-original="{{ mobile_config.get('DISPLAY','standalone') }}">
+                                    {% for mode in ['standalone', 'fullscreen', 'minimal-ui', 'browser'] %}
+                                    <option value="{{ mode }}" {% if mobile_config.get('DISPLAY','standalone') == mode %}selected{% endif %}>{{ mode }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <input type="hidden" data-mobile-field="START_URL" name="START_URL" value="{{ mobile_config.get('START_URL','/index') }}" data-original="{{ mobile_config.get('START_URL','/index') }}">
+                    </div>
+                </form>
+            </section>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentBrowseTarget = '';
+let mobileStatusTimer = null;
+
+function mobileStatusId() { return 'mobileTopStatus'; }
+
+function setMobileStatus(message, ok=true) {
+    const box = document.getElementById(mobileStatusId());
+    if (!box) return;
+    clearTimeout(mobileStatusTimer);
+    if (!message) {
+        box.hidden = true;
+        box.textContent = '';
+        box.classList.remove('is-visible', 'ok', 'err');
+        return;
+    }
+    box.hidden = false;
+    box.textContent = message;
+    box.classList.toggle('ok', !!ok);
+    box.classList.toggle('err', !ok);
+    box.classList.add('is-visible');
+    if (ok) {
+        mobileStatusTimer = setTimeout(() => setMobileStatus('', true), 900);
+    }
+}
+
+function normalizeBrowserStartPath(value, fallbackPath) {
+    const fallback = fallbackPath || '/static';
+    const raw = String(value || '').trim();
+    if (!raw) return fallback;
+    if (raw.startsWith('static/')) return '/' + raw;
+    if (!raw.startsWith('/')) return fallback;
+    return raw;
+}
+function openYoleoSystemBrowser(mode, targetId, fallbackPath) {
+    currentBrowseTarget = targetId || '';
+    const input = document.getElementById(currentBrowseTarget);
+    const startPath = normalizeBrowserStartPath(input ? input.value : '', fallbackPath || '/static');
+    const params = new URLSearchParams({target: currentBrowseTarget, path: startPath});
+    const url = '/browser/' + (mode || 'image') + '?' + params.toString();
+    const popup = window.open(url, 'yoleo_mobile_browser', 'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+    if (popup) popup.focus();
+}
+function openStaticBrowser(targetId) {
+    openYoleoSystemBrowser('image', targetId, '/static');
+}
+window.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type !== 'yoleo-browser-select') return;
+    const targetId = data.target || currentBrowseTarget;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    input.value = data.path || '';
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    input.dispatchEvent(new Event('change', {bubbles: true}));
+    if (targetId === 'mobile_icon_src') {
+        updateMobileViewFromInputs();
+        saveMobileConfig({close:false});
+    }
+});
+function syncMobileColor(targetId, sourceId) {
+    const target = document.getElementById(targetId);
+    const source = document.getElementById(sourceId);
+    if (!target || !source) return;
+    const value = String(source.value || '').trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) target.value = value.toUpperCase();
+}
+function refreshMobileIconPreview() {
+    const input = document.getElementById('mobile_icon_src');
+    const preview = document.getElementById('mobile_icon_preview');
+    if (!input || !preview) return;
+    let value = String(input.value || '').trim();
+    if (value.startsWith('static/')) value = '/' + value;
+    if (value.startsWith('/static/')) {
+        preview.innerHTML = '<img src="' + escapeMobileHtml(value) + '" alt="">';
+    } else {
+        preview.textContent = '📱';
+    }
+}
+function escapeMobileHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function mobileInputs() {
+    return Array.from(document.querySelectorAll('[data-mobile-field]'));
+}
+function autosizeMobileInput(input) {
+    if (!input || input.tagName === 'SELECT' || input.type === 'color') return;
+    const key = input.dataset.mobileField || '';
+    const limits = {
+        SHORT_NAME: [7, 18],
+        NAME: [10, 24],
+        DESCRIPTION: [14, 34],
+        ICON_SRC: [14, 34],
+        START_URL: [8, 22],
+        BACKGROUND_COLOR: [8, 9],
+        THEME_COLOR: [8, 9],
+    };
+    const [min, max] = limits[key] || [8, 28];
+    const len = Math.max(min, Math.min(max, String(input.value || input.placeholder || '').length + 3));
+    input.style.width = len + 'ch';
+}
+function autosizeMobileInputs() {
+    for (const input of mobileInputs()) autosizeMobileInput(input);
+}
+function beginMobileEdit() {
+    const card = document.getElementById('mobileAppCard');
+    if (!card) return;
+    for (const input of mobileInputs()) input.dataset.original = input.value || '';
+    card.classList.add('is-editing');
+    autosizeMobileInputs();
+    setTimeout(() => document.querySelector('[data-mobile-field="SHORT_NAME"]')?.focus(), 30);
+}
+function endMobileEdit(cancel=false) {
+    const card = document.getElementById('mobileAppCard');
+    if (!card || !card.classList.contains('is-editing')) return;
+    if (cancel) {
+        for (const input of mobileInputs()) input.value = input.dataset.original || '';
+        syncMobileColor('mobile_background_picker', 'mobile_background_color');
+        syncMobileColor('mobile_theme_picker', 'mobile_theme_color');
+        refreshMobileIconPreview();
+        updateMobileViewFromInputs();
+    }
+    card.classList.remove('is-editing');
+}
+function cancelMobileEdit() { endMobileEdit(true); }
+function valueOfMobileField(key) {
+    const input = document.querySelector('[data-mobile-field="' + key + '"]');
+    return input ? input.value : '';
+}
+function updateMobileViewFromInputs() {
+    for (const key of ['SHORT_NAME','NAME','DESCRIPTION','START_URL','DISPLAY','BACKGROUND_COLOR','THEME_COLOR','ICON_SRC']) {
+        const view = document.querySelector('[data-mobile-view="' + key + '"]');
+        const value = valueOfMobileField(key);
+        if (!view) continue;
+        if (key === 'BACKGROUND_COLOR' || key === 'THEME_COLOR') {
+            view.innerHTML = '<span class="pers-mobile-swatch" data-mobile-swatch="' + key + '" style="background: ' + escapeMobileHtml(value || '#000000') + '"></span>' + escapeMobileHtml(value || '#000000');
+        } else {
+            view.textContent = value || '—';
+        }
+    }
+    const nameView = document.getElementById('mobileAppNameView');
+    const descView = document.getElementById('mobileAppDescView');
+    const iconView = document.getElementById('mobileIconMainView');
+    const name = valueOfMobileField('NAME') || valueOfMobileField('SHORT_NAME') || 'Yoleo NAS OS';
+    const desc = valueOfMobileField('DESCRIPTION') || 'Interface NAS Debian';
+    let icon = valueOfMobileField('ICON_SRC') || '/static/logo.png';
+    if (icon.startsWith('static/')) icon = '/' + icon;
+    if (nameView) nameView.textContent = name;
+    if (descView) descView.textContent = desc;
+    if (iconView) {
+        if (icon.startsWith('/static/')) iconView.innerHTML = '<img src="' + escapeMobileHtml(icon) + '" alt="Icône application">';
+        else iconView.innerHTML = '<span>📱</span>';
+    }
+    refreshMobileIconPreview();
+}
+async function saveMobileConfig({close=true} = {}) {
+    const fd = new FormData();
+    fd.append('action', 'update_mobile_config');
+    for (const input of mobileInputs()) fd.append(input.name || input.dataset.mobileField, input.value || '');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', {method:'POST', body:fd});
+        const type = (res.headers.get('content-type') || '').toLowerCase();
+        const payload = type.includes('application/json') ? await res.json() : {ok: res.ok, message: await res.text()};
+        if (!res.ok || payload.ok === false) throw new Error(payload.message || 'Erreur sauvegarde mobile.');
+        if (payload.config) {
+            for (const [key, value] of Object.entries(payload.config)) {
+                const input = document.querySelector('[data-mobile-field="' + key + '"]');
+                if (input) input.value = value || '';
+            }
+        }
+        syncMobileColor('mobile_background_picker', 'mobile_background_color');
+        syncMobileColor('mobile_theme_picker', 'mobile_theme_color');
+        updateMobileViewFromInputs();
+        for (const input of mobileInputs()) input.dataset.original = input.value || '';
+        if (close) endMobileEdit(false);
+        setMobileStatus('Enregistré', true);
+        return true;
+    } catch (e) {
+        setMobileStatus(String(e && e.message ? e.message : e), false);
+        return false;
+    }
+}
+
+(function initMobilePersonalizationPage() {
+    autosizeMobileInputs();
+    updateMobileViewFromInputs();
+    for (const input of mobileInputs()) {
+        input.addEventListener('input', () => {
+            autosizeMobileInput(input);
+            updateMobileViewFromInputs();
+        });
+        input.addEventListener('change', () => {
+            updateMobileViewFromInputs();
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveMobileConfig({close:true});
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelMobileEdit();
+            }
+        });
+    }
+    document.getElementById('mobileAppCard')?.addEventListener('keydown', (e) => {
+        if (e.key === 'F2') {
+            e.preventDefault();
+            beginMobileEdit();
+        }
+    });
+    document.addEventListener('click', (e) => {
+        const card = document.getElementById('mobileAppCard');
+        if (card && card.classList.contains('is-editing') && !card.contains(e.target)) {
+            saveMobileConfig({close:true});
+        }
+    });
+})();
+</script>
+{% endblock %}

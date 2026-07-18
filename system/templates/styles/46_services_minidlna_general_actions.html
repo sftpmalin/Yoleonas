@@ -1,0 +1,126 @@
+/* ------------------------------------------------------------------
+   46 - Services / MiniDLNA : actions service dans Général
+   ------------------------------------------------------------------ */
+.mini-page .mini-main-toolbar {
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.mini-page .mini-save-actions,
+.mini-page .mini-service-actions {
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:7px;
+    flex-wrap:wrap;
+}
+
+.mini-page .mini-service-actions {
+    padding-left:10px;
+    border-left:1px solid rgba(151, 170, 196, .22);
+}
+
+.mini-page .mini-icon-action {
+    width:34px;
+    height:31px;
+    min-height:31px;
+    padding:0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:9px;
+    border:1px solid rgba(148, 163, 184, .28);
+    background:#101826;
+    color:#fff;
+    font-size:14px;
+    line-height:1;
+    cursor:pointer;
+    box-shadow:0 8px 18px rgba(0,0,0,.16);
+}
+
+.mini-page .mini-icon-action:hover {
+    transform:translateY(-1px);
+    filter:brightness(1.08);
+}
+
+.mini-page .mini-icon-green {
+    border-color:rgba(34, 197, 94, .55);
+    background:rgba(22, 101, 52, .48);
+}
+
+.mini-page .mini-icon-red {
+    border-color:rgba(248, 113, 113, .55);
+    background:rgba(127, 29, 29, .52);
+}
+
+.mini-page .mini-icon-orange {
+    border-color:rgba(251, 191, 36, .55);
+    background:rgba(146, 64, 14, .50);
+}
+
+.mini-page .mini-icon-blue {
+    border-color:rgba(26, 235, 255, .55);
+    background:rgba(14, 116, 144, .50);
+}
+
+.mini-page .mini-icon-muted {
+    border-color:rgba(148, 163, 184, .38);
+    background:rgba(51, 65, 85, .48);
+}
+
+.mini-page .mini-service-state-heading {
+    color:#eaf2ff;
+    font-size:14px;
+    font-weight:900;
+    letter-spacing:.15px;
+    margin:2px 0 8px;
+}
+
+.mini-page .mini-summary-grid-compact {
+    grid-template-columns:minmax(140px,1.45fr) repeat(10, minmax(62px,1fr));
+    gap:7px;
+    margin-bottom:0;
+}
+
+.mini-page .mini-summary-grid-compact .summary-card {
+    padding:7px 9px;
+    border-radius:11px;
+}
+
+.mini-page .mini-summary-grid-compact .summary-label {
+    font-size:9px;
+}
+
+.mini-page .mini-summary-grid-compact .summary-value {
+    font-size:15px;
+    margin-top:3px;
+}
+
+.mini-page .mini-summary-grid-compact .summary-value.small {
+    font-size:11px;
+}
+
+@media (max-width:1250px) {
+    .mini-page .mini-summary-grid-compact {
+        grid-template-columns:repeat(auto-fit, minmax(92px, 1fr));
+    }
+}
+
+@media (max-width:900px) {
+    .mini-page .mini-main-toolbar,
+    .mini-page .mini-save-actions,
+    .mini-page .mini-service-actions {
+        justify-content:flex-start;
+    }
+
+    .mini-page .mini-service-actions {
+        width:100%;
+        padding-left:0;
+        border-left:0;
+        padding-top:8px;
+        border-top:1px solid rgba(151, 170, 196, .18);
+    }
+}

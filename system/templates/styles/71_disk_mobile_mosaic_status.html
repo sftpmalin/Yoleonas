@@ -1,0 +1,50 @@
+/* Mosaïque mobile Stockage : icône HDD, état montage et veille. */
+@media (max-width: 900px) {
+    .yoleo-mobile-table-tile.is-disk-row .yoleo-mobile-tile-icon {
+        position: relative;
+        border-color: rgba(62, 171, 255, .26);
+        background: rgba(6, 12, 18, .92);
+    }
+
+    .yoleo-mobile-table-tile.is-mounted {
+        border-color: rgba(72, 213, 151, .58) !important;
+        background: linear-gradient(180deg, rgba(72, 213, 151, .10), rgba(18, 26, 36, .94)) !important;
+        box-shadow: inset 0 0 0 1px rgba(72, 213, 151, .18), 0 10px 24px rgba(0, 0, 0, .18) !important;
+    }
+
+    .yoleo-mobile-table-tile.is-unmounted {
+        border-color: rgba(255, 93, 115, .58) !important;
+        background: linear-gradient(180deg, rgba(255, 93, 115, .10), rgba(18, 26, 36, .94)) !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 93, 115, .18), 0 10px 24px rgba(0, 0, 0, .18) !important;
+    }
+
+    .yoleo-mobile-table-tile.is-mounted .yoleo-mobile-tile-icon {
+        border-color: rgba(72, 213, 151, .45) !important;
+    }
+
+    .yoleo-mobile-table-tile.is-unmounted .yoleo-mobile-tile-icon {
+        border-color: rgba(255, 93, 115, .45) !important;
+    }
+
+    .yoleo-mobile-tile-power-dot {
+        position: absolute;
+        right: 4px;
+        bottom: 4px;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, .35);
+        box-shadow: 0 0 0 2px rgba(5, 8, 13, .92);
+        background: rgba(148, 163, 184, .95);
+        pointer-events: none;
+    }
+
+    .yoleo-mobile-tile-power-dot.is-on {
+        background: rgba(72, 213, 151, .98);
+    }
+
+    .yoleo-mobile-tile-power-dot.is-standby,
+    .yoleo-mobile-tile-power-dot.is-off {
+        background: rgba(255, 93, 115, .98);
+    }
+}

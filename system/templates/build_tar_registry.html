@@ -1,0 +1,117 @@
+{% extends "build_base.html" %}
+
+{% block route_content %}
+<div id="tab-tar_registre" class="tab-panel active build-mobile-simple-list">
+                    <section class="card">
+                        <div class="table-tools tar-registry-toolbar">
+                            <div class="tar-registry-search">
+                                <label for="registrySearch">Rechercher un fichier TAR :</label>
+                                <input class="search-input" id="registrySearch" type="text" placeholder="nom, image, tar…" oninput="filterTable('registryTable', this.value)">
+                            </div>
+                            <button type="button" class="yoleo-btn yoleo-btn-primary" data-running-text="Envoi…" onclick="runRegistryAll(this)">📤 Tout envoyer vers le registre</button>
+                        </div>
+                        {% if not builds %}
+                            <div class="empty-state">Aucun TAR à afficher.</div>
+                        {% else %}
+                        <div class="table-wrap">
+                            <table class="build-table compact-table" id="registryTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:24%;">Fichier TAR</th>
+                                        <th style="width:16%;">Taille / SHA</th>
+                                        <th style="width:42%;">Image registre</th>
+                                        <th style="width:18%; text-align:right;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for b in builds %}
+                                    <tr data-filter="{{ b.name|lower }} {{ b.registry_display|lower }} {{ 'tar' if b.tar_exists else 'notar' }} {{ 'registry' if b.registry else 'noregistry' }}">
+                                        <td>
+                                            <div class="dock-cell">
+                                                <div style="min-width:0;"><div class="name-main">{{ b.name }}.tar</div></div>
+                                            </div>
+                                        </td>
+                                        <td data-tar-cell="registry" data-tar-name="{{ b.name }}">
+                                            {% if b.tar_exists %}<span class="badge badge-ok">{{ b.tar_size_h }}</span> <div class="name-sub">sha256 : {{ 'oui' if b.sha else 'non' }}</div>{% else %}<span class="badge badge-no">manquant</span>{% endif %}
+                                        </td>
+                                        <td>
+                                            {% if b.registry %}<span class="tag-val">{{ b.registry }}</span>{% else %}<span class="badge badge-warn">ligne registre manquante</span><div class="name-sub">proposition : {{ b.registry_suggested }}</div>{% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="actions-cell">
+                                                <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-primary smart-action-button" onclick='runRegistryOne({{ b.name|tojson }}, this)' data-status-kind="registry" data-status-name="{{ b.name }}" data-base-disabled="{{ '0' if b.can_import else '1' }}" data-action-label="Envoyer" data-current-label="À jour" data-running-text="Envoi…" {{ '' if b.can_import else 'disabled' }}>{{ b.registry_status_label }}</button>
+                                                {% if b.tar_exists %}<button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-mini" title="Supprimer ce TAR" onclick='openDeleteTar({{ b.name|tojson }})'>✖</button>{% endif %}
+                                                <span class="badge badge-muted smart-status is-hidden" data-status-kind="registry" data-status-name="{{ b.name }}"></span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                    </section>
+                </div>
+
+    <script>
+    const buildDeleteTarUrl = {{ url_for('builds_bp.delete_tar_route')|tojson }};
+    function tarDeleteDoc() {
+        try {
+            if (window.top && window.top.document && window.top.location.origin === window.location.origin) return window.top.document;
+        } catch (e) {}
+        return document;
+    }
+    function tarDeleteEscape(text) {
+        return String(text || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
+    function openDeleteTar(name) {
+        const doc = tarDeleteDoc();
+        let overlay = doc.getElementById('tarDeleteOverlay');
+        if (!overlay) {
+            const wrap = doc.createElement('div');
+            wrap.innerHTML = `<div id="tarDeleteOverlay" class="tar-delete-overlay" style="display:none;"><div class="tar-delete-box"><div class="tar-delete-title">Supprimer le TAR</div><div class="tar-delete-text" id="tarDeleteText"></div><div class="tar-delete-warn">Le dossier build reste en place. Build → TAR reproposera donc de reconstruire ce TAR.</div><pre class="tar-delete-log" id="tarDeleteLog"></pre><div class="tar-delete-actions"><button type="button" class="yoleo-btn yoleo-btn-muted" data-action="cancel">Annuler</button><button type="button" class="yoleo-btn yoleo-btn-red" data-action="confirm">Supprimer</button></div></div></div>`;
+            overlay = wrap.firstElementChild;
+            doc.body.appendChild(overlay);
+            overlay.addEventListener('click', event => {
+                const action = event.target && event.target.getAttribute && event.target.getAttribute('data-action');
+                if (action === 'cancel') overlay.style.display = 'none';
+                if (action === 'confirm') runDeleteTar(overlay.dataset.name || '');
+            });
+        }
+        overlay.dataset.name = name;
+        doc.getElementById('tarDeleteText').innerHTML = `Fichier : <b>${tarDeleteEscape(name)}.tar</b>`;
+        doc.getElementById('tarDeleteLog').textContent = '';
+        overlay.querySelectorAll('button').forEach(btn => btn.disabled = false);
+        overlay.style.display = 'flex';
+    }
+    async function runDeleteTar(name) {
+        const doc = tarDeleteDoc();
+        const overlay = doc.getElementById('tarDeleteOverlay');
+        const log = doc.getElementById('tarDeleteLog');
+        if (!overlay || !name) return;
+        overlay.querySelectorAll('button').forEach(btn => btn.disabled = true);
+        if (log) log.textContent = 'Suppression du TAR en cours…';
+        try {
+            const response = await fetch(buildDeleteTarUrl, {method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify({name})});
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+            if (log) log.textContent = payload.message || 'TAR supprimé.';
+            // IMPORTANT : la popup est dans le document parent. Si on prévient le parent
+            // avant de la fermer, l'iframe peut se recharger et le setTimeout est annulé,
+            // ce qui laisse la popup bloquée à l'écran. On la retire donc AVANT toute
+            // notification/reload.
+            try { overlay.remove(); } catch (e) { overlay.style.display = 'none'; }
+            try {
+                localStorage.setItem('builds_refresh_stamp', String(Date.now()));
+                if (window.top && window.top !== window && window.top.postMessage) {
+                    window.top.postMessage({ type: 'builds:task-finished', action: 'delete_tar', name }, window.location.origin);
+                }
+            } catch (e) {}
+            window.setTimeout(() => { window.location.reload(); }, 80);
+        } catch (err) {
+            if (log) log.textContent = String(err && (err.message || err) || 'Erreur suppression.');
+            overlay.querySelectorAll('button').forEach(btn => btn.disabled = false);
+        }
+    }
+    </script>
+{% endblock %}

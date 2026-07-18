@@ -1,0 +1,259 @@
+{% extends "dockers_base.html" %}
+
+{% block route_content %}
+<section class="confmgr-route-page docker-yml-confstyle">
+    <div class="page-wrap docker-yml-page-wrap">
+        <div class="panel docker-yml-panel">
+            {% if yml_error %}
+            <div class="action-message bad">{{ yml_error }}</div>
+            {% endif %}
+
+            <nav class="docker-yml-workbar" aria-label="Navigation fichiers YAML">
+                <a href="{{ url_for('dockers_bp.docker_yml_page') }}" class="yoleo-subnav-link is-active">📂 Fichiers YAML</a>
+                <span id="openYmlFilesTabs" class="conf-open-tabs-inline" aria-label="YAML ouverts"></span>
+            </nav>
+
+            <form method="post" action="{{ url_for('dockers_bp.stacks_yml_import') }}" enctype="multipart/form-data" id="docker-yml-import-form" class="docker-hidden-form">
+                <input id="docker-yml-import-input" type="file" name="yaml_files" accept=".yml,.yaml,text/yaml,text/x-yaml" multiple onchange="dockerSubmitYmlImport(this)">
+            </form>
+
+            {% if yml_mode == 'edit' %}
+            {% if not (_menu_top_active|default(false)) %}
+            <div class="page-head docker-yml-page-head docker-yml-editor-actions-fallback">
+                <div>
+                    <div class="page-subtitle">Édition du YAML Compose dans <span class="mono">{{ conf.YML_FOLDER }}</span>.</div>
+                </div>
+                <div class="inline-actions docker-yml-top-actions">
+                    {% if yml_current_name and not yml_is_new %}
+                    <button class="yoleo-btn yoleo-btn-red" type="button" onclick="dockerDeleteYml()">🗑 Supprimer</button>
+                    {% endif %}
+                    <button type="submit" form="docker-yml-form" class="yoleo-btn yoleo-btn-primary">💾 Enregistrer</button>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="conf-editor-section docker-yml-editor-section">
+                <form method="post" action="{{ url_for('dockers_bp.stacks_yml_save') }}" id="docker-yml-form" class="docker-yml-form" data-current-file="{{ yml_current_name }}" onsubmit="return dockerBeforeYmlSubmit()">
+                    <input type="hidden" name="original_filename" id="docker-yml-original-name" value="{{ yml_original_name }}">
+                    <input type="hidden" name="content" id="docker-yml-content">
+
+                    <div class="card docker-yml-name-card">
+                        <label class="docker-yml-name-field">
+                            <span class="label-mini">Nom du fichier</span>
+                            <input class="yoleo-input mono" name="filename" id="docker-yml-name" value="{{ yml_current_name }}" placeholder="nom.yml" autocomplete="off">
+                        </label>
+                    </div>
+
+                    <textarea class="docker-textarea docker-yml-textarea docker-yml-confstyle-textarea" id="docker-yml-editor" spellcheck="false" placeholder="# Ton YAML Compose s’affiche ici en grand&#10;services:">{{ yml_current_content }}</textarea>
+                </form>
+
+                <form method="post" action="{{ url_for('dockers_bp.stacks_yml_delete') }}" id="docker-yml-delete-form" class="docker-hidden-form">
+                    <input type="hidden" name="filename" id="docker-yml-delete-name" value="{{ yml_current_name }}">
+                </form>
+            </div>
+            {% else %}
+            {% if not (_menu_top_active|default(false)) %}
+            <div class="page-head docker-yml-page-head docker-yml-list-actions-head docker-yml-actions-fallback">
+                <div></div>
+                <div class="inline-actions docker-yml-top-actions">
+                    <a class="yoleo-btn yoleo-btn-primary" href="{{ url_for('dockers_bp.docker_yml_edit_new_page') }}">＋ Nouveau YAML</a>
+                    <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="document.getElementById('docker-yml-import-input').click()">⬆ Importer</button>
+                    <a class="yoleo-btn yoleo-btn-muted" href="{{ url_for('dockers_bp.docker_yml_page') }}">↻ Recharger</a>
+                </div>
+            </div>
+            {% endif %}
+
+            <section class="card conf-folder-section docker-yml-folder-section">
+                <div class="folder-panel-head docker-yml-folder-head">
+                    <div class="docker-yml-folder-title-block">
+                        <div class="folder-panel-title docker-yml-folder-count"><span class="folder-icon">📂</span> {{ yml_files|length }} fichier{% if yml_files|length > 1 %}s{% endif %} YAML détecté{% if yml_files|length > 1 %}s{% endif %} dans ce dossier</div>
+                    </div>
+                    <input class="yoleo-input docker-yml-search" id="docker-yml-search" placeholder="Filtrer les fichiers YAML..." oninput="filterYmlCards(this.value)">
+                </div>
+
+                {% if yml_files %}
+                <div class="folder-files-grid docker-yml-files-grid" id="docker-yml-card-grid" data-yoleo-context-zone="docker-yml-grid">
+                    {% for f in yml_files %}
+                    <a href="{{ url_for('dockers_bp.docker_yml_edit_file_page', filename=f.name) }}" class="file-card docker-yml-file-card" data-name="{{ f.name|lower }}" onclick='rememberOpenYmlFile({{ f.name|tojson }})'>
+                        <div class="file-icon">📝</div>
+                        <div>
+                            <div class="file-name">{{ f.name }}</div>
+                            <div class="file-path">{{ conf.YML_FOLDER.rstrip('/') }}/{{ f.name }} · {{ ((f.size|default(0)|int) / 1024)|round(1) }} Ko</div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state" data-yoleo-context-zone="docker-yml-empty">Aucun fichier YAML dans ce dossier.</div>
+                {% endif %}
+            </section>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        const OPEN_YML_FILES_KEY = 'docker_yml_open_files_v1';
+        let openYmlFilesFallback = [];
+
+        function ymlEscapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function getOpenYmlFiles() {
+            try {
+                const raw = window.localStorage ? window.localStorage.getItem(OPEN_YML_FILES_KEY) : JSON.stringify(openYmlFilesFallback);
+                const parsed = JSON.parse(raw || '[]');
+                return Array.isArray(parsed) ? parsed.filter(item => item && item.name) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function setOpenYmlFiles(items) {
+            const clean = [];
+            const seen = new Set();
+            (items || []).forEach(item => {
+                const name = String(item && item.name || '').trim();
+                if (!name || seen.has(name)) return;
+                seen.add(name);
+                clean.push({name});
+            });
+            openYmlFilesFallback = clean.slice(-12);
+            if (window.localStorage) window.localStorage.setItem(OPEN_YML_FILES_KEY, JSON.stringify(openYmlFilesFallback));
+        }
+
+        function rememberOpenYmlFile(name) {
+            name = String(name || '').trim();
+            if (!name) return;
+
+            const items = getOpenYmlFiles();
+            if (items.find(item => item.name === name)) {
+                setOpenYmlFiles(items);
+                return;
+            }
+
+            items.push({name});
+            setOpenYmlFiles(items);
+        }
+
+        function forgetOpenYmlFile(name) {
+            name = String(name || '').trim();
+            if (!name) return;
+            setOpenYmlFiles(getOpenYmlFiles().filter(item => item.name !== name));
+        }
+
+        function currentOpenYmlFile() {
+            const form = document.getElementById('docker-yml-form');
+            return form && form.dataset.currentFile ? String(form.dataset.currentFile) : '';
+        }
+
+        function closeOpenYmlFile(name) {
+            const target = String(name || currentOpenYmlFile() || '').trim();
+            if (target) forgetOpenYmlFile(target);
+            const current = currentOpenYmlFile();
+            if (current && current === target) {
+                window.location.href = {{ url_for('dockers_bp.docker_yml_page')|tojson }};
+                return;
+            }
+            renderOpenYmlFileTabs();
+        }
+
+        function renderOpenYmlFileTabs() {
+            const tabs = document.getElementById('openYmlFilesTabs');
+            if (!tabs) return;
+
+            const items = getOpenYmlFiles();
+            const current = currentOpenYmlFile();
+            if (!items.length) {
+                tabs.innerHTML = '';
+                tabs.classList.remove('is-visible');
+                return;
+            }
+
+            tabs.classList.add('is-visible');
+            tabs.innerHTML = items.map(item => {
+                const name = String(item.name || '');
+                const href = {{ url_for('dockers_bp.docker_yml_edit_new_page')|tojson }} + '/' + encodeURIComponent(name);
+                const activeClass = current && current === name ? ' is-active' : '';
+                return `
+                    <span class="conf-open-tab-shell" title="${ymlEscapeHtml(name)}">
+                        <a class="yoleo-subnav-link conf-open-tab-link conf-open-tab${activeClass}" href="${href}">${ymlEscapeHtml(name)}</a>
+                        <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-mini conf-open-tab-close" aria-label="Fermer ${ymlEscapeHtml(name)}" data-name="${ymlEscapeHtml(name)}">×</button>
+                    </span>
+                `;
+            }).join('');
+
+            tabs.querySelectorAll('.conf-open-tab-close').forEach(button => {
+                button.addEventListener('click', event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closeOpenYmlFile(button.dataset.name || '');
+                });
+            });
+        }
+
+        function filterYmlCards(value) {
+            const needle = String(value || '').trim().toLowerCase();
+            document.querySelectorAll('.docker-yml-file-card').forEach(card => {
+                const name = String(card.dataset.name || '').toLowerCase();
+                card.hidden = !!needle && !name.includes(needle);
+            });
+        }
+
+        function keepYmlEditorPagePosition(editor) {
+            const pageX = window.scrollX;
+            const pageY = window.scrollY;
+
+            window.requestAnimationFrame(() => {
+                if (document.activeElement === editor) {
+                    window.scrollTo(pageX, pageY);
+                }
+            });
+        }
+
+        function autoGrowYmlEditor() {
+            const editor = document.getElementById('docker-yml-editor');
+            if (!editor) return;
+
+            editor.style.overflowY = 'auto';
+        }
+
+        function dockerYmlSubmitEditor() {
+            const form = document.getElementById('docker-yml-form');
+            if (!form) return false;
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+            } else if (!window.dockerBeforeYmlSubmit || window.dockerBeforeYmlSubmit()) {
+                form.submit();
+            }
+            return false;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('docker-yml-form');
+            const editor = document.getElementById('docker-yml-editor');
+            if (form && form.dataset.currentFile) {
+                rememberOpenYmlFile(form.dataset.currentFile);
+            }
+            if (editor) {
+                autoGrowYmlEditor();
+                editor.addEventListener('input', () => keepYmlEditorPagePosition(editor));
+                window.addEventListener('resize', autoGrowYmlEditor);
+            }
+            renderOpenYmlFileTabs();
+        });
+
+        window.rememberOpenYmlFile = rememberOpenYmlFile;
+        window.closeOpenYmlFile = closeOpenYmlFile;
+        window.renderOpenYmlFileTabs = renderOpenYmlFileTabs;
+        window.filterYmlCards = filterYmlCards;
+        window.autoGrowYmlEditor = autoGrowYmlEditor;
+        window.dockerYmlSubmitEditor = dockerYmlSubmitEditor;
+    </script>
+</section>
+{% endblock %}

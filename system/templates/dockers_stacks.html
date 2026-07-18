@@ -1,0 +1,628 @@
+{% extends "dockers_base.html" %}
+
+{% block route_content %}
+<section class="yoleo-card docker-section docker-stacks-browser-section">
+    <div id="dockerStacksStatus" class="status-line docker-stacks-browser-status" hidden></div>
+
+    <div class="docker-stacks-browser-head">
+        <div>
+            <div id="dockerStacksCounter" class="docker-stacks-browser-counter"></div>
+            <div class="docker-stacks-browser-path mono" title="{{ conf.YML_FOLDER }}">Dossier YAML : {{ conf.YML_FOLDER }}</div>
+            <div id="dockerStacksCrumbs" class="docker-stacks-browser-crumbs"></div>
+        </div>
+        {% if not (_menu_top_active|default(false)) %}
+        <div class="docker-stacks-browser-actions">
+            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="dockerStacksAddStack()">+ Stack</button>
+            <button type="button" id="dockerStacksAddYmlBtn" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="dockerStacksAddYml()" title="Ouvre une stack pour ajouter un YAML">+ YAML</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="dockerStacksGrid" class="docker-stacks-browser-grid" data-yoleo-context-zone="docker-stacks-grid"></div>
+</section>
+
+<div id="dockerStacksConfirmModal" class="docker-stacks-confirm-modal" hidden>
+    <div class="docker-stacks-confirm-box" role="dialog" aria-modal="true" aria-labelledby="dockerStacksConfirmTitle">
+        <h3 id="dockerStacksConfirmTitle">Confirmer la suppression</h3>
+        <p id="dockerStacksConfirmText">Supprimer cette entrée ?</p>
+        <div class="docker-stacks-confirm-actions">
+            <button type="button" id="dockerStacksConfirmCancel" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="dockerStacksCancelDelete()">Annuler</button>
+            <button type="button" id="dockerStacksConfirmDelete" class="yoleo-btn yoleo-btn-danger yoleo-btn-small" onclick="dockerStacksConfirmDelete()">Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let dockerStacks = [
+{% for stack in stacks %}
+{% set stack_idx = loop.index0 %}
+    {
+        id: 'stack_{{ loop.index0 }}_{{ loop.index }}',
+        name: {{ stack.name|tojson }},
+        ymls: [{% for yml in stack.ymls %}{id: 'yml_{{ stack_idx }}_{{ loop.index0 }}', file: {{ yml|tojson }}}{% if not loop.last %}, {% endif %}{% endfor %}]
+    }{% if not loop.last %},{% endif %}
+{% endfor %}
+];
+if (!Array.isArray(dockerStacks) || !dockerStacks.length) {
+    dockerStacks = [{id: dockerStacksNewId('stack'), name: 'base', ymls: []}];
+}
+
+let dockerStacksCurrent = -1;
+let dockerStacksEditing = null;
+let dockerStacksEditBackup = null;
+let dockerStacksFocus = {type: 'stack', stackIndex: 0, ymlIndex: -1};
+let dockerStacksDeletePending = null;
+let dockerStacksSaveTimer = null;
+let dockerStacksSaveInFlight = false;
+let dockerStacksPendingSave = false;
+let dockerStacksStatusTimer = null;
+let dockerStacksPickerTarget = null;
+const dockerStacksYmlFolder = {{ conf.YML_FOLDER|tojson }};
+const dockerStacksSaveUrl = {{ url_for('dockers_bp.stacks_stacks_save_json')|tojson }};
+
+function dockerStacksNewId(prefix) {
+    return String(prefix || 'id') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function dockerStacksEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function dockerStacksCleanName(value) {
+    return String(value ?? '').replace(/[\r\n]/g, ' ').trim();
+}
+
+function dockerStacksNormalize() {
+    dockerStacks = (Array.isArray(dockerStacks) ? dockerStacks : []).map((stack) => ({
+        id: stack?.id || dockerStacksNewId('stack'),
+        name: dockerStacksCleanName(stack?.name || 'Stack'),
+        ymls: (Array.isArray(stack?.ymls) ? stack.ymls : []).map((item) => {
+            if (typeof item === 'string') return {id: dockerStacksNewId('yml'), file: dockerStacksCleanName(item)};
+            return {id: item?.id || dockerStacksNewId('yml'), file: dockerStacksCleanName(item?.file || '')};
+        }).filter(item => item.file || dockerStacksEditing)
+    })).filter(stack => stack.name || stack.ymls.length);
+    if (!dockerStacks.length) dockerStacks.push({id: dockerStacksNewId('stack'), name: 'base', ymls: []});
+    if (dockerStacksCurrent >= dockerStacks.length) dockerStacksCurrent = -1;
+}
+
+function dockerStacksHideStatus() {
+    const el = document.getElementById('dockerStacksStatus');
+    if (!el) return;
+    el.textContent = '';
+    el.className = 'status-line docker-stacks-browser-status';
+    el.setAttribute('hidden', 'hidden');
+    el.style.display = 'none';
+}
+
+function dockerStacksSetStatus(message, ok=true) {
+    const el = document.getElementById('dockerStacksStatus');
+    if (!el) return;
+    if (dockerStacksStatusTimer) {
+        clearTimeout(dockerStacksStatusTimer);
+        dockerStacksStatusTimer = null;
+    }
+    message = String(message || '').trim();
+    if (!message) {
+        dockerStacksHideStatus();
+        return;
+    }
+    el.textContent = message;
+    el.className = 'status-line docker-stacks-browser-status ' + (ok ? 'ok' : 'bad');
+    el.removeAttribute('hidden');
+    el.style.display = 'inline-flex';
+    if (ok) dockerStacksStatusTimer = setTimeout(dockerStacksHideStatus, 1000);
+}
+
+function dockerStacksAutosave(delay=500) {
+    if (dockerStacksSaveTimer) clearTimeout(dockerStacksSaveTimer);
+    dockerStacksSaveTimer = setTimeout(() => dockerStacksSave(true), delay);
+}
+
+function dockerStacksChanged(delay=500) {
+    dockerStacksRender();
+    dockerStacksAutosave(delay);
+}
+
+function dockerStacksPayload() {
+    return dockerStacks.map(stack => ({
+        name: dockerStacksCleanName(stack.name),
+        ymls: (stack.ymls || []).map(item => dockerStacksCleanName(item.file)).filter(Boolean)
+    })).filter(stack => stack.name || stack.ymls.length);
+}
+
+function dockerStacksValidate() {
+    const payload = dockerStacksPayload();
+    if (!payload.length) return 'Il faut au moins une stack.';
+    for (const stack of payload) {
+        if (!stack.name) return 'Une stack a un nom vide.';
+        for (const yml of stack.ymls) {
+            if (!yml) return `Un YAML est vide dans la stack ${stack.name}.`;
+            if (/[\r\n\0]/.test(yml)) return `Nom YAML invalide : ${yml}`;
+        }
+    }
+    return '';
+}
+
+async function dockerStacksSave(auto=false) {
+    if (dockerStacksSaveInFlight) {
+        dockerStacksPendingSave = true;
+        return;
+    }
+    const validationError = dockerStacksValidate();
+    if (validationError) {
+        dockerStacksSetStatus(validationError, false);
+        return;
+    }
+    dockerStacksSaveInFlight = true;
+    try {
+        const res = await fetch(dockerStacksSaveUrl, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({stacks: dockerStacksPayload()})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.message || 'Erreur sauvegarde stacks.conf.');
+        if (Array.isArray(data.stacks) && Array.isArray(data.warnings) && data.warnings.length) {
+            dockerStacks = data.stacks.map((stack) => ({
+                id: dockerStacksNewId('stack'),
+                name: dockerStacksCleanName(stack?.name || 'Stack'),
+                ymls: (Array.isArray(stack?.ymls) ? stack.ymls : []).map((file) => ({
+                    id: dockerStacksNewId('yml'),
+                    file: dockerStacksCleanName(file)
+                }))
+            }));
+            dockerStacksRender();
+        }
+        dockerStacksSetStatus(data.message || 'Sauvegardé', true);
+    } catch (err) {
+        dockerStacksSetStatus(String(err && err.message ? err.message : err), false);
+    } finally {
+        dockerStacksSaveInFlight = false;
+        if (dockerStacksPendingSave) {
+            dockerStacksPendingSave = false;
+            dockerStacksAutosave(120);
+        }
+    }
+}
+
+function dockerStacksTotalYml() {
+    return dockerStacks.reduce((total, stack) => total + (stack.ymls || []).length, 0);
+}
+
+function dockerStacksRenderCrumbs() {
+    const crumbs = document.getElementById('dockerStacksCrumbs');
+    if (!crumbs) return;
+    const parts = [`<button type="button" onclick="dockerStacksGoRoot()">🏠 Racine</button>`];
+    if (dockerStacksCurrent >= 0 && dockerStacks[dockerStacksCurrent]) {
+        parts.push(`<span>›</span><button type="button" onclick="dockerStacksOpenStack(${dockerStacksCurrent})">${dockerStacksEscape(dockerStacks[dockerStacksCurrent].name || 'Stack')}</button>`);
+    }
+    crumbs.innerHTML = parts.join('');
+}
+
+function dockerStacksRenderCounter() {
+    const counter = document.getElementById('dockerStacksCounter');
+    if (!counter) return;
+    if (dockerStacksCurrent >= 0 && dockerStacks[dockerStacksCurrent]) {
+        counter.textContent = `Stack : ${dockerStacks[dockerStacksCurrent].name || 'Stack'} · ${(dockerStacks[dockerStacksCurrent].ymls || []).length} YAML`;
+        return;
+    }
+    counter.textContent = `${dockerStacks.length} stack(s) · ${dockerStacksTotalYml()} YAML`;
+}
+
+function dockerStacksUpdateAddYmlButton() {
+    const btn = document.getElementById('dockerStacksAddYmlBtn');
+    if (!btn) return;
+    const inStack = dockerStacksCurrent >= 0 && !!dockerStacks[dockerStacksCurrent];
+    btn.disabled = !inStack;
+    btn.classList.toggle('is-disabled', !inStack);
+    btn.title = inStack ? 'Ajouter un YAML dans cette stack' : 'Ouvre une stack pour ajouter un YAML';
+}
+
+function dockerStacksRender() {
+    dockerStacksNormalize();
+    dockerStacksRenderCrumbs();
+    dockerStacksRenderCounter();
+    dockerStacksUpdateAddYmlButton();
+    const grid = document.getElementById('dockerStacksGrid');
+    if (!grid) return;
+
+    if (dockerStacksCurrent < 0) {
+        grid.innerHTML = dockerStacks.length
+            ? dockerStacks.map((stack, index) => dockerStacksRenderStackTile(stack, index)).join('')
+            : '<div class="docker-stacks-browser-empty">Aucune stack. Ajoute une stack avec le bouton du haut.</div>';
+    } else {
+        const stack = dockerStacks[dockerStacksCurrent];
+        const ymls = stack ? (stack.ymls || []) : [];
+        grid.innerHTML = ymls.length
+            ? ymls.map((item, index) => dockerStacksRenderYmlTile(item, dockerStacksCurrent, index)).join('')
+            : '<div class="docker-stacks-browser-empty">Stack vide. Ajoute un YAML avec le bouton du haut.</div>';
+    }
+    dockerStacksAfterRenderFocus();
+}
+
+function dockerStacksInputWidth(value, min=14, max=72, extra=5) {
+    const len = Math.max(String(value || '').length, 1) + extra;
+    return Math.max(min, Math.min(max, len));
+}
+
+function dockerStacksInputStyle(value, min=14, max=72, extra=5) {
+    return `width:${dockerStacksInputWidth(value, min, max, extra)}ch`;
+}
+
+function dockerStacksAutoSize(input, min=14, max=72, extra=5) {
+    if (!input) return;
+    input.style.width = dockerStacksInputWidth(input.value, min, max, extra) + 'ch';
+}
+
+function dockerStacksIsEditing(type, stackIndex, ymlIndex=-1) {
+    return dockerStacksEditing
+        && dockerStacksEditing.type === type
+        && Number(dockerStacksEditing.stackIndex) === Number(stackIndex)
+        && Number(dockerStacksEditing.ymlIndex ?? -1) === Number(ymlIndex);
+}
+
+function dockerStacksRenderStackTile(stack, index) {
+    const safeName = dockerStacksEscape(stack.name || 'Stack');
+    const ymlCount = (stack.ymls || []).length;
+    const focused = dockerStacksFocus.type === 'stack' && dockerStacksFocus.stackIndex === index ? ' is-key-focused' : '';
+    if (dockerStacksIsEditing('stack', index)) {
+        return `
+            <div class="docker-stacks-tile is-stack is-editing" data-type="stack" data-stack-index="${index}" tabindex="0" onfocus="dockerStacksFocus={type:'stack',stackIndex:${index},ymlIndex:-1}">
+                <div class="docker-stacks-tile-icon">📁</div>
+                <div class="docker-stacks-tile-edit">
+                    <input class="yoleo-input" value="${safeName}" placeholder="Nom de la stack" style="${dockerStacksInputStyle(stack.name || '', 14, 42, 5)}" oninput="dockerStacks[${index}].name=this.value; dockerStacksAutoSize(this,14,42,5); dockerStacksAutosave(800)">
+                </div>
+                <div class="docker-stacks-tile-actions">
+                    <button type="button" class="docker-stacks-tile-action is-save" title="OK" onclick="dockerStacksStopEdit()">💾</button>
+                    <button type="button" class="docker-stacks-tile-action" title="Annuler" onclick="dockerStacksCancelEdit()">↩</button>
+                </div>
+            </div>`;
+    }
+    return `
+        <div class="docker-stacks-tile is-stack${focused}" data-type="stack" data-stack-index="${index}" tabindex="0" onfocus="dockerStacksFocus={type:'stack',stackIndex:${index},ymlIndex:-1}" onkeydown="dockerStacksTileKeydown(event, 'stack', ${index}, -1)" onclick="if (!event.target.closest('.docker-stacks-tile-action, button, input')) dockerStacksOpenStack(${index})">
+            <div class="docker-stacks-tile-icon">📁</div>
+            <div class="docker-stacks-tile-label">${safeName}</div>
+            <div class="docker-stacks-tile-sub">${ymlCount} YAML</div>
+            <div class="docker-stacks-tile-actions">
+                <button type="button" class="docker-stacks-tile-action" title="Ouvrir" onclick="dockerStacksOpenStack(${index})">↵</button>
+                <button type="button" class="docker-stacks-tile-action" title="Renommer" onclick="dockerStacksStartEdit('stack', ${index}, -1)">✎</button>
+                <button type="button" class="docker-stacks-tile-action" title="Monter" onclick="dockerStacksMoveStack(${index}, -1)">▲</button>
+                <button type="button" class="docker-stacks-tile-action" title="Descendre" onclick="dockerStacksMoveStack(${index}, 1)">▼</button>
+                <button type="button" class="docker-stacks-tile-action is-danger" title="Supprimer" onclick="dockerStacksAskDelete('stack', ${index}, -1)">×</button>
+            </div>
+        </div>`;
+}
+
+function dockerStacksRenderYmlTile(item, stackIndex, ymlIndex) {
+    const file = item.file || '';
+    const safeFile = dockerStacksEscape(file || 'YAML');
+    const focused = dockerStacksFocus.type === 'yml' && dockerStacksFocus.stackIndex === stackIndex && dockerStacksFocus.ymlIndex === ymlIndex ? ' is-key-focused' : '';
+    return `
+        <div class="docker-stacks-tile is-yml${focused}" data-type="yml" data-stack-index="${stackIndex}" data-yml-index="${ymlIndex}" tabindex="0" onfocus="dockerStacksFocus={type:'yml',stackIndex:${stackIndex},ymlIndex:${ymlIndex}}" onkeydown="dockerStacksTileKeydown(event, 'yml', ${stackIndex}, ${ymlIndex})">
+            <div class="docker-stacks-tile-icon">📄</div>
+            <div class="docker-stacks-tile-label">${safeFile}</div>
+            <div class="docker-stacks-tile-sub">YAML Compose</div>
+            <div class="docker-stacks-tile-actions">
+                <button type="button" class="docker-stacks-tile-action" title="Choisir un autre YAML existant" onclick="dockerStacksOpenYmlPicker(${stackIndex}, ${ymlIndex})">📂</button>
+                <button type="button" class="docker-stacks-tile-action" title="Monter" onclick="dockerStacksMoveYml(${stackIndex}, ${ymlIndex}, -1)">▲</button>
+                <button type="button" class="docker-stacks-tile-action" title="Descendre" onclick="dockerStacksMoveYml(${stackIndex}, ${ymlIndex}, 1)">▼</button>
+                <button type="button" class="docker-stacks-tile-action is-danger" title="Supprimer" onclick="dockerStacksAskDelete('yml', ${stackIndex}, ${ymlIndex})">×</button>
+            </div>
+        </div>`;
+}
+
+function dockerStacksOpenStack(index) {
+    if (!dockerStacks[index]) return;
+    dockerStacksCurrent = index;
+    dockerStacksEditing = null;
+    dockerStacksFocus = {type: 'yml', stackIndex: index, ymlIndex: 0};
+    dockerStacksRender();
+}
+
+function dockerStacksGoRoot() {
+    dockerStacksCurrent = -1;
+    dockerStacksEditing = null;
+    dockerStacksFocus = {type: 'stack', stackIndex: Math.max(0, Math.min(dockerStacksFocus.stackIndex || 0, dockerStacks.length - 1)), ymlIndex: -1};
+    dockerStacksRender();
+}
+
+function dockerStacksAddStack() {
+    const index = dockerStacks.length;
+    dockerStacks.push({id: dockerStacksNewId('stack'), name: 'Nouvelle stack', ymls: []});
+    dockerStacksCurrent = -1;
+    dockerStacksFocus = {type: 'stack', stackIndex: index, ymlIndex: -1};
+    dockerStacksStartEdit('stack', index, -1, false);
+    dockerStacksAutosave(800);
+}
+
+function dockerStacksAddYml() {
+    if (dockerStacksCurrent < 0 || !dockerStacks[dockerStacksCurrent]) {
+        dockerStacksSetStatus('Ouvre une stack avant d’ajouter un YAML.', false);
+        return;
+    }
+
+    // Nouveau YAML : on ne crée pas une ligne fantôme.
+    // On ouvre d'abord le composant Parcourir, puis la ligne est ajoutée
+    // seulement après sélection réelle d'un fichier existant.
+    dockerStacksOpenYmlPicker(dockerStacksCurrent, -1, true);
+}
+
+function dockerStacksCloneState() {
+    return JSON.parse(JSON.stringify(dockerStacks));
+}
+
+function dockerStacksStartEdit(type, stackIndex, ymlIndex=-1, doRender=true) {
+    // Une entrée YAML n'est pas renommable à la main : elle doit toujours
+    // pointer vers un fichier réel choisi avec Parcourir.
+    if (type === 'yml') {
+        dockerStacksOpenYmlPicker(stackIndex, ymlIndex);
+        return;
+    }
+    dockerStacksEditing = {type, stackIndex, ymlIndex};
+    dockerStacksFocus = {type, stackIndex, ymlIndex};
+    dockerStacksEditBackup = dockerStacksCloneState();
+    if (doRender) dockerStacksRender();
+    else dockerStacksRender();
+}
+
+function dockerStacksStopEdit() {
+    dockerStacksEditing = null;
+    dockerStacksEditBackup = null;
+    dockerStacksRender();
+    dockerStacksAutosave(120);
+}
+
+function dockerStacksCancelEdit() {
+    if (dockerStacksEditBackup) dockerStacks = dockerStacksEditBackup;
+    dockerStacksEditing = null;
+    dockerStacksEditBackup = null;
+    dockerStacksRender();
+}
+
+function dockerStacksMoveStack(index, direction) {
+    const target = index + direction;
+    if (target < 0 || target >= dockerStacks.length) return;
+    const [item] = dockerStacks.splice(index, 1);
+    dockerStacks.splice(target, 0, item);
+    dockerStacksFocus = {type: 'stack', stackIndex: target, ymlIndex: -1};
+    if (dockerStacksCurrent === index) dockerStacksCurrent = target;
+    else if (dockerStacksCurrent === target) dockerStacksCurrent = index;
+    dockerStacksChanged(200);
+}
+
+function dockerStacksMoveYml(stackIndex, ymlIndex, direction) {
+    const stack = dockerStacks[stackIndex];
+    if (!stack) return;
+    const target = ymlIndex + direction;
+    if (target < 0 || target >= stack.ymls.length) return;
+    const [item] = stack.ymls.splice(ymlIndex, 1);
+    stack.ymls.splice(target, 0, item);
+    dockerStacksFocus = {type: 'yml', stackIndex, ymlIndex: target};
+    dockerStacksChanged(200);
+}
+
+function dockerStacksAskDelete(type, stackIndex, ymlIndex=-1) {
+    const modal = document.getElementById('dockerStacksConfirmModal');
+    const text = document.getElementById('dockerStacksConfirmText');
+    if (!modal || !text) return;
+    dockerStacksDeletePending = {type, stackIndex, ymlIndex};
+    if (type === 'stack') {
+        const stack = dockerStacks[stackIndex];
+        text.textContent = `Supprimer la stack « ${stack?.name || 'Stack'} » et ses YAML déclarés ?`;
+    } else {
+        const file = dockerStacks[stackIndex]?.ymls?.[ymlIndex]?.file || 'YAML';
+        text.textContent = `Retirer le YAML « ${file} » de cette stack ?`;
+    }
+    modal.hidden = false;
+    setTimeout(() => document.getElementById('dockerStacksConfirmDelete')?.focus(), 0);
+}
+
+function dockerStacksCancelDelete() {
+    dockerStacksDeletePending = null;
+    const modal = document.getElementById('dockerStacksConfirmModal');
+    if (modal) modal.hidden = true;
+    dockerStacksAfterRenderFocus();
+}
+
+function dockerStacksConfirmDelete() {
+    const pending = dockerStacksDeletePending;
+    dockerStacksDeletePending = null;
+    const modal = document.getElementById('dockerStacksConfirmModal');
+    if (modal) modal.hidden = true;
+    if (!pending) return;
+    if (pending.type === 'stack') {
+        dockerStacks.splice(pending.stackIndex, 1);
+        dockerStacksCurrent = -1;
+        dockerStacksFocus = {type: 'stack', stackIndex: Math.max(0, Math.min(pending.stackIndex, dockerStacks.length - 1)), ymlIndex: -1};
+    } else {
+        const stack = dockerStacks[pending.stackIndex];
+        if (stack) stack.ymls.splice(pending.ymlIndex, 1);
+        dockerStacksFocus = {type: 'yml', stackIndex: pending.stackIndex, ymlIndex: Math.max(0, pending.ymlIndex - 1)};
+    }
+    dockerStacksEditing = null;
+    dockerStacksEditBackup = null;
+    dockerStacksChanged(120);
+}
+
+function dockerStacksVisibleTiles() {
+    return Array.from(document.querySelectorAll('#dockerStacksGrid .docker-stacks-tile[data-type]'));
+}
+
+function dockerStacksAfterRenderFocus() {
+    setTimeout(() => {
+        if (dockerStacksEditing) {
+            const selector = dockerStacksEditing.type === 'stack'
+                ? `.docker-stacks-tile[data-type="stack"][data-stack-index="${dockerStacksEditing.stackIndex}"]`
+                : `.docker-stacks-tile[data-type="yml"][data-stack-index="${dockerStacksEditing.stackIndex}"][data-yml-index="${dockerStacksEditing.ymlIndex}"]`;
+            const tile = document.querySelector(selector);
+            const input = tile?.querySelector('input');
+            if (input) {
+                input.focus();
+                input.select?.();
+                return;
+            }
+        }
+        const selector = dockerStacksFocus.type === 'stack'
+            ? `.docker-stacks-tile[data-type="stack"][data-stack-index="${dockerStacksFocus.stackIndex}"]`
+            : `.docker-stacks-tile[data-type="yml"][data-stack-index="${dockerStacksFocus.stackIndex}"][data-yml-index="${dockerStacksFocus.ymlIndex}"]`;
+        const tile = document.querySelector(selector);
+        if (tile) tile.focus({preventScroll:true});
+    }, 0);
+}
+
+function dockerStacksFocusByStep(step) {
+    const tiles = dockerStacksVisibleTiles();
+    if (!tiles.length) return;
+    let pos = tiles.findIndex(tile => {
+        const type = tile.dataset.type;
+        const stackIndex = Number(tile.dataset.stackIndex || -1);
+        const ymlIndex = Number(tile.dataset.ymlIndex || -1);
+        return type === dockerStacksFocus.type && stackIndex === dockerStacksFocus.stackIndex && ymlIndex === (dockerStacksFocus.ymlIndex ?? -1);
+    });
+    if (pos < 0) pos = 0;
+    pos = Math.max(0, Math.min(tiles.length - 1, pos + step));
+    const tile = tiles[pos];
+    dockerStacksFocus = {type: tile.dataset.type, stackIndex: Number(tile.dataset.stackIndex || -1), ymlIndex: Number(tile.dataset.ymlIndex || -1)};
+    tile.focus({preventScroll:false});
+}
+
+function dockerStacksTileKeydown(event, type, stackIndex, ymlIndex=-1) {
+    if (document.getElementById('dockerStacksConfirmModal')?.hidden === false) return;
+    if (event.key === 'ArrowDown') { event.preventDefault(); dockerStacksFocusByStep(1); return; }
+    if (event.key === 'ArrowUp') { event.preventDefault(); dockerStacksFocusByStep(-1); return; }
+    if (event.key === 'Home') { event.preventDefault(); dockerStacksFocusByStep(-999); return; }
+    if (event.key === 'End') { event.preventDefault(); dockerStacksFocusByStep(999); return; }
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (type === 'stack') dockerStacksOpenStack(stackIndex);
+        else dockerStacksOpenYmlPicker(stackIndex, ymlIndex);
+        return;
+    }
+    if (event.key === 'F2') {
+        event.preventDefault();
+        if (type === 'yml') dockerStacksOpenYmlPicker(stackIndex, ymlIndex);
+        else dockerStacksStartEdit(type, stackIndex, ymlIndex);
+        return;
+    }
+    if (event.key === 'Delete') { event.preventDefault(); dockerStacksAskDelete(type, stackIndex, ymlIndex); return; }
+    if (event.key === 'Backspace' || event.key === 'ArrowLeft') { event.preventDefault(); dockerStacksGoRoot(); return; }
+    if (event.key === 'ArrowRight' && type === 'stack') { event.preventDefault(); dockerStacksOpenStack(stackIndex); return; }
+}
+
+function dockerStacksConfirmButtons() {
+    return [document.getElementById('dockerStacksConfirmCancel'), document.getElementById('dockerStacksConfirmDelete')].filter(Boolean);
+}
+
+function dockerStacksFocusConfirmButton(step=1) {
+    const buttons = dockerStacksConfirmButtons();
+    if (!buttons.length) return;
+    let pos = buttons.indexOf(document.activeElement);
+    if (pos < 0) pos = 0;
+    pos = (pos + step + buttons.length) % buttons.length;
+    buttons[pos].focus();
+}
+
+function dockerStacksHandleKeys(event) {
+    const modalOpen = document.getElementById('dockerStacksConfirmModal')?.hidden === false;
+    const target = event.target;
+    const isTextInput = target && (target.matches?.('input, textarea') || target.isContentEditable);
+
+    if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 's') {
+        event.preventDefault();
+        dockerStacksSave();
+        return;
+    }
+
+    if (modalOpen) {
+        if (event.key === 'Escape') { event.preventDefault(); dockerStacksCancelDelete(); return; }
+        if (event.key === 'Enter' || event.key === 'Delete') {
+            event.preventDefault();
+            if (target?.id === 'dockerStacksConfirmCancel') dockerStacksCancelDelete();
+            else dockerStacksConfirmDelete();
+            return;
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') { event.preventDefault(); dockerStacksFocusConfirmButton(-1); return; }
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); dockerStacksFocusConfirmButton(1); return; }
+        if (event.key === 'Tab') { event.preventDefault(); dockerStacksFocusConfirmButton(event.shiftKey ? -1 : 1); return; }
+        return;
+    }
+
+    if (dockerStacksEditing && isTextInput) {
+        if (event.key === 'Enter') { event.preventDefault(); dockerStacksStopEdit(); }
+        if (event.key === 'Escape') { event.preventDefault(); dockerStacksCancelEdit(); }
+        return;
+    }
+
+    if (!isTextInput && event.key === 'Escape' && dockerStacksCurrent >= 0) {
+        event.preventDefault();
+        dockerStacksGoRoot();
+    }
+}
+
+document.addEventListener('keydown', dockerStacksHandleKeys);
+
+document.addEventListener('click', (event) => {
+    const modal = document.getElementById('dockerStacksConfirmModal');
+    if (modal && !modal.hidden && event.target === modal) dockerStacksCancelDelete();
+});
+
+function dockerStacksOpenYmlPicker(stackIndex, ymlIndex, createNew=false) {
+    if (!dockerStacks[stackIndex]) return;
+    dockerStacksPickerTarget = {stackIndex, ymlIndex, createNew: !!createNew};
+    dockerStacksSetStatus(createNew ? 'Choisis le fichier YAML à ajouter à cette stack.' : 'Choisis le fichier YAML de remplacement.', true, 1800);
+    if (typeof openYoleoBrowser === 'function') {
+        openYoleoBrowser('file', 'docker-stacks-browser-yml-picker', dockerStacksYmlFolder || '/');
+        return;
+    }
+    const url = '/browser/file?' + new URLSearchParams({target: 'docker-stacks-browser-yml-picker', path: dockerStacksYmlFolder || '/'}).toString();
+    window.open(url, 'yoleo_browser_docker_stacks_yml', 'width=980,height=720,resizable=yes,scrollbars=yes');
+}
+
+function dockerStacksRelativeYmlPath(path) {
+    let selected = String(path || '').replace(/\\/g, '/');
+    const base = String(dockerStacksYmlFolder || '').replace(/\\/g, '/').replace(/\/+$/, '');
+    if (base && selected.startsWith(base + '/')) selected = selected.slice(base.length + 1);
+    return selected;
+}
+
+function dockerStacksIsYamlFile(path) {
+    return /\.(ya?ml)$/i.test(String(path || '').trim());
+}
+
+window.addEventListener('message', event => {
+    const payload = event.data || {};
+    if (payload.type !== 'yoleo-browser-select' || payload.target !== 'docker-stacks-browser-yml-picker') return;
+    if (!dockerStacksPickerTarget || !payload.path) return;
+
+    const {stackIndex, ymlIndex, createNew} = dockerStacksPickerTarget;
+    if (!dockerStacks[stackIndex]) return;
+
+    const selectedFile = dockerStacksRelativeYmlPath(payload.path);
+    if (!selectedFile) return;
+    if (!dockerStacksIsYamlFile(selectedFile)) {
+        dockerStacksPickerTarget = null;
+        dockerStacksSetStatus('Choisis un fichier .yml ou .yaml existant.', false);
+        return;
+    }
+
+    let finalYmlIndex = Number(ymlIndex);
+    if (createNew || finalYmlIndex < 0 || !dockerStacks[stackIndex].ymls[finalYmlIndex]) {
+        finalYmlIndex = dockerStacks[stackIndex].ymls.length;
+        dockerStacks[stackIndex].ymls.push({id: dockerStacksNewId('yml'), file: selectedFile});
+        dockerStacksEditing = null;
+    } else {
+        dockerStacks[stackIndex].ymls[finalYmlIndex].file = selectedFile;
+        dockerStacksEditing = null;
+    }
+
+    dockerStacksPickerTarget = null;
+    dockerStacksCurrent = stackIndex;
+    dockerStacksFocus = {type: 'yml', stackIndex, ymlIndex: finalYmlIndex};
+    dockerStacksRender();
+    dockerStacksAutosave(200);
+});
+
+dockerStacksRender();
+setTimeout(() => dockerStacksAfterRenderFocus(), 0);
+</script>
+{% endblock %}

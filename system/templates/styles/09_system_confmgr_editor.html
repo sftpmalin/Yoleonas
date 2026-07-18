@@ -1,0 +1,122 @@
+.section-head {
+        padding: 14px 16px; border-bottom: 1px solid #2a3443; background: #111822;
+        display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .section-name { color: #fff; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+    .section-body { padding: 16px; display: grid; gap: 14px; }
+
+    .config-row {
+        display: grid; grid-template-columns: minmax(220px, 0.48fr) 24px minmax(420px, 1fr) 42px;
+        gap: 10px; align-items: start;
+    }
+    .config-row > input[name="keys[]"] {
+        min-height: 46px;
+        line-height: 22px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .conf-editor-meta-inline {
+        display: grid;
+        grid-template-columns: minmax(150px, 0.24fr) minmax(0, 1fr) auto;
+        align-items: stretch;
+        gap: 12px;
+        margin-top: 14px;
+    }
+    .conf-editor-meta-inline .meta-box {
+        min-width: 0;
+    }
+    .conf-editor-meta-inline .meta-value {
+        overflow-wrap: anywhere;
+    }
+    .conf-editor-search-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .conf-editor-search-row label {
+        flex: 0 0 auto;
+        margin: 0;
+        color: #1AEBFF;
+        font-size: 14px;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+    .conf-editor-search-row .search-input {
+        flex: 0 1 620px;
+        max-width: 620px;
+    }
+    .conf-editor-meta-actions {
+        align-items: center;
+        justify-content: flex-end;
+        align-self: stretch;
+        flex-wrap: nowrap;
+        min-width: 210px;
+    }
+    .conf-editor-meta-actions .yoleo-btn {
+        white-space: nowrap;
+    }
+    .equal-sign { color: #1AEBFF; font-weight: bold; font-size: 18px; display: flex; align-items: center; justify-content: center; min-height: 46px; }
+    .value-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0; }
+    .value-wrap textarea { border-radius: 8px 0 0 8px; }
+    .config-row .value-wrap textarea.auto-grow {
+        min-height: 46px;
+        line-height: 22px;
+        white-space: nowrap;
+        overflow-x: hidden;
+        overflow-y: hidden;
+    }
+    .browse-trigger {
+        min-width: 46px; border-radius: 0 8px 8px 0; border: 1px solid #39485d; border-left: none; background: #263242;
+        color: #e9eef5; cursor: pointer; font-size: 18px;
+    }
+    .browse-trigger.placeholder { background: #10161f; color: #5f6f82; cursor: default; }
+    .remove-btn {
+        width: 42px; height: 46px; border-radius: 8px; border: 1px solid #7c2f35; background: #3a1518; color: #ff8f8f; cursor: pointer;
+        font-size: 18px;
+    }
+    .remove-btn:hover { background: #4b191e; color: #ffd3d3; }
+
+    .tools-row { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 8px; border-top: 1px dashed #2b394d; }
+    .empty-state { text-align: center; color: #8193a6; border: 1px dashed #2b394d; border-radius: 12px; padding: 22px 12px; }
+    .muted-note { color: #8ea0b4; font-size: 12px; }
+
+    #rebootOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.90); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; color: #1AEBFF; }
+    .spinner { width: 54px; height: 54px; border: 5px solid #333; border-top: 5px solid #1AEBFF; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    #browseModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.84); z-index: 2200; align-items: center; justify-content: center; padding: 20px; }
+    .browse-box { background: #1f293a; width: 100%; max-width: 760px; max-height: 84vh; border-radius: 14px; border: 1px solid #1AEBFF; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 22px 60px rgba(0,0,0,0.45); }
+    .browse-head { padding: 16px 18px; border-bottom: 1px solid #2b394d; background: #17202d; }
+    .browse-path { color: #cbd7e2; word-break: break-all; font-size: 13px; margin-top: 6px; }
+    .browse-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .browse-list { flex: 1; overflow-y: auto; padding: 8px 10px 16px 10px; background: #0e1218; }
+    .browse-entry { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 11px 12px; border: none; border-bottom: 1px solid #1c2633; cursor: pointer; color: #e9eef5; border-radius: 8px; background: transparent; text-align: left; font: inherit; }
+    .browse-entry:hover { background: #233040; color: #1AEBFF; }
+    .browse-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .browse-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .browse-kind { color: #92a6ba; font-size: 12px; flex-shrink: 0; }
+    .browse-footer { border-top: 1px solid #2b394d; padding: 14px 18px; display: flex; justify-content: flex-end; gap: 10px; background: #17202d; }
+
+    .sticky-actions {
+        position: sticky; bottom: 0; background: rgba(14,18,24,.92); border-top: 1px solid #2b394d; padding-top: 14px; margin-top: 18px;
+        backdrop-filter: blur(6px);
+    }
+
+    @media (max-width: 1200px) {
+        .folder-files-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 1120px) {
+        .edit-layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 860px) {
+        .folder-files-grid { grid-template-columns: 1fr; }
+        .config-row { grid-template-columns: 1fr; }
+        .conf-editor-meta-inline { grid-template-columns: 1fr; }
+        .conf-editor-meta-actions { justify-content: flex-start; min-width: 0; }
+        .conf-editor-search-row { align-items: stretch; flex-direction: column; gap: 6px; }
+        .conf-editor-search-row .search-input { max-width: none; }
+        .equal-sign { display: none; }
+        .remove-btn { width: 100%; }
+        .value-wrap textarea { border-radius: 8px 0 0 8px; }
+    }

@@ -1,0 +1,445 @@
+    /* ------------------------------------------------------------------
+       Terminal host ttyd
+       CSS centralisé : le template terminal.html ne contient pas de <style>.
+       ------------------------------------------------------------------ */
+    .terminal-page {
+        min-height: calc(100vh - 55px);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px;
+        overflow: auto;
+    }
+
+    .terminal-page-full {
+        height: calc(100vh - 55px);
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .yoleo-subnav,
+    .terminal-subnav {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        overflow-x: auto;
+        padding: 7px;
+        border: 1px solid var(--yoleo-border-soft);
+        border-radius: 12px;
+        background: rgba(18, 26, 36, .82);
+        scrollbar-width: thin;
+        scrollbar-color: #344963 transparent;
+        scroll-behavior: auto;
+        overscroll-behavior: contain;
+    }
+
+    .yoleo-subnav-link,
+    .terminal-subnav-link {
+        min-height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 7px 11px;
+        border: 1px solid transparent;
+        border-radius: 9px;
+        color: var(--yoleo-text);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 850;
+        white-space: nowrap;
+    }
+
+    .yoleo-subnav-link:hover,
+    .yoleo-subnav-link.is-active,
+    .terminal-subnav-link:hover,
+    .terminal-subnav-link.is-active {
+        background: rgba(139, 92, 246, .18);
+        border-color: rgba(139, 92, 246, .48);
+        color: #fff;
+    }
+
+    .terminal-card {
+        flex: 0 0 auto;
+        min-width: 0;
+        border: 1px solid var(--yoleo-border);
+        border-radius: var(--yoleo-radius);
+        background: rgba(18, 26, 36, .88);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, .18);
+        overflow: hidden;
+    }
+
+    .terminal-card-full {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .terminal-card-log {
+        display: flex;
+        flex-direction: column;
+        min-height: calc(100vh - 168px);
+    }
+
+    .terminal-card-head {
+        min-height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        background: rgba(10, 15, 22, .62);
+    }
+
+    .terminal-card-head-compact {
+        min-height: 46px;
+        padding: 8px 10px;
+    }
+
+    .terminal-card-head h2,
+    .terminal-section-head h3 {
+        margin: 0;
+        color: #fff;
+        line-height: 1.2;
+    }
+
+    .terminal-card-head h2 {
+        font-size: 17px;
+    }
+
+    .terminal-card-head p {
+        margin: 3px 0 0;
+        color: var(--yoleo-muted);
+        font-size: 12px;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .terminal-section-head {
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        background: rgba(10, 15, 22, .48);
+    }
+
+    .terminal-section-head h3 {
+        font-size: 14px;
+    }
+
+    .terminal-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .terminal-frame-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 8px;
+        background: #05070a;
+    }
+
+    .terminal-frame {
+        width: 100%;
+        height: 100%;
+        min-height: 420px;
+        display: block;
+        border: 0;
+        border-radius: 10px;
+        background: #000;
+    }
+
+    .terminal-page-full .terminal-frame {
+        min-height: 0;
+    }
+
+    .terminal-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 22px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .terminal-badge.is-ok {
+        background: rgba(72, 213, 151, .18);
+        color: #8fffd0;
+        border: 1px solid rgba(72, 213, 151, .42);
+    }
+
+    .terminal-badge.is-ko {
+        background: rgba(255, 93, 115, .14);
+        color: #ffb6c0;
+        border: 1px solid rgba(255, 93, 115, .42);
+    }
+
+    .terminal-muted,
+    .terminal-code {
+        font-family: Consolas, Monaco, monospace;
+        overflow-wrap: anywhere;
+    }
+
+    .terminal-muted { color: var(--yoleo-muted); font-size: 12px; }
+    .terminal-code { color: #c4b5fd; }
+
+    .terminal-notice {
+        margin: 10px 12px 0;
+        padding: 8px 10px;
+        border: 1px solid var(--yoleo-border-soft);
+        border-radius: 10px;
+        background: rgba(10, 15, 22, .62);
+        color: #d7e3ef;
+        font-size: 12px;
+        line-height: 1.32;
+    }
+
+    .terminal-notice-warning {
+        border-color: rgba(255, 181, 92, .48);
+        background: rgba(255, 181, 92, .12);
+        color: #ffe8c6;
+    }
+
+    .terminal-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .terminal-status-wrap {
+        padding: 10px 12px 0;
+    }
+
+    .terminal-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        background: rgba(10, 15, 22, .42);
+        color: var(--yoleo-text);
+        font-size: 12px;
+    }
+
+    .terminal-table th,
+    .terminal-table td {
+        padding: 7px 9px;
+        border: 1px solid rgba(120, 150, 185, .16);
+        vertical-align: middle;
+        overflow-wrap: anywhere;
+    }
+
+    .terminal-table th {
+        width: 150px;
+        background: rgba(17, 26, 38, .88);
+        color: #9fdfff;
+        font-weight: 900;
+        text-align: left;
+        text-transform: uppercase;
+        letter-spacing: .02em;
+    }
+
+    .terminal-table td {
+        color: #dce8f5;
+        font-family: Consolas, Monaco, monospace;
+    }
+
+    .terminal-status-table th {
+        width: 130px;
+    }
+
+    .terminal-status-table td {
+        color: #fff;
+    }
+
+    .terminal-form {
+        padding: 10px 12px 12px;
+    }
+
+    .terminal-form-section {
+        margin-bottom: 10px;
+        border: 1px solid var(--yoleo-border-soft);
+        border-radius: 12px;
+        background: rgba(10, 15, 22, .36);
+        overflow: hidden;
+    }
+
+    .terminal-form-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .terminal-config-table th {
+        width: 190px;
+    }
+
+    .terminal-config-table td:nth-child(2) {
+        width: 48%;
+    }
+
+    .terminal-config-table td:nth-child(3) {
+        width: 32%;
+        color: var(--yoleo-muted);
+        font-family: "Segoe UI", Arial, sans-serif;
+        font-size: 11px;
+    }
+
+    .terminal-config-table input,
+    .terminal-config-table select {
+        width: 100%;
+        min-height: 30px;
+        padding: 6px 8px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 8px;
+        outline: none;
+        background: rgba(4, 7, 11, .92);
+        color: var(--yoleo-text);
+        font: inherit;
+        font-size: 12px;
+    }
+
+    .terminal-config-table input:focus,
+    .terminal-config-table select:focus {
+        border-color: var(--yoleo-accent);
+        box-shadow: 0 0 0 2px rgba(139, 92, 246, .22);
+    }
+
+    .terminal-color-row {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr);
+        gap: 7px;
+    }
+
+    .terminal-color-row input[type="color"] {
+        min-height: 30px;
+        padding: 2px;
+        cursor: pointer;
+    }
+
+    .terminal-log,
+    .terminal-modal-log {
+        margin: 0;
+        font-family: Consolas, Monaco, monospace;
+        font-size: 12px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        overflow: auto;
+    }
+
+    .terminal-log {
+        flex: 1 1 auto;
+        min-height: 320px;
+        padding: 12px;
+        background: #05070a;
+        color: #dce8f5;
+    }
+
+    .terminal-modal-box {
+        width: min(92vw, 620px);
+    }
+
+    .terminal-modal-log {
+        max-height: 50vh;
+        padding: 12px;
+        border: 1px solid var(--yoleo-border-soft);
+        border-radius: 10px;
+        background: #05070a;
+        color: #dce8f5;
+    }
+
+    /* Terminal plein écran logique : la page principale ne scrolle pas,
+       seul le terminal ttyd garde son ascenseur interne. Utilise dvh pour
+       suivre automatiquement la hauteur réelle disponible sur mobile. */
+    html:has(.terminal-page-full),
+    body:has(.terminal-page-full) {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow: hidden;
+    }
+
+    body:has(.terminal-page-full) .yoleo-shell,
+    body:has(.terminal-page-full) .yoleo-main {
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        max-height: 100vh;
+        max-height: 100dvh;
+        overflow: hidden;
+    }
+
+    body:has(.terminal-page-full) .yoleo-main {
+        display: flex;
+        flex-direction: column;
+    }
+
+    body:has(.terminal-page-full) .yoleo-content {
+        min-height: 0;
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    body:has(.terminal-page-full) .terminal-page-full {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+        overflow: hidden;
+    }
+
+    body:has(.terminal-page-full) .terminal-card-full,
+    body:has(.terminal-page-full) .terminal-frame-wrap {
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    body:has(.terminal-page-full) .terminal-frame {
+        height: 100%;
+        min-height: 0;
+        overflow: auto;
+    }
+
+    @media (max-width: 900px) {
+        .terminal-page:not(.terminal-page-full) {
+            min-height: calc(100vh - 55px);
+            min-height: calc(100dvh - 55px);
+            height: auto;
+            overflow: visible;
+            padding: 8px;
+        }
+
+        .terminal-page-full {
+            padding: 8px;
+        }
+
+        .terminal-card-head {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .terminal-actions {
+            justify-content: stretch;
+        }
+
+        .terminal-actions .yoleo-btn {
+            flex: 1 1 auto;
+        }
+
+        .terminal-table {
+            min-width: 720px;
+        }
+    }
+
+
+

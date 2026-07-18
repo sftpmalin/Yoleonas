@@ -1,0 +1,404 @@
+{% extends "build_base.html" %}
+
+{% block route_content %}
+<div id="tab-registry-browser" class="tab-panel active build-mobile-simple-list build-registry-mobile-simple-list">
+                    {% with images=registry_images, total_repos=registry_total_repos, total_tags=registry_total_tags, registry_url=registry_url, registry_storage=registry_storage, message=registry_message, message_type=registry_message_type %}
+    <div class="container-reg">
+
+        <div id="registry-inline-flash" class="flash-msg success registry-inline-flash" hidden></div>
+
+        {% if message %}
+            <div style="background:{{ '#2e7d32' if message_type=='success' else '#c62828' }}; color:white; padding:10px; border-radius:5px; margin-bottom:15px; text-align:center;">
+                {{ message }}
+            </div>
+        {% endif %}
+
+        <div class="view-pc">
+            <div class="stats-bar">
+                <div class="stat-item">Dépôts<br><span>{{ total_repos }}</span></div>
+                <div class="stat-item">Versions<br><span>{{ total_tags }}</span></div>
+                <div class="stat-url">{{ registry_url }}</div>
+                <div class="registry-size">Taille registre : <span id="registry-storage-size">{{ registry_storage.size_h if registry_storage else '0 o' }}</span></div>
+                {% if not (_menu_top_active|default(false)) %}
+                <div class="registry-maintenance">
+                    <button type="button" class="yoleo-btn yoleo-btn-red" data-running-text="Suppression..." onclick="runRegistryService('registry_service_delete_all_tags', this)">Supprimer tous les tags</button>
+                    <button type="button" class="yoleo-btn yoleo-btn-orange" data-running-text="Nettoyage..." onclick="runRegistryService('registry_service_clean_storage', this)">Nettoyer le registre</button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <input type="text" id="search" class="search-box" onkeyup="filterRepos()" placeholder="🔍 Filtrer les dépôts et les tags...">
+
+        <div class="view-pc" data-yoleo-context-zone="build-registry-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Dépôt</th>
+                        <th>Versions (Tags)</th>
+                    </tr>
+                </thead>
+                <tbody id="repo-table-body">
+                    {% for img in images %}
+                    <tr class="data-row" data-search="{{ img.search }}">
+                        <td>
+                            <span class="repo-name">{{ img.name }}</span>
+                            <span class="repo-count">{{ img.tags|length }} version(s)</span>
+                        </td>
+                        <td>
+                            <div class="tags-container">
+                                {% for t in img.tags %}
+                                <div class="tag-badge">
+                                    <div>
+                                        <span class="tag-txt">{{ t.name }}</span>
+                                        {% if t.arch %}<span class="tag-arch">{{ t.arch }}</span>{% endif %}
+                                    </div>
+                                    <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon registry-delete-btn" onclick='confirmDelete({{ img.name|tojson }}, {{ t.name|tojson }})' title="Supprimer">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="view-mobile">
+            <div class="mobile-top-bar">
+                <div class="stat-card">
+                    <small>Dépôts</small><strong>{{ total_repos }}</strong>
+                </div>
+                <div class="stat-card">
+                    <small>Versions</small><strong>{{ total_tags }}</strong>
+                </div>
+            </div>
+
+            <h3 class="mobile-title">Dépôts Registre</h3>
+            <div class="grid-container" id="repo-grid" data-yoleo-context-zone="build-registry-grid">
+                {% for img in images %}
+                <div class="grid-item data-row" data-search="{{ img.search }}" onclick='openRepoMenu({{ img|tojson|safe }})'>
+                    <div class="grid-name">{{ img.name }}</div>
+                    <div class="grid-count">{{ img.tags|length }} Tags</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="empty-state" class="empty-state" data-yoleo-context-zone="build-registry-empty">Aucun dépôt ou tag trouvé.</div>
+    </div>
+
+    <form id="delete-form" method="post" action="{{ url_for('builds_bp.registry_browser_action') }}" style="display:none;">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="repo" id="delete-repo">
+        <input type="hidden" name="tag" id="delete-tag">
+    </form>
+
+    <div id="repo-menu-overlay" class="custom-overlay">
+        <div class="modal-box">
+            <div class="menu-header">
+                <img id="rm-icon" class="menu-icon-lg" onerror="this.src='{{ '/static/logo.png' }}'">
+                <div>
+                    <h3 id="rm-title" style="margin:0; font-size:18px; color:#fff; word-break: break-all;">Repo</h3>
+                    <div style="font-size:12px; color:#888; margin-top:5px;">Gérer les versions</div>
+                </div>
+            </div>
+
+            <div id="rm-list" class="menu-list"></div>
+
+            <button type="button" onclick="closeAll()" class="yoleo-btn yoleo-btn-muted" style="margin-top:15px;">Fermer</button>
+        </div>
+    </div>
+
+    <div id="confirm-overlay" class="custom-overlay">
+        <div class="modal-box">
+            <h3 style="color:#fff; margin-top:0;">Confirmation</h3>
+            <p style="color:#ccc;">Voulez-vous vraiment supprimer :<br><b id="conf-tag" style="color:#1AEBFF"></b> ?</p>
+            <div class="conf-btns">
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeConfirmOnly()">Annuler</button>
+                <button type="button" class="yoleo-btn yoleo-btn-red" onclick="executeDelete()">Supprimer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let deleteRepo = '';
+        let deleteTag = '';
+        let registryImages = {{ images|tojson|safe }};
+        let registryRefreshTimer = null;
+        const registryJsonUrl = {{ url_for('builds_bp.registry_browser_json')|tojson }};
+        const registryDeleteUrl = {{ url_for('builds_bp.registry_browser_action')|tojson }};
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function filterRepos() {
+            const val = document.getElementById('search').value.toLowerCase().trim();
+            let visibleCount = 0;
+
+            document.querySelectorAll('#tab-registry-browser .data-row').forEach(row => {
+                const txt = (row.getAttribute('data-search') || '').toLowerCase();
+                const visible = txt.includes(val);
+                row.style.display = visible ? '' : 'none';
+                if (visible) visibleCount += 1;
+            });
+
+            document.getElementById('empty-state').style.display = visibleCount ? 'none' : 'block';
+        }
+
+        function showRegistryInlineFlash(message, ok = true, autoHide = true) {
+            const box = document.getElementById('registry-inline-flash');
+            if (!box) return;
+            if (box._hideTimer) window.clearTimeout(box._hideTimer);
+            box.textContent = message || (ok ? 'Opération terminée.' : 'Erreur registre.');
+            box.className = `flash-msg ${ok ? 'success' : 'error'} registry-inline-flash`;
+            box.hidden = false;
+            box.classList.remove('is-hiding');
+
+            if (autoHide) {
+                box._hideTimer = window.setTimeout(() => {
+                    box.classList.add('is-hiding');
+                    window.setTimeout(() => {
+                        box.hidden = true;
+                        box.classList.remove('is-hiding');
+                    }, 260);
+                }, 3000);
+            }
+        }
+
+        function runRegistryBrowserMenuAction(actionName) {
+            actionName = String(actionName || '');
+            if (!actionName) return false;
+            if (typeof runTask === 'function') {
+                runTask(actionName, '', 'normal', false, null, true).then(() => {
+                    window.setTimeout(() => refreshRegistryServiceStatus && refreshRegistryServiceStatus(), 700);
+                    window.setTimeout(() => refreshRegistryBrowser(false).catch(() => {}), 1200);
+                    if (typeof invalidateStatus === 'function') invalidateStatus('registry');
+                    if (typeof startStatusScan === 'function') window.setTimeout(() => startStatusScan('registry', true), 1500);
+                    if (typeof isBuildMainPage === 'function' && isBuildMainPage() && typeof startMainRegistryStatusScan === 'function') {
+                        window.setTimeout(() => startMainRegistryStatusScan(true), 1700);
+                    }
+                });
+            } else if (typeof runRegistryService === 'function') {
+                runRegistryService(actionName, null);
+            }
+            return false;
+        }
+
+        document.addEventListener('build:task-finished', (event) => {
+            const detail = event.detail || {};
+            const action = String(detail.action || '');
+            if (action !== 'registry_service_delete_all_tags' && action !== 'registry_service_clean_storage') return;
+
+            if (detail.ok) {
+                const label = action === 'registry_service_delete_all_tags'
+                    ? 'Suppression des tags terminée.'
+                    : 'Nettoyage du registre terminé.';
+                showRegistryInlineFlash(label, true, true);
+                window.setTimeout(() => refreshRegistryBrowser(false).catch(() => {}), 350);
+            } else {
+                showRegistryInlineFlash(detail.message || 'Erreur pendant la maintenance du registre.', false, false);
+            }
+        });
+
+        function registryTagHtml(repo, tag) {
+            return `
+                <div class="tag-badge">
+                    <div>
+                        <span class="tag-txt">${escapeHtml(tag.name || '')}</span>
+                        ${tag.arch ? `<span class="tag-arch">${escapeHtml(tag.arch)}</span>` : ''}
+                    </div>
+                    <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon registry-delete-btn" data-reg-delete="1" data-repo="${escapeHtml(repo)}" data-tag="${escapeHtml(tag.name || '')}" title="Supprimer">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>`;
+        }
+
+        function bindRegistryBrowserActions() {
+            document.querySelectorAll('#tab-registry-browser [data-reg-delete="1"]').forEach(button => {
+                button.onclick = () => confirmDelete(button.dataset.repo || '', button.dataset.tag || '');
+            });
+            document.querySelectorAll('#tab-registry-browser [data-reg-open]').forEach(card => {
+                card.onclick = () => openRepoMenu(registryImages[Number(card.dataset.regOpen || 0)] || {});
+            });
+        }
+
+        function renderRegistryBrowser(payload) {
+            if (!payload || !Array.isArray(payload.images)) return;
+            registryImages = payload.images;
+            const stats = document.querySelectorAll('#tab-registry-browser .stats-bar .stat-item span');
+            if (stats[0]) stats[0].textContent = payload.total_repos ?? registryImages.length;
+            if (stats[1]) stats[1].textContent = payload.total_tags ?? 0;
+            const statUrl = document.querySelector('#tab-registry-browser .stat-url');
+            if (statUrl) statUrl.textContent = payload.registry_url || '';
+            const storageSize = document.getElementById('registry-storage-size');
+            if (storageSize) storageSize.textContent = (payload.registry_storage && payload.registry_storage.size_h) || '0 o';
+            const mobileStats = document.querySelectorAll('#tab-registry-browser .mobile-top-bar .stat-card strong');
+            if (mobileStats[0]) mobileStats[0].textContent = payload.total_repos ?? registryImages.length;
+            if (mobileStats[1]) mobileStats[1].textContent = payload.total_tags ?? 0;
+
+            const tbody = document.getElementById('repo-table-body');
+            if (tbody) {
+                tbody.innerHTML = registryImages.map(img => `
+                    <tr class="data-row" data-search="${escapeHtml(img.search || '')}">
+                        <td>
+                            <span class="repo-name">${escapeHtml(img.name || '')}</span>
+                            <span class="repo-count">${(img.tags || []).length} version(s)</span>
+                        </td>
+                        <td><div class="tags-container">${(img.tags || []).map(tag => registryTagHtml(img.name || '', tag)).join('')}</div></td>
+                    </tr>`).join('');
+            }
+
+            const grid = document.getElementById('repo-grid');
+            if (grid) {
+                grid.innerHTML = registryImages.map((img, index) => `
+                    <div class="grid-item data-row" data-search="${escapeHtml(img.search || '')}" data-reg-open="${index}">
+                        <div class="grid-name">${escapeHtml(img.name || '')}</div>
+                        <div class="grid-count">${(img.tags || []).length} Tags</div>
+                    </div>`).join('');
+            }
+
+            bindRegistryBrowserActions();
+            filterRepos();
+        }
+
+        async function refreshRegistryBrowser(showMessage = false) {
+            const response = await fetch(registryJsonUrl, {cache: 'no-store', credentials: 'same-origin'});
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+            renderRegistryBrowser(payload);
+            if (showMessage && payload.message) console.log(payload.message);
+            return payload;
+        }
+
+        function startRegistryBrowserAutoRefresh() {
+            if (registryRefreshTimer) return;
+            refreshRegistryBrowser(false).catch(() => {});
+            registryRefreshTimer = window.setInterval(() => {
+                const panel = document.getElementById('tab-registry-browser');
+                if (panel && panel.classList.contains('active')) refreshRegistryBrowser(false).catch(() => {});
+            }, 5000);
+        }
+
+        function openRepoMenu(data) {
+            document.getElementById('rm-icon').src = data.icon || '{{ '/static/logo.png' }}';
+            document.getElementById('rm-title').innerText = data.name || 'Repo';
+
+            const list = document.getElementById('rm-list');
+            list.innerHTML = '';
+
+            if (!data.tags || data.tags.length === 0) {
+                list.innerHTML = "<p style='color:#666;'>Aucun tag.</p>";
+            } else {
+                data.tags.forEach(t => {
+                    const row = document.createElement('div');
+                    row.className = 'menu-row';
+
+                    const info = document.createElement('div');
+                    info.className = 'menu-row-info';
+
+                    const tag = document.createElement('div');
+                    tag.className = 'menu-tag';
+                    tag.textContent = t.name || '';
+                    info.appendChild(tag);
+
+                    if (t.arch) {
+                        const arch = document.createElement('div');
+                        arch.className = 'menu-arch';
+                        arch.textContent = t.arch;
+                        info.appendChild(arch);
+                    }
+
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'yoleo-btn yoleo-btn-mini yoleo-btn-red reg-menu-delete';
+                    btn.textContent = '🗑';
+                    btn.addEventListener('click', function (event) {
+                        event.stopPropagation();
+                        confirmDelete(data.name, t.name);
+                    });
+
+                    row.appendChild(info);
+                    row.appendChild(btn);
+                    list.appendChild(row);
+                });
+            }
+
+            document.getElementById('repo-menu-overlay').classList.add('show');
+        }
+
+        function confirmDelete(repo, tagName) {
+            deleteRepo = repo || '';
+            deleteTag = tagName || '';
+            document.getElementById('conf-tag').innerText = deleteTag;
+            document.getElementById('confirm-overlay').classList.add('show');
+        }
+
+        async function executeDelete() {
+            if (!deleteRepo || !deleteTag) return;
+
+            document.getElementById('delete-repo').value = deleteRepo;
+            document.getElementById('delete-tag').value = deleteTag;
+            const form = document.getElementById('delete-form');
+            const button = document.querySelector('#confirm-overlay .b-confirm');
+            const oldText = button ? button.textContent : '';
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Suppression...';
+            }
+            try {
+                const response = await fetch(registryDeleteUrl, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+                renderRegistryBrowser(payload);
+                closeAll();
+            } catch (err) {
+                alert(String(err && (err.message || err) || 'Erreur suppression registre'));
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = oldText || 'Supprimer';
+                }
+            }
+        }
+
+        function closeConfirmOnly() {
+            document.getElementById('confirm-overlay').classList.remove('show');
+        }
+
+        function closeAll() {
+            document.getElementById('repo-menu-overlay').classList.remove('show');
+            document.getElementById('confirm-overlay').classList.remove('show');
+        }
+
+        document.getElementById('repo-menu-overlay').addEventListener('click', function (event) {
+            if (event.target === this) closeAll();
+        });
+
+        document.getElementById('confirm-overlay').addEventListener('click', function (event) {
+            if (event.target === this) closeConfirmOnly();
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') closeAll();
+        });
+
+        bindRegistryBrowserActions();
+    </script>
+                    {% endwith %}
+                </div>
+{% endblock %}

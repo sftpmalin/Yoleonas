@@ -1,0 +1,203 @@
+{% extends "menu.html" %}
+{% block title %}Services - Yoleo{% endblock %}
+{% block page_title %}
+{% if service_active == 'minidnla' %}{% if (active_tab|default('main')) == 'main' %}MiniDLNA - État des services{% else %}MiniDLNA{% endif %}
+{% elif service_active == 'proftpd' %}ProFTPD - État des services
+{% elif service_active == 'sftp' %}{% if (active_subtab|default('main')) == 'main' %}SFTP - État des services{% elif (active_subtab|default('main')) in ['users', 'ssh'] %}SFTP - Accès Docker{% else %}SFTP{% endif %}
+{% elif service_active == 'archive' %}Archive
+{% elif service_active == 'cache' %}Cache
+{% elif service_active == 'backup' %}Gestionnaire de backup
+{% elif service_active == 'ffmpeg' %}FFmpeg over IP - Réglages
+{% else %}Services{% endif %}
+{% endblock %}
+{% block page_subtitle %}
+{% if service_active == 'minidnla' %}Serveur DLNA host, dossiers médias, service systemd et journaux.
+{% elif service_active == 'proftpd' %}Serveur FTP utilisant les vrais utilisateurs Linux, leurs homes et permissions Linux, avec gestion du service systemd.
+{% elif service_active == 'sftp' %}{% if (active_subtab|default('main')) == 'main' %}Configuration SFTP Docker, utilisateurs, clés SSH et options du serveur.{% else %}Accès utilisateurs isolés dans le conteneur SFTP, sans toucher au SSH du host.{% endif %}
+{% elif service_active == 'archive' %}Archive : profils, lancement, arrêt, suivi de progression et logs.
+{% elif service_active == 'cache' %}Profils cache/mover, lancement manuel et configuration technique.
+{% elif service_active == 'backup' %}Rsync host, scripts de sauvegarde, logs et statuts détachés de Flask.
+{% elif service_active == 'ffmpeg' %}Serveur FFmpeg distant, ports, rewrites Samba/NFS et service systemd.
+{% else %}Services applicatifs du NAS.{% endif %}
+{% endblock %}
+{% block content %}
+<div class="services-page">
+  <div class="services-panel">
+      <div class="services-content">
+        {% block route_content %}{% endblock %}
+      </div>
+  </div>
+</div>
+<style>
+.yoleo-service-context-menu {
+  position: fixed;
+  z-index: 99999;
+  min-width: 210px;
+  max-width: min(360px, calc(100vw - 16px));
+  padding: 7px;
+  border: 1px solid rgba(139,92,246,.58);
+  border-radius: 14px;
+  background: rgba(15,23,42,.98);
+  box-shadow: 0 20px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(34,211,238,.10) inset;
+  backdrop-filter: blur(10px);
+}
+.yoleo-service-context-menu a {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:34px;
+  padding:8px 10px;
+  border-radius:10px;
+  color:#f8fafc;
+  text-decoration:none;
+  font-weight:800;
+  outline:none;
+}
+.yoleo-service-context-menu a:hover,
+.yoleo-service-context-menu a:focus {
+  background:rgba(124,58,237,.34);
+  color:#fff;
+}
+.yoleo-service-context-menu .page-settings-icon {
+  width:22px;
+  min-width:22px;
+  display:inline-grid;
+  place-items:center;
+}
+.yoleo-service-context-menu img.yoleo-menu-img {
+  max-width:20px;
+  max-height:20px;
+  object-fit:contain;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.services-page .flash-stack .flash, .services-page .flash-stack .flash-msg').forEach(function(box){
+    const text = (box.textContent || '').trim();
+    const cls = box.className || '';
+    const isError = cls.includes('error') || cls.includes('danger') || text.startsWith('❌') || text.startsWith('⚠️');
+    if(isError) return;
+    setTimeout(function(){
+      box.classList.add('services-flash-hiding');
+      setTimeout(function(){
+        const stack = box.closest('.flash-stack');
+        box.remove();
+        if(stack && !stack.querySelector('.flash, .flash-msg')) stack.remove();
+      }, 190);
+    }, 700);
+  });
+
+  const contextZones = document.querySelectorAll('[data-yoleo-service-context-zone]');
+  if (!contextZones.length) return;
+
+  let contextMenu = null;
+
+  function getTopMenuLinks(){
+    const menu = document.querySelector('#yoleoPageSettingsMenu .yoleo-page-settings-dropdown');
+    if (!menu) return [];
+    return Array.from(menu.querySelectorAll('a')).filter(function(link){
+      return !link.hidden && link.offsetParent !== null;
+    });
+  }
+
+  function closeServiceContextMenu(){
+    if (contextMenu) {
+      contextMenu.remove();
+      contextMenu = null;
+    }
+    document.removeEventListener('mousedown', onDocumentMouseDown, true);
+    document.removeEventListener('keydown', onDocumentKeyDown, true);
+    window.removeEventListener('resize', closeServiceContextMenu, true);
+    window.removeEventListener('scroll', closeServiceContextMenu, true);
+  }
+
+  function onDocumentMouseDown(event){
+    if (contextMenu && !contextMenu.contains(event.target)) closeServiceContextMenu();
+  }
+
+  function onDocumentKeyDown(event){
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeServiceContextMenu();
+      return;
+    }
+    if (!contextMenu) return;
+    const items = Array.from(contextMenu.querySelectorAll('a'));
+    if (!items.length) return;
+    const current = document.activeElement;
+    let index = Math.max(0, items.indexOf(current));
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      items[(index + 1) % items.length].focus();
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      items[(index - 1 + items.length) % items.length].focus();
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      items[0].focus();
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      items[items.length - 1].focus();
+    }
+  }
+
+  function buildServiceContextMenu(links){
+    const box = document.createElement('div');
+    box.className = 'yoleo-service-context-menu';
+    box.setAttribute('role', 'menu');
+    box.setAttribute('aria-label', 'Menu contextuel de la page');
+
+    links.forEach(function(link){
+      const clone = link.cloneNode(true);
+      clone.setAttribute('role', 'menuitem');
+      clone.removeAttribute('id');
+      clone.classList.remove('is-active');
+      clone.addEventListener('click', function(){
+        closeServiceContextMenu();
+      }, { once:false });
+      box.appendChild(clone);
+    });
+    return box;
+  }
+
+  function positionServiceContextMenu(box, x, y){
+    box.style.left = '0px';
+    box.style.top = '0px';
+    document.body.appendChild(box);
+    const rect = box.getBoundingClientRect();
+    const pad = 8;
+    const left = Math.min(Math.max(pad, x), Math.max(pad, window.innerWidth - rect.width - pad));
+    const top = Math.min(Math.max(pad, y), Math.max(pad, window.innerHeight - rect.height - pad));
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+  }
+
+  function openServiceContextMenu(event){
+    const zone = event.target.closest('[data-yoleo-service-context-zone]');
+    if (!zone) return;
+    const links = getTopMenuLinks();
+    if (!links.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    closeServiceContextMenu();
+    contextMenu = buildServiceContextMenu(links);
+    positionServiceContextMenu(contextMenu, event.clientX, event.clientY);
+
+    const first = contextMenu.querySelector('a');
+    if (first) first.focus({ preventScroll:true });
+    setTimeout(function(){
+      document.addEventListener('mousedown', onDocumentMouseDown, true);
+      document.addEventListener('keydown', onDocumentKeyDown, true);
+      window.addEventListener('resize', closeServiceContextMenu, true);
+      window.addEventListener('scroll', closeServiceContextMenu, true);
+    }, 0);
+  }
+
+  contextZones.forEach(function(zone){
+    zone.addEventListener('contextmenu', openServiceContextMenu);
+  });
+});
+</script>
+{% endblock %}

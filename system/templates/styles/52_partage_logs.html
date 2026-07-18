@@ -1,0 +1,37 @@
+/* Correctifs ciblés Partage > Logs : titre global + barre filtre/actualiser compacte. */
+.partage-page .partage-logs-page-v4 .partage-logs-main-v4 {
+    padding-top: 12px;
+}
+
+.partage-page .partage-logs-page-v4 .partage-logs-actions-v4 {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+    margin-bottom: 10px;
+}
+
+.partage-page .partage-logs-page-v4 .partage-logs-actions-v4 .select-input {
+    width: 220px;
+    min-width: 180px;
+    flex: 0 0 220px;
+}
+
+.partage-page .partage-logs-page-v4 .partage-logs-actions-v4 .yoleo-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    .partage-page .partage-logs-page-v4 .partage-logs-actions-v4 {
+        justify-content: stretch;
+        flex-wrap: wrap;
+    }
+
+    .partage-page .partage-logs-page-v4 .partage-logs-actions-v4 .select-input,
+    .partage-page .partage-logs-page-v4 .partage-logs-actions-v4 .yoleo-btn {
+        width: 100%;
+        flex: 1 1 100%;
+    }
+}

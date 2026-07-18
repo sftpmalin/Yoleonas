@@ -1,0 +1,1096 @@
+﻿{% extends "menu.html" %}
+
+{% block title %}Utilisateurs - Yoleo{% endblock %}
+{% block page_title %}{{ users_current_title[0] }}{% endblock %}
+{% block page_subtitle %}{{ users_current_title[1] }}{% endblock %}
+
+{% block content %}
+<div class="lu-wrap">
+<div class="users-page users-mobile-simple-list no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+    {% if active_user_tab != 'p12' %}
+        <div class="users-section users-linux-section">
+            <div class="lu-card">
+                <div class="lu-table-wrap users-mobile-list-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" data-yoleo-context-zone="users-linux-table">
+                    <table class="lu-table users-mobile-list-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th width="80">UID</th>
+                                <th width="80">GID</th>
+                                <th>Groupe</th>
+                                <th>Password</th>
+                                <th>Home</th>
+                                <th>Shell</th>
+                                <th width="86">SSH</th>
+                                <th width="62">Lock</th>
+                                <th width="54">Del</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-body"></tbody>
+                    </table>
+                </div>
+
+                <div class="lu-status" id="lu-status">Chargement...</div>
+            </div>
+        </div>
+    {% else %}
+        <div class="users-section users-p12-section">
+            <div class="tab-grid">
+                <div class="stack-col">
+                    <div class="card">
+                        <form onsubmit="event.preventDefault(); generateP12();">
+                            <div class="grid-2">
+                                <div>
+                                    <label class="lbl-lu" for="p12-name">Nom du fichier</label>
+                                    <input type="text" id="p12-name" class="text-input inp-lu" placeholder="ex: mon_certif" required>
+                                    <div class="hint">Les fichiers générés s’appelleront <b>nom.p12</b> et <b>nom_comp.p12</b>, avec la clé et le certificat à côté.</div>
+                                </div>
+
+                                <div>
+                                    <label class="lbl-lu" for="p12-url">Domaine / CN</label>
+                                    <input type="text" id="p12-url" class="text-input inp-lu" placeholder="ex: sftpmalin.com" required>
+                                    <div class="hint">Tu peux mettre un domaine simple, un sous-domaine ou un wildcard du style <b>*.mondomaine.com</b>.</div>
+                                </div>
+
+                                <div>
+                                    <label class="lbl-lu" for="p12-pwd">Mot de passe P12</label>
+                                    <input type="password" id="p12-pwd" class="text-input inp-lu" placeholder="Optionnel">
+                                    <div class="hint">Tu peux laisser vide si tu veux un P12 sans mot de passe.</div>
+                                </div>
+
+                                <div>
+                                    <label class="lbl-lu" for="p12-key-size">Format de clé</label>
+                                    <select id="p12-key-size" class="select-input sel-lu">
+                                        <option value="2048">RSA 2048</option>
+                                        <option value="3072" selected>RSA 3072</option>
+                                        <option value="4096">RSA 4096</option>
+                                        <option value="ed25519">Ed25519</option>
+                                    </select>
+                                    <div class="hint" id="p12-algoHint">RSA 3072 est un bon compromis sécurité / compatibilité.</div>
+                                </div>
+
+                                <div class="wide-field">
+                                    <label class="lbl-lu" for="p12-output-dir">Dossier de sortie P12</label>
+                                    <div class="path-picker">
+                                        <input type="text" id="p12-output-dir" class="text-input inp-lu" value="{{ p12_output_dir }}" placeholder="Choisis un dossier de sortie..." autocomplete="off">
+                                        <button type="button" class="yoleo-btn yoleo-btn-muted btn-lu" onclick="openP12Browser()" title="Parcourir" aria-label="Parcourir">📁</button>
+                                    </div>
+                                    <div class="hint">Obligatoire. Chemin absolu accepté, ou relatif au dossier conf. Exemple : <span class="code-path">../p12</span>.</div>
+                                    <div id="p12-output-state" class="p12-output-state"></div>
+                                </div>
+                            </div>
+
+                            <div class="toolbar">
+                                <button type="submit" id="p12-generate-btn" class="yoleo-btn yoleo-btn-primary" {% if not allow_actions %}disabled{% endif %}>🚀 Générer le P12</button>
+                            </div>
+                        </form>
+
+                        <div id="p12-result" class="result-box" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <div class="stack-col">
+                    <div class="card">
+                        <h2 class="section-title">Résumé rapide</h2>
+                        <div class="summary-box">
+                            <div class="summary-line"><b>Dossier choisi :</b> <span class="code-path" id="p12-summary-output">{{ p12_output_dir or '—' }}</span></div>
+                            <div class="summary-line"><b>Chemin réel :</b> <span class="code-path" id="p12-summary-output-resolved">{{ p12_output_dir_resolved or '—' }}</span></div>
+                            <div class="summary-line"><b>Fichier de conf :</b> <span class="code-path" id="p12-summary-conf">{{ p12_config_file }}</span></div>
+                            <div class="summary-line"><b>Durée certificat :</b> 3650 jours</div>
+                            <div class="summary-line"><b>Fichiers générés :</b> .key + .crt + .p12 + _comp.p12</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2 class="section-title">Conseils</h2>
+                        <div class="summary-box">
+                            <div class="summary-line"><span class="mode-chip">Compatibilité</span></div>
+                            <div class="summary-line">RSA 3072 reste le meilleur choix par défaut pour éviter les surprises avec certains clients.</div>
+                            <div class="summary-line"><span class="mode-chip">Nom de fichier</span></div>
+                            <div class="summary-line">Le nom est nettoyé automatiquement pour éviter les caractères gênants dans les chemins.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+    </div>
+</div>
+
+<div id="lu-modal" class="modal-overlay">
+    <div class="modal-box lu-user-modal-box">
+        <div class="modal-header">
+            <span id="lu-modal-title"></span>
+            <span style="cursor:pointer;" onclick="closeModal()">✕</span>
+        </div>
+        <div class="modal-body" id="lu-modal-body"></div>
+        <div class="modal-footer">
+            <button class="yoleo-btn yoleo-btn-muted btn-lu" onclick="closeModal()">Annuler</button>
+            <button class="yoleo-btn yoleo-btn-primary btn-lu" id="lu-modal-ok">Valider</button>
+        </div>
+    </div>
+</div>
+
+<div id="ssh-popup-modal" class="modal-overlay ssh-iframe-modal" onclick="if (event.target === this) closeSshPopup();">
+    <div class="modal-box ssh-popup-box">
+        <div class="modal-header">
+            <span id="ssh-popup-title">🔐 Générateur de clé SSH</span>
+            <span style="cursor:pointer;" onclick="closeSshPopup()">✕</span>
+        </div>
+        <iframe id="ssh-popup-frame" class="ssh-modal-frame" title="Générateur de clé SSH" scrolling="no"></iframe>
+    </div>
+</div>
+
+<script>
+    let users = [];
+    let selectedUser = null;
+    let selectedActionIndex = -1;
+    const ACTIVE_USER_SECTION = {{ active_user_tab|default('general')|tojson }};
+    const SSH_URL = {{ url_for('users_bp.show_ssh')|tojson }};
+
+    const allowActions = {{ allow_actions | tojson }};
+    const allowedShells = {{ allowed_shells | tojson }};
+    const defaultShell = {{ default_shell | tojson }};
+    const initialP12OutputDir = {{ p12_output_dir | tojson }};
+    const initialP12OutputDirResolved = {{ p12_output_dir_resolved | tojson }};
+    let p12BrowserCurrentPath = initialP12OutputDirResolved || '/';
+    let p12BrowserParentPath = '/';
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function shellOptions(selectedShell=null) {
+        const shells = Array.isArray(allowedShells) && allowedShells.length ? allowedShells : ['/bin/bash'];
+        const wanted = selectedShell || defaultShell;
+        return shells.map(sh => {
+            const selected = sh === wanted ? ' selected' : '';
+            return `<option value="${escapeHtml(sh)}"${selected}>${escapeHtml(sh)}</option>`;
+        }).join('');
+    }
+
+    function setStatus(msg, isError=false) {
+        const el = document.getElementById('lu-status');
+        if (!el) return;
+        el.textContent = msg;
+        el.style.color = isError ? '#ff9f9f' : '#9bb0c2';
+    }
+
+    function showResult(id, msg, isError=false) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.display = 'block';
+        el.classList.remove('ok', 'error');
+        el.classList.add(isError ? 'error' : 'ok');
+        el.textContent = msg;
+    }
+
+    function passwordClass(state) {
+        if (state === 'mot de passe défini') return 'pwd-ok';
+        if (state === 'verrouillé' || state === 'désactivé') return 'pwd-lock';
+        return 'muted';
+    }
+
+    function passwordBadge(state) {
+        let cls = 'badge';
+        if (state === 'mot de passe défini') cls += ' ok';
+        if (state === 'verrouillé' || state === 'désactivé') cls += ' lock';
+        return `<span class="${cls}">${escapeHtml(state)}</span>`;
+    }
+
+    function isUserLocked(user) {
+        const state = user && user.password_state ? String(user.password_state) : '';
+        return state === 'verrouillé' || state === 'désactivé';
+    }
+
+    async function loadUsers(opts={}) {
+        const previousSelectedName = selectedUser ? selectedUser.name : null;
+        selectedUser = null;
+        if (!opts.quiet) setStatus('Chargement...');
+        try {
+            const r = await fetch('/api/users/list');
+            const d = await r.json();
+
+            if (d.error) {
+                setStatus(d.error, true);
+                return;
+            }
+
+            users = d.items || [];
+            renderUsers(previousSelectedName);
+            updateActionButtons();
+            if (!opts.quiet) setStatus(`${users.length} utilisateur(s) affiché(s).`);
+        } catch (e) {
+            if (!opts.quiet) setStatus('Erreur de chargement.', true);
+        }
+    }
+
+    function renderUsers(preferredName=null) {
+        const body = document.getElementById('users-body');
+        if (!body) return;
+        let html = '';
+
+        users.forEach(u => {
+            const protectedIcon = u.protected ? ' 🔐' : '';
+            const disabled = (!allowActions || u.protected) ? ' disabled' : '';
+            const protectedTitle = u.protected ? 'Utilisateur protégé' : '';
+            const sshTitle = protectedTitle || `Générer une clé SSH pour ${u.name}`;
+            const locked = isUserLocked(u);
+            const lockIcon = locked ? '🔒' : '🔓';
+            const lockTitle = protectedTitle || (locked ? `Déverrouiller ${u.name}` : `Verrouiller ${u.name}`);
+            const delTitle = protectedTitle || `Supprimer ${u.name}`;
+            const mobileIdentity = [`UID ${escapeHtml(u.uid)}`, `GID ${escapeHtml(u.gid)}`, `Groupe ${escapeHtml(u.group || '—')}`].join(' · ');
+            const mobileHome = `<div class="lu-mobile-only lu-mobile-line"><span>Home</span><code>${escapeHtml(u.home || '—')}</code></div>`;
+            const mobileShell = `<div class="lu-mobile-only lu-mobile-line"><span>Shell</span><code>${escapeHtml(u.shell || '—')}</code></div>`;
+
+            html += `<tr class="lu-row" tabindex="-1" data-user="${escapeHtml(u.name)}" onclick="selectUser(this.dataset.user, this)">
+                <td class="lu-user-main-cell"><b>${escapeHtml(u.name)}</b>${protectedIcon}<div class="lu-mobile-only lu-mobile-meta">${mobileIdentity}</div>${mobileHome}${mobileShell}</td>
+                <td>${escapeHtml(u.uid)}</td>
+                <td>${escapeHtml(u.gid)}</td>
+                <td>${escapeHtml(u.group)}</td>
+                <td class="${passwordClass(u.password_state)}">${passwordBadge(u.password_state)}</td>
+                <td class="muted">${escapeHtml(u.home)}</td>
+                <td class="muted">${escapeHtml(u.shell)}</td>
+                <td class="ssh-cell">
+                    <button type="button" class="yoleo-btn yoleo-btn-mini btn-lu lu-row-ssh" title="${escapeHtml(sshTitle)}" onclick='event.stopPropagation(); openSshForUser(${JSON.stringify(u.name)})'${disabled}>🔐 SSH</button>
+                </td>
+                <td class="lu-action-cell">
+                    <button type="button" class="yoleo-btn yoleo-btn-mini btn-lu lu-row-action lu-lock-toggle" title="${escapeHtml(lockTitle)}" onclick='event.stopPropagation(); toggleLockUser(${JSON.stringify(u.name)})'${disabled}>${lockIcon}</button>
+                </td>
+                <td class="lu-action-cell">
+                    <button type="button" class="yoleo-btn yoleo-btn-mini btn-lu lu-row-action lu-delete-user" title="${escapeHtml(delTitle)}" onclick='event.stopPropagation(); removeUser(${JSON.stringify(u.name)})'${disabled}>✕</button>
+                </td>
+            </tr>`;
+        });
+
+        body.innerHTML = html;
+
+        const wanted = preferredName && users.some(u => u.name === preferredName)
+            ? preferredName
+            : (users[0] ? users[0].name : null);
+
+        if (wanted) {
+            const row = getUserRows().find(r => r.dataset.user === wanted);
+            if (row) selectUser(wanted, row, {silent:true, keepFocus:true});
+        }
+    }
+
+    function setActionButtonState(id, enabled, title='') {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.disabled = !enabled;
+        btn.classList.toggle('lu-disabled-action', !enabled);
+        btn.title = title || '';
+    }
+
+    function updateActionButtons() {
+        /* Les actions principales sont maintenant dans chaque ligne du tableau. */
+    }
+
+    function selectUser(name, row, opts={}) {
+        selectedUser = users.find(u => u.name === name) || null;
+        const selectedRow = row || getUserRows().find(r => r.dataset.user === name);
+
+        document.querySelectorAll('.lu-row').forEach(r => {
+            r.classList.remove('selected', 'kbd-selected');
+            r.setAttribute('aria-selected', 'false');
+        });
+
+        if (selectedRow) {
+            selectedRow.classList.add('selected', 'kbd-selected');
+            selectedRow.setAttribute('aria-selected', 'true');
+            if (!opts.keepFocus && typeof selectedRow.focus === 'function') {
+                selectedRow.focus({preventScroll:true});
+            }
+            if (!opts.keepFocus && !opts.noScroll) {
+                selectedRow.scrollIntoView({block:'nearest'});
+            }
+        }
+
+        updateActionButtons();
+
+        if (selectedUser && !opts.silent) {
+            let prot = selectedUser.protected ? ' — utilisateur protégé' : '';
+            setStatus(`Sélection : ${selectedUser.name} UID=${selectedUser.uid} GID=${selectedUser.gid}${prot}`);
+        }
+
+    }
+
+    function openSshForUser(name) {
+        const u = users.find(item => item.name === name);
+        if (!u) { setStatus('Utilisateur introuvable.', true); return; }
+        if (u.protected) { setStatus('Utilisateur protégé.', true); return; }
+
+        const row = getUserRows().find(r => r.dataset.user === name);
+        if (row) selectUser(name, row, {silent:true, keepFocus:true});
+
+        const url = new URL(SSH_URL, window.location.origin);
+        url.searchParams.set('user', name);
+        url.searchParams.set('popup', '1');
+
+        const modal = document.getElementById('ssh-popup-modal');
+        const frame = document.getElementById('ssh-popup-frame');
+        const title = document.getElementById('ssh-popup-title');
+        if (!modal || !frame) {
+            window.location.href = url.toString();
+            return;
+        }
+
+        if (title) title.textContent = `🔐 Générateur de clé SSH — ${name}`;
+        frame.style.height = '146px';
+        frame.src = url.toString();
+        modal.style.display = 'flex';
+    }
+
+    function closeSshPopup() {
+        const modal = document.getElementById('ssh-popup-modal');
+        const frame = document.getElementById('ssh-popup-frame');
+        if (modal) modal.style.display = 'none';
+        if (frame) frame.src = 'about:blank';
+    }
+
+
+    window.addEventListener('message', (event) => {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data || {};
+        if (data.type === 'yoleo:ssh-close') {
+            closeSshPopup();
+            return;
+        }
+        if (data.type === 'yoleo:ssh-generated') {
+            closeSshPopup();
+            setStatus(data.message || 'Clé SSH générée.');
+        }
+    });
+
+    function updateP12AlgoHint() {
+        const select = document.getElementById('p12-key-size');
+        const hint = document.getElementById('p12-algoHint');
+
+        if (!select || !hint) return;
+
+        const texts = {
+            '2048': 'RSA 2048 maximise la compatibilité mais est un peu moins costaud.',
+            '3072': 'RSA 3072 est un bon compromis sécurité / compatibilité.',
+            '4096': 'RSA 4096 est plus lourd à générer et pas forcément utile partout.',
+            'ed25519': 'Ed25519 est moderne et léger, mais vérifie la compatibilité côté client.'
+        };
+
+        hint.textContent = texts[select.value] || texts['3072'];
+    }
+
+    function p12OutputValue() {
+        const input = document.getElementById('p12-output-dir');
+        return input ? input.value.trim() : '';
+    }
+
+    function updateP12Summary(outputDir, outputDirResolved, configFile) {
+        const rawEl = document.getElementById('p12-summary-output');
+        const realEl = document.getElementById('p12-summary-output-resolved');
+        const confEl = document.getElementById('p12-summary-conf');
+
+        if (rawEl && outputDir !== undefined) rawEl.textContent = outputDir || '—';
+        if (realEl && outputDirResolved !== undefined) realEl.textContent = outputDirResolved || '—';
+        if (confEl && configFile) confEl.textContent = configFile;
+    }
+
+    function updateP12OutputState() {
+        const value = p12OutputValue();
+        const state = document.getElementById('p12-output-state');
+        const btn = document.getElementById('p12-generate-btn');
+
+        if (btn) {
+            btn.disabled = !allowActions || !value;
+            btn.title = value ? '' : 'Choisis d’abord un dossier de sortie P12.';
+        }
+
+        if (!state) return;
+
+        state.classList.remove('ok', 'error');
+        if (!value) {
+            state.classList.add('error');
+            state.textContent = 'Dossier de sortie obligatoire : génération P12 bloquée.';
+        } else {
+            state.classList.add('ok');
+            state.textContent = `Dossier sélectionné : ${value}`;
+        }
+
+        updateP12Summary(value, undefined, undefined);
+    }
+
+    async function saveP12OutputDir(value) {
+        const outputDir = String(value || '').trim();
+
+        if (!outputDir) {
+            updateP12OutputState();
+            return false;
+        }
+
+        try {
+            const r = await fetch('/api/users/p12/output', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({p12_output_dir: outputDir})
+            });
+            const d = await r.json();
+
+            if (d.error) {
+                showResult('p12-result', d.error, true);
+                return false;
+            }
+
+            updateP12Summary(d.output_dir, d.output_dir_resolved, d.config_file);
+            updateP12OutputState();
+            return true;
+        } catch (e) {
+            showResult('p12-result', 'Erreur pendant l’enregistrement du dossier P12.', true);
+            return false;
+        }
+    }
+
+    function closeP12Browser() {}
+
+    function openP12Browser() {
+        const start = p12OutputValue() || initialP12OutputDirResolved || '/';
+        const params = new URLSearchParams({target: 'p12-output-dir', path: start});
+        const browserUrl = '/browser/folder?' + params.toString();
+        const popup = window.open(
+            browserUrl,
+            'yoleo_browser_p12_output_dir',
+            'width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+        );
+        if (popup) popup.focus();
+    }
+
+    window.addEventListener('message', async function(event) {
+        const data = event.data || {};
+        if (data.type !== 'yoleo-browser-select' || data.mode !== 'folder' || data.target !== 'p12-output-dir') return;
+        const input = document.getElementById('p12-output-dir');
+        if (!input) return;
+        input.value = data.path || '';
+        input.dispatchEvent(new Event('input', {bubbles:true}));
+        input.dispatchEvent(new Event('change', {bubbles:true}));
+        updateP12OutputState();
+        await saveP12OutputDir(data.path || '');
+    });
+
+    async function generateP12() {
+        const payload = {
+            p12_name: document.getElementById('p12-name').value.trim(),
+            p12_url: document.getElementById('p12-url').value.trim(),
+            p12_pwd: document.getElementById('p12-pwd').value,
+            key_size: document.getElementById('p12-key-size').value,
+            p12_output_dir: p12OutputValue()
+        };
+
+        if (!payload.p12_output_dir) {
+            updateP12OutputState();
+            showResult('p12-result', 'Choisis d’abord un dossier de sortie P12.', true);
+            return;
+        }
+
+        if (!payload.p12_name || !payload.p12_url) {
+            showResult('p12-result', 'Nom du fichier et domaine / CN obligatoires.', true);
+            return;
+        }
+
+        showResult('p12-result', 'Génération P12 en cours...');
+        try {
+            const r = await fetch('/api/users/p12/generate', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const d = await r.json();
+
+            if (d.error) {
+                showResult('p12-result', d.error, true);
+                return;
+            }
+
+            updateP12Summary(d.output_dir, d.output_dir_resolved, d.config_file);
+
+            showResult('p12-result',
+                `✅ ${d.message}\n\nDossier : ${d.output_dir_resolved}\nP12 : ${d.p12_path}\nP12 compatible : ${d.p12_compat_path}\nCertificat : ${d.cert_path}\nClé : ${d.key_path}`
+            );
+        } catch (e) {
+            showResult('p12-result', 'Erreur pendant la génération P12.', true);
+        }
+    }
+
+    function getUserRows() {
+        return Array.from(document.querySelectorAll('#users-body .lu-row'));
+    }
+
+    function selectedRowIndex() {
+        const rows = getUserRows();
+        const name = selectedUser ? selectedUser.name : null;
+        let index = rows.findIndex(r => r.dataset.user === name);
+        if (index < 0) index = rows.findIndex(r => r.classList.contains('selected'));
+        return index;
+    }
+
+    function selectUserByIndex(index, opts={}) {
+        const rows = getUserRows();
+        if (!rows.length) return;
+
+        const clamped = Math.max(0, Math.min(index, rows.length - 1));
+        const row = rows[clamped];
+        selectUser(row.dataset.user, row, opts);
+    }
+
+    function toolbarButtons() {
+        return Array.from(document.querySelectorAll('.lu-toolbar .btn-lu')).filter(btn => !btn.disabled && btn.offsetParent !== null);
+    }
+
+    function clearToolbarFocusClass() {
+        document.querySelectorAll('.lu-toolbar .btn-lu').forEach(btn => btn.classList.remove('kbd-focus'));
+    }
+
+    function defaultActionIndex() {
+        const buttons = toolbarButtons();
+        if (!buttons.length) return -1;
+
+        if (selectedUser) {
+            const userAction = buttons.findIndex(btn => /UID\/GID|Shell|Mot de passe|Lock|Unlock|Supprimer/.test(btn.textContent || ''));
+            if (userAction >= 0) return userAction;
+        }
+
+        return 0;
+    }
+
+    function focusToolbarButton(index) {
+        const buttons = toolbarButtons();
+        if (!buttons.length) return;
+
+        const clamped = Math.max(0, Math.min(index, buttons.length - 1));
+        selectedActionIndex = clamped;
+        clearToolbarFocusClass();
+
+        const btn = buttons[clamped];
+        btn.classList.add('kbd-focus');
+        btn.focus({preventScroll:true});
+    }
+
+    function isModalOpen() {
+        const modal = document.getElementById('lu-modal');
+        return !!(modal && modal.style.display && modal.style.display !== 'none');
+    }
+
+    function isTypingTarget(target) {
+        if (!target) return false;
+        const tag = String(target.tagName || '').toLowerCase();
+        return target.isContentEditable || ['input', 'textarea', 'select'].includes(tag);
+    }
+
+    function handleUserKeyboard(e) {
+        if (e.key === 'Escape' && typeof window.yoleoClosePageContextMenu === 'function') {
+            window.yoleoClosePageContextMenu();
+        }
+
+        if (isModalOpen()) {
+            if (e.key === 'Escape') {
+                closeModal();
+                closeP12Browser();
+            }
+            return;
+        }
+
+        if (e.key === 'F5' && ACTIVE_USER_SECTION === 'general') {
+            e.preventDefault();
+            loadUsers();
+            return;
+        }
+
+        if (ACTIVE_USER_SECTION !== 'general') return;
+
+        const handledKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '];
+        if (!handledKeys.includes(e.key)) return;
+        if (isTypingTarget(e.target)) return;
+
+        const rows = getUserRows();
+        if (!rows.length) return;
+
+        let index = selectedRowIndex();
+        if (index < 0) index = 0;
+
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectUserByIndex(index - 1);
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectUserByIndex(index + 1);
+            return;
+        }
+
+        if (e.key === 'Home') {
+            e.preventDefault();
+            selectUserByIndex(0);
+            return;
+        }
+
+        if (e.key === 'End') {
+            e.preventDefault();
+            selectUserByIndex(rows.length - 1);
+            return;
+        }
+
+        if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            const start = selectedActionIndex >= 0 ? selectedActionIndex + 1 : defaultActionIndex();
+            focusToolbarButton(start);
+            return;
+        }
+
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const buttons = toolbarButtons();
+            const start = selectedActionIndex >= 0 ? selectedActionIndex - 1 : defaultActionIndex();
+            focusToolbarButton(Math.max(0, Math.min(start, buttons.length - 1)));
+            return;
+        }
+
+        if (e.key === 'Enter' || e.key === ' ') {
+            const active = document.activeElement;
+            const focusedToolbarButton = active && active.classList && active.classList.contains('btn-lu') && active.closest('.lu-toolbar');
+
+            if (focusedToolbarButton) {
+                e.preventDefault();
+                active.click();
+                return;
+            }
+
+            if (selectedUser) {
+                e.preventDefault();
+                const idx = selectedActionIndex >= 0 ? selectedActionIndex : defaultActionIndex();
+                focusToolbarButton(idx);
+                const btn = toolbarButtons()[selectedActionIndex];
+                if (btn) btn.click();
+            }
+        }
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('lu-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function showModal(title, html, onOk, danger=false, modalClass='') {
+        const modal = document.getElementById('lu-modal');
+        const box = modal ? modal.querySelector('.modal-box') : null;
+        if (box) {
+            box.className = 'modal-box lu-user-modal-box' + (modalClass ? ` ${modalClass}` : '') + (danger ? ' lu-modal-danger' : '');
+        }
+
+        document.getElementById('lu-modal-title').innerText = title;
+        document.getElementById('lu-modal-body').innerHTML = html;
+
+        const ok = document.getElementById('lu-modal-ok');
+        ok.innerText = danger ? 'SUPPRIMER' : 'Valider';
+        ok.style.background = danger ? '#883333' : '#1AEBFF';
+        ok.style.borderColor = danger ? '#883333' : '#1AEBFF';
+        ok.style.color = danger ? '#fff' : '#000';
+
+        ok.onclick = async () => {
+            const keepOpen = await onOk();
+            if (keepOpen !== true) closeModal();
+        };
+
+        if (modal) modal.style.display = 'flex';
+
+        const body = document.getElementById('lu-modal-body');
+        if (body) {
+            body.onkeydown = (event) => {
+                if (event.key !== 'Enter') return;
+                if (event.target && String(event.target.tagName || '').toLowerCase() === 'textarea') return;
+                event.preventDefault();
+                ok.click();
+            };
+        }
+
+        setTimeout(() => {
+            const input = document.querySelector('#lu-modal-body input, #lu-modal-body select, #lu-modal-body button');
+            if (input) input.focus();
+        }, 100);
+    }
+
+    async function postAction(payload) {
+        if (!allowActions) {
+            setStatus('Actions désactivées dans la configuration.', true);
+            return false;
+        }
+
+        setStatus('Action en cours...');
+        try {
+            const r = await fetch('/api/users/action', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const d = await r.json();
+
+            if (d.error) {
+                setStatus(d.error, true);
+                return false;
+            }
+
+            if (d.warning) {
+                setStatus(d.warning);
+            } else if (d.message) {
+                setStatus(d.message);
+            } else {
+                setStatus('Action terminée.');
+            }
+
+            await loadUsers({quiet:true});
+            return true;
+        } catch (e) {
+            setStatus('Erreur pendant l’action.', true);
+            return false;
+        }
+    }
+
+    async function backupUsers() {
+        return await postAction({action:'backup_users'});
+    }
+
+    function restoreUsers() {
+        showModal('Restaurer les utilisateurs', `
+            <div class="warn-box">
+                Cette action lit <b>users_backup.conf</b>, cree les comptes manquants
+                et remet UID, GID et shell pour les comptes existants.
+            </div>
+            <div class="muted">
+                Aucun mot de passe n'est restaure : les nouveaux comptes seront crees sans mot de passe.
+            </div>
+        `, async () => {
+            return !(await postAction({action:'restore_users'}));
+        }, false, 'lu-modal-restore-users');
+    }
+
+    function openAdd() {
+        showModal('Ajouter un utilisateur Linux', `
+            <div class="lu-modal-grid lu-modal-grid-3">
+                <div>
+                    <label class="lbl-lu">Nom utilisateur :</label>
+                    <input id="new-user" class="text-input inp-lu" placeholder="ex: antony">
+                </div>
+                <div>
+                    <label class="lbl-lu">UID :</label>
+                    <input id="new-uid" class="text-input inp-lu" inputmode="numeric" size="6" placeholder="auto">
+                </div>
+                <div>
+                    <label class="lbl-lu">GID :</label>
+                    <input id="new-gid" class="text-input inp-lu" inputmode="numeric" size="6" placeholder="auto">
+                </div>
+            </div>
+
+            <div class="lu-modal-grid lu-modal-grid-2">
+                <div>
+                    <label class="lbl-lu">Mot de passe :</label>
+                    <input id="new-pass" class="text-input inp-lu" type="password" placeholder="vide = aucun mot de passe">
+                </div>
+                <div>
+                    <label class="lbl-lu">Shell :</label>
+                    <select id="new-shell" class="select-input sel-lu">
+                        ${shellOptions()}
+                    </select>
+                </div>
+            </div>
+        `, async () => {
+            const user = document.getElementById('new-user').value.trim();
+            const uid = document.getElementById('new-uid').value.trim();
+            const gid = document.getElementById('new-gid').value.trim();
+            const password = document.getElementById('new-pass').value;
+            const shell = document.getElementById('new-shell').value;
+
+            if (!user) {
+                setStatus('Nom utilisateur vide.', true);
+                return true;
+            }
+
+            return !(await postAction({action:'add', user, uid, gid, password, shell}));
+        }, false, 'lu-modal-add');
+    }
+
+    function requireSelected() {
+        if (!selectedUser) {
+            setStatus('Sélectionne un utilisateur.', true);
+            return null;
+        }
+        return selectedUser;
+    }
+
+    function openIds() {
+        const u = requireSelected();
+        if (!u) return;
+
+        if (u.protected) {
+            setStatus('Utilisateur protégé.', true);
+            return;
+        }
+
+        showModal(`Changer UID/GID : ${u.name}`, `
+            <div class="lu-modal-grid lu-modal-grid-2 lu-modal-grid-short">
+                <div>
+                    <label class="lbl-lu">UID :</label>
+                    <input id="edit-uid" class="text-input inp-lu" inputmode="numeric" size="6" value="${escapeHtml(u.uid)}">
+                </div>
+                <div>
+                    <label class="lbl-lu">GID :</label>
+                    <input id="edit-gid" class="text-input inp-lu" inputmode="numeric" size="6" value="${escapeHtml(u.gid)}">
+                </div>
+            </div>
+
+            <div class="warn-box">
+                Ça change l'identité Linux du compte dans passwd/group.
+                Ça ne corrige pas automatiquement les propriétaires des fichiers déjà existants.
+            </div>
+        `, async () => {
+            const uid = document.getElementById('edit-uid').value.trim();
+            const gid = document.getElementById('edit-gid').value.trim();
+
+            if (!uid && !gid) {
+                setStatus('UID/GID vides.', true);
+                return true;
+            }
+
+            return !(await postAction({action:'setids', user:u.name, uid, gid}));
+        }, false, 'lu-modal-ids');
+    }
+
+    function openPass() {
+        const u = requireSelected();
+        if (!u) return;
+
+        showModal(`Changer le mot de passe : ${u.name}`, `
+            <div class="lu-modal-grid lu-modal-grid-1 lu-modal-grid-pass">
+                <div>
+                    <label class="lbl-lu" for="set-pass">Nouveau mot de passe Linux :</label>
+                    <input id="set-pass" class="text-input inp-lu" type="password" autocomplete="new-password">
+                </div>
+                <div>
+                    <label class="lbl-lu" for="set-pass-confirm">Confirmation :</label>
+                    <input id="set-pass-confirm" class="text-input inp-lu" type="password" autocomplete="new-password">
+                </div>
+                <div id="set-pass-feedback" class="hint">Tape deux fois le même mot de passe puis valide.</div>
+            </div>
+        `, async () => {
+            const passInput = document.getElementById('set-pass');
+            const confirmInput = document.getElementById('set-pass-confirm');
+            const feedback = document.getElementById('set-pass-feedback');
+            const password = passInput ? passInput.value : '';
+            const confirmPassword = confirmInput ? confirmInput.value : '';
+
+            const showPassError = (message, focusEl=null) => {
+                if (feedback) feedback.textContent = message;
+                setStatus(message, true);
+                if (focusEl && typeof focusEl.focus === 'function') focusEl.focus();
+                return true;
+            };
+
+            if (!password) {
+                return showPassError('Mot de passe vide.', passInput);
+            }
+
+            if (password !== confirmPassword) {
+                return showPassError('Les deux mots de passe ne correspondent pas.', confirmInput);
+            }
+
+            return !(await postAction({action:'setpass', user:u.name, password}));
+        }, false, 'lu-modal-pass');
+
+        const passInput = document.getElementById('set-pass');
+        const confirmInput = document.getElementById('set-pass-confirm');
+        if (passInput && confirmInput) {
+            passInput.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                event.stopPropagation();
+                confirmInput.focus();
+            });
+        }
+    }
+
+    function openShell() {
+        const u = requireSelected();
+        if (!u) return;
+
+        if (u.protected) {
+            setStatus('Utilisateur protege.', true);
+            return;
+        }
+
+        showModal(`Changer le shell : ${u.name}`, `
+            <div class="lu-modal-grid lu-modal-grid-1 lu-modal-grid-shell">
+                <div>
+                    <label class="lbl-lu" for="edit-shell">Shell utilisateur :</label>
+                    <select id="edit-shell" class="select-input sel-lu">
+                        ${shellOptions(u.shell)}
+                    </select>
+                    <div class="hint">Shell actuel : <code>${escapeHtml(u.shell || '-')}</code></div>
+                </div>
+            </div>
+        `, async () => {
+            const shell = document.getElementById('edit-shell').value;
+            if (!shell) {
+                setStatus('Shell vide.', true);
+                return true;
+            }
+
+            return !(await postAction({action:'setshell', user:u.name, shell}));
+        }, false, 'lu-modal-shell');
+    }
+
+    function openHome() {
+        const u = requireSelected();
+        if (!u) return;
+
+        if (u.protected) {
+            setStatus('Utilisateur protégé.', true);
+            return;
+        }
+
+        const suggestedHome = (u.home && u.home !== '/') ? u.home : `/home/${u.name}`;
+        showModal(`Changer le home : ${u.name}`, `
+            <div class="lu-modal-grid lu-modal-grid-1 lu-modal-grid-shell">
+                <div>
+                    <label class="lbl-lu" for="edit-home">Dossier home utilisateur :</label>
+                    <input id="edit-home" class="text-input inp-lu" value="${escapeHtml(suggestedHome)}" placeholder="/home/${escapeHtml(u.name)}">
+                    <div class="hint">Home actuel : <code>${escapeHtml(u.home || '-')}</code></div>
+                </div>
+            </div>
+            <div class="warn-box">
+                Cette action modifie le champ HOME Linux avec <code>usermod -d</code>.
+                Elle ne déplace pas les fichiers et ne crée pas le dossier automatiquement.
+            </div>
+        `, async () => {
+            const home = document.getElementById('edit-home').value.trim();
+            if (!home) { setStatus('Dossier home vide.', true); return true; }
+            if (!home.startsWith('/')) { setStatus('Le home doit commencer par /', true); return true; }
+            return !(await postAction({action:'sethome', user:u.name, home}));
+        }, false, 'lu-modal-home');
+    }
+
+    function findUserAndSelect(name) {
+        const u = name ? users.find(item => item.name === name) : selectedUser;
+        if (!u) return null;
+
+        const row = getUserRows().find(r => r.dataset.user === u.name);
+        if (row) selectUser(u.name, row, {silent:true, keepFocus:true});
+        return u;
+    }
+
+    async function toggleLockUser(name=null) {
+        const u = findUserAndSelect(name);
+        if (!u) return setStatus('Utilisateur introuvable.', true);
+        if (u.protected) return setStatus('Utilisateur protégé.', true);
+
+        const action = isUserLocked(u) ? 'unlock' : 'lock';
+        await postAction({action, user:u.name});
+    }
+
+    async function lockUser(name=null) {
+        const u = findUserAndSelect(name) || requireSelected();
+        if (!u) return;
+        if (u.protected) return setStatus('Utilisateur protégé.', true);
+        await postAction({action:'lock', user:u.name});
+    }
+
+    async function unlockUser(name=null) {
+        const u = findUserAndSelect(name) || requireSelected();
+        if (!u) return;
+        if (u.protected) return setStatus('Utilisateur protégé.', true);
+        await postAction({action:'unlock', user:u.name});
+    }
+
+    function removeUser(name=null) {
+        const u = findUserAndSelect(name) || requireSelected();
+        if (!u) return;
+
+        if (u.protected) {
+            setStatus('Utilisateur protégé.', true);
+            return;
+        }
+
+        showModal(`Supprimer : ${u.name}`, `
+            <div>Supprimer uniquement l’entrée utilisateur Linux :</div>
+            <div class="danger-box">
+                <b>${escapeHtml(u.name)}</b><br>
+                UID=${escapeHtml(u.uid)} GID=${escapeHtml(u.gid)}<br>
+                Home conservé : ${escapeHtml(u.home)}
+            </div>
+            <p class="muted">Le dossier home ne sera pas supprimé.</p>
+        `, async () => {
+            return !(await postAction({action:'remove', user:u.name}));
+        }, true, 'lu-modal-remove');
+    }
+
+
+    document.addEventListener('contextmenu', function(event) {
+        if (ACTIVE_USER_SECTION !== 'general') return;
+        const row = event.target && event.target.closest ? event.target.closest('.lu-row') : null;
+        if (!row) return;
+        const user = findUserAndSelect(row.dataset.user);
+        if (user) selectedUser = user;
+    }, true);
+    function modalIsOpen() {
+        const modal = document.getElementById('lu-modal');
+        return !!(modal && getComputedStyle(modal).display !== 'none');
+    }
+
+    function startUsersAutoRefresh() {
+        if (ACTIVE_USER_SECTION === 'p12') return;
+        setInterval(() => {
+            if (modalIsOpen()) return;
+            loadUsers({quiet:true});
+        }, 10000);
+    }
+
+    document.addEventListener('keydown', handleUserKeyboard);
+
+    document.addEventListener('focusin', function(e) {
+        const btn = e.target && e.target.closest ? e.target.closest('.lu-toolbar .btn-lu') : null;
+        if (!btn) return;
+
+        const buttons = toolbarButtons();
+        selectedActionIndex = buttons.indexOf(btn);
+        clearToolbarFocusClass();
+        btn.classList.add('kbd-focus');
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest || !e.target.closest('.lu-toolbar .btn-lu')) {
+            clearToolbarFocusClass();
+            if (!e.target.closest('.lu-row')) selectedActionIndex = -1;
+        }
+    });
+
+    const p12KeySelect = document.getElementById('p12-key-size');
+    if (p12KeySelect) {
+        p12KeySelect.addEventListener('change', updateP12AlgoHint);
+        updateP12AlgoHint();
+    }
+
+    const p12OutputInput = document.getElementById('p12-output-dir');
+    if (p12OutputInput) {
+        p12OutputInput.addEventListener('input', updateP12OutputState);
+        p12OutputInput.addEventListener('blur', () => updateP12OutputState());
+        updateP12OutputState();
+    }
+
+
+    if (ACTIVE_USER_SECTION === 'general') {
+        loadUsers();
+        startUsersAutoRefresh();
+    }
+</script>
+{% endblock %}

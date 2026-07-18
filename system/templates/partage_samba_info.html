@@ -1,0 +1,26 @@
+{% extends "partage_samba_base.html" %}
+
+{% block samba_content %}
+<div id="tab-samba-info" class="tab-panel active">
+                <section class="card">
+                    <div class="topbar">
+                        <div class="title-block">
+                            <h1>Info Samba</h1>
+                            <div class="subtitle">Édite <b>samba.conf</b>, génère <b>/etc/samba/smb.conf</b>, crée les users SMB et pilote les vrais services Linux : smbd, nmbd, wsdd/wsdd2.</div>
+                        </div>
+                    </div>
+
+                    <div class="partage-samba-info-note-v4">
+                        <div class="partage-samba-info-title-v4">Partage Samba</div>
+                        <div class="partage-samba-info-text-v4"><b>normal</b> garde les permissions Linux ; <b>root</b> force root + masques 0777. La corbeille Samba est optionnelle ; si activée, elle reconstruit toujours l’arborescence.</div>
+                    </div>
+
+                    <div class="form-grid partage-info-fields-v4">
+                        <div class="field"><label>source samba.conf</label><span class="path-pill" title="{{ state.samba.conf_path }}"><span>{{ state.samba.conf_path }}</span></span></div>
+                        <div class="field"><label>smb.conf cible</label><span class="path-pill" title="{{ sg.smb_conf }}"><span>{{ sg.smb_conf }}</span></span></div>
+                        <div class="field"><label>interface détectée</label><span class="path-pill" title="{{ sg.interface }}"><span>{{ sg.interface or 'auto' }}</span></span></div>
+                        <div class="field"><label>log file</label><span class="path-pill" title="{{ sg.log_file }}"><span>{{ sg.log_file }}</span></span></div>
+                    </div>
+                </section>
+            </div>
+{% endblock %}

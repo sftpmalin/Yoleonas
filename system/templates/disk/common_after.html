@@ -1,0 +1,859 @@
+</main>
+
+<div class="modal-backdrop" id="mount-modal">
+    <div class="modal mount-modal-compact">
+        <div class="modal-head"><div class="modal-title">Monter une partition</div><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('mount-modal')">✕</button></div>
+        <div class="modal-body mount-modal-body">
+            <div class="mount-modal-row mount-modal-row-target">
+                <div class="form-row mount-target-row"><label>Périphérique</label><input id="mount-target" readonly></div>
+                <div class="form-row mount-path-row"><label>Chemin de montage</label><input id="mount-path" placeholder="/mnt/coco"></div>
+            </div>
+            <div class="actions-line mount-shortcuts"><button class="yoleo-btn yoleo-btn-small" onclick="openBrowserFor('mount-path','mount-browser-box','mount-browser-current','mount-browser-list')">📁 Parcourir</button><button class="yoleo-btn yoleo-btn-small" onclick="setPathAndBrowse('mount-path','/mnt','mount-browser-box','mount-browser-current','mount-browser-list')">/mnt</button><button class="yoleo-btn yoleo-btn-small" onclick="setPathAndBrowse('mount-path','/media','mount-browser-box','mount-browser-current','mount-browser-list')">/media</button><button class="yoleo-btn yoleo-btn-small" onclick="setPathAndBrowse('mount-path','/srv','mount-browser-box','mount-browser-current','mount-browser-list')">/srv</button></div>
+            <div class="mount-modal-row mount-modal-row-options">
+                <div class="form-row mount-fstype-row"><label>Filesystem</label><select id="mount-fstype"><option value="auto">auto</option><option value="xfs">xfs</option><option value="ext4">ext4</option><option value="btrfs">btrfs</option><option value="exfat">exfat</option><option value="ntfs">ntfs</option><option value="vfat">vfat/fat32</option></select></div>
+                <div class="form-row mount-options-row"><label>Options</label><input id="mount-options" value="defaults,nofail,noatime"></div>
+            </div>
+            <div class="mount-modal-checks">
+                <label class="check-row"><input type="checkbox" id="mount-create-dir" checked> Créer le dossier s'il n'existe pas</label>
+                <label class="check-row"><input type="checkbox" id="mount-add-fstab"> Ajouter au démarrage automatique dans /etc/fstab</label>
+            </div>
+        </div>
+        <div class="modal-actions"><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('mount-modal')">Annuler</button><button class="yoleo-btn yoleo-btn-small yoleo-btn-green" onclick="submitMount()">OK monter</button></div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="unmount-modal">
+    <div class="modal unmount-modal-compact">
+        <div class="modal-head"><div class="modal-title">Démonter une partition</div><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('unmount-modal')">✕</button></div>
+        <div class="modal-body unmount-modal-body">
+            <div class="maintenance-note unmount-note">Par défaut, le démontage est temporaire : au redémarrage, Linux remontera ce qui existe encore dans <b>/etc/fstab</b>.</div>
+            <div class="unmount-modal-row unmount-modal-row-main">
+                <div class="form-row unmount-target-row"><label>Périphérique</label><input id="unmount-target" readonly></div>
+                <label class="check-row unmount-check-row"><input type="checkbox" id="unmount-remove-fstab"> Supprimer l'entrée /etc/fstab</label>
+            </div>
+            <div class="unmount-modal-row unmount-modal-row-bottom">
+                <label class="check-row unmount-check-row"><input type="checkbox" id="unmount-remove-dir"> Supprimer le dossier vide du point de montage</label>
+                <div class="unmount-hints">
+                    <div class="hint">Dossier supprimé seulement s'il est vide, démonté, dans une racine autorisée, et jamais sous /mnt/user ou /mnt/user0.</div>
+                    <div class="hint">Coche /etc/fstab seulement si le disque doit rester démonté après reboot.</div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions"><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('unmount-modal')">Annuler</button><button class="yoleo-btn yoleo-btn-small yoleo-btn-red" onclick="submitUnmount()">OK démonter</button></div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="format-modal">
+    <div class="modal format-modal-compact">
+        <div class="modal-head"><div class="modal-title">Formater une partition</div><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('format-modal')">✕</button></div>
+        <div class="modal-body format-modal-body">
+            <div class="maintenance-note">Attention : le formatage efface les données du périphérique sélectionné.</div>
+            <div class="format-modal-row format-modal-row-top">
+                <div class="form-row format-target-row"><label>Périphérique</label><input id="format-target" readonly></div>
+                <div class="form-row format-fstype-row"><label>Format</label><select id="format-fstype"><option value="xfs">xfs</option><option value="ext4">ext4</option><option value="btrfs">btrfs</option><option value="exfat">exfat</option><option value="ntfs">ntfs</option><option value="vfat">vfat/fat32</option></select></div>
+            </div>
+            <div class="format-modal-row format-modal-row-bottom">
+                <div class="form-row format-label-row"><label>Label</label><input id="format-label" placeholder="disk1"></div>
+                <label class="check-row format-quick-row"><input type="checkbox" id="format-quick" checked> Formatage quick quand le format le permet</label>
+            </div>
+        </div>
+        <div class="modal-actions"><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('format-modal')">Annuler</button><button class="yoleo-btn yoleo-btn-small yoleo-btn-red" onclick="submitFormat()">OK formater</button></div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="label-modal">
+    <div class="modal label-modal-compact">
+        <div class="modal-head"><div class="modal-title">Modifier le label du volume</div><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('label-modal')">✕</button></div>
+        <div class="modal-body label-modal-body">
+            <div class="maintenance-note">Par sécurité, le changement de label est autorisé uniquement quand le volume est démonté.</div>
+            <div class="label-modal-grid">
+                <div class="form-row label-target-row"><label>Périphérique</label><input id="label-target" readonly></div>
+                <div class="form-row label-fstype-row"><label>Filesystem</label><input id="label-fstype" readonly></div>
+            </div>
+            <div class="label-modal-grid">
+                <div class="form-row"><label>Label actuel</label><input id="label-current" readonly></div>
+                <div class="form-row"><label>Nouveau label</label><input id="label-new" placeholder="cache, disk1, archive..."></div>
+            </div>
+            <div class="hint">Limites usuelles : XFS 12 caractères, ext4 16, FAT 11. Utilise un nom simple : lettres, chiffres, tiret, underscore.</div>
+        </div>
+        <div class="modal-actions"><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('label-modal')">Annuler</button><button class="yoleo-btn yoleo-btn-small yoleo-btn-green" onclick="submitLabel()">OK modifier</button></div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="mergerfs-modal">
+    <div class="modal wide">
+        <div class="modal-head mergerfs-modal-head">
+            <div class="mergerfs-modal-title-line">
+                <div class="modal-title" id="mergerfs-modal-title">Ajouter un dossier MergerFS à une ligne</div>
+                <div class="maintenance-note mergerfs-modal-note-inline" id="mergerfs-modal-note">Ajoute une ou plusieurs sources, puis une destination. La ligne est écrite dans /etc/fstab et montée à chaud.</div>
+            </div>
+            <button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('mergerfs-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="mergerfs-old-target" value="">
+            <div class="form-row mergerfs-sources-row"><label>Sources</label><div class="mergerfs-sources-zone"><div id="mergerfs-branches"></div><button type="button" class="yoleo-btn yoleo-btn-small mergerfs-add-source-btn" onclick="addMergerfsBranch()">➕ Ajouter une source</button></div></div>
+            <div class="form-row mergerfs-target-row"><label for="mergerfs-target">Destination</label><input id="mergerfs-target" placeholder="/mnt/user"><button class="yoleo-btn yoleo-btn-small" onclick="openBrowserFor('mergerfs-target','mergerfs-browser-box','mergerfs-browser-current','mergerfs-browser-list')">📁 Parcourir</button><button class="yoleo-btn yoleo-btn-small" onclick="setPathAndBrowse('mergerfs-target','/mnt','mergerfs-browser-box','mergerfs-browser-current','mergerfs-browser-list')">/mnt</button></div>
+            <div class="form-row">
+                <label>Options mergerfs</label>
+                <div class="mergerfs-options-panel">
+                    <div class="mergerfs-options-head">
+                        <div>
+                            <div class="mergerfs-options-title">Options simples</div>
+                            <div class="mergerfs-options-subtitle">Les cases remplissent automatiquement le champ avancé. Les choix incompatibles se décochent tout seuls.</div>
+                        </div>
+                        <div class="mergerfs-options-actions">
+                            <button type="button" class="yoleo-btn yoleo-btn-small" onclick="setMergerfsOptionPreset('unraid')">Profil Unraid-like</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-small" onclick="setMergerfsOptionPreset('safe')">Profil prudent</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-muted yoleo-btn-mini" onclick="syncMergerfsChecksFromInput()">Relire le champ</button>
+                        </div>
+                    </div>
+                    <details class="mergerfs-options-details">
+                        <summary>Options rapides</summary>
+                    <div class="mergerfs-options-grid">
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="defaults" checked><span><span class="mergerfs-option-main">Options Linux standards</span><span class="mergerfs-option-help">Base classique du montage fstab.</span><span class="mergerfs-option-token">defaults</span></span></label>
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="allow_other" checked><span><span class="mergerfs-option-main">Autoriser les autres utilisateurs</span><span class="mergerfs-option-help">Utile pour Samba, Docker, services et comptes non-root.</span><span class="mergerfs-option-token">allow_other</span></span></label>
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="use_ino" checked><span><span class="mergerfs-option-main">Inodes stables</span><span class="mergerfs-option-help">Meilleur comportement avec Samba, caches et indexeurs.</span><span class="mergerfs-option-token">use_ino</span></span></label>
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="moveonenospc=true"><span><span class="mergerfs-option-main">Basculer si un disque est plein</span><span class="mergerfs-option-help">Si la branche choisie manque de place pendant l’écriture, mergerfs tente de basculer vers une autre branche.</span><span class="mergerfs-option-token">moveonenospc=true</span></span></label>
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="cache.files=partial" data-exclusive-group="cache" checked><span><span class="mergerfs-option-main">Cache fichiers partiel</span><span class="mergerfs-option-help">Cache le fichier mergerfs seulement pendant qu’il est ouvert : bon compromis pour Samba, Docker et médias.</span><span class="mergerfs-option-token">cache.files=partial</span></span></label>
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="cache.files=off" data-exclusive-group="cache"><span><span class="mergerfs-option-main">Désactiver le cache fichiers</span><span class="mergerfs-option-help">Désactive le cache côté mergerfs : moins de RAM/double cache, mais parfois moins compatible avec mmap.</span><span class="mergerfs-option-token">cache.files=off</span></span></label>
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="category.create=mfs" data-exclusive-group="create" checked><span><span class="mergerfs-option-main">Créer sur le disque le plus libre</span><span class="mergerfs-option-help">Répartit les nouveaux fichiers vers la source qui a le plus d’espace.</span><span class="mergerfs-option-token">category.create=mfs</span></span></label>
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="category.create=ff" data-exclusive-group="create"><span><span class="mergerfs-option-main">Créer sur la première source</span><span class="mergerfs-option-help">Priorité au périphérique numéro 1 dans la liste des sources.</span><span class="mergerfs-option-token">category.create=ff</span></span></label>
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="category.create=epmfs" data-exclusive-group="create"><span><span class="mergerfs-option-main">Chemin existant, sinon plus libre</span><span class="mergerfs-option-help">Garde la structure existante quand possible, sinon choisit le plus libre.</span><span class="mergerfs-option-token">category.create=epmfs</span></span></label>
+                        <label class="mergerfs-option-card"><input type="checkbox" class="mergerfs-option-check" data-option="dropcacheonclose=true"><span><span class="mergerfs-option-main">Libérer le cache à la fermeture</span><span class="mergerfs-option-help">Demande au noyau de libérer le cache quand le fichier se ferme : utile pour éviter le gonflement RAM.</span><span class="mergerfs-option-token">dropcacheonclose=true</span></span></label>
+                    </div>
+                    </details>
+                    <div class="mergerfs-options-advanced">
+                        <label for="mergerfs-options">Champ avancé / options réelles</label>
+                        <input id="mergerfs-options" value="defaults,use_ino,cache.files=partial,category.create=mfs,allow_other" oninput="syncMergerfsChecksFromInput()">
+                        <div class="hint">Tu peux ajouter à la main une option spéciale ici. Les options inconnues sont conservées quand tu coches/décoches.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="mergerfs-final-checks">
+                <label class="check-row"><input type="checkbox" id="mergerfs-create-target" checked> Créer le dossier destination s'il n'existe pas</label>
+                <label class="check-row"><input type="checkbox" id="mergerfs-mount-now" checked> Monter tout de suite après écriture fstab</label>
+            </div>
+        </div>
+        <div class="modal-actions"><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('mergerfs-modal')">Annuler</button><button class="yoleo-btn yoleo-btn-small yoleo-btn-green" id="mergerfs-submit-btn" onclick="submitMergerfsAdd()">Valider</button></div>
+    </div>
+</div>
+
+
+<div class="modal-backdrop" id="check-modal">
+    <div class="modal">
+        <div class="modal-head"><div class="modal-title">Vérifier un volume démonté</div><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('check-modal')">✕</button></div>
+        <div class="modal-body">
+            <div class="maintenance-note">La vérification est lancée dans une session <b>tmux</b> indépendante de Flask. Le suivi se fait dans le vrai terminal ttyd, pas dans un log Ajax Python.</div>
+            <div class="form-row"><label>Périphérique</label><input id="check-target" readonly></div>
+            <div class="form-row">
+                <label>Mode de vérification</label>
+                <select id="check-mode">
+                    <option value="fsck">Filesystem / fsck adapté au type de volume</option>
+                    <option value="surface">Surface lecture seule / badblocks -sv</option>
+                </select>
+            </div>
+            <div class="hint">Sécurité : le backend refuse la vérification si le volume est encore monté ou protégé système/boot.</div>
+        </div>
+        <div class="modal-actions"><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('check-modal')">Annuler</button><button class="yoleo-btn yoleo-btn-small yoleo-btn-orange" onclick="submitCheck()">Démarrer dans tmux</button></div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="check-terminal-modal">
+    <div class="modal terminal-modal">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title">Terminal vérification disque</div>
+                <div class="hint" id="check-terminal-session">Session tmux</div>
+            </div>
+            <div class="actions-line">
+                <a class="yoleo-btn yoleo-btn-small" id="check-terminal-link" href="#" target="_blank" rel="noopener" hidden>Ouvrir dans un onglet</a>
+                <button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('check-terminal-modal')">✕</button>
+            </div>
+        </div>
+        <iframe id="check-terminal-frame" class="terminal-frame" title="Terminal tmux vérification disque"></iframe>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="confirm-modal">
+    <div class="modal">
+        <div class="modal-head"><div class="modal-title" id="confirm-title">Confirmation</div><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="resolveConfirm(false)">✕</button></div>
+        <div class="modal-body"><div class="modal-danger-text" id="confirm-message">—</div></div>
+        <div class="modal-actions"><button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="resolveConfirm(false)" id="confirm-cancel">Annuler</button><button class="yoleo-btn yoleo-btn-small yoleo-btn-red" onclick="resolveConfirm(true)" id="confirm-ok">OK</button></div>
+    </div>
+</div>
+
+<pre class="output-box{% if disk_section == 'mergerfs' %} mergerfs-action-output-hidden{% endif %}" id="action-output"{% if disk_section == 'mergerfs' %} hidden aria-hidden="true"{% endif %}></pre>
+
+
+<script>
+
+const REFRESH_SECONDS = {{ refresh_seconds|int }};
+    let refreshTimer = null;
+    let activeTab = {{ initial_tab|default('general', true)|tojson }};
+    let actionBusy = false;
+    const pendingActions = {};
+    let confirmResolver = null;
+    let mergerfsSources = [];
+    let mergerfsEntries = [];
+    let selectedMergerfsTarget = '';
+
+    function $(id) { return document.getElementById(id); }
+    function esc(value) { return String(value ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+    function escNoWrap(value) { return esc(value).replace(/ /g, '&nbsp;'); }
+    function dotClass(statusClass) { if (statusClass === 'active') return 'dot-active'; if (statusClass === 'standby') return 'dot-standby'; if (statusClass === 'bad') return 'dot-bad'; if (statusClass === 'ssd') return 'dot-active'; return 'dot-unknown'; }
+    function tempBadgeClass(tempClass) { if (tempClass === 'ok') return 'badge-temp-ok'; if (tempClass === 'warn') return 'badge-temp-warn'; if (tempClass === 'crit') return 'badge-temp-crit'; if (tempClass === 'standby') return 'badge-temp-standby'; return 'badge-temp-unknown'; }
+    function shortDiskName(disk) { return String(disk.display_device || disk.device || '—'); }
+    function sleepText(disk) { return esc(disk.sleep_label || '★'); }
+    function hasUsageInfo(disk) { return disk.used_pct !== null && disk.used_pct !== undefined && disk.used && disk.used !== '—' && disk.used !== '••'; }
+
+
+    function renderUsageUsed(disk) {
+        if (!hasUsageInfo(disk)) {
+            if (disk.power_state === 'standby' || disk.status_class === 'standby' || disk.usage_sleeping) return `<span class="usage-sleep">${sleepText(disk)}</span>`;
+            return '<span class="text-muted">—</span>';
+        }
+        const pctNumber = Math.max(0, Math.min(100, Number(disk.used_pct || 0)));
+        const pctText = `${esc(disk.used_pct)}%`;
+        const cacheNote = (disk.usage_cached || disk.usage_sleeping) ? `<span class="usage-cache-note">${sleepText(disk)} cache</span>` : '';
+        return `<div class="usage-combo" title="Utilisé: ${esc(disk.used)} / Libre: ${esc(disk.free || '—')}"><div class="usage-labels"><span class="usage-used-text">${escNoWrap(disk.used)}</span><span class="usage-pct">${pctText}</span></div><progress class="usage-progress" value="${pctNumber}" max="100"></progress>${cacheNote}</div>`;
+    }
+    function renderFree(disk) {
+        if (disk.free && disk.free !== '—' && disk.free !== '••') { const cacheNote = (disk.usage_cached || disk.usage_sleeping) ? `<span class="usage-cache-note">${sleepText(disk)}</span>` : ''; return `<span class="free-with-cache"><span class="usage-free-text">${escNoWrap(disk.free)}</span>${cacheNote}</span>`; }
+        if (disk.power_state === 'standby' || disk.status_class === 'standby' || disk.usage_sleeping) return `<span class="usage-sleep">${sleepText(disk)}</span>`;
+        return escNoWrap(disk.free || '—');
+    }
+    function renderPowerButton(disk) {
+        const disabled = !disk.is_hdd || disk.is_system_disk;
+        const title = disabled ? 'Action désactivée' : (disk.power_state === 'standby' ? 'Réveiller le disque' : 'Mettre le disque en veille');
+        const cls = dotClass(disk.status_class);
+        const label = `${title} ${shortDiskName(disk)}`;
+        return `<button type="button" class="status-power ${disabled ? 'disabled' : ''}" ${disabled ? 'disabled' : ''} title="${esc(title)}" aria-label="${esc(label)}" data-device="${esc(disk.device)}" onclick="powerToggle(this.dataset.device)"><span class="status-dot ${cls}"></span></button>`;
+    }
+    function renderMounts(disk) {
+        const mounts = Array.isArray(disk.mounts) && disk.mounts.length ? disk.mounts : (disk.mountpoint ? [{kind:'principal', path: disk.mountpoint}] : []);
+        if (!mounts.length) return '<span class="mount-none">Non monté</span>';
+        return `<div class="mount-lines">${mounts.map(m => { const kind = esc(m.kind || 'mnt'); const kindClass = (m.kind === 'bind' || m.kind === 'omv') ? m.kind : ''; return `<div class="mount-line"><span class="mount-kind ${kindClass}">${kind}</span><span class="mount-path" title="${esc(m.path || '')}">${esc(m.path || '')}</span></div>`; }).join('')}</div>`;
+    }
+    function rowKey(device) { return 'disk-row-' + String(device || '').replace(/[^a-zA-Z0-9_-]/g, '_'); }
+    function tableRowHtml(disk) {
+        const transportBadge = disk.transport ? `<span class="badge badge-fs">${esc(disk.transport)}</span>` : '';
+        return `<td class="state-col"><div class="status-cell">${renderPowerButton(disk)}<span>${esc(disk.health_label || '—')}</span></div></td><td class="disk-col"><div class="disk-name">${esc(shortDiskName(disk))}</div></td><td class="ident-col"><div class="model-main" title="${esc(disk.model || '—')}">${esc(disk.model || '—')}</div><div class="model-sub">${transportBadge}</div></td><td class="label-col">${labelCell(disk, !!disk.mountpoint, !!disk.is_system_disk, false)}</td><td class="fs-col">${fsBadge(fsValue(disk))}</td><td class="size-cell">${escNoWrap(disk.size)}</td><td class="used-cell">${renderUsageUsed(disk)}</td><td class="free-cell">${renderFree(disk)}</td><td class="temp-col"><span class="badge ${tempBadgeClass(disk.temp_class)}">${esc(disk.temp_label)}</span></td><td class="mount-col" title="${esc((disk.mounts || []).map(m => m.path).join(' / ') || disk.mountpoint || 'Non monté')}">${renderMounts(disk)}</td>`;
+    }
+    function roleTitle(role) { if (role === 'Cache') return 'CACHE'; if (role === 'Array') return 'DISQUES DE DONNÉES'; if (role === 'Montages spéciaux') return 'MONTAGES SPÉCIAUX'; if (role === 'Système / boot') return 'SYSTÈME / BOOT'; if (role === 'Non monté') return 'NON MONTÉS'; return role || 'AUTRES'; }
+    function renderTable(disks) { const tbody = $('disk-tbody'); if (!disks.length) { tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Aucun disque détecté.</td></tr>'; tbody.dataset.loaded = '1'; return; } let html = ''; let currentRole = null; disks.forEach(disk => { const role = disk.role || 'Autres'; if (role !== currentRole) { currentRole = role; html += `<tr class="group-row"><td colspan="10">${esc(roleTitle(role))}</td></tr>`; } html += `<tr id="${rowKey(disk.device)}">${tableRowHtml(disk)}</tr>`; }); tbody.innerHTML = html; tbody.dataset.loaded = '1'; }
+    function mobileCardHtml(disk) {
+        const mountText = (disk.mounts || []).map(m => m.path).join(' / ') || disk.mountpoint || 'Non monté';
+        const modelText = [disk.model || '—', disk.transport || '', fsValue(disk) || ''].filter(Boolean).join(' / ');
+        const roleText = disk.role || disk.logical_name || '—';
+        return `<div class="disk-mobile-head"><div class="disk-mobile-title">${renderPowerButton(disk)}<div class="disk-mobile-title-text"><div class="mobile-name">${esc(shortDiskName(disk))}</div><div class="mobile-sub">${esc(disk.health_label || '—')} · ${esc(roleText)}</div></div></div><span class="badge ${tempBadgeClass(disk.temp_class)}">${esc(disk.temp_label)}</span></div><div class="disk-mobile-metrics"><div class="mobile-kv"><div class="mobile-k">Taille</div><div class="mobile-v">${esc(disk.size || '—')}</div></div><div class="mobile-kv"><div class="mobile-k">Utilisé</div><div class="mobile-v">${renderUsageUsed(disk)}</div></div><div class="mobile-kv"><div class="mobile-k">Libre</div><div class="mobile-v">${renderFree(disk)}</div></div></div><div class="mobile-grid disk-mobile-details"><div class="mobile-kv"><div class="mobile-k">Label</div><div class="mobile-v">${esc(labelDisplay(disk))}</div></div><div class="mobile-kv"><div class="mobile-k">FS</div><div class="mobile-v">${esc(fsValue(disk) || '—')}</div></div><div class="mobile-kv disk-mobile-wide"><div class="mobile-k">Identification</div><div class="mobile-v">${esc(modelText)}</div></div><div class="mobile-kv disk-mobile-wide"><div class="mobile-k">Montage</div><div class="mobile-v">${esc(mountText)}</div></div></div>`;
+    }
+    function renderMobile(disks) { const box = $('disk-mobile'); if (!disks.length) { if (!box.dataset.loaded) box.innerHTML = '<div class="empty-state">Aucun disque détecté.</div>'; return; } const empty = box.querySelector('.empty-state'); if (empty) box.innerHTML = ''; const seen = new Set(); disks.forEach(disk => { const key = rowKey(disk.device).replace('disk-row-', 'disk-card-'); seen.add(key); let card = document.getElementById(key); if (!card) { card = document.createElement('div'); card.id = key; box.appendChild(card); } const mounted = !!(disk.mountpoint || ((disk.mounts || []).length)); const awake = disk.status_class === 'active' || disk.status_class === 'ssd'; card.className = `mobile-card disk-mobile-card ${mounted ? 'is-mounted' : 'is-unmounted'} ${awake ? 'is-awake' : 'is-sleeping'}`; card.innerHTML = mobileCardHtml(disk); }); Array.from(box.querySelectorAll('.mobile-card[id^="disk-card-"]')).forEach(card => { if (!seen.has(card.id)) card.remove(); }); box.dataset.loaded = '1'; }
+    function updateSummary(summary) { $('sum-count').textContent = summary.count ?? '0'; $('sum-mounted').textContent = summary.mounted ?? '0'; $('sum-active').textContent = summary.active ?? '0'; $('sum-standby').textContent = summary.standby ?? '0'; $('sum-alerts').textContent = summary.alerts ?? '0'; $('sum-size').textContent = summary.total_size ?? '—'; }
+    function setActionMessage(message, ok = null, output = '') { const box = $('action-message'); if (box) { box.className = 'action-message' + (ok === true ? ' ok' : ok === false ? ' bad' : ''); box.textContent = message || '—'; } const out = $('action-output'); if (out) { if (output) { out.textContent = output; out.classList.add('active'); } else { out.textContent = ''; out.classList.remove('active'); } } }
+
+    async function loadDisks() { const tbody = $('disk-tbody'); try { const response = await fetch('/disk/api', {cache:'no-store'}); if (!response.ok) throw new Error('HTTP ' + response.status); const data = await response.json(); updateSummary(data.summary || {}); renderTable(data.disks || []); renderMobile(data.disks || []); $('last-update').textContent = 'Dernière mise à jour : ' + (data.generated_at || '—') + (data.disk_log_file ? ' • cache: ' + data.disk_log_file : ''); } catch (err) { $('last-update').textContent = 'Erreur API /disk/api : ancienne vue conservée'; if (tbody && !tbody.dataset.loaded) { tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Erreur API /disk/api</td></tr>'; $('disk-mobile').innerHTML = '<div class="empty-state">Erreur API /disk/api</div>'; } } }
+
+    function showConfirm(title, message, okText = 'OK', danger = true) { return new Promise(resolve => { confirmResolver = resolve; $('confirm-title').textContent = title || 'Confirmation'; $('confirm-message').textContent = message || 'Confirmer cette action ?'; $('confirm-ok').textContent = okText || 'OK'; $('confirm-ok').className = danger ? 'yoleo-btn yoleo-btn-small yoleo-btn-red' : 'yoleo-btn yoleo-btn-small yoleo-btn-green'; openModal('confirm-modal'); }); }
+    function resolveConfirm(value) { closeModal('confirm-modal'); if (confirmResolver) { const resolver = confirmResolver; confirmResolver = null; resolver(!!value); } }
+    function setPending(target, message) { if (!target) return; pendingActions[target] = message || 'Action en cours...'; renderPendingIfPossible(); }
+    function clearPending(target) { if (target) delete pendingActions[target]; renderPendingIfPossible(); }
+    function renderPendingIfPossible() { const tbody = $('maintenance-tbody'); if (activeTab === 'maintenance' && tbody?.dataset?.lastDisks) { try { renderMaintenance(JSON.parse(tbody.dataset.lastDisks)); } catch (e) {} } }
+    function pendingRowHtml(target) { const msg = pendingActions[target]; if (!msg) return ''; return `<tr class="pending-action-row"><td colspan="8"><div class="pending-action-box"><span class="pending-spinner"></span><span>${esc(msg)}</span><span class="mount-path">${esc(target)}</span></div></td></tr>`; }
+
+    async function apiPost(url, payload, busyText, pendingTarget = '', refresh = true) {
+        if (actionBusy) return {ok:false, message:'Action déjà en cours'};
+        actionBusy = true;
+        if (pendingTarget) setPending(pendingTarget, busyText || 'Action en cours...');
+        setActionMessage(busyText || 'Action en cours...', null);
+        try {
+            const response = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload || {})});
+            const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+            setActionMessage(data.message || (data.ok ? 'OK' : 'Erreur'), !!data.ok, data.output || '');
+            if (refresh) await loadActive(true);
+            return data;
+        } catch (err) {
+            setActionMessage('Erreur Ajax : ' + err.message, false);
+            return {ok:false, message:err.message};
+        } finally {
+            clearPending(pendingTarget);
+            actionBusy = false;
+        }
+    }
+    async function powerToggle(device) { await apiPost('/disk/api/action/power-toggle', {device}, 'Bascule veille/réveil en cours...', device); }
+
+    function maintenanceIconButton(kind, target, title, icon, label, onclick, extraClass = '') {
+        return `<button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-mini maintenance-icon-btn maintenance-action-${esc(kind)} ${extraClass}" data-target="${esc(target)}" title="${esc(title)}" aria-label="${esc(label)}" onclick="${onclick}"><span class="action-ico">${icon}</span><span class="action-label">${esc(label)}</span></button>`;
+    }
+    function maintenanceViewButton(item) {
+        const target = String(item?.path || item?.device || item || '');
+        const active = !!(item && item.maintenance_tmux_active);
+        const session = item?.maintenance_tmux_session || '';
+        const label = item?.maintenance_tmux_label || 'session';
+        const title = active ? ('Voir ' + label + ' : ' + session) : 'Aucune session tmux active';
+        return `<button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-primary yoleo-btn-mini maintenance-icon-btn maintenance-action-view" data-target="${esc(target)}" data-session="${esc(session)}" ${active ? '' : 'disabled'} title="${esc(title)}" aria-label="Voir" onclick="openMaintenanceTmuxView(this.dataset.target, this.dataset.session)"><span class="action-ico">👁️</span><span class="action-label">Voir</span></button>`;
+    }
+    function maintenanceActions(item, mounted, protectedDisk) {
+        const target = String(item?.path || item?.device || item || '');
+        const view = maintenanceViewButton(item);
+        if (protectedDisk) return `<div class="actions-line maintenance-actions"><span class="badge badge-lock">🔒 protégé</span>${view}</div>`;
+        if (mounted) return `<div class="actions-line maintenance-actions">${maintenanceIconButton('unmount', target, 'Démonter ce volume', '⏏️', 'Démonter', 'openUnmountModal(this.dataset.target)', 'yoleo-btn-red')}${view}</div>`;
+        return `<div class="actions-line maintenance-actions">${maintenanceIconButton('mount', target, 'Monter ce volume', '📌', 'Monter', 'openMountModal(this.dataset.target)', 'yoleo-btn-green')}${maintenanceIconButton('check', target, 'Vérifier ce volume', '🔎', 'Vérifier', 'openCheckModal(this.dataset.target)', 'yoleo-btn-orange')}${maintenanceIconButton('format', target, 'Formater ce volume', '🧱', 'Formater', 'openFormatModal(this.dataset.target)', 'yoleo-btn-red')}${maintenanceIconButton('wipe', target, 'Wipe : effacer signatures/partitions pour préparer le RAID', '🧽', 'Wipe', 'openWipeConfirm(this.dataset.target)', 'yoleo-btn-red')}${view}</div>`;
+    }
+    function diskHasMountedChildren(disk) {
+        if (!disk) return false;
+        if (disk.mountpoint || (Array.isArray(disk.mounts) && disk.mounts.length)) return true;
+        return (disk.parts || []).some(part => !!(part.mount || part.mountpoint));
+    }
+    function maintenanceDiskParentActions(disk, protectedDisk) {
+        const target = String(disk?.device || disk?.path || '');
+        const view = maintenanceViewButton(disk);
+        if (protectedDisk) return `<div class="actions-line maintenance-actions"><span class="badge badge-lock">🔒 protégé</span>${view}</div>`;
+        if (diskHasMountedChildren(disk)) return `<div class="actions-line maintenance-actions"><span class="text-muted">actions sur partitions</span>${view}</div>`;
+        return `<div class="actions-line maintenance-actions">${maintenanceIconButton('wipe', target, 'Wipe disque complet : supprime partitions/signatures pour le rendre éligible RAID', '🧽', 'Wipe', 'openWipeConfirm(this.dataset.target)', 'yoleo-btn-red')}${view}</div>`;
+    }
+    function maintMountCell(mount) { return mount ? `<span class="mount-path">${esc(mount)}</span>` : '<span class="mount-none">Non monté</span>'; }
+    function fsValue(item) { return item?.blkid_fstype || item?.fstype || item?.fs_type || item?.filesystem || ''; }
+    function fsBadge(fs) { return fs ? `<span class="badge badge-fs">${esc(fs)}</span>` : '<span class="badge badge-muted">non formaté</span>'; }
+    function labelValue(item) { return String(item?.blkid_label || item?.label || item?.id_fs_label || item?.ID_FS_LABEL || '').trim(); }
+    function labelDisplay(item) { const label = labelValue(item); return label ? label : '—'; }
+    function labelCell(item, mounted, protectedItem, editable = true) {
+        const label = labelDisplay(item);
+        const target = String(item?.path || item?.device || '');
+        const fs = fsValue(item);
+        if (!editable || !target || protectedItem) return `<span class="disk-label-text" title="${esc(label)}">${esc(label)}</span>`;
+        const disabled = mounted || !fs;
+        const title = mounted ? 'Démonte le volume avant de modifier son label' : (!fs ? 'Aucun filesystem détecté' : 'Modifier le label sans reformater');
+        return `<div class="disk-label-cell"><span class="disk-label-text" title="${esc(label)}">${esc(label)}</span><button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-mini disk-label-edit" data-target="${esc(target)}" data-label="${esc(label === '—' ? '' : label)}" data-fstype="${esc(fs)}" data-mounted="${mounted ? '1' : '0'}" ${disabled ? 'disabled' : ''} title="${esc(title)}" onclick="openLabelModalFromButton(this)">🏷️</button></div>`;
+    }
+
+    function renderRaidMaintenance(volumes) {
+        const tbody = $('maintenance-raid-tbody');
+        if (!tbody) return;
+        const list = Array.isArray(volumes) ? volumes : [];
+        const countEl = $('maintenance-raid-count');
+        if (countEl) countEl.textContent = String(list.length) + ' volume' + (list.length > 1 ? 's' : '');
+        if (!list.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Aucun volume RAID logique détecté.</td></tr>';
+            return;
+        }
+        let html = '';
+        list.forEach(volume => {
+            const target = String(volume.path || volume.device || '');
+            const mounted = !!(volume.mount || volume.mountpoint);
+            const engine = String(volume.engine || 'raid').toUpperCase();
+            const alias = String(volume.alias_device || volume.serial || '');
+            const idParts = [volume.name ? 'nom=' + volume.name : '', volume.uuid ? 'uuid=' + volume.uuid : ''].filter(Boolean);
+            const idText = idParts.join(' • ') || engine + ' volume logique';
+            const subLine = alias ? ('alias : ' + alias) : (engine + ' • volume virtuel');
+            const mounts = Array.isArray(volume.mounts) && volume.mounts.length ? volume.mounts.join(' / ') : (volume.mountpoint || volume.mount || 'Non monté');
+            html += `<tr class="maintenance-raid-row"><td class="state-col"><span class="badge ${mounted ? 'badge-temp-ok' : 'badge-temp-standby'}">${mounted ? 'monté' : 'démonté'}</span></td><td class="disk-col"><div class="disk-name">${esc(target || '—')}</div><div class="disk-sub">${esc(engine)} logique</div></td><td class="ident-col"><div class="model-main" title="${esc(idText)}">${esc(idText)}</div><div class="model-sub" title="${esc(subLine)}">${esc(subLine)}</div></td><td class="label-col">${labelCell(volume, mounted, false, true)}</td><td class="fs-col">${fsBadge(fsValue(volume))}</td><td class="size-cell">${escNoWrap(volume.size || '—')}</td><td class="mount-col" title="${esc(mounts)}">${maintMountCell(volume.mount || volume.mountpoint)}</td><td class="actions-col">${maintenanceActions(volume, mounted, false)}</td></tr>`;
+            html += pendingRowHtml(target);
+        });
+        tbody.innerHTML = html;
+    }
+
+    function renderMaintenance(disks) { const tbody = $('maintenance-tbody'); tbody.dataset.lastDisks = JSON.stringify(disks || []); if (!disks.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Aucun disque détecté.</td></tr>'; return; } let html = ''; let currentRole = null; disks.forEach(disk => { const role = disk.role || 'Autres'; if (role !== currentRole) { currentRole = role; html += `<tr class="group-row"><td colspan="8">${esc(roleTitle(role))}</td></tr>`; } const protectedDisk = !!(disk.maintenance_protected || disk.is_system_disk); const diskFs = fsValue(disk); html += `<tr><td class="state-col"><div class="status-cell">${renderPowerButton(disk)}<span>${esc(disk.health_label || '—')}</span></div></td><td class="disk-col"><div class="disk-name">${esc(shortDiskName(disk))}</div><div class="disk-sub">disque</div></td><td class="ident-col"><div class="model-main" title="${esc(disk.model || '—')}">${esc(disk.model || '—')}</div><div class="model-sub" title="${protectedDisk ? 'système/boot protégé' : esc(disk.serial || '')}">${protectedDisk ? '🔒 système/boot protégé' : esc(disk.serial || '')}</div></td><td class="label-col">${labelCell(disk, !!disk.mountpoint, protectedDisk, true)}</td><td class="fs-col">${fsBadge(diskFs)}</td><td class="size-cell">${escNoWrap(disk.size || '—')}</td><td class="mount-col" title="${esc((disk.mounts || []).map(m => m.path).join(' / ') || disk.mountpoint || 'Non monté')}">${renderMounts(disk)}</td><td class="actions-col">${(disk.parts || []).length ? maintenanceDiskParentActions(disk, protectedDisk) : maintenanceActions(disk, !!disk.mountpoint, protectedDisk)}</td></tr>`; html += pendingRowHtml(disk.device); (disk.parts || []).forEach(part => { const mounted = !!part.mount; const protectedPart = protectedDisk || !!part.protected; const idText = [part.uuid ? 'uuid=' + part.uuid : ''].filter(Boolean).join(' • ') || '—'; html += `<tr class="part-row"><td class="state-col"><span class="badge ${mounted ? 'badge-temp-ok' : 'badge-temp-standby'}">${mounted ? 'monté' : 'démonté'}</span></td><td class="disk-col"><div class="part-name"><span class="part-arrow">↳</span>${esc(part.path || part.name || '—')}</div></td><td class="ident-col"><div class="model-main" title="${esc(idText)}">${esc(idText)}</div></td><td class="label-col">${labelCell(part, mounted, protectedPart, true)}</td><td class="fs-col">${fsBadge(fsValue(part))}</td><td class="size-cell">${escNoWrap(part.size || '—')}</td><td class="mount-col" title="${esc(part.mount || 'Non monté')}">${maintMountCell(part.mount)}</td><td class="actions-col">${maintenanceActions(part, mounted, protectedPart)}</td></tr>`; html += pendingRowHtml(part.path); }); }); tbody.innerHTML = html; }
+    async function loadMaintenance() { try { const response = await fetch('/disk/api/maintenance', {cache:'no-store'}); if (!response.ok) throw new Error('HTTP ' + response.status); const data = await response.json(); renderRaidMaintenance(data.raid_maintenance_volumes || []); renderMaintenance(data.disks || []); const updateEl = $('maintenance-update'); if (updateEl) updateEl.textContent = 'Actualisé : ' + (data.generated_at || '—'); if (data.mount_default_options) $('mount-options').value = data.mount_default_options; } catch (err) { const updateEl = $('maintenance-update'); if (updateEl) updateEl.textContent = 'Erreur maintenance'; const raidTbody = $('maintenance-raid-tbody'); if (raidTbody) raidTbody.innerHTML = '<tr><td colspan="8" class="empty-state">Erreur API /disk/api/maintenance</td></tr>'; $('maintenance-tbody').innerHTML = '<tr><td colspan="8" class="empty-state">Erreur API /disk/api/maintenance</td></tr>'; } }
+
+    function openUnmountModal(target) { $('unmount-target').value = target; $('unmount-remove-fstab').checked = false; $('unmount-remove-dir').checked = false; openModal('unmount-modal'); }
+    function unmountTarget(target) { openUnmountModal(target); }
+    async function submitUnmount() {
+        const payload = {
+            target:$('unmount-target').value,
+            remove_fstab:$('unmount-remove-fstab').checked,
+            remove_mount_dir:$('unmount-remove-dir').checked
+        };
+        closeModal('unmount-modal');
+        const extras = [];
+        if (payload.remove_fstab) extras.push('suppression fstab');
+        if (payload.remove_mount_dir) extras.push('suppression dossier');
+        await apiPost('/disk/api/action/unmount', payload, extras.length ? 'Démontage + ' + extras.join(' + ') + ' en cours...' : 'Démontage à chaud en cours...', payload.target);
+    }
+    function updateModalScrollLock() {
+        const hasOpenModal = !!document.querySelector('.modal-backdrop.active');
+        document.documentElement.classList.toggle('yoleo-modal-open', hasOpenModal);
+        if (document.body) document.body.classList.toggle('yoleo-modal-open', hasOpenModal);
+    }
+    function closeModal(id) {
+        const modal = $(id);
+        if (modal) modal.classList.remove('active');
+        updateModalScrollLock();
+    }
+    function openModal(id) {
+        const modal = $(id);
+        if (!modal) return;
+        modal.classList.add('active');
+        if (id === 'mergerfs-modal') {
+            const body = modal.querySelector('.modal-body');
+            if (body) body.scrollTop = 0;
+        }
+        updateModalScrollLock();
+    }
+    function targetBaseName(target) { return String(target || '').replace('/dev/', '').replace(/[^a-zA-Z0-9_.-]/g, ''); }
+    function openMountModal(target) { $('mount-target').value = target; $('mount-path').value = '/mnt/' + targetBaseName(target); $('mount-create-dir').checked = true; $('mount-add-fstab').checked = false; openModal('mount-modal'); }
+    function openFormatModal(target) { $('format-target').value = target; $('format-label').value = targetBaseName(target); openModal('format-modal'); }
+    async function openWipeConfirm(target) {
+        target = String(target || '').trim();
+        if (!target) return;
+        const ok = await showConfirm(
+            'Wipe disque / volume',
+            'Effacer les signatures et, sur un disque complet, la table de partitions de ' + target + ' ? Le volume doit être démonté. Action à utiliser pour rendre un disque de nouveau éligible dans RAID.',
+            'WIPER',
+            true
+        );
+        if (!ok) return;
+        await apiPost('/disk/api/action/wipe', {target}, 'Wipe en cours...', target);
+    }
+    function openLabelModalFromButton(btn) {
+        if (!btn) return;
+        if (btn.dataset.mounted === '1') { setActionMessage('Démonte le volume avant de modifier son label.', false); return; }
+        $('label-target').value = btn.dataset.target || '';
+        $('label-fstype').value = btn.dataset.fstype || '';
+        $('label-current').value = btn.dataset.label || '';
+        $('label-new').value = btn.dataset.label || '';
+        openModal('label-modal');
+        setTimeout(() => { const input = $('label-new'); if (input) { input.focus(); input.select(); } }, 80);
+    }
+    async function submitLabel() {
+        const target = $('label-target').value;
+        const label = $('label-new').value;
+        const fstype = $('label-fstype').value;
+        const ok = await showConfirm('Modifier le label', 'Modifier le label de ' + target + ' en "' + label + '" ? Le volume doit rester démonté.', 'MODIFIER', false);
+        if (!ok) return;
+        closeModal('label-modal');
+        await apiPost('/disk/api/action/label', {target, label, fstype}, 'Modification du label en cours...', target);
+    }
+    function openCheckModal(target) {
+        $('check-target').value = target;
+        $('check-mode').value = 'fsck';
+        $('check-terminal-link').href = '#';
+        $('check-terminal-link').hidden = true;
+        openModal('check-modal');
+    }
+    async function submitCheck() {
+        const payload = {target:$('check-target').value, mode:$('check-mode').value};
+        closeModal('check-modal');
+        setActionMessage('Démarrage vérification dans tmux...', true);
+        try {
+            const response = await fetch('/disk/api/action/check/start', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(payload)
+            });
+            const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+            setActionMessage(data.message || (data.ok ? 'Vérification lancée.' : 'Erreur vérification'), !!data.ok);
+            if (data.ok && data.terminal_url) {
+                openCheckTerminal(data.terminal_url, data.session || '');
+            }
+            await loadMaintenance();
+            return data;
+        } catch (err) {
+            setActionMessage('Erreur Ajax vérification : ' + err.message, false);
+            return {ok:false, message:err.message};
+        }
+    }
+    function openCheckTerminal(url, session) {
+        $('check-terminal-frame').src = url;
+        $('check-terminal-session').textContent = session ? ('Session tmux : ' + session) : 'Session tmux';
+        $('check-terminal-link').href = url;
+        $('check-terminal-link').hidden = false;
+        openModal('check-terminal-modal');
+    }
+    async function openMaintenanceTmuxView(target, session) {
+        if (!target || !session) return;
+        setActionMessage('Ouverture session tmux ' + session + '.', true);
+        try {
+            const response = await fetch('/disk/api/action/tmux/view', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({target, session})
+            });
+            const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+            setActionMessage(data.message || (data.ok ? 'Terminal ouvert.' : 'Session indisponible'), !!data.ok);
+            if (data.ok && data.terminal_url) openCheckTerminal(data.terminal_url, data.session || session);
+            await loadMaintenance();
+            return data;
+        } catch (err) {
+            setActionMessage('Erreur Ajax session tmux : ' + err.message, false);
+            return {ok:false, message:err.message};
+        }
+    }
+
+    function setPathAndBrowse(inputId, path, boxId, currentId, listId) {
+        const input = $(inputId);
+        if (input) {
+            input.value = path || '/mnt';
+            input.dispatchEvent(new Event('input', {bubbles:true}));
+            input.dispatchEvent(new Event('change', {bubbles:true}));
+        }
+    }
+    function openBrowserFor(inputId, boxId, currentId, listId) {
+        const input = $(inputId);
+        const start = input && input.value ? input.value : '/mnt';
+        const url = '/browser/folder?target=' + encodeURIComponent(inputId) + '&path=' + encodeURIComponent(start);
+        if (typeof window.yoleoOpenBrowserUrl === 'function') {
+            window.yoleoOpenBrowserUrl(url, 'Parcourir un dossier');
+        } else {
+            window.open(url, 'yoleo_browser_' + inputId, 'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+        }
+    }
+    async function submitMount() { const payload = {target:$('mount-target').value, mountpoint:$('mount-path').value, fstype:$('mount-fstype').value, options:$('mount-options').value, create_dir:$('mount-create-dir').checked, add_fstab:$('mount-add-fstab').checked}; closeModal('mount-modal'); await apiPost('/disk/api/action/mount', payload, 'Montage en cours...', payload.target); }
+    async function submitFormat() {
+        const target = $('format-target').value;
+        const fstype = $('format-fstype').value;
+        const label = $('format-label').value;
+        const quick = $('format-quick').checked;
+        const modeText = quick ? 'formatage rapide' : 'formatage lent dans tmux';
+        const ctx = {target, fstype, label, quick};
+        const ok = await showConfirm('Dernière confirmation formatage', 'Tu vas lancer un ' + modeText + ' de ' + target + ' en ' + fstype + (label ? ' avec le label "' + label + '"' : '') + '. Cette action efface les données de cette partition.', 'FORMATER', true);
+        if (!ok) return;
+        const payload = {target, fstype, label, quick};
+        closeModal('format-modal');
+        if (typeof window.onDiskFormatStart === 'function') {
+            try { window.onDiskFormatStart(ctx); } catch (e) {}
+        }
+        setActionMessage(quick ? 'Formatage rapide en cours...' : 'Démarrage formatage lent dans tmux...', true);
+        try {
+            const response = await fetch('/disk/api/action/format', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(payload)
+            });
+            const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+            let handled = false;
+            if (typeof window.onDiskFormatFinish === 'function') {
+                try { handled = !!window.onDiskFormatFinish(data, ctx); } catch (e) { handled = false; }
+            }
+            if (!handled) setActionMessage(data.message || (data.ok ? 'Formatage lancé.' : 'Erreur formatage'), !!data.ok, data.output || '');
+            if (data.ok && data.terminal_url) openCheckTerminal(data.terminal_url, data.session || '');
+            if (String(activeTab || '') === 'raid' && typeof loadRaid === 'function') await loadRaid(true);
+            else await loadMaintenance();
+            return data;
+        } catch (err) {
+            if (typeof window.onDiskFormatError === 'function') {
+                try { window.onDiskFormatError(err, ctx); } catch (e) {}
+            }
+            setActionMessage('Erreur Ajax formatage : ' + err.message, false);
+            return {ok:false, message:err.message};
+        }
+    }
+
+    function splitMergerfsOptions(value) { return String(value || '').split(',').map(x => x.trim()).filter(Boolean); }
+    function isModalOpen(id) { const el = $(id); return !!(el && el.classList && el.classList.contains('active')); }
+    function mergerfsModalIsOpen() { return isModalOpen('mergerfs-modal'); }
+    function mergerfsOptionChecks() { return Array.from(document.querySelectorAll('.mergerfs-option-check')); }
+    function knownMergerfsOptions() { return new Set(mergerfsOptionChecks().map(cb => cb.dataset.option).filter(Boolean)); }
+    function refreshMergerfsOptionsInput() {
+        const selected = [];
+        const seen = new Set();
+        mergerfsOptionChecks().forEach(cb => {
+            const option = cb.dataset.option || '';
+            if (cb.checked && option && !seen.has(option)) {
+                selected.push(option);
+                seen.add(option);
+            }
+        });
+        const known = knownMergerfsOptions();
+        const custom = splitMergerfsOptions($('mergerfs-options')?.value || '').filter(option => !known.has(option) && !seen.has(option));
+        $('mergerfs-options').value = selected.concat(custom).join(',');
+    }
+    function syncMergerfsChecksFromInput() {
+        const input = $('mergerfs-options');
+        if (!input) return;
+        const values = new Set(splitMergerfsOptions(input.value));
+        mergerfsOptionChecks().forEach(cb => cb.checked = values.has(cb.dataset.option || ''));
+        enforceMergerfsExclusiveGroups(false);
+    }
+    function enforceMergerfsExclusiveGroups(rewriteInput = true) {
+        const groups = {};
+        mergerfsOptionChecks().forEach(cb => {
+            const group = cb.dataset.exclusiveGroup || '';
+            if (!group || !cb.checked) return;
+            groups[group] = groups[group] || [];
+            groups[group].push(cb);
+        });
+        Object.values(groups).forEach(items => {
+            if (items.length <= 1) return;
+            // On garde la dernière case cochée dans le DOM, les autres sautent.
+            const keep = items[items.length - 1];
+            items.forEach(cb => { if (cb !== keep) cb.checked = false; });
+        });
+        if (rewriteInput) refreshMergerfsOptionsInput();
+    }
+    function handleMergerfsOptionChange(event) {
+        const cb = event.target;
+        if (!cb || !cb.classList || !cb.classList.contains('mergerfs-option-check')) return;
+        const group = cb.dataset.exclusiveGroup || '';
+        if (cb.checked && group) {
+            mergerfsOptionChecks().forEach(other => {
+                if (other !== cb && other.dataset.exclusiveGroup === group) other.checked = false;
+            });
+        }
+        refreshMergerfsOptionsInput();
+    }
+    function setMergerfsOptions(value) {
+        if (!$('mergerfs-options')) return;
+        $('mergerfs-options').value = value || 'defaults,use_ino,cache.files=partial,category.create=mfs,allow_other';
+        syncMergerfsChecksFromInput();
+    }
+    function setMergerfsOptionPreset(kind) {
+        if (kind === 'safe') {
+            setMergerfsOptions('defaults,use_ino,cache.files=partial,category.create=epmfs,allow_other');
+            return;
+        }
+        setMergerfsOptions('defaults,use_ino,cache.files=partial,category.create=mfs,allow_other');
+    }
+
+    async function loadMergerfs() {
+        try {
+            const response = await fetch('/disk/api/mergerfs', {cache:'no-store'});
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            mergerfsSources = data.sources || [];
+            mergerfsEntries = data.entries || [];
+            // Important UX : l'auto-refresh Ajax ne doit JAMAIS réécrire les options
+            // pendant que la popup Ajouter/Modifier est ouverte. Sinon une case cochée
+            // par l'utilisateur, par exemple moveonenospc=true, peut se décocher au
+            // prochain refresh si elle n'est pas dans les options par défaut de l'API.
+            if (!mergerfsModalIsOpen()) {
+                if (data.default_options) setMergerfsOptions(data.default_options);
+                else syncMergerfsChecksFromInput();
+            }
+            const statusEl = $('mergerfs-status');
+            if (statusEl) statusEl.textContent = `fstab: ${data.fstab_file || '—'} • profils: ${data.state_file || '—'} • ${data.entries?.length || 0} ligne(s) • ${data.generated_at || '—'}`;
+            if ($('mergerfs-tbody')) renderMergerfsTable(data.entries || []);
+        } catch (err) {
+            const statusEl = $('mergerfs-status');
+            if (statusEl) statusEl.textContent = 'Erreur MargeFS : ' + err.message;
+            if ($('mergerfs-tbody')) $('mergerfs-tbody').innerHTML = '<tr><td colspan="5" class="empty-state">Erreur API MargeFS</td></tr>';
+        }
+    }
+
+    function mergerfsStateBadge(row) {
+        if (row.disabled || row.status === 'disabled') return '<span class="badge badge-disabled">désactivé</span>';
+        if (row.mounted || row.status === 'mounted') return '<span class="badge badge-temp-ok">démarré</span>';
+        return '<span class="badge badge-temp-standby">arrêté</span>';
+    }
+
+    function selectMergerfsRow(target, focusRow = false) {
+        selectedMergerfsTarget = String(target || '');
+        document.querySelectorAll('.mergerfs-row').forEach(row => {
+            row.classList.toggle('selected', row.dataset.target === selectedMergerfsTarget && !!selectedMergerfsTarget);
+        });
+        const pill = $('mergerfs-selection');
+        if (pill) pill.textContent = selectedMergerfsTarget ? 'Sélection : ' + selectedMergerfsTarget : 'Aucune ligne sélectionnée';
+        if (focusRow) focusSelectedMergerfsRow();
+    }
+
+    function mergerfsRows() {
+        return Array.from(document.querySelectorAll('#mergerfs-tbody .mergerfs-row'));
+    }
+
+    function focusSelectedMergerfsRow() {
+        const row = mergerfsRows().find(item => item.dataset.target === selectedMergerfsTarget);
+        if (!row) return;
+        try { row.focus({preventScroll:true}); } catch (e) { row.focus(); }
+        row.scrollIntoView({block:'nearest', inline:'nearest'});
+    }
+
+    function moveMergerfsSelection(delta) {
+        const rows = mergerfsRows();
+        if (!rows.length) return false;
+        let index = rows.findIndex(row => row.dataset.target === selectedMergerfsTarget);
+        if (index < 0) index = delta > 0 ? -1 : rows.length;
+        const nextIndex = Math.max(0, Math.min(rows.length - 1, index + delta));
+        selectMergerfsRow(rows[nextIndex].dataset.target, true);
+        return true;
+    }
+
+    function jumpMergerfsSelection(toEnd = false) {
+        const rows = mergerfsRows();
+        if (!rows.length) return false;
+        selectMergerfsRow(rows[toEnd ? rows.length - 1 : 0].dataset.target, true);
+        return true;
+    }
+
+    function keyboardTargetIsTyping(target) {
+        if (!target) return false;
+        if (target.isContentEditable) return true;
+        return ['INPUT', 'SELECT', 'TEXTAREA'].includes(String(target.tagName || '').toUpperCase());
+    }
+
+    function diskModalOpen() {
+        return !!document.querySelector('.modal-backdrop.active');
+    }
+
+    function handleDiskKeyboard(event) {
+        if (activeTab !== 'mergerfs') return;
+        if (diskModalOpen() || keyboardTargetIsTyping(event.target)) return;
+        if (event.key === 'ArrowDown') { event.preventDefault(); moveMergerfsSelection(1); return; }
+        if (event.key === 'ArrowUp') { event.preventDefault(); moveMergerfsSelection(-1); return; }
+        if (event.key === 'Home') { event.preventDefault(); jumpMergerfsSelection(false); return; }
+        if (event.key === 'End') { event.preventDefault(); jumpMergerfsSelection(true); return; }
+        if (event.key === 'Enter' && selectedMergerfsTarget && !event.target.closest('button,a')) {
+            event.preventDefault();
+            openSelectedMergerfsEdit();
+        }
+    }
+
+    function renderMergerfsTable(entries) {
+        const tbody = $('mergerfs-tbody');
+        const targets = new Set((entries || []).map(row => String(row.target || row.mount || '')).filter(Boolean));
+        if (selectedMergerfsTarget && !targets.has(selectedMergerfsTarget)) selectedMergerfsTarget = '';
+        if (!entries.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucune ligne MargeFS déclarée.</td></tr>';
+            selectMergerfsRow('');
+            return;
+        }
+        tbody.innerHTML = entries.map(row => {
+            const target = row.target || row.mount || '';
+            const sources = (row.sources || []).map(s => `<div class="mount-path" title="${esc(s)}">${esc(s)}</div>`).join('') || esc(row.source || '—');
+            const canManage = row.from_fstab;
+            const selectedClass = target && target === selectedMergerfsTarget ? ' selected' : '';
+            const origin = row.disabled ? 'fstab désactivé' : (row.from_fstab ? 'fstab actif' : 'live seulement');
+            const mobileState = (row.disabled || row.status === 'disabled') ? 'stopped' : ((row.mounted || row.status === 'mounted') ? 'running' : 'stopped');
+            const actions = canManage
+                ? `<button class="yoleo-btn yoleo-btn-small yoleo-btn-primary yoleo-btn-mini yoleo-btn-icon mergerfs-action-btn" title="Modifier" aria-label="Modifier" data-target="${esc(target)}" onclick="event.stopPropagation(); openMergerfsEdit(this.dataset.target)">✏️</button>
+                   <button class="yoleo-btn yoleo-btn-small yoleo-btn-green yoleo-btn-mini yoleo-btn-icon mergerfs-action-btn" title="Démarrer" aria-label="Démarrer" data-target="${esc(target)}" onclick="event.stopPropagation(); mergerfsService('start', this.dataset.target)">▶</button>
+                   <button class="yoleo-btn yoleo-btn-small yoleo-btn-red yoleo-btn-mini yoleo-btn-icon mergerfs-action-btn" title="Arrêter" aria-label="Arrêter" data-target="${esc(target)}" onclick="event.stopPropagation(); mergerfsService('stop', this.dataset.target)">■</button>
+                   <button class="yoleo-btn yoleo-btn-small yoleo-btn-orange yoleo-btn-mini yoleo-btn-icon mergerfs-action-btn" title="Redémarrer" aria-label="Redémarrer" data-target="${esc(target)}" onclick="event.stopPropagation(); mergerfsService('restart', this.dataset.target)">↻</button>
+                   <button class="yoleo-btn yoleo-btn-small yoleo-btn-orange yoleo-btn-mini yoleo-btn-icon mergerfs-action-btn" title="Désactiver" aria-label="Désactiver" data-target="${esc(target)}" onclick="event.stopPropagation(); mergerfsService('disable', this.dataset.target)">⏸</button>
+                   <button class="yoleo-btn yoleo-btn-small yoleo-btn-red yoleo-btn-mini yoleo-btn-icon mergerfs-action-btn" title="Supprimer" aria-label="Supprimer" data-target="${esc(target)}" onclick="event.stopPropagation(); deleteMergerfs(this.dataset.target)">🗑️</button>`
+                : '<span class="badge badge-lock">non déclaré fstab</span>';
+            return `<tr tabindex="0" class="mergerfs-row${selectedClass}" data-target="${esc(target)}" data-mobile-kind="mergerfs" data-mobile-state="${mobileState}" onclick="selectMergerfsRow(this.dataset.target)"><td>${mergerfsStateBadge(row)}</td><td class="mergerfs-destination-col"><div class="mount-path" title="${esc(target || '—')}">${esc(target || '—')}</div><div class="hint">${origin}</div></td><td class="mergerfs-sources-col">${sources}</td><td class="mergerfs-options-col"><div class="code-line" title="${esc(row.options || '—')}">${esc(row.options || '—')}</div></td><td class="actions-col"><div class="actions-line mergerfs-actions-line">${actions}</div></td></tr>`;
+        }).join('');
+        selectMergerfsRow(selectedMergerfsTarget);
+    }
+    function sourceOptions(selected = '') {
+        if (!mergerfsSources.length) return '<option value="">Aucun disque monté disponible</option>';
+        const hasSelected = selected && mergerfsSources.some(s => s.path === selected);
+        const extra = hasSelected || !selected ? '' : `<option value="${esc(selected)}" selected>${esc(selected)} (actuel)</option>`;
+        return extra + mergerfsSources.map(s => `<option value="${esc(s.path)}" ${s.path === selected ? 'selected' : ''}>${esc(s.label || s.path)}</option>`).join('');
+    }
+    function addMergerfsBranch(value = '') {
+        const box = $('mergerfs-branches');
+        const row = document.createElement('div');
+        row.className = 'branch-row';
+        row.innerHTML = `<select class="yoleo-input select-input mergerfs-source">${sourceOptions(value)}</select><button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-red yoleo-btn-mini" onclick="this.closest('.branch-row').remove()">✕</button>`;
+        box.appendChild(row);
+    }
+    function mergerfsEntryByTarget(target) {
+        target = String(target || '');
+        return (mergerfsEntries || []).find(row => String(row.target || row.mount || '') === target) || null;
+    }
+    function setMergerfsModalMode(mode, row = null) {
+        const edit = mode === 'edit';
+        $('mergerfs-old-target').value = edit ? String(row?.target || row?.mount || '') : '';
+        $('mergerfs-modal-title').textContent = edit ? 'Modifier une ligne MergerFS' : 'Ajouter un dossier MergerFS à une ligne';
+        $('mergerfs-modal-note').textContent = edit
+            ? 'Modifie les sources, la destination ou les options. Si la ligne est montée, elle sera démontée puis remontée avec la nouvelle configuration.'
+            : 'Ajoute une ou plusieurs sources, puis une destination. La ligne est écrite dans /etc/fstab et montée à chaud.';
+        $('mergerfs-submit-btn').textContent = edit ? 'Modifier / appliquer' : 'Valider';
+    }
+    function openMergerfsAdd() {
+        setMergerfsModalMode('add');
+        $('mergerfs-branches').innerHTML = '';
+        addMergerfsBranch();
+        $('mergerfs-target').value = '/mnt/user';
+        $('mergerfs-create-target').checked = true;
+        $('mergerfs-mount-now').checked = true;
+        
+        setMergerfsOptions('defaults,use_ino,cache.files=partial,category.create=mfs,allow_other');
+        openModal('mergerfs-modal');
+    }
+    function openSelectedMergerfsEdit() {
+        if (!selectedMergerfsTarget) {
+            const out = $('mergerfs-output');
+            out.textContent = 'Sélectionne une ligne MargeFS dans le tableau. La ligne sélectionnée devient violette.';
+            out.classList.add('active');
+            return;
+        }
+        openMergerfsEdit(selectedMergerfsTarget);
+    }
+    function openMergerfsEdit(target) {
+        const row = mergerfsEntryByTarget(target);
+        if (!row || !row.from_fstab) {
+            const out = $('mergerfs-output');
+            out.textContent = 'Cette ligne ne peut pas être modifiée ici : elle n’est pas déclarée dans fstab.';
+            out.classList.add('active');
+            return;
+        }
+        selectMergerfsRow(target);
+        setMergerfsModalMode('edit', row);
+        $('mergerfs-branches').innerHTML = '';
+        const sources = Array.isArray(row.sources) && row.sources.length ? row.sources : String(row.source || '').split(':').filter(Boolean);
+        sources.forEach(src => addMergerfsBranch(src));
+        if (!sources.length) addMergerfsBranch();
+        $('mergerfs-target').value = row.target || row.mount || target;
+        $('mergerfs-create-target').checked = true;
+        $('mergerfs-mount-now').checked = !row.disabled;
+        
+        setMergerfsOptions(row.options || 'defaults,use_ino,cache.files=partial,category.create=mfs,allow_other');
+        openModal('mergerfs-modal');
+    }
+    async function submitMergerfsAdd() {
+        refreshMergerfsOptionsInput();
+        const sources = Array.from(document.querySelectorAll('.mergerfs-source')).map(s => s.value).filter(Boolean);
+        const oldTarget = $('mergerfs-old-target').value || '';
+        const payload = {sources, target:$('mergerfs-target').value, options:$('mergerfs-options').value, create_target:$('mergerfs-create-target').checked, mount_now:$('mergerfs-mount-now').checked};
+        if (oldTarget) payload.old_target = oldTarget;
+        const endpoint = oldTarget ? '/disk/api/action/mergerfs/edit' : '/disk/api/action/mergerfs/add';
+        const label = oldTarget ? 'Modification MargeFS en cours...' : 'Ajout MargeFS en cours...';
+        closeModal('mergerfs-modal');
+        await apiPost(endpoint, payload, label, payload.target);
+        selectedMergerfsTarget = payload.target;
+        await loadMergerfs();
+    }
+    async function deleteMergerfs(target) {
+        const ok = await showConfirm('Supprimer MargeFS', 'Supprimer la ligne fstab MargeFS pour ' + target + ' ? Si elle est montée, elle sera démontée avant suppression.', 'Supprimer', true);
+        if (!ok) return;
+        await apiPost('/disk/api/action/mergerfs/delete', {target}, 'Suppression MargeFS en cours...', target);
+        if (selectedMergerfsTarget === target) selectedMergerfsTarget = '';
+        await loadMergerfs();
+    }
+
+    async function mergerfsService(action, target = null, allowGlobal = false) {
+        target = target || selectedMergerfsTarget;
+        if (!target && !allowGlobal && action !== 'status') {
+            const out = $('mergerfs-output');
+            out.textContent = 'Sélectionne une ligne MargeFS dans le tableau. La ligne sélectionnée devient violette.';
+            out.classList.add('active');
+            return;
+        }
+        const payload = target ? {action, target} : {action};
+        const label = target ? `Action MargeFS : ${action} → ${target}` : `Action MargeFS globale : ${action}`;
+        const data = await apiPost('/disk/api/action/mergerfs/service', payload, label, target || '', false);
+        const out = $('mergerfs-output');
+        out.textContent = data?.output || data?.message || '';
+        out.classList.add('active');
+        await loadMergerfs();
+    }
+
+    async function loadSleep() { try { const response = await fetch('/disk/api/sleep', {cache:'no-store'}); if (!response.ok) throw new Error('HTTP ' + response.status); const data = await response.json(); const cfg = data.config || {}; const sys = data.systemd || cfg.systemd || {}; const pid = data.pid || cfg.pid || sys.MainPID || sys.ExecMainPID || ''; const execStart = cfg.exec_start || sys.ExecStart || ''; $('sleep-status').innerHTML = `<span class="sleep-pill"><b>${esc(data.service || 'hd-idle.service')}</b> : ${esc(data.service_status || '—')}</span><span class="sleep-pill">PID Linux : <b>${esc(pid || '—')}</b></span><span class="sleep-pill">Conf : ${esc(data.config_file || cfg.defaults_file || '—')}</span>`; $('sleep-output').textContent = `ExecStart réel: ${execStart || '—'}
+Source de vérité : systemd / hd-idle.service`; $('sleep-minutes').value = cfg.minutes || 10; renderSleepDisks(data.disks || [], cfg.devices || []); } catch (err) { $('sleep-status').textContent = 'Erreur veille : ' + err.message; $('sleep-tbody').innerHTML = '<tr><td colspan="5" class="empty-state">Erreur API veille</td></tr>'; } }
+    function renderSleepDisks(disks, selected) { const tbody = $('sleep-tbody'); if (!disks.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucun HDD détecté.</td></tr>'; return; } const selectedSet = new Set(selected || []); tbody.innerHTML = disks.map(d => { const targeted = !d.protected && selectedSet.has(d.device); const targetBadge = d.protected ? '<span class="badge badge-lock">protégé</span>' : (targeted ? '<span class="badge badge-ok">hd-idle</span>' : '<span class="badge badge-muted">ignoré</span>'); return `<tr><td>${targetBadge}</td><td><div class="sleep-disk-inline"><span class="disk-name">${esc(d.name || d.device)}</span><span class="model-sub">${esc(d.model || '')}</span></div></td><td>${d.protected ? '<span class="badge badge-lock">système protégé</span>' : `<span class="badge ${d.power_state === 'standby' ? 'badge-temp-standby' : 'badge-temp-ok'}">${esc(d.power_state || '—')}</span>`}</td><td>${esc(d.size || '—')}</td><td><span class="mount-path">${esc(d.mountpoint || 'Non monté')}</span></td></tr>`; }).join(''); }
+    function toggleSleepAll(checked) { /* mode hdd.sh global : pas de sélection manuelle ici */ }
+    async function applySleep() { const payload = {all:true, minutes:$('sleep-minutes').value}; const data = await apiPost('/disk/api/action/sleep/apply', payload, 'Application hd-idle en cours...', '', false); const out = $('sleep-output'); out.textContent = data?.output || data?.message || ''; out.classList.add('active'); await loadSleep(); }
+    async function sleepService(action) { const data = await apiPost('/disk/api/action/sleep/service', {action}, 'Action service veille : ' + action, '', false); const out = $('sleep-output'); out.textContent = data?.output || data?.message || ''; out.classList.add('active'); await loadSleep(); }
+
+    async function loadLogs() { try { const response = await fetch('/disk/api/logs?lines=500', {cache:'no-store'}); if (!response.ok) throw new Error('HTTP ' + response.status); const data = await response.json(); $('logs-update').textContent = 'Actualisé : ' + (data.generated_at || '—'); $('log-output').value = data.text || ''; $('log-output').scrollTop = $('log-output').scrollHeight; } catch (err) { $('logs-update').textContent = 'Erreur logs : ' + err.message; } }
+
+    async function loadActive(force = false) {
+        const tab = String(activeTab || 'general');
+        if (tab === 'general') await loadDisks();
+        else if (tab === 'maintenance') await loadMaintenance();
+        else if (tab === 'mergerfs' || tab === 'margefs') await loadMergerfs();
+        else if (tab === 'raid' && typeof loadRaid === 'function') await loadRaid();
+        else if (tab === 'ramdrive' && typeof loadRamdrive === 'function') await loadRamdrive(false);
+        else if (tab === 'sleep' || tab === 'veille') await loadSleep();
+        else if (tab === 'logs' || tab === 'log') await loadLogs();
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('change', handleMergerfsOptionChange);
+        document.addEventListener('keydown', handleDiskKeyboard);
+        syncMergerfsChecksFromInput();
+        loadActive(true);
+        refreshTimer = setInterval(() => loadActive(false), Math.max(3, REFRESH_SECONDS) * 1000);
+    });
+
+</script>

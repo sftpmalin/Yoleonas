@@ -1,0 +1,188 @@
+
+    .mergerfs-toolbar-compact {
+        gap: 6px;
+    }
+
+    .mergerfs-toolbar-compact .mergerfs-selection {
+        margin-right: auto;
+        min-height: 32px;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .mergerfs-toolbar-btn,
+    .mergerfs-action-btn {
+        padding-left: 0;
+        padding-right: 0;
+        justify-content: center;
+    }
+
+    .mergerfs-toolbar-btn {
+        width: 32px;
+        min-width: 32px;
+    }
+
+    .mergerfs-action-btn {
+        width: 30px;
+        min-width: 30px;
+        font-size: 12px;
+    }
+
+    .mergerfs-actions-line {
+        gap: 6px;
+        flex-wrap: nowrap;
+    }
+
+    .actions-col {
+        width: 220px;
+        min-width: 210px;
+    }
+
+    @media (max-width: 1080px) {
+        .mergerfs-toolbar-compact .mergerfs-selection {
+            order: 10;
+            width: 100%;
+            margin-right: 0;
+        }
+
+        .mergerfs-actions-line {
+            flex-wrap: wrap;
+        }
+    }
+
+    /* MergerFS : harmonisation avec les autres pages Stockage */
+    .disk-mergerfs-page {
+        display: grid;
+        gap: 12px;
+    }
+
+    .disk-mergerfs-card {
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .disk-mergerfs-card .mergerfs-head {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        background: rgba(10, 15, 22, .38);
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .mergerfs-head-title {
+        min-width: 220px;
+        flex: 1 1 auto;
+    }
+
+    .mergerfs-head-title h3 {
+        margin: 0 0 4px;
+        color: #fff;
+        font-size: 16px;
+        font-weight: 900;
+        line-height: 1.2;
+    }
+
+    .mergerfs-note {
+        color: var(--yoleo-accent-2);
+        font-size: 11px;
+        line-height: 1.45;
+        word-break: break-word;
+    }
+
+    .disk-mergerfs-card .mergerfs-toolbar-compact {
+        margin-left: auto;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 7px;
+    }
+
+    .disk-mergerfs-card .mergerfs-selection {
+        max-width: min(420px, 42vw);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mergerfs-output-hidden,
+    .mergerfs-output-hidden.active {
+        display: none !important;
+    }
+
+
+    .mergerfs-action-output-hidden,
+    .mergerfs-action-output-hidden.active {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .mergerfs-table-wrap {
+        margin: 0;
+    }
+
+    .mergerfs-table th:first-child,
+    .mergerfs-table td:first-child {
+        padding-left: 14px;
+    }
+
+    .mergerfs-table th:last-child,
+    .mergerfs-table td:last-child {
+        padding-right: 14px;
+    }
+
+    .mergerfs-table .actions-col {
+        text-align: right;
+    }
+
+    .mergerfs-table .mergerfs-actions-line {
+        justify-content: flex-end;
+    }
+
+    @media (max-width: 1080px) {
+        .disk-mergerfs-card .mergerfs-head {
+            padding: 11px 12px;
+        }
+
+        .disk-mergerfs-card .mergerfs-toolbar-compact {
+            width: 100%;
+            margin-left: 0;
+            justify-content: flex-start;
+        }
+
+        .disk-mergerfs-card .mergerfs-selection {
+            max-width: 100%;
+        }
+    }
+
+    /* MergerFS : retour au rythme visuel commun des pages Yoleo.
+       Le module ne doit pas remonter/descendre tout seul par rapport au bandeau haut. */
+    .yoleo-content > .disk-page #tab-mergerfs.disk-mergerfs-page {
+        margin-top: 0 !important;
+    }
+
+    .yoleo-content > .disk-page #tab-mergerfs .disk-mergerfs-card {
+        border-radius: var(--yoleo-card-radius, 14px) !important;
+        background: var(--yoleo-card-bg, linear-gradient(180deg, #131d2b 0%, #101722 100%)) !important;
+        border-color: var(--yoleo-card-border, #26364b) !important;
+        box-shadow: var(--yoleo-card-shadow, 0 14px 30px rgba(0,0,0,.18)) !important;
+    }
+
+    .yoleo-content > .disk-page #tab-mergerfs .mergerfs-head {
+        padding: 16px 18px 12px !important;
+        min-height: 68px;
+    }
+
+    .yoleo-content > .disk-page #tab-mergerfs .mergerfs-head-title h3 {
+        font-size: 18px !important;
+        line-height: 1.15 !important;
+    }
+
+    .yoleo-content > .disk-page #tab-mergerfs .mergerfs-note {
+        margin-top: 4px;
+    }

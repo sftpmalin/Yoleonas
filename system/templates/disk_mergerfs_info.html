@@ -1,0 +1,60 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-mergerfs-info" class="disk-section disk-mergerfs-info-page">
+    <section class="yoleo-card disk-card disk-mergerfs-info-card">
+        <div class="disk-card-head compact-head mergerfs-info-head">
+            <div>
+                <h3>Informations MergerFS</h3>
+                <div class="hint">Généré : {{ mergerfs_generated_at }} · fstab : {{ mergerfs_fstab_file }} · profils : {{ mergerfs_state_file }}</div>
+            </div>
+        </div>
+
+        <div class="table-wrap disk-table-compact mergerfs-info-table-wrap">
+            <table class="yoleo-table mini-table mergerfs-info-table">
+                <thead>
+                    <tr>
+                        <th>État</th>
+                        <th>Destination</th>
+                        <th>Sources</th>
+                        <th>Options</th>
+                        <th>Commande complète</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if mergerfs_rows %}
+                        {% for row in mergerfs_rows %}
+                        <tr>
+                            <td><span class="badge {{ 'badge-temp-ok' if row.mounted else ('badge-disabled' if row.disabled else 'badge-temp-standby') }}">{{ row.status_label }}</span></td>
+                            <td><div class="mount-path">{{ row.target or row.mount or '—' }}</div><div class="hint">{{ 'fstab' if row.from_fstab else 'live seulement' }}</div></td>
+                            <td>
+                                {% for src in row.sources or [] %}
+                                    <div class="mount-path">{{ src }}</div>
+                                {% else %}
+                                    <span class="hint">—</span>
+                                {% endfor %}
+                            </td>
+                            <td><code class="code-line mergerfs-info-code">{{ row.options or '—' }}</code></td>
+                            <td><code class="code-line mergerfs-info-code">{{ row.mount_command or '—' }}</code></td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr><td colspan="5" class="empty-state">Aucun partage MergerFS actif ou déclaré.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="yoleo-card disk-card disk-mergerfs-info-card mergerfs-info-split">
+        <div class="mergerfs-info-block">
+            <h3>Extrait /etc/fstab MergerFS</h3>
+            <pre class="output-box active mergerfs-info-pre">{{ mergerfs_fstab_excerpt }}</pre>
+        </div>
+        <div class="mergerfs-info-block">
+            <h3>Profils MergerFS</h3>
+            <pre class="output-box active mergerfs-info-pre">{{ mergerfs_state_excerpt }}</pre>
+        </div>
+    </section>
+</div>
+{% endblock %}

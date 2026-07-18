@@ -1,0 +1,20 @@
+{% extends "services_ffmpeg_base.html" %}
+
+{% block ffmpeg_content %}
+<section class="card ffoi-card">
+  <div class="card-head">
+    <div>
+      <h2 class="card-title">📜 Logs FFmpeg over IP</h2>
+      <div class="hint">Lecture du fichier log configuré et de journalctl si disponible.</div>
+    </div>
+    <div class="toolbar ffoi-toolbar">
+      <form method="post" action="{{ url_for('services_bp.ffoi_action') }}">
+        <input type="hidden" name="action" value="restart">
+        <input type="hidden" name="return_to" value="logs">
+        <button class="yoleo-btn yoleo-btn-orange" type="submit">🔁 Redémarrer</button>
+      </form>
+    </div>
+  </div>
+  <pre class="terminal ffoi-log-box">{{ logs }}</pre>
+</section>
+{% endblock %}

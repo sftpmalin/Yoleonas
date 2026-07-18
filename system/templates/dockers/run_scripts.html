@@ -1,0 +1,556 @@
+    let dockerRunKeyboardRow = 0;
+    let dockerRunKeyboardButton = 0;
+
+    function dockerRunRows() {
+        return Array.from(document.querySelectorAll('.docker-run-row'))
+            .filter(row => row.style.display !== 'none');
+    }
+
+    function dockerRunButtons(row) {
+        return Array.from(row?.querySelectorAll('.docker-run-action-btn:not(:disabled)') || []);
+    }
+
+    function dockerPaintRunKeyboard(rowIndex = dockerRunKeyboardRow, buttonIndex = dockerRunKeyboardButton, focus = true) {
+        const rows = dockerRunRows();
+        if (!rows.length) return;
+        document.querySelectorAll('.keyboard-selected-row').forEach(row => row.classList.remove('keyboard-selected-row'));
+        document.querySelectorAll('.keyboard-action-focus').forEach(button => button.classList.remove('keyboard-action-focus'));
+        dockerRunKeyboardRow = Math.max(0, Math.min(rowIndex, rows.length - 1));
+        const row = rows[dockerRunKeyboardRow];
+        row.classList.add('keyboard-selected-row');
+        const buttons = dockerRunButtons(row);
+        if (buttons.length) {
+            dockerRunKeyboardButton = Math.max(0, Math.min(buttonIndex, buttons.length - 1));
+            const button = buttons[dockerRunKeyboardButton];
+            button.classList.add('keyboard-action-focus');
+            if (focus) {
+                try { button.focus({preventScroll: true}); }
+                catch (error) { button.focus(); }
+            }
+        }
+        row.scrollIntoView({block: 'nearest', inline: 'nearest'});
+    }
+
+    function dockerBindRunKeyboard() {
+        dockerRunRows().forEach((row, index) => {
+            if (row.dataset.runKeyboardBound === '1') return;
+            row.dataset.runKeyboardBound = '1';
+            row.addEventListener('click', event => {
+                const buttons = dockerRunButtons(row);
+                const button = event.target.closest('.docker-run-action-btn');
+                dockerRunKeyboardButton = button ? Math.max(0, buttons.indexOf(button)) : 0;
+                dockerPaintRunKeyboard(index, dockerRunKeyboardButton, false);
+            });
+        });
+    }
+
+    function dockerHandleRunKeyboard(event) {
+        if (!document.querySelector('.docker-page[data-active-tab="docker_run"]')) return;
+        if (document.querySelector('.docker-page')?.dataset.activeSubtab !== 'main') return;
+        if (document.querySelector('.modal-backdrop.active')) return;
+        if (event.target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '].includes(event.key)) return;
+        const rows = dockerRunRows();
+        if (!rows.length) return;
+        event.preventDefault();
+        if (event.key === 'ArrowDown') dockerPaintRunKeyboard(dockerRunKeyboardRow + 1, 0, true);
+        else if (event.key === 'ArrowUp') dockerPaintRunKeyboard(dockerRunKeyboardRow - 1, 0, true);
+        else if (event.key === 'ArrowRight') dockerPaintRunKeyboard(dockerRunKeyboardRow, dockerRunKeyboardButton + 1, true);
+        else if (event.key === 'ArrowLeft') dockerPaintRunKeyboard(dockerRunKeyboardRow, dockerRunKeyboardButton - 1, true);
+        else if (event.key === 'Home') dockerPaintRunKeyboard(0, 0, true);
+        else if (event.key === 'End') dockerPaintRunKeyboard(rows.length - 1, 0, true);
+        else if (event.key === 'Enter' || event.key === ' ') dockerRunButtons(rows[dockerRunKeyboardRow])[dockerRunKeyboardButton]?.click();
+    }
+
+    dockerBindRunKeyboard();
+    dockerPaintRunKeyboard(0, 0, false);
+    document.addEventListener('keydown', dockerHandleRunKeyboard);
+
+    function dockerSetTerminalText(box, text, append = false) {
+        if (!box) return;
+        if ('value' in box) {
+            box.value = append ? box.value + text : text;
+            box.scrollTop = box.scrollHeight;
+        } else {
+            box.textContent = append ? box.textContent + text : text;
+            box.scrollTop = box.scrollHeight;
+        }
+    }
+
+    window.dockerFilterRuns = function () {
+        const input = document.getElementById('docker-run-search');
+        const filter = (input?.value || '').trim().toLowerCase();
+        let visible = 0;
+        document.querySelectorAll('.docker-run-row').forEach(row => {
+            const haystack = row.dataset.filter || '';
+            const show = !filter || haystack.includes(filter);
+            row.style.display = show ? '' : 'none';
+            if (show) visible += 1;
+        });
+        document.querySelectorAll('.docker-run-mobile-file-card').forEach(card => {
+            const haystack = card.dataset.filter || '';
+            const show = !filter || haystack.includes(filter);
+            card.hidden = !show;
+        });
+        const chip = document.getElementById('docker-run-count');
+        if (chip) chip.textContent = visible + ' fichier(s)';
+        dockerRunKeyboardRow = 0;
+        dockerRunKeyboardButton = 0;
+        dockerPaintRunKeyboard(0, 0, false);
+    };
+
+    function dockerRunFindRow(filename) {
+        filename = filename || '';
+        return Array.from(document.querySelectorAll('.docker-run-row'))
+            .find(row => (row.dataset.runName || '') === filename);
+    }
+
+    function dockerRunSetRowStatus(filename, data) {
+        const row = dockerRunFindRow(filename);
+        if (!row || !data) return;
+
+        const status = data.status || 'idle';
+        const cssClass = data.class || status || 'idle';
+        const label = data.label || (status === 'running' ? 'En cours' : status === 'success' ? 'Succès' : status === 'error' ? 'Erreur' : '—');
+        const progress = Number.isFinite(Number(data.progress)) ? Math.max(0, Math.min(100, Number(data.progress))) : (status === 'running' ? 55 : status === 'idle' ? 0 : 100);
+
+        row.dataset.runStatus = status;
+        const progressBox = row.querySelector('.docker-run-progress');
+        if (progressBox) {
+            progressBox.className = 'docker-run-progress docker-run-progress-' + cssClass;
+            const bar = progressBox.querySelector('.docker-run-progress-track span');
+            if (bar) bar.style.width = progress + '%';
+            const text = progressBox.querySelector('.docker-run-progress-label');
+            if (text) text.textContent = label;
+        }
+
+        const playButton = row.querySelector('.docker-run-play-btn');
+        if (playButton) {
+            const running = Boolean(data.running || status === 'running');
+            playButton.classList.toggle('docker-run-play-spinning', running);
+            playButton.disabled = running;
+            playButton.setAttribute('aria-disabled', running ? 'true' : 'false');
+            if (playButton.tagName === 'A') {
+                const target = '/docker/run/log?filename=' + encodeURIComponent(filename) + (running ? '' : '&run=1');
+                playButton.setAttribute('href', target);
+            }
+        }
+    }
+
+    async function dockerRunPollStatus(filename) {
+        if (!filename) return;
+        try {
+            const res = await fetch('/docker/run/status?filename=' + encodeURIComponent(filename), {cache: 'no-store'});
+            const data = await res.json();
+            if (data && data.ok !== false) dockerRunSetRowStatus(filename, data);
+            if (data && data.running) {
+                window.setTimeout(() => dockerRunPollStatus(filename), 1500);
+            }
+        } catch (error) {
+            dockerRunSetRowStatus(filename, {status: 'error', class: 'error', label: 'Erreur', progress: 100, running: false});
+        }
+    }
+
+    window.dockerRunStartFromLibrary = async function (event, filename) {
+        if (event) event.preventDefault();
+        if (!filename) return;
+
+        dockerRunSetRowStatus(filename, {status: 'running', class: 'running', label: 'En cours', progress: 55, running: true});
+        try {
+            const body = new URLSearchParams();
+            body.set('filename', filename);
+            const res = await fetch('/docker/run/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
+                body,
+                cache: 'no-store'
+            });
+            const data = await res.json();
+            if (!res.ok || data.ok === false) {
+                dockerRunSetRowStatus(filename, {status: 'error', class: 'error', label: 'Erreur', progress: 100, running: false});
+                return;
+            }
+            dockerRunSetRowStatus(filename, data);
+            if (data.running) dockerRunPollStatus(filename);
+            return false;
+        } catch (error) {
+            dockerRunSetRowStatus(filename, {status: 'error', class: 'error', label: 'Erreur', progress: 100, running: false});
+            window.location.href = '/docker/run/log?filename=' + encodeURIComponent(filename) + '&run=1';
+            return false;
+        }
+    };
+
+    document.querySelectorAll('.docker-run-play-btn[data-filename]').forEach(button => {
+        if (button.dataset.runStartBound === '1') return;
+        button.dataset.runStartBound = '1';
+        button.addEventListener('click', event => {
+            if (button.getAttribute('aria-disabled') === 'true') return;
+            dockerRunStartFromLibrary(event, button.dataset.filename || '');
+        });
+    });
+
+    document.querySelectorAll('.docker-run-row[data-run-status="running"]').forEach(row => {
+        const filename = row.dataset.runName || '';
+        if (filename) dockerRunPollStatus(filename);
+    });
+
+    function dockerDecodeBase64Utf8(value) {
+        try {
+            const binary = atob(value || '');
+            const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+            return new TextDecoder().decode(bytes);
+        } catch (error) {
+            return '';
+        }
+    }
+
+    window.dockerResetRunEditor = function () {
+        const filename = document.getElementById('docker-run-existing-filename');
+        const command = document.getElementById('docker-run-command');
+        const mode = document.getElementById('docker-run-editor-mode');
+        if (filename) filename.value = '';
+        if (command) command.value = '';
+        if (mode) mode.textContent = 'Nouveau fichier';
+    };
+
+    window.dockerEditRun = function (filename, contentB64) {
+        const filenameInput = document.getElementById('docker-run-existing-filename');
+        const commandInput = document.getElementById('docker-run-command');
+        const decoded = dockerDecodeBase64Utf8(contentB64);
+        if (!filenameInput || !commandInput) {
+            sessionStorage.setItem('dockerRunEditFilename', filename || '');
+            sessionStorage.setItem('dockerRunEditContent', contentB64 || '');
+            window.location.href = '/docker/run/edit';
+            return;
+        }
+        filenameInput.value = filename || '';
+        commandInput.value = decoded;
+        const mode = document.getElementById('docker-run-editor-mode');
+        if (mode) mode.textContent = 'Édition : ' + filename;
+        commandInput.focus();
+    };
+
+    function dockerRunMobileSetText(id, value, fallback = '—') {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value || fallback;
+    }
+
+    window.dockerOpenRunMobileDetail = function (button) {
+        if (!button) return;
+        const data = button.dataset || {};
+        const filename = data.filename || '';
+        const icon = data.icon || '';
+        const image = data.image || '';
+        const preview = data.preview || '';
+        const modal = document.getElementById('docker-run-mobile-detail-modal');
+        const iconEl = document.getElementById('docker-run-mobile-detail-icon');
+        const runLink = document.getElementById('docker-run-mobile-detail-run');
+        const editLink = document.getElementById('docker-run-mobile-detail-edit');
+        const deleteInput = document.getElementById('docker-run-mobile-detail-delete-name');
+
+        dockerRunMobileSetText('docker-run-mobile-detail-title', filename, 'Docker Run');
+        dockerRunMobileSetText('docker-run-mobile-detail-image', image || preview, '');
+        dockerRunMobileSetText('docker-run-mobile-detail-status', data.status || '—');
+        dockerRunMobileSetText('docker-run-mobile-detail-size', data.size ? data.size + ' Ko' : '—');
+        dockerRunMobileSetText('docker-run-mobile-detail-lines', data.lines ? data.lines + ' ligne(s)' : '—');
+        dockerRunMobileSetText('docker-run-mobile-detail-modified', data.modified || '—');
+        dockerRunMobileSetText('docker-run-mobile-detail-preview', preview || image || 'Aucun aperçu disponible.', 'Aucun aperçu disponible.');
+
+        if (iconEl && icon) iconEl.src = icon;
+        if (runLink) runLink.href = data.logUrl || ('/docker/run/log?filename=' + encodeURIComponent(filename) + '&run=1');
+        if (editLink) {
+            editLink.href = data.editUrl || ('/docker/run/edit?filename=' + encodeURIComponent(filename));
+            editLink.onclick = function () {
+                if (window.dockerRunRememberEditor) dockerRunRememberEditor(filename, icon);
+            };
+        }
+        if (deleteInput) deleteInput.value = filename;
+        modal?.classList.add('active');
+    };
+
+    window.dockerCloseRunMobileDetail = function () {
+        document.getElementById('docker-run-mobile-detail-modal')?.classList.remove('active');
+    };
+
+    document.getElementById('docker-run-mobile-detail-modal')?.addEventListener('click', event => {
+        if (event.target.id === 'docker-run-mobile-detail-modal') dockerCloseRunMobileDetail();
+    });
+
+    window.dockerOpenRunDeleteModal = function (filename) {
+        document.getElementById('docker-run-delete-name-display').textContent = filename || '';
+        document.getElementById('docker-run-delete-name').value = filename || '';
+        document.getElementById('docker-run-delete-modal')?.classList.add('active');
+    };
+
+    window.dockerCloseRunDeleteModal = function () {
+        document.getElementById('docker-run-delete-modal')?.classList.remove('active');
+    };
+
+    document.getElementById('docker-run-delete-modal')?.addEventListener('click', event => {
+        if (event.target.id === 'docker-run-delete-modal') dockerCloseRunDeleteModal();
+    });
+
+    window.dockerClearRunTerminal = function () {
+        dockerSetTerminalText(document.getElementById('docker-run-terminal'), '');
+    };
+
+    window.dockerCloseRunTerminal = function () {
+        const box = document.getElementById('docker-run-terminal');
+        dockerSetTerminalText(box, 'Terminal fermé.');
+        const title = document.getElementById('docker-run-terminal-title');
+        const file = document.getElementById('docker-run-terminal-file');
+        if (title) title.textContent = 'Log Docker Run';
+        if (file) file.textContent = 'Aucune';
+    };
+
+    async function dockerReadRunStream(url, filename, initialText) {
+        const box = document.getElementById('docker-run-terminal');
+        if (!box || !filename) return;
+        const title = document.getElementById('docker-run-terminal-title');
+        const file = document.getElementById('docker-run-terminal-file');
+        if (title) title.textContent = 'Log : ' + filename;
+        if (file) file.textContent = filename;
+        dockerSetTerminalText(box, initialText || '');
+        try {
+            const res = await fetch(url, {cache: 'no-store'});
+            if (!res.ok || !res.body) throw new Error('HTTP ' + res.status);
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const chunk = await reader.read();
+                if (chunk.done) break;
+                dockerSetTerminalText(box, decoder.decode(chunk.value, {stream: true}), true);
+            }
+            dockerSetTerminalText(box, decoder.decode(), true);
+        } catch (error) {
+            dockerSetTerminalText(box, '\n❌ Erreur : ' + error.message, true);
+        }
+    }
+
+    window.dockerExecRun = async function (filename) {
+        const box = document.getElementById('docker-run-terminal');
+        if (!box) {
+            if (filename) sessionStorage.setItem('dockerRunPendingFile', filename);
+            window.location.href = '/docker/run/log' + (filename ? '?filename=' + encodeURIComponent(filename) + '&run=1' : '');
+            return;
+        }
+        if (!filename) return;
+        dockerReadRunStream(
+            '/docker/exec_docker_run?filename=' + encodeURIComponent(filename),
+            filename,
+            '⏳ Exécution ' + filename + '...\n'
+        );
+    };
+
+    window.dockerTailRunLog = async function (filename) {
+        if (!filename) return;
+        dockerReadRunStream(
+            '/docker/run/log_stream?filename=' + encodeURIComponent(filename),
+            filename,
+            ''
+        );
+    };
+
+    const serverDockerRunFile = {{ docker_run_autorun_file|tojson }};
+    const serverDockerRunLogFile = {{ docker_run_log_filename|tojson }};
+    const pendingDockerRunFile = sessionStorage.getItem('dockerRunPendingFile');
+    if (serverDockerRunFile && document.getElementById('docker-run-terminal')) {
+        sessionStorage.removeItem('dockerRunPendingFile');
+        dockerExecRun(serverDockerRunFile);
+    } else if (pendingDockerRunFile && document.getElementById('docker-run-terminal')) {
+        sessionStorage.removeItem('dockerRunPendingFile');
+        dockerExecRun(pendingDockerRunFile);
+    } else if (serverDockerRunLogFile && document.getElementById('docker-run-terminal')) {
+        dockerTailRunLog(serverDockerRunLogFile);
+    }
+
+    const pendingEditFilename = sessionStorage.getItem('dockerRunEditFilename');
+    const pendingEditContent = sessionStorage.getItem('dockerRunEditContent');
+    if ((pendingEditFilename || pendingEditContent) && document.getElementById('docker-run-existing-filename')) {
+        sessionStorage.removeItem('dockerRunEditFilename');
+        sessionStorage.removeItem('dockerRunEditContent');
+        dockerEditRun(pendingEditFilename || '', pendingEditContent || '');
+    }
+
+    const dockerRunOpenEditorsKey = 'dockerRunOpenEditorsV1';
+
+    function dockerRunLoadOpenEditors() {
+        try {
+            const raw = localStorage.getItem(dockerRunOpenEditorsKey);
+            const parsed = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(parsed)) return [];
+            return parsed
+                .filter(item => item && typeof item.filename === 'string' && item.filename.trim())
+                .map(item => ({
+                    filename: item.filename.trim(),
+                    icon: typeof item.icon === 'string' ? item.icon : ''
+                }));
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function dockerRunSaveOpenEditors(items) {
+        const clean = [];
+        const seen = new Set();
+        (items || []).forEach(item => {
+            const filename = (item?.filename || '').trim();
+            if (!filename || seen.has(filename)) return;
+            seen.add(filename);
+            clean.push({filename, icon: item.icon || ''});
+        });
+        localStorage.setItem(dockerRunOpenEditorsKey, JSON.stringify(clean.slice(-14)));
+    }
+
+    window.dockerRunRememberEditor = function (filename, icon) {
+        filename = (filename || '').trim();
+        if (!filename) return;
+
+        const tabs = dockerRunLoadOpenEditors();
+        const existing = tabs.find(item => item.filename === filename);
+        if (existing) {
+            // Ne pas supprimer/réinsérer l'onglet : sinon les onglets changent de place
+            // à chaque clic entre deux fichiers ouverts.
+            if (icon) existing.icon = icon;
+        } else {
+            tabs.push({filename, icon: icon || ''});
+        }
+
+        dockerRunSaveOpenEditors(tabs);
+        dockerRunRenderOpenEditorTabs();
+    };
+
+    function dockerRunForgetEditor(filename) {
+        filename = (filename || '').trim();
+        if (!filename) return;
+        dockerRunSaveOpenEditors(dockerRunLoadOpenEditors().filter(item => item.filename !== filename));
+        dockerRunRenderOpenEditorTabs();
+    }
+
+    function dockerRunForgetEditorFromForm() {
+        const original = document.getElementById('docker-run-original-filename')?.value || '';
+        const current = document.getElementById('docker-run-existing-filename')?.value || '';
+        dockerRunForgetEditor(original);
+        if (current && current !== original) dockerRunForgetEditor(current);
+    }
+
+    window.dockerRunRememberEditorFromForm = function () {
+        const filename = document.getElementById('docker-run-existing-filename')?.value || '';
+        const icon = document.getElementById('docker-run-open-edit-tabs')?.dataset.activeIcon || '';
+        dockerRunRememberEditor(filename, icon);
+    };
+
+    window.dockerRunCloseEditorTabBeforeSubmit = function () {
+        dockerRunForgetEditorFromForm();
+    };
+
+    window.dockerRunCloseCurrentEditor = function () {
+        dockerRunForgetEditorFromForm();
+        window.location.href = '/docker/run/main';
+    };
+
+    window.dockerRunSubmitEditor = function (actionName) {
+        const form = document.getElementById('docker-run-editor-form');
+        if (!form) return false;
+
+        actionName = String(actionName || '').trim();
+        if (!['save_run', 'save_run_close'].includes(actionName)) return false;
+
+        form.querySelectorAll('input[data-docker-run-menu-submit="1"]').forEach(input => input.remove());
+
+        if (actionName === 'save_run_close') {
+            dockerRunCloseEditorTabBeforeSubmit();
+        } else {
+            dockerRunRememberEditorFromForm();
+        }
+
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = actionName;
+        input.value = '1';
+        input.setAttribute('data-docker-run-menu-submit', '1');
+        form.appendChild(input);
+
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+        return false;
+    };
+
+    window.dockerRunCloseEditorTab = function (event, filename) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        dockerRunForgetEditor(filename);
+        const host = document.getElementById('docker-run-open-edit-tabs');
+        const activeFilename = host?.dataset.activeFilename || '';
+        const activeSubtab = host?.dataset.activeSubtab || '';
+        if (activeSubtab === 'edit' && activeFilename === filename) {
+            window.location.href = '/docker/run/main';
+        }
+    };
+
+    window.dockerRunRenderOpenEditorTabs = function () {
+        const host = document.getElementById('docker-run-open-edit-tabs');
+        if (!host) return;
+        const activeFilename = host.dataset.activeFilename || '';
+        const activeSubtab = host.dataset.activeSubtab || '';
+        host.innerHTML = '';
+        dockerRunLoadOpenEditors().forEach(item => {
+            const shell = document.createElement('span');
+            shell.className = 'docker-run-temp-edit-shell';
+
+            const link = document.createElement('a');
+            link.className = 'yoleo-subnav-link docker-run-temp-edit-tab';
+            if (activeSubtab === 'edit' && activeFilename === item.filename) link.classList.add('is-active');
+            link.href = '/docker/run/edit?filename=' + encodeURIComponent(item.filename);
+            link.title = item.filename;
+
+            if (item.icon) {
+                const img = document.createElement('img');
+                img.src = item.icon;
+                img.alt = '';
+                img.className = 'docker-run-temp-edit-icon';
+                img.onerror = () => { img.remove(); };
+                link.appendChild(img);
+            } else {
+                const fallback = document.createElement('span');
+                fallback.textContent = '✍️';
+                fallback.className = 'docker-run-temp-edit-fallback-icon';
+                link.appendChild(fallback);
+            }
+
+            const label = document.createElement('span');
+            label.textContent = item.filename;
+            link.appendChild(label);
+
+            const close = document.createElement('button');
+            close.className = 'yoleo-btn yoleo-btn-red yoleo-btn-mini docker-run-temp-edit-close';
+            close.type = 'button';
+            close.title = 'Fermer cet éditeur';
+            close.textContent = '✕';
+            close.addEventListener('click', event => dockerRunCloseEditorTab(event, item.filename));
+
+            shell.appendChild(link);
+            shell.appendChild(close);
+            host.appendChild(shell);
+        });
+    };
+
+    function dockerRunSyncCurrentEditorTab() {
+        const host = document.getElementById('docker-run-open-edit-tabs');
+        if (!host) return;
+        const activeSubtab = host.dataset.activeSubtab || '';
+        const activeFilename = host.dataset.activeFilename || '';
+        const activeIcon = host.dataset.activeIcon || '';
+        if (activeSubtab === 'edit' && activeFilename) {
+            dockerRunRememberEditor(activeFilename, activeIcon);
+        } else {
+            dockerRunRenderOpenEditorTabs();
+        }
+    }
+
+    dockerRunSyncCurrentEditorTab();

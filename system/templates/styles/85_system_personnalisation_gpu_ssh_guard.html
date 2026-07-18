@@ -1,0 +1,20 @@
+/* Système > Personnalisation > Accueil : GPU SSH activable seulement quand la configuration SSH est complète. */
+.pers-home-ssh-toggle-row .home-toggle.home-toggle-ssh-gpu.is-disabled {
+    cursor: not-allowed;
+    opacity: .58;
+    filter: saturate(.72);
+}
+
+.pers-home-ssh-toggle-row .home-toggle.home-toggle-ssh-gpu.is-disabled:hover {
+    transform: none;
+    border-color: #2b394d;
+    background: #10161f;
+}
+
+.pers-home-ssh-toggle-row .home-toggle.home-toggle-ssh-gpu.is-disabled input {
+    cursor: not-allowed;
+}
+
+.pers-home-ssh-note[hidden] {
+    display: none !important;
+}

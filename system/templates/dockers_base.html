@@ -1,0 +1,64 @@
+{% extends "menu.html" %}
+
+{% set docker_titles = {
+    'docker': ['Conteneurs Docker', 'État, actions et service Docker'],
+    'stacks': ['Stacks', 'Déclaration des stacks et fichiers YAML associés'],
+    'yml': ['Fichier YML', 'Éditeur YAML Compose'],
+    'env': ['Éditeur ENV', 'Variables .env utilisées par Compose'],
+    'images': ['Images Docker', 'Images, espace disque et maintenance'],
+    'docker_lan': ['LAN Docker - Réseau Docker', 'macvlan / ipvlan / bridge, enregistré dans le JSON réseau'],
+    'docker_run': ['Docker Run', 'Bibliothèque de commandes docker run'],
+    'options': ['Options Docker', 'Chemins et paramètres du module Docker']
+} %}
+{% set docker_run_titles = {
+    'main': ['Bibliothèque Docker Run', 'Bibliothèque de commandes docker run'],
+    'log': ['Log Docker Run', 'Sortie et journal de la dernière exécution'],
+    'edit': ['Éditeur Docker Run', 'Création et modification des commandes docker run'],
+    'info': ['Info Docker Run', 'Résumé et paramètres du module Docker Run']
+} %}
+{% set current_title = docker_run_titles.get(active_subtab, docker_run_titles['main']) if active_tab == 'docker_run' else docker_titles.get(active_tab, docker_titles['docker']) %}
+{% if active_tab == 'docker_run' %}{% set page_icon_override = '🚀' %}{% endif %}
+{% set default_icon = url_for('static', filename='logo/docker.png') %}
+
+{% block title %}{{ current_title[0]|striptags }} - Yoleo{% endblock %}
+{% block page_title %}{{ current_title[0] }}{% endblock %}
+{% block page_subtitle %}{% if active_tab == 'docker_lan' %}{{ docker_lan_state_file }} - {{ current_title[1] }}{% elif active_tab == 'stacks' %}{{ current_title[1] }} - Fichier : {{ conf.STACKS_FILE }}{% elif active_tab == 'env' %}{{ current_title[1] }} - Fichier : {{ conf.ENV_FILE }}{% else %}{{ current_title[1] }}{% endif %}{% endblock %}
+
+{% block content %}
+<main class="docker-page" data-active-tab="{{ active_tab }}" data-active-subtab="{{ active_subtab }}">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <section class="docker-flash-stack docker-floating-flash-stack">
+        {% for category, message in messages %}
+        <div class="action-message {{ 'ok' if category == 'success' else 'bad' }}">{{ message }}</div>
+        {% endfor %}
+    </section>
+    {% endif %}
+    {% endwith %}
+
+    {% if docker_setup and docker_setup.required and active_tab != 'options' %}
+    <section class="yoleo-card docker-section">
+        <div class="topbar">
+            <div>
+                <div class="card-title">Configuration requise</div>
+                <div class="subtitle">Choisis au minimum le dossier YML et le dossier Docker Run.</div>
+            </div>
+            <a class="yoleo-btn yoleo-btn-primary" href="/docker/options">Ouvrir Options</a>
+        </div>
+    </section>
+    {% endif %}
+
+    {% set docker_options_sections = ['options', 'stacks', 'env', 'images', 'docker_lan'] %}
+    {% if active_tab in docker_options_sections %}
+    <nav class="yoleo-subnav docker-options-subnav" aria-label="Navigation options Docker">
+        <a class="yoleo-subnav-link {{ 'is-active' if active_tab == 'options' else '' }}" href="/docker/options">⚙️ Options générales</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_tab == 'stacks' else '' }}" href="/docker/stacks">🧩 Stacks</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_tab == 'env' else '' }}" href="/docker/env">🔐 ENV</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_tab == 'images' else '' }}" href="/docker/images">🖼️ Images Docker</a>
+        <a class="yoleo-subnav-link {{ 'is-active' if active_tab == 'docker_lan' else '' }}" href="/docker/networks">🌐 LAN Docker</a>
+    </nav>
+    {% endif %}
+
+    {% block route_content %}{% endblock %}
+{% include "dockers/common_after.html" %}
+{% endblock %}

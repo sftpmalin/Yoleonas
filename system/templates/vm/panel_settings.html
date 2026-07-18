@@ -1,0 +1,15 @@
+<div id="tab-settings" class="tab-panel {{ 'active' if active_section == 'settings' else '' }}">
+                <section class="card">
+                    <div class="topbar">
+                        <div class="title-block">
+                            <h2>⚙️ Réglages / Maintenance</h2>
+                            <div class="subtitle">Ajout rapide de pool, chemins par défaut, état libvirt et raccourcis utiles.</div>
+                        </div>
+                        <div class="toolbar"><button class="yoleo-btn yoleo-btn-muted" onclick="loadLogs()">Lire infos</button></div>
+                    </div>
+                    <div class="details-grid">
+                        <div class="detail-card"><div class="detail-title">Configuration</div><div class="code" id="confBox">{{ conf|tojson(indent=2) }}</div></div>
+                        <div class="detail-card"><div class="detail-title">Actions rapides</div><div class="toolbar" style="justify-content:flex-start;"><button class="yoleo-btn yoleo-btn-green" onclick="openPoolModal()">➕ Pool</button><button class="yoleo-btn yoleo-btn-green" onclick="openNetworkModal()">➕ Réseau</button><button class="yoleo-btn yoleo-btn-primary" onclick="openDeviceModal('disk')">➕ Disque VM sélectionnée</button><button class="yoleo-btn yoleo-btn-primary" onclick="openDeviceModal('iso')">➕ ISO VM sélectionnée</button></div></div>
+                    </div>
+                </section>
+            </div>

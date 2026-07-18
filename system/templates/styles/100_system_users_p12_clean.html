@@ -1,0 +1,959 @@
+/* ============================================================
+   Routes propres /system/users et /system/p12
+   Trame neuve, namespacing .su-* pour éviter les effets fantômes
+   de l'ancien module /users et de ses correctifs successifs.
+   ============================================================ */
+
+.yoleo-content > .su-page {
+    width: min(var(--yoleo-content-wide, 1680px), calc(100% - (var(--yoleo-page-gap-x, 18px) * 2)));
+    margin: var(--yoleo-page-gap-top, 14px) auto var(--yoleo-page-gap-bottom, 34px);
+    padding: 0;
+    box-sizing: border-box;
+    color: var(--yoleo-text, #e9eef5);
+}
+
+.su-page,
+.su-page * {
+    box-sizing: border-box;
+}
+
+.su-panel {
+    min-width: 0;
+    border: 1px solid var(--yoleo-card-border, #26364b);
+    border-radius: var(--yoleo-card-radius, 14px);
+    background: var(--yoleo-card-bg, linear-gradient(180deg, #131d2b 0%, #101722 100%));
+    box-shadow: var(--yoleo-card-shadow, 0 14px 30px rgba(0,0,0,.18));
+    overflow: hidden;
+}
+
+.su-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 14px 12px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+.su-panel-head h2,
+.su-info-card h2 {
+    margin: 0;
+    color: var(--yoleo-title-color, #1AEBFF);
+    font-size: 17px;
+    line-height: 1.2;
+    font-weight: 900;
+}
+
+.su-panel-head p,
+.su-muted,
+.su-form-grid label > span {
+    margin: 5px 0 0;
+    color: var(--yoleo-title-sub, #99acc2);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.su-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.su-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    background: #0c131e;
+}
+
+.su-table {
+    width: 100%;
+    min-width: 1080px;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+.su-table th {
+    height: 32px;
+    padding: 8px 10px;
+    background: #1a2636;
+    border-bottom: 1px solid #273447;
+    color: #a8eaff;
+    text-align: left;
+    text-transform: uppercase;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+.su-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(255,255,255,.055);
+    color: #eaf2ff;
+    font-size: 12px;
+    line-height: 1.2;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.su-table td code,
+.su-summary-box code {
+    color: #bdefff;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    word-break: break-all;
+}
+
+.su-table th:nth-child(1), .su-table td:nth-child(1) { width: 13%; }
+.su-table th:nth-child(2), .su-table td:nth-child(2) { width: 7%; }
+.su-table th:nth-child(3), .su-table td:nth-child(3) { width: 7%; }
+.su-table th:nth-child(4), .su-table td:nth-child(4) { width: 13%; }
+.su-table th:nth-child(5), .su-table td:nth-child(5) { width: 14%; }
+.su-table th:nth-child(6), .su-table td:nth-child(6) { width: 14%; }
+.su-table th:nth-child(7), .su-table td:nth-child(7) { width: 17%; }
+.su-table th:nth-child(8), .su-table td:nth-child(8) { width: 7%; text-align: center; }
+.su-table th:nth-child(9), .su-table td:nth-child(9) { width: 4%; text-align: center; }
+.su-table th:nth-child(10), .su-table td:nth-child(10) { width: 4%; text-align: center; }
+
+.su-row {
+    background: #0d1520;
+    cursor: default;
+}
+
+.su-row:nth-child(even) {
+    background: #0b121c;
+}
+
+.su-row:hover td {
+    background: #142238;
+}
+
+.su-row.is-selected td {
+    background: linear-gradient(90deg, rgba(122,44,255,.86), rgba(79,28,171,.64));
+    color: #fff;
+}
+
+.su-row.is-selected {
+    box-shadow: inset 3px 0 0 var(--yoleo-accent-2, #1AEBFF);
+}
+
+.su-user-cell b {
+    color: #fff;
+    font-weight: 900;
+}
+
+.su-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid #39485d;
+    background: #263242;
+    color: #dbe5ef;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 900;
+}
+
+.su-badge.is-ok {
+    border-color: #327a53;
+    background: #214634;
+    color: #adffd0;
+}
+
+.su-badge.is-locked {
+    border-color: #7c3131;
+    background: #4b2424;
+    color: #ffc0c0;
+}
+
+.su-row-btn {
+    min-width: 66px;
+}
+
+.su-icon-btn {
+    width: 32px;
+    min-width: 32px;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.su-status {
+    min-height: 34px;
+    padding: 10px 12px;
+    border-top: 1px solid #273447;
+    background: #111822;
+    color: #99acc2;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+.su-status.is-error {
+    color: #ffb4b4;
+}
+
+.su-p12-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.16fr) minmax(320px, .84fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.su-p12-form {
+    padding-bottom: 14px;
+}
+
+.su-side-stack {
+    display: grid;
+    gap: 14px;
+}
+
+.su-info-card {
+    padding: 14px;
+}
+
+.su-info-card h2 {
+    margin-bottom: 12px;
+}
+
+.su-form-grid {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+}
+
+.su-grid-1 { grid-template-columns: minmax(0, 1fr); }
+.su-grid-2 { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+.su-grid-3 { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
+.su-wide { grid-column: 1 / -1; }
+
+.su-form-grid label,
+.su-full-label {
+    display: grid;
+    gap: 5px;
+    color: #a8eaff;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .35px;
+    font-weight: 900;
+}
+
+.su-form-grid .yoleo-input,
+.su-full-label .yoleo-input {
+    width: 100%;
+    min-height: 34px;
+    font-family: Consolas, Monaco, monospace;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+}
+
+.su-path-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.su-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0 14px;
+}
+
+.su-output-state {
+    display: block;
+    color: #8effb0;
+    font-size: 12px;
+    line-height: 1.3;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.su-output-state.is-error {
+    color: #ffaaaa;
+}
+
+.su-result {
+    margin: 14px 14px 0;
+    padding: 12px;
+    white-space: pre-wrap;
+    border-radius: 12px;
+    border: 1px solid rgba(76,175,80,.32);
+    background: rgba(76,175,80,.10);
+    color: #caffd0;
+    font: 12px/1.35 Consolas, Monaco, monospace;
+}
+
+.su-result.is-error {
+    border-color: rgba(244,67,54,.35);
+    background: rgba(244,67,54,.12);
+    color: #ffd0d0;
+}
+
+.su-summary-box {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid #26364b;
+    border-radius: 13px;
+    background: #0b111a;
+    color: #d8e5f2;
+    line-height: 1.35;
+}
+
+.su-chip {
+    display: inline-flex;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(26,235,255,.28);
+    background: rgba(26,235,255,.10);
+    color: #9debff;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.su-modal-overlay[hidden] {
+    display: none !important;
+}
+
+.su-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0,0,0,.78);
+    backdrop-filter: blur(4px);
+}
+
+.su-modal-box {
+    width: min(620px, 96vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #30435b;
+    border-radius: 16px;
+    background: #152033;
+    box-shadow: 0 22px 50px rgba(0,0,0,.55);
+    overflow: hidden;
+}
+
+.su-ssh-box {
+    width: min(610px, 94vw);
+}
+
+.su-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #30435b;
+    color: #1AEBFF;
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.su-modal-close {
+    border: 0;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.su-modal-body {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    overflow: auto;
+    font-size: 12px;
+}
+
+.su-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 14px 14px;
+    border-top: 1px solid rgba(255,255,255,.06);
+}
+
+.su-warn,
+.su-danger {
+    border-radius: 10px;
+    padding: 8px;
+    font-size: 11.5px;
+    line-height: 1.3;
+}
+
+.su-warn {
+    border: 1px solid rgba(249,168,37,.34);
+    background: rgba(249,168,37,.10);
+    color: #ffdba0;
+}
+
+.su-danger {
+    border: 1px solid rgba(244,67,54,.38);
+    background: rgba(244,67,54,.12);
+    color: #ffcac7;
+}
+
+.su-ssh-frame {
+    width: 100%;
+    height: 196px;
+    border: 0;
+    background: transparent;
+}
+
+/* Popups /system/users : version compacte. */
+.su-modal-box.su-modal-compact {
+    width: min(520px, 94vw);
+}
+
+.su-modal-box.su-modal-add {
+    width: min(620px, 96vw);
+}
+
+.su-modal-box.su-modal-home,
+.su-modal-box.su-modal-ids,
+.su-modal-box.su-modal-remove,
+.su-modal-box.su-modal-restore {
+    width: min(520px, 94vw);
+}
+
+.su-modal-box.su-modal-shell,
+.su-modal-box.su-modal-pass {
+    width: min(460px, 94vw);
+}
+
+.su-modal-box.su-modal-compact .su-modal-header {
+    padding: 10px 14px;
+    font-size: 15px;
+}
+
+.su-modal-box.su-modal-compact .su-modal-body {
+    gap: 8px;
+    padding: 12px 14px;
+    font-size: 11px;
+}
+
+.su-modal-box.su-modal-compact .su-modal-footer {
+    padding: 9px 14px 12px;
+}
+
+.su-modal-box.su-modal-compact .su-form-grid {
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.su-modal-box.su-modal-compact .su-full-label {
+    gap: 4px;
+}
+
+.su-modal-box.su-modal-compact .su-form-grid .yoleo-input,
+.su-modal-box.su-modal-compact .su-full-label .yoleo-input {
+    min-height: 32px;
+}
+
+.su-modal-box.su-modal-compact .su-muted {
+    font-size: 11px;
+    line-height: 1.25;
+}
+
+.su-modal-box.su-modal-compact .su-warn,
+.su-modal-box.su-modal-compact .su-danger {
+    padding: 7px 8px;
+    font-size: 10.5px;
+    line-height: 1.25;
+}
+
+.su-modal-box.su-modal-shell .su-modal-body,
+.su-modal-box.su-modal-pass .su-modal-body {
+    font-size: 10.5px;
+}
+
+.su-modal-box.su-modal-shell .su-muted,
+.su-modal-box.su-modal-pass .su-muted {
+    font-size: 10.5px;
+}
+
+.su-ssh-box {
+    width: min(610px, 94vw);
+}
+
+.su-ssh-box .su-modal-header {
+    padding: 10px 14px;
+    font-size: 15px;
+}
+
+.su-ssh-frame {
+    height: 196px;
+}
+
+/* Contenu interne de l'iframe SSH, chargé par users_ssh_popup.html. */
+body.ssh-route-page .ssh-popup-card {
+    padding: 6px 8px 7px !important;
+}
+
+body.ssh-route-page .ssh-popup-mainrow {
+    grid-template-columns: 110px minmax(260px, 1fr) !important;
+    gap: 6px !important;
+}
+
+body.ssh-route-page .ssh-popup-user {
+    min-height: 30px !important;
+    padding: 4px 8px !important;
+}
+
+body.ssh-route-page .ssh-popup-label,
+body.ssh-route-page .ssh-popup-paths span,
+body.ssh-route-page .ssh-popup-type .lbl-lu {
+    font-size: 9px !important;
+}
+
+body.ssh-route-page .ssh-popup-user strong {
+    font-size: 12px !important;
+}
+
+body.ssh-route-page .ssh-popup-type select {
+    height: 31px !important;
+    min-height: 31px !important;
+}
+
+body.ssh-route-page .ssh-popup-paths {
+    margin-top: 6px !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+}
+
+body.ssh-route-page .ssh-popup-paths div {
+    padding: 4px 7px !important;
+}
+
+body.ssh-route-page .ssh-popup-paths code {
+    font-size: 11px !important;
+}
+
+body.ssh-route-page .ssh-popup-actions {
+    margin-top: 6px !important;
+    gap: 6px !important;
+}
+
+body.ssh-route-page .ssh-popup-actions .yoleo-btn {
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+}
+
+@media (max-width: 1100px) {
+    .su-p12-grid,
+    .su-grid-2,
+    .su-grid-3 {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .yoleo-content > .su-page {
+        width: calc(100% - 20px);
+        margin-top: var(--yoleo-page-gap-top, 10px);
+        margin-bottom: var(--yoleo-page-gap-bottom, 28px);
+    }
+
+    .su-panel-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .su-toolbar {
+        justify-content: stretch;
+    }
+
+    .su-toolbar .yoleo-btn,
+    .su-form-actions .yoleo-btn {
+        width: 100%;
+    }
+
+    .su-form-actions,
+    .su-modal-footer {
+        flex-direction: column;
+    }
+
+    .su-modal-footer .yoleo-btn {
+        width: 100%;
+    }
+}
+
+/* ------------------------------------------------------------
+   /system/users - retouches après test réel
+   - pas de sous-entête ni boutons internes : les actions restent
+     dans le menu haut / clic droit existant et dans les lignes.
+   - tableau calé comme l'ancienne route : pas de scroll horizontal
+     desktop, colonnes fixes pour UID/GID/actions.
+   - reprise du rendu mobile liste de l'ancienne carte.
+   ------------------------------------------------------------ */
+.su-users-page .su-panel-head,
+.su-users-page .su-toolbar {
+    display: none !important;
+}
+
+.su-users-page .su-table-wrap {
+    border-radius: var(--yoleo-card-radius, 14px) var(--yoleo-card-radius, 14px) 0 0;
+}
+
+@media (min-width: 901px) {
+    .su-users-page .su-table-wrap {
+        overflow-x: hidden !important;
+        overflow-y: visible !important;
+        background: #0c131e !important;
+    }
+
+    .su-users-page .su-table {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+    }
+
+    .su-users-page .su-table th:nth-child(1),
+    .su-users-page .su-table td:nth-child(1) { width: 13% !important; }
+    .su-users-page .su-table th:nth-child(2),
+    .su-users-page .su-table td:nth-child(2) { width: 80px !important; }
+    .su-users-page .su-table th:nth-child(3),
+    .su-users-page .su-table td:nth-child(3) { width: 80px !important; }
+    .su-users-page .su-table th:nth-child(4),
+    .su-users-page .su-table td:nth-child(4) { width: 11% !important; }
+    .su-users-page .su-table th:nth-child(5),
+    .su-users-page .su-table td:nth-child(5) { width: 14% !important; }
+    .su-users-page .su-table th:nth-child(6),
+    .su-users-page .su-table td:nth-child(6) { width: 13% !important; }
+    .su-users-page .su-table th:nth-child(7),
+    .su-users-page .su-table td:nth-child(7) { width: 17% !important; }
+    .su-users-page .su-table th:nth-child(8),
+    .su-users-page .su-table td:nth-child(8) { width: 86px !important; text-align: center !important; }
+    .su-users-page .su-table th:nth-child(9),
+    .su-users-page .su-table td:nth-child(9) { width: 62px !important; text-align: center !important; }
+    .su-users-page .su-table th:nth-child(10),
+    .su-users-page .su-table td:nth-child(10) { width: 54px !important; text-align: center !important; }
+
+    .su-users-page .su-table td code {
+        display: inline-block !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        word-break: normal !important;
+        vertical-align: bottom !important;
+    }
+
+    .su-users-page .su-row-btn {
+        min-width: 66px !important;
+        width: 66px !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        justify-content: center !important;
+    }
+
+    .su-users-page .su-icon-btn {
+        width: 32px !important;
+        min-width: 32px !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        justify-content: center !important;
+    }
+}
+
+.su-users-page .su-mobile-only {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    body.yoleo-mobile-mosaic-ready .su-users-page .su-table-wrap,
+    .su-users-page .su-table-wrap {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 6px !important;
+        border: 1px solid #26364b !important;
+        border-radius: 13px !important;
+        background: #0c131e !important;
+        box-sizing: border-box !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .su-users-page .su-table-wrap + .yoleo-mobile-table-grid,
+    .su-users-page .su-table-wrap + .yoleo-mobile-table-grid,
+    .su-users-page .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .su-users-page .su-table,
+    .su-users-page .su-table thead,
+    .su-users-page .su-table tbody,
+    .su-users-page .su-table tr,
+    .su-users-page .su-table th,
+    .su-users-page .su-table td {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .su-users-page .su-table {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: auto !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+    }
+
+    .su-users-page .su-table thead {
+        display: none !important;
+    }
+
+    .su-users-page .su-table tbody {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 7px !important;
+        width: 100% !important;
+    }
+
+    .su-users-page .su-table tr {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) 62px 30px 30px !important;
+        grid-template-rows: auto auto !important;
+        gap: 5px 6px !important;
+        align-items: center !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 8px 8px !important;
+        border: 1px solid #26364b !important;
+        border-left: 4px solid rgba(0, 221, 255, .70) !important;
+        border-radius: 11px !important;
+        background: rgba(15, 24, 36, .97) !important;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.025) !important;
+    }
+
+    .su-users-page .su-table tr.is-selected {
+        border-left-color: #c9a7ff !important;
+        background: linear-gradient(90deg, rgba(123,44,255,.62), rgba(15,24,36,.98)) !important;
+        outline: 2px solid rgba(26,235,255,.70) !important;
+        outline-offset: -2px !important;
+        box-shadow: inset 0 0 0 1px rgba(201,167,255,.22) !important;
+    }
+
+    .su-users-page .su-table td {
+        display: block !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        white-space: normal !important;
+        vertical-align: middle !important;
+        font-size: 11px !important;
+        line-height: 1.22 !important;
+        overflow: hidden !important;
+    }
+
+    .su-users-page .su-table td:nth-child(2),
+    .su-users-page .su-table td:nth-child(3),
+    .su-users-page .su-table td:nth-child(4),
+    .su-users-page .su-table td:nth-child(6),
+    .su-users-page .su-table td:nth-child(7) {
+        display: none !important;
+    }
+
+    .su-users-page .su-table .su-user-main-cell {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        min-width: 0 !important;
+        align-self: start !important;
+    }
+
+    .su-users-page .su-table .su-user-main-cell > b {
+        display: block !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        color: #fff !important;
+        font-size: 13px !important;
+        line-height: 1.15 !important;
+    }
+
+    .su-users-page .su-table .su-mobile-only {
+        display: block !important;
+    }
+
+    .su-users-page .su-table .su-mobile-meta {
+        margin-top: 3px !important;
+        color: #9bb0c2 !important;
+        font-size: 10px !important;
+        line-height: 1.15 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .su-users-page .su-table .su-mobile-line {
+        display: grid !important;
+        grid-template-columns: 34px minmax(0, 1fr) !important;
+        gap: 5px !important;
+        align-items: center !important;
+        margin-top: 2px !important;
+        min-width: 0 !important;
+    }
+
+    .su-users-page .su-table .su-mobile-line span {
+        color: #8fb4d6 !important;
+        font-size: 9px !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        letter-spacing: .2px !important;
+    }
+
+    .su-users-page .su-table .su-mobile-line code {
+        min-width: 0 !important;
+        color: #9debff !important;
+        font-family: Consolas, Monaco, monospace !important;
+        font-size: 10px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .su-users-page .su-table td:nth-child(5) {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+        align-self: end !important;
+        min-width: 0 !important;
+    }
+
+    .su-users-page .su-table .su-badge {
+        max-width: 100% !important;
+        min-height: 18px !important;
+        padding: 2px 6px !important;
+        border-radius: 999px !important;
+        font-size: 9.5px !important;
+        line-height: 1.1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .su-users-page .su-table td.su-ssh-cell {
+        grid-column: 2 !important;
+        grid-row: 1 / span 2 !important;
+        justify-self: end !important;
+        align-self: center !important;
+        width: auto !important;
+        overflow: visible !important;
+        text-align: right !important;
+    }
+
+    .su-users-page .su-table td:nth-child(9) {
+        grid-column: 3 !important;
+        grid-row: 1 / span 2 !important;
+        justify-self: end !important;
+        align-self: center !important;
+        overflow: visible !important;
+    }
+
+    .su-users-page .su-table td:nth-child(10) {
+        grid-column: 4 !important;
+        grid-row: 1 / span 2 !important;
+        justify-self: end !important;
+        align-self: center !important;
+        overflow: visible !important;
+    }
+
+    .su-users-page .su-table .su-row-ssh {
+        width: 62px !important;
+        min-width: 62px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+        padding: 0 6px !important;
+        border-radius: 8px !important;
+        font-size: 10px !important;
+        line-height: 1 !important;
+        justify-content: center !important;
+    }
+
+    .su-users-page .su-table .su-row-action {
+        width: 28px !important;
+        min-width: 28px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        font-size: 13px !important;
+        line-height: 1 !important;
+        justify-content: center !important;
+    }
+
+    .su-users-page .su-status {
+        padding: 9px 10px !important;
+        border-top: 1px solid #26364b !important;
+        font-size: 11px !important;
+    }
+}
+
+@media (max-width: 460px) {
+    .su-users-page .su-table tr {
+        grid-template-columns: minmax(0, 1fr) 58px 28px 28px !important;
+        gap: 5px 5px !important;
+        padding: 8px 7px !important;
+    }
+
+    .su-users-page .su-table .su-row-ssh {
+        width: 58px !important;
+        min-width: 58px !important;
+        font-size: 9.5px !important;
+    }
+}
+
+
+/* Correctif SSH compact : ne pas couper les boutons et ne pas empiler les champs. */
+.su-ssh-box {
+    width: min(610px, 94vw);
+}
+
+.su-ssh-frame {
+    height: 196px;
+    min-height: 196px;
+}
+
+body.ssh-route-page .ssh-popup-card {
+    overflow: hidden !important;
+}
+
+body.ssh-route-page .ssh-popup-mainrow {
+    grid-template-columns: 110px minmax(260px, 1fr) !important;
+}
+
+body.ssh-route-page .ssh-popup-paths {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+}
+
+body.ssh-route-page .ssh-popup-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    margin-top: 7px !important;
+}

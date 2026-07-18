@@ -1,0 +1,44 @@
+/* ------------------------------------------------------------------
+   47 - Services / MiniDLNA : spinner sur actions + feedback propre
+   ------------------------------------------------------------------ */
+.mini-page .mini-action-loading {
+    cursor:wait !important;
+    opacity:.88;
+}
+
+.mini-page .mini-action-loading,
+.mini-page .mini-action-loading .mini-action-label {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+}
+
+.mini-page .mini-action-spinner {
+    width:13px;
+    height:13px;
+    border:2px solid rgba(255,255,255,.35);
+    border-top-color:#fff;
+    border-radius:999px;
+    display:inline-block;
+    flex:0 0 auto;
+    animation:mini-action-spin .72s linear infinite;
+}
+
+.mini-page .mini-icon-action.mini-action-loading {
+    color:#fff;
+}
+
+.mini-page .mini-icon-action.mini-action-loading .mini-action-spinner {
+    width:14px;
+    height:14px;
+}
+
+.mini-page .mini-main-toolbar button:disabled:not(.mini-action-loading) {
+    opacity:.50;
+    cursor:not-allowed;
+}
+
+@keyframes mini-action-spin {
+    to { transform:rotate(360deg); }
+}

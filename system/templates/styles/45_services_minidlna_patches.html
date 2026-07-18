@@ -1,0 +1,95 @@
+/* ------------------------------------------------------------------
+   45 - Services / MiniDLNA : petits correctifs page principale
+   ------------------------------------------------------------------ */
+.mini-page .mini-flash {
+    transition: opacity .28s ease, transform .28s ease, max-height .28s ease, margin .28s ease, padding .28s ease;
+    overflow: hidden;
+}
+
+.mini-page .mini-flash.success.is-hiding {
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+    margin: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-width: 0;
+}
+
+.mini-page .service-inner-subnav {
+    align-items: center;
+}
+
+.mini-page #tab-main > form > .card:first-child .topbar {
+    align-items: center;
+}
+
+.mini-page #tab-main > form > .card:first-child .title-block h1 {
+    margin-bottom: 0;
+}
+
+
+/* MiniDLNA : interface simplifiée des dossiers médias.
+   Les champs restent dans le formulaire pour la sauvegarde, mais on masque
+   les colonnes techniques que l'utilisateur n'a pas besoin d'éditer. */
+.mini-page #sharesTable th:nth-child(1),
+.mini-page #sharesTable td:nth-child(1),
+.mini-page #sharesTable th:nth-child(4),
+.mini-page #sharesTable td:nth-child(4) {
+    display: none !important;
+}
+
+.mini-page #sharesTable th:nth-child(2),
+.mini-page #sharesTable td:nth-child(2) {
+    width: auto;
+}
+
+.mini-page #sharesTable th:nth-child(3),
+.mini-page #sharesTable td:nth-child(3) {
+    width: 150px;
+}
+
+.mini-page #sharesTable th:nth-child(5),
+.mini-page #sharesTable td:nth-child(5) {
+    width: 78px;
+}
+
+/* MiniDLNA : badges harmonisés avec ProFTPD / FFmpeg over IP.
+   États OK = vert ; états KO = rouge ; valeurs techniques/compteurs = neutre. */
+.mini-page .mini-status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    max-width: 100%;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 900;
+    line-height: 1.05;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border: 1px solid rgba(148, 163, 184, .34);
+    background: rgba(148, 163, 184, .12);
+    color: #dbeafe;
+}
+
+.mini-page .mini-status-ok {
+    color: #bbf7d0;
+    background: rgba(34, 197, 94, .18);
+    border-color: rgba(34, 197, 94, .55);
+}
+
+.mini-page .mini-status-ko {
+    color: #fecaca;
+    background: rgba(239, 68, 68, .17);
+    border-color: rgba(239, 68, 68, .58);
+}
+
+.mini-page .mini-status-neutral {
+    color: #bae6fd;
+    background: rgba(34, 211, 238, .10);
+    border-color: rgba(34, 211, 238, .34);
+}
+

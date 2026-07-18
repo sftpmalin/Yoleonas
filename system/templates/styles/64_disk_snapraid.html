@@ -1,0 +1,118 @@
+.disk-snapraid-page {
+  display: grid;
+  gap: 14px;
+}
+.disk-snapraid-page .snapraid-card {
+  margin: 0;
+  overflow: hidden;
+}
+.disk-snapraid-page .snapraid-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 12px 10px;
+}
+.disk-snapraid-page .snapraid-head h3 {
+  margin: 0 0 5px 0;
+  line-height: 1.22;
+}
+.disk-snapraid-page .snapraid-note {
+  color: var(--muted);
+  font-size: .86rem;
+  line-height: 1.35;
+}
+.disk-snapraid-page .snapraid-actions {
+  justify-content: flex-end;
+  white-space: nowrap;
+  align-items: center;
+}
+.disk-snapraid-page .snapraid-task-actions .yoleo-btn {
+  min-width: 38px;
+  padding-inline: 10px;
+  font-weight: 900;
+}
+.disk-snapraid-page .snapraid-counter {
+  color: var(--accent);
+  font-weight: 800;
+  white-space: nowrap;
+}
+.disk-snapraid-page .snapraid-flash {
+  margin: 2px 12px 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(26, 235, 255, .25);
+  background: rgba(26, 235, 255, .08);
+  color: #cfffff;
+}
+.disk-snapraid-page .snapraid-flash.bad {
+  border-color: rgba(255, 93, 115, .4);
+  background: rgba(255, 93, 115, .12);
+  color: #ffd9df;
+}
+.disk-snapraid-page .snapraid-flash.ok {
+  border-color: rgba(72, 213, 151, .35);
+  background: rgba(72, 213, 151, .12);
+  color: #dbfff0;
+}
+.disk-snapraid-page .snapraid-table th,
+.disk-snapraid-page .snapraid-table td {
+  vertical-align: middle;
+}
+.disk-snapraid-page .snapraid-select-col {
+  width: 62px;
+  text-align: center;
+}
+.disk-snapraid-page .snapraid-select-col input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.disk-snapraid-page .snapraid-select-col input[type="radio"]:disabled {
+  cursor: not-allowed;
+  opacity: .35;
+}
+.disk-snapraid-page .snapraid-status-grid {
+  display: grid;
+  grid-template-columns: minmax(150px, .7fr) minmax(240px, 1fr) minmax(280px, 1.4fr);
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+.disk-snapraid-page .snapraid-status-box {
+  border: 1px solid var(--yoleo-border);
+  border-radius: 12px;
+  background: rgba(10, 15, 22, .58);
+  padding: 10px 12px;
+  min-width: 0;
+}
+.disk-snapraid-page .snapraid-status-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.disk-snapraid-page .snapraid-status-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .disk-snapraid-page .snapraid-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 900px) {
+  .disk-snapraid-page .snapraid-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .disk-snapraid-page .snapraid-actions {
+    justify-content: flex-start;
+  }
+}

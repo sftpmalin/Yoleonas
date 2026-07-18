@@ -1,0 +1,50 @@
+{% extends "services_base.html" %}
+
+{% block route_content %}
+<div class="ffoi-page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+          <div class="flash-stack ffoi-flash-stack">
+              {% for category, message in messages %}
+                  <div class="flash {{ 'success' if category == 'success' else 'error' }}" {% if category == 'success' %}data-auto-hide="success"{% endif %}>{{ message }}</div>
+              {% endfor %}
+          </div>
+      {% endif %}
+  {% endwith %}
+
+
+  {% if not status.arch_ok %}
+  <div class="ffoi-alert ffoi-alert-warning">
+      FFmpeg over IP est volontairement limité à AMD64 dans cette première version. Architecture détectée : <strong>{{ status.arch }}</strong>.
+  </div>
+  {% endif %}
+
+  {% block ffmpeg_content %}{% endblock %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.ffoi-flash-stack .flash[data-auto-hide="success"]').forEach(function(box){
+    window.setTimeout(function(){
+      box.style.transition = 'opacity .35s ease, max-height .35s ease, margin .35s ease, padding .35s ease, border-width .35s ease';
+      box.style.overflow = 'hidden';
+      box.style.maxHeight = box.scrollHeight + 'px';
+      window.requestAnimationFrame(function(){
+        box.style.opacity = '0';
+        box.style.maxHeight = '0';
+        box.style.marginTop = '0';
+        box.style.marginBottom = '0';
+        box.style.paddingTop = '0';
+        box.style.paddingBottom = '0';
+        box.style.borderWidth = '0';
+      });
+      window.setTimeout(function(){
+        var stack = box.closest('.ffoi-flash-stack');
+        box.remove();
+        if(stack && stack.children.length === 0){ stack.remove(); }
+      }, 450);
+    }, 850);
+  });
+});
+</script>
+</div>
+{% endblock %}

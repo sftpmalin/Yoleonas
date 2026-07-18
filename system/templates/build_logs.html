@@ -1,0 +1,25 @@
+{% extends "build_base.html" %}
+
+{% block route_content %}
+<div id="tab-logs" class="tab-panel active">
+                    <section class="card">
+                        <div class="topbar" style="grid-template-columns:minmax(180px, 420px) auto; align-items:center; gap:10px;">
+                            <div id="statusBox" class="status-box" style="margin-bottom:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Prêt.</div>
+                            <div class="toolbar" style="align-items:center;">
+                                <label class="hint" for="buildLogLevelInput" style="margin:0;">Log</label>
+                                <select class="select-input" id="buildLogLevelInput" style="width:140px;" onchange="saveBuildLogLevel(this.value)">
+                                    {% for level in ['debug','info','warn','warning','error','fatal','panic'] %}
+                                    <option value="{{ level }}" {{ 'selected' if build_options.log_level == level else '' }}>{{ level }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="clearLog()">Effacer l’écran</button>
+                            </div>
+                        </div>
+                        <textarea id="terminal-output" spellcheck="false" readonly></textarea>
+                        <div class="progress-box">
+                            <div class="progress-head"><div class="progress-title" id="progressTitle">Progression</div><div class="progress-value" id="progressValue">0%</div></div>
+                            <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+                        </div>
+                    </section>
+                </div>
+{% endblock %}

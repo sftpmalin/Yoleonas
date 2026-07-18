@@ -1,0 +1,242 @@
+/* Services > Cache mover : progression et états d'action isolés. */
+.cache-page .cache-v4-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.cache-page .cache-v4-run-all-group {
+    display: grid;
+    grid-template-columns: auto minmax(190px, 280px);
+    align-items: center;
+    gap: 9px;
+    min-width: min(100%, 430px);
+}
+
+.cache-page .cache-v4-progress-cell {
+    min-width: 185px;
+}
+
+.cache-page .cache-v4-progress {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+}
+
+.cache-page .cache-v4-progress-track {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, .18);
+    border: 1px solid rgba(148, 163, 184, .24);
+}
+
+.cache-page .cache-v4-progress-track span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: rgba(148, 163, 184, .72);
+    transition: width .25s ease;
+}
+
+.cache-page .cache-v4-progress-label {
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 800;
+    font-size: 11px;
+    line-height: 1.25;
+    text-align: left;
+    white-space: nowrap;
+    color: var(--yoleo-muted);
+}
+
+.cache-page #cacheAllProgress .cache-v4-progress-label {
+    max-width: 160px;
+}
+
+.cache-page #cacheGeneralTable .actions-cell {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+.cache-page #cacheGeneralTable .yoleo-btn {
+    white-space: nowrap;
+}
+
+.cache-page .cache-v4-progress-running .cache-v4-progress-track span {
+    background: linear-gradient(90deg, rgba(34, 211, 238, .35), rgba(34, 211, 238, .95), rgba(34, 211, 238, .35));
+    background-size: 180% 100%;
+    animation: none;
+}
+
+.cache-page .cache-v4-progress-running.cache-v4-progress-indeterminate .cache-v4-progress-track span {
+    animation: cache-v4-progress-flow 1s linear infinite;
+}
+
+.cache-page .cache-v4-progress-running.cache-v4-progress-determinate .cache-v4-progress-track span {
+    background-size: 100% 100%;
+}
+
+.cache-page .cache-v4-progress-running .cache-v4-progress-label {
+    color: #22d3ee;
+}
+
+.cache-page .cache-v4-progress-success .cache-v4-progress-track span {
+    background: rgba(34, 197, 94, .95);
+}
+
+.cache-page .cache-v4-progress-success .cache-v4-progress-label {
+    color: #86efac;
+}
+
+.cache-page .cache-v4-progress-error .cache-v4-progress-track span {
+    background: rgba(244, 63, 94, .96);
+}
+
+.cache-page .cache-v4-progress-error .cache-v4-progress-label {
+    color: #fda4af;
+}
+
+.cache-page .cache-v4-button-loading {
+    position: relative;
+    pointer-events: auto;
+    cursor: not-allowed;
+    opacity: .9;
+    color: transparent !important;
+}
+
+.cache-page .cache-v4-button-loading::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 17px;
+    height: 17px;
+    margin-left: -8.5px;
+    margin-top: -8.5px;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, .36);
+    border-top-color: #fff;
+    animation: cache-v4-button-spin .75s linear infinite;
+}
+
+.cache-page .cache-v4-inline-status {
+    margin: 10px 0 12px;
+    padding: 9px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 800;
+    border: 1px solid rgba(148, 163, 184, .2);
+    background: rgba(15, 23, 42, .82);
+}
+
+.cache-page .cache-v4-inline-info {
+    color: #67e8f9;
+    border-color: rgba(34, 211, 238, .35);
+    background: rgba(8, 47, 73, .32);
+}
+
+.cache-page .cache-v4-inline-success {
+    color: #86efac;
+    border-color: rgba(34, 197, 94, .38);
+    background: rgba(20, 83, 45, .28);
+}
+
+.cache-page .cache-v4-inline-error {
+    color: #fda4af;
+    border-color: rgba(244, 63, 94, .45);
+    background: rgba(127, 29, 29, .32);
+}
+
+@keyframes cache-v4-button-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes cache-v4-progress-flow {
+    from { background-position: 0 0; }
+    to { background-position: 180% 0; }
+}
+
+@media (max-width: 1250px) {
+    .cache-page .cache-v4-run-all-group,
+    .cache-page .cache-v4-progress {
+        grid-template-columns: 1fr;
+    }
+
+    .cache-page .cache-v4-progress-label {
+        max-width: none;
+        font-size: 10px;
+    }
+}
+
+
+/* Cache : les messages longs restent dans la progression, pas en bulle flottante. */
+.cache-page .cache-v4-inline-status:not([hidden]) {
+    position: static !important;
+    width: 100%;
+    box-shadow: none;
+}
+
+.cache-page .cache-v4-row-stop[hidden] {
+    display: none !important;
+}
+
+/* Cache général : tableau de bord compact en une seule ligne.
+   Les actions secondaires sont dans le menu cranté du haut. */
+.cache-page .cache-general-control-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: stretch;
+    margin-bottom: 12px;
+}
+
+.cache-page .cache-summary-inline {
+    margin: 0 !important;
+    grid-template-columns: repeat(4, minmax(105px, 1fr));
+    align-self: stretch;
+}
+
+.cache-page .cache-summary-inline .summary-card {
+    min-height: 58px;
+}
+
+.cache-page .cache-run-all-right {
+    justify-self: end;
+    align-self: center;
+    min-width: min(100%, 430px);
+    margin: 0;
+}
+
+.cache-page .cache-table-tools-compact {
+    margin-top: 0;
+}
+
+.cache-page .cache-table-tools-compact .search-input {
+    width: 100%;
+    min-width: 0;
+}
+
+@media (max-width: 1180px) {
+    .cache-page .cache-general-control-row {
+        grid-template-columns: 1fr;
+    }
+    .cache-page .cache-run-all-right {
+        justify-self: stretch;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 760px) {
+    .cache-page .cache-summary-inline {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

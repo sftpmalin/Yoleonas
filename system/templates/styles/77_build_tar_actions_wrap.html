@@ -1,0 +1,91 @@
+/* ------------------------------------------------------------------
+   Build → TAR : actions de ligne compactes
+   Objectif : éviter que les boutons/états de la colonne Action soient
+   coupés quand la sidebar prend de la place. Les actions passent sur une
+   deuxième ligne au lieu de sortir du tableau.
+   ------------------------------------------------------------------ */
+
+.builds-page #tab-builds_tar .build-table {
+    table-layout: fixed;
+}
+
+.builds-page #tab-builds_tar .build-table th:nth-child(1),
+.builds-page #tab-builds_tar .build-table td:nth-child(1) {
+    width: 21% !important;
+}
+
+.builds-page #tab-builds_tar .build-table th:nth-child(2),
+.builds-page #tab-builds_tar .build-table td:nth-child(2) {
+    width: 14% !important;
+}
+
+.builds-page #tab-builds_tar .build-table th:nth-child(3),
+.builds-page #tab-builds_tar .build-table td:nth-child(3) {
+    width: 15% !important;
+}
+
+.builds-page #tab-builds_tar .build-table th:nth-child(4),
+.builds-page #tab-builds_tar .build-table td:nth-child(4) {
+    width: 16% !important;
+}
+
+.builds-page #tab-builds_tar .build-table th:nth-child(5),
+.builds-page #tab-builds_tar .build-table td:nth-child(5) {
+    width: 18% !important;
+}
+
+.builds-page #tab-builds_tar .build-table th:nth-child(6),
+.builds-page #tab-builds_tar .build-table td:nth-child(6) {
+    width: 16% !important;
+}
+
+.builds-page #tab-builds_tar .build-table th:nth-child(6) {
+    text-align: left !important;
+}
+
+.builds-page #tab-builds_tar .build-row-actions {
+    max-width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    white-space: normal !important;
+}
+
+.builds-page #tab-builds_tar .build-row-actions .build-db-option-btn {
+    flex: 0 0 28px;
+}
+
+.builds-page #tab-builds_tar .build-row-actions .smart-action-button {
+    flex: 0 0 auto;
+    min-width: 58px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.builds-page #tab-builds_tar .build-row-actions .smart-status {
+    flex: 1 1 100%;
+    width: max-content;
+    max-width: 100%;
+    justify-content: center;
+    text-align: center;
+    margin-top: 2px;
+}
+
+@media (max-width: 1100px) {
+    .builds-page #tab-builds_tar .build-table th:nth-child(1),
+    .builds-page #tab-builds_tar .build-table td:nth-child(1) {
+        width: 19% !important;
+    }
+
+    .builds-page #tab-builds_tar .build-table th:nth-child(5),
+    .builds-page #tab-builds_tar .build-table td:nth-child(5) {
+        width: 17% !important;
+    }
+
+    .builds-page #tab-builds_tar .build-table th:nth-child(6),
+    .builds-page #tab-builds_tar .build-table td:nth-child(6) {
+        width: 19% !important;
+    }
+}

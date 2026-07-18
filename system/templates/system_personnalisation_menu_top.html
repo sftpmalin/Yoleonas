@@ -1,0 +1,350 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<div class="pers-page pers-menu-page pers-menu-top-index-page">
+    {% include "partials/system_personnalisation_subnav.html" %}
+
+    <div id="topMenuIndexStatus" class="status-line personal-menu-status-top" hidden></div>
+
+    <div class="card pers-menu-card personal-browser-card top-menu-index-card">
+        <div class="card-body pers-menu-card-body">
+            <div class="personal-browser-head top-menu-index-head">
+                <div>
+                    <div class="pers-menu-section-title">Menu top</div>
+                    <div id="topMenuIndexCounter" class="personal-browser-counter"></div>
+                    <div id="topMenuIndexCrumbs" class="personal-browser-crumbs"></div>
+                </div>
+                <div class="personal-browser-actions">
+                    <button type="button" id="topMenuIndexNewBtn" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="topMenuIndexNew()">+ Groupe top</button>
+                </div>
+            </div>
+
+
+            <div id="topMenuIndexList" class="personal-browser-list top-menu-index-list"></div>
+        </div>
+    </div>
+</div>
+
+<div id="topMenuIndexConfirmModal" class="top-menu-index-confirm-overlay" hidden>
+    <div class="top-menu-index-confirm-box" role="dialog" aria-modal="true" aria-labelledby="topMenuIndexConfirmTitle">
+        <h2 class="top-menu-index-confirm-title" id="topMenuIndexConfirmTitle">Confirmation</h2>
+        <div class="top-menu-index-confirm-body" id="topMenuIndexConfirmBody"></div>
+        <div class="top-menu-index-confirm-actions">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" id="topMenuIndexConfirmCancel">Annuler</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red" id="topMenuIndexConfirmOk">Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.pers-menu-top-index-page { display:flex; flex-direction:column; gap:10px; }
+.top-menu-index-card .card-body { display:flex; flex-direction:column; gap:14px; }
+.personal-browser-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.personal-browser-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.personal-browser-counter { margin-top:4px; color:#b8c7dc; font-size:.84rem; }
+.personal-browser-crumbs { margin-top:8px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; color:#a7f3d0; font-size:.84rem; }
+.personal-browser-crumbs button { border:1px solid rgba(34,211,238,.26); border-radius:999px; background:rgba(2,6,23,.54); color:#dbeafe; padding:4px 9px; cursor:pointer; }
+.personal-browser-crumbs button:hover { border-color:rgba(34,211,238,.62); color:#fff; }
+.personal-browser-list { display:flex; flex-direction:column; align-items:center; gap:8px; min-height:210px; padding:2px; }
+.top-menu-index-list { align-items:center; gap:8px; }
+.personal-menu-status-top {
+    position: fixed;
+    top: 126px;
+    left: min(24vw, 360px);
+    z-index: 5000;
+    display: none !important;
+    margin: 0;
+    max-width: min(720px, calc(100vw - 48px));
+    pointer-events: none;
+    padding:7px 11px;
+    border-radius:10px;
+    font-size:.84rem;
+}
+.personal-menu-status-top.is-visible { display:block !important; }
+.personal-menu-status-top[hidden] { display:none !important; }
+.personal-menu-status-top.ok { border:1px solid rgba(34,197,94,.45); background:rgba(22,163,74,.13); color:#bbf7d0; }
+.personal-menu-status-top.bad { border:1px solid rgba(244,63,94,.5); background:rgba(127,29,29,.18); color:#fecdd3; }
+
+.top-menu-index-tile { position:relative; min-height:64px; width:fit-content; max-width:100%; min-width:min(520px, 100%); display:grid; grid-template-columns:48px minmax(190px, 1fr) auto; grid-template-rows:auto auto; align-items:center; column-gap:12px; row-gap:2px; padding:9px 10px; border:1px solid rgba(168,85,247,.28); border-radius:12px; background:linear-gradient(180deg, rgba(15,23,42,.74), rgba(15,23,42,.46)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.018); cursor:pointer; user-select:none; }
+.top-menu-index-tile:hover { border-color:rgba(168,85,247,.58); background:linear-gradient(180deg, rgba(18,31,54,.82), rgba(15,23,42,.54)); }
+.top-menu-index-tile.is-disabled { opacity:.72; border-color:rgba(148,163,184,.20); }
+.top-menu-index-icon { grid-column:1; grid-row:1 / span 2; width:42px; height:42px; display:grid; place-items:center; border-radius:10px; font-size:25px; background:rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.18); overflow:hidden; }
+.top-menu-index-icon img { max-width:100%; max-height:100%; object-fit:contain; }
+.top-menu-index-title { grid-column:2; grid-row:1; min-width:0; color:#fff; font-weight:900; font-size:.95rem; line-height:1.18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.top-menu-index-sub { grid-column:2; grid-row:2; min-width:0; color:#8edcff; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:.73rem; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.top-menu-index-actions { grid-column:3; grid-row:1 / span 2; display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:nowrap; margin-left:16px; }
+.top-menu-index-badge { border:1px solid rgba(148,163,184,.22); border-radius:999px; padding:4px 8px; color:#dbeafe; background:rgba(15,23,42,.72); font-size:.72rem; font-weight:900; white-space:nowrap; }
+.top-menu-index-badge.is-on { border-color:rgba(34,197,94,.34); color:#bbf7d0; background:rgba(22,101,52,.18); }
+.top-menu-index-badge.is-off { border-color:rgba(244,63,94,.28); color:#fecdd3; background:rgba(127,29,29,.16); }
+.top-menu-index-action { width:28px; height:28px; flex:0 0 28px; display:grid; place-items:center; border:1px solid rgba(148,163,184,.28); border-radius:8px; background:rgba(15,23,42,.78); color:#dbeafe; cursor:pointer; font-size:13px; padding:0; }
+.top-menu-index-action:hover { border-color:rgba(34,211,238,.62); color:#fff; }
+.top-menu-index-action.is-danger { border-color:rgba(244,63,94,.45); color:#fecdd3; }
+.top-menu-index-empty { width:100%; box-sizing:border-box; padding:26px; border:1px dashed rgba(148,163,184,.28); border-radius:14px; color:#9fb3c8; text-align:center; background:rgba(2,6,23,.22); }
+.top-menu-index-confirm-overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:9000; background:rgba(2,6,23,.62); backdrop-filter:blur(2px); }
+.top-menu-index-confirm-overlay.is-open { display:flex; }
+.top-menu-index-confirm-overlay[hidden] { display:none !important; }
+.top-menu-index-confirm-box { width:min(420px, calc(100vw - 32px)); border:1px solid rgba(34,211,238,.42); border-radius:16px; background:linear-gradient(180deg, rgba(15,23,42,.98), rgba(2,6,23,.98)); box-shadow:0 24px 70px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.025); padding:16px; }
+.top-menu-index-confirm-title { margin:0 0 8px; color:#fff; font-size:1.05rem; font-weight:900; }
+.top-menu-index-confirm-body { color:#cbd5e1; font-size:.9rem; line-height:1.45; margin-bottom:14px; }
+.top-menu-index-confirm-actions { display:flex; justify-content:flex-end; gap:8px; }
+@media (max-width: 860px) {
+    .top-menu-index-list { align-items:stretch; }
+    .top-menu-index-tile { width:100%; min-width:0; grid-template-columns:44px minmax(0, 1fr) auto; column-gap:9px; }
+    .top-menu-index-actions { gap:4px; margin-left:6px; }
+    .top-menu-index-badge { display:none; }
+}
+</style>
+
+<script>
+let topMenuIndexSections = {{ menu_top_sections|tojson }};
+let topMenuIndexGroups = {{ menu_top_groups|default([])|tojson }};
+const topMenuIndexCurrentFolder = {{ menu_top_active_folder|default(request.args.get('folder', ''))|tojson }};
+let topMenuIndexTimer = null;
+let topMenuIndexConfirmResolver = null;
+
+function topMenuIndexEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function topMenuIndexIconHtml(value, fallback='⚙️') {
+    value = String(value || '').trim();
+    const lower = value.toLowerCase();
+    const isImg = value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/static/') || value.startsWith('static/') || ['.png','.jpg','.jpeg','.webp','.gif','.svg','.ico','.bmp','.avif'].some(ext => lower.endsWith(ext));
+    if (!isImg) return topMenuIndexEscape(value || fallback);
+    let src = value.startsWith('static/') ? '/' + value : value;
+    return `<img src="${topMenuIndexEscape(src)}" alt="">`;
+}
+function topMenuIndexEditorUrl(section) {
+    const p = new URLSearchParams();
+    p.set('folder', section.group || section.folder || topMenuIndexCurrentFolder || 'general');
+    p.set('section', section.id || '');
+    if (section.file_name) p.set('file', section.file_name || '');
+    p.set('match', section.match || '');
+    p.set('label', section.label || 'Menu top');
+    p.set('icon', section.icon || '⚙️');
+    return '/system/personnalisation/top-menu?' + p.toString();
+}
+function topMenuIndexFolderUrl(folder) {
+    const p = new URLSearchParams();
+    p.set('folder', folder || 'general');
+    return '/system/personnalisation/menu-top?' + p.toString();
+}
+function topMenuIndexSetStatus(message, ok=true) {
+    const el = document.getElementById('topMenuIndexStatus');
+    if (!el) return;
+    if (topMenuIndexTimer) clearTimeout(topMenuIndexTimer);
+    message = String(message || '').trim();
+    if (!message) {
+        el.textContent = '';
+        el.className = 'status-line personal-menu-status-top';
+        el.classList.remove('is-visible');
+        el.setAttribute('hidden', 'hidden');
+        el.style.display = 'none';
+        return;
+    }
+    el.textContent = message;
+    el.className = 'status-line personal-menu-status-top ' + (ok ? 'ok' : 'bad');
+    el.classList.add('is-visible');
+    el.removeAttribute('hidden');
+    el.style.display = 'block';
+    if (ok) topMenuIndexTimer = setTimeout(() => topMenuIndexSetStatus('', true), 850);
+}
+
+function topMenuIndexConfirm(title, body, okLabel='Supprimer') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('topMenuIndexConfirmModal');
+        const titleEl = document.getElementById('topMenuIndexConfirmTitle');
+        const bodyEl = document.getElementById('topMenuIndexConfirmBody');
+        const okEl = document.getElementById('topMenuIndexConfirmOk');
+        if (!modal || !titleEl || !bodyEl || !okEl) {
+            topMenuIndexSetStatus('Boîte de confirmation indisponible.', false);
+            resolve(false);
+            return;
+        }
+        titleEl.textContent = title || 'Confirmation';
+        bodyEl.textContent = body || '';
+        okEl.textContent = okLabel || 'Valider';
+        topMenuIndexConfirmResolver = resolve;
+        modal.removeAttribute('hidden');
+        modal.classList.add('is-open');
+        setTimeout(() => okEl.focus(), 20);
+    });
+}
+function topMenuIndexSettleConfirm(value) {
+    const modal = document.getElementById('topMenuIndexConfirmModal');
+    if (modal) {
+        modal.classList.remove('is-open');
+        modal.setAttribute('hidden', 'hidden');
+    }
+    if (topMenuIndexConfirmResolver) topMenuIndexConfirmResolver(value === true);
+    topMenuIndexConfirmResolver = null;
+}
+function topMenuIndexBindConfirmModal() {
+    document.getElementById('topMenuIndexConfirmCancel')?.addEventListener('click', () => topMenuIndexSettleConfirm(false));
+    document.getElementById('topMenuIndexConfirmOk')?.addEventListener('click', () => topMenuIndexSettleConfirm(true));
+    document.getElementById('topMenuIndexConfirmModal')?.addEventListener('click', (event) => {
+        if (event.target && event.target.id === 'topMenuIndexConfirmModal') topMenuIndexSettleConfirm(false);
+    });
+    document.addEventListener('keydown', (event) => {
+        const modal = document.getElementById('topMenuIndexConfirmModal');
+        if (event.key === 'Escape' && modal && modal.classList.contains('is-open')) {
+            event.preventDefault();
+            topMenuIndexSettleConfirm(false);
+        }
+    });
+}
+function topMenuIndexFolderSections() {
+    const folder = String(topMenuIndexCurrentFolder || '').trim();
+    if (!folder) return topMenuIndexSections || [];
+    return (topMenuIndexSections || []).filter(section => String(section.group || section.folder || '') === folder);
+}
+function topMenuIndexRefreshHead() {
+    const counter = document.getElementById('topMenuIndexCounter');
+    const crumbs = document.getElementById('topMenuIndexCrumbs');
+    const btn = document.getElementById('topMenuIndexNewBtn');
+    const folder = String(topMenuIndexCurrentFolder || '').trim();
+    if (!folder) {
+        if (counter) counter.textContent = `${(topMenuIndexGroups || []).length} dossier(s) · ${(topMenuIndexSections || []).length} groupe(s)`;
+        if (crumbs) crumbs.innerHTML = `<button type="button" onclick="window.location.href='/system/personnalisation/menu'">🏠 Racine</button><span>›</span><button type="button">Menus crantés</button>`;
+        if (btn) btn.textContent = '+ Dossier top';
+        return;
+    }
+    const sections = topMenuIndexFolderSections();
+    const group = (topMenuIndexGroups || []).find(row => String(row.folder || '') === folder) || {label:folder, folder:folder};
+    if (counter) counter.textContent = `${sections.length} groupe(s) dans ${group.label || folder}`;
+    if (crumbs) crumbs.innerHTML = `<button type="button" onclick="window.location.href='/system/personnalisation/menu'">🏠 Racine</button><span>›</span><button type="button" onclick="window.location.href='/system/personnalisation/menu-top'">Menus crantés</button><span>›</span><button type="button">${topMenuIndexEscape(group.label || folder)}</button>`;
+    if (btn) btn.textContent = '+ Groupe top';
+}
+function topMenuIndexRender() {
+    const box = document.getElementById('topMenuIndexList');
+    if (!box) return;
+    topMenuIndexRefreshHead();
+    const folder = String(topMenuIndexCurrentFolder || '').trim();
+    if (!folder) {
+        if (!Array.isArray(topMenuIndexGroups) || !topMenuIndexGroups.length) {
+            box.innerHTML = '<div class="top-menu-index-empty">Aucun dossier dans conf/menu_top.</div>';
+            return;
+        }
+        box.innerHTML = topMenuIndexGroups.map((group, groupIndex) => {
+            const count = Number(group.sections || 0);
+            const items = Number(group.items || 0);
+            const route = String(group.route || ('/' + (group.folder || ''))).trim();
+            return `<article class="top-menu-index-tile" tabindex="0" onclick="topMenuIndexOpenFolderByIndex(${groupIndex})" onkeydown="topMenuIndexFolderKey(event, ${groupIndex})">`
+                + `<span class="top-menu-index-icon">${topMenuIndexIconHtml('📁', '📁')}</span>`
+                + `<span class="top-menu-index-title">${topMenuIndexEscape(group.label || group.folder || 'Dossier')}</span>`
+                + `<span class="top-menu-index-sub">${topMenuIndexEscape(route)}</span>`
+                + `<span class="top-menu-index-actions" onclick="event.stopPropagation()">`
+                + `<span class="top-menu-index-badge">${count} groupe${count > 1 ? 's' : ''}</span>`
+                + `<span class="top-menu-index-badge">${items} cmd</span>`
+                + `<button type="button" class="top-menu-index-action" title="Ouvrir" onclick="topMenuIndexOpenFolderByIndex(${groupIndex})">↪</button>`
+                + `</span></article>`;
+        }).join('');
+        return;
+    }
+
+    const visible = topMenuIndexFolderSections();
+    if (!visible.length) {
+        box.innerHTML = '<div class="top-menu-index-empty">Aucun fichier .conf dans ce dossier.</div>';
+        return;
+    }
+    box.innerHTML = visible.map((section) => {
+        const globalIndex = topMenuIndexSections.indexOf(section);
+        const enabled = !!section.enabled;
+        const routes = String(section.match || '').trim() || '(aucune route)';
+        const count = Array.isArray(section.items) ? section.items.length : 0;
+        return `<article class="top-menu-index-tile ${enabled ? '' : 'is-disabled'}" tabindex="0" onclick="topMenuIndexOpen(${globalIndex})" onkeydown="topMenuIndexKey(event, ${globalIndex})">`
+            + `<span class="top-menu-index-icon">${topMenuIndexIconHtml(section.icon, '⚙️')}</span>`
+            + `<span class="top-menu-index-title">${topMenuIndexEscape(section.label || section.id || 'Menu top')}</span>`
+            + `<span class="top-menu-index-sub">${topMenuIndexEscape(routes)}</span>`
+            + `<span class="top-menu-index-actions" onclick="event.stopPropagation()">`
+            + `<span class="top-menu-index-badge ${enabled ? 'is-on' : 'is-off'}">${enabled ? 'actif' : 'désactivé'}</span>`
+            + `<span class="top-menu-index-badge">${count} cmd</span>`
+            + `<button type="button" class="top-menu-index-action" title="Ouvrir" onclick="topMenuIndexOpen(${globalIndex})">↪</button>`
+            + `<button type="button" class="top-menu-index-action" title="Activer / désactiver" onclick="topMenuIndexToggle(${globalIndex})">${enabled ? '✓' : '○'}</button>`
+            + `<button type="button" class="top-menu-index-action is-danger" title="Supprimer ce groupe" onclick="topMenuIndexDelete(${globalIndex})">×</button>`
+            + `</span></article>`;
+    }).join('');
+}
+function topMenuIndexOpenFolder(folder) {
+    folder = String(folder || '').trim();
+    if (!folder) return;
+    window.location.href = topMenuIndexFolderUrl(folder);
+}
+function topMenuIndexOpenFolderByIndex(index) {
+    const group = topMenuIndexGroups[index];
+    if (!group) return;
+    topMenuIndexOpenFolder(group.folder || '');
+}
+function topMenuIndexFolderKey(event, index) {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); topMenuIndexOpenFolderByIndex(index); }
+}
+function topMenuIndexOpen(index) {
+    const section = topMenuIndexSections[index];
+    if (!section) return;
+    window.location.href = topMenuIndexEditorUrl(section);
+}
+function topMenuIndexKey(event, index) {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); topMenuIndexOpen(index); }
+    if (event.key === 'Delete') { event.preventDefault(); topMenuIndexDelete(index); }
+}
+function topMenuIndexNew() {
+    const folder = String(topMenuIndexCurrentFolder || '').trim();
+    const p = new URLSearchParams();
+    if (folder) {
+        p.set('folder', folder);
+        p.set('label', 'Nouveau menu top');
+        p.set('icon', '⚙️');
+        p.set('match', '/' + folder.replace(/^\/+|\/+$/g, ''));
+        p.set('section', 'new_' + Date.now().toString(36));
+        p.set('create', '1');
+        window.location.href = '/system/personnalisation/top-menu?' + p.toString();
+        return;
+    }
+    const name = window.prompt('Nom du dossier menu_top ?', 'nouveau');
+    if (!name) return;
+    const clean = name.trim() || 'nouveau';
+    p.set('folder', clean);
+    p.set('label', 'Nouveau menu top');
+    p.set('icon', '⚙️');
+    p.set('match', '/' + clean.replace(/^\/+|\/+$/g, ''));
+    p.set('section', 'new_' + Date.now().toString(36));
+    p.set('create', '1');
+    window.location.href = '/system/personnalisation/top-menu?' + p.toString();
+}
+async function topMenuIndexSave(message='Enregistré') {
+    try {
+        const res = await fetch('/system/personnalisation/top-menu', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json', 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest'},
+            body: JSON.stringify({sections: topMenuIndexSections})
+        });
+        const payload = await res.json();
+        if (!res.ok || payload.ok === false) throw new Error(payload.message || 'Enregistrement impossible.');
+        topMenuIndexSections = payload.sections || topMenuIndexSections;
+        topMenuIndexGroups = payload.groups || topMenuIndexGroups;
+        topMenuIndexRender();
+        topMenuIndexSetStatus(message, true);
+    } catch (error) {
+        topMenuIndexSetStatus(String(error && error.message ? error.message : error), false);
+    }
+}
+function topMenuIndexToggle(index) {
+    const section = topMenuIndexSections[index];
+    if (!section) return;
+    section.enabled = !section.enabled;
+    topMenuIndexSave(section.enabled ? 'Menu top activé' : 'Menu top désactivé');
+}
+async function topMenuIndexDelete(index) {
+    const section = topMenuIndexSections[index];
+    if (!section) return;
+    const label = section.label || section.id || 'ce groupe';
+    const ok = await topMenuIndexConfirm('Supprimer ce menu top ?', `Supprimer définitivement le groupe top : ${label} ?`, 'Supprimer');
+    if (!ok) return;
+    topMenuIndexSections.splice(index, 1);
+    topMenuIndexSave('Groupe top supprimé');
+}
+document.addEventListener('DOMContentLoaded', () => {
+    topMenuIndexBindConfirmModal();
+    topMenuIndexRender();
+});
+</script>
+{% endblock %}

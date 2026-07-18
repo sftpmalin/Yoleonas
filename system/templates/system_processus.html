@@ -1,0 +1,78 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<section id="tab-processes" class="system-tab-panel active no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                <div class="system-tools-page">
+                    <div class="system-tool-card">
+                        <div class="system-tool-head system-tool-head-compact">
+                            <div class="system-form-line">
+                                <input class="system-input" id="process-search" placeholder="Filtrer : python, docker, root..." oninput="loadProcesses()">
+                                <select class="system-select" id="process-sort" onchange="loadProcesses()">
+                                    <option value="cpu">Tri CPU</option>
+                                    <option value="mem">Tri RAM</option>
+                                    <option value="pid">Tri PID</option>
+                                    <option value="name">Tri nom</option>
+                                </select>
+                                <button class="yoleo-btn" type="button" onclick="loadProcesses(true)">↻ Rafraîchir</button>
+                            </div>
+                            <div class="system-tool-subtitle" id="processes-last">Chargement...</div>
+                        </div>
+                        <div class="system-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                            <table class="system-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                <thead><tr><th>PID</th><th>PPID</th><th>Nom</th><th>User</th><th>CPU</th><th>RAM</th><th>RSS</th><th>État</th><th>Démarré</th><th>Commande</th></tr></thead>
+                                <tbody id="processes-tbody"><tr><td colspan="10" class="empty-state">Chargement des processus...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            
+
+<script>
+function procEsc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function procAttr(value) { return procEsc(value).replace(/\n/g, ' '); }
+function procSetText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (value === undefined || value === null || value === '') ? '—' : value;
+}
+function renderProcessRows(processes) {
+    const tbody = document.getElementById('processes-tbody');
+    if (!tbody) return;
+    if (!processes || !processes.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Aucun processus trouvé.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = processes.map(p => `<tr>
+        <td class="mono">${procEsc(p.pid)}</td>
+        <td class="mono">${procEsc(p.ppid)}</td>
+        <td><b>${procEsc(p.name)}</b></td>
+        <td>${procEsc(p.username || p.user || '')}</td>
+        <td class="mono">${procEsc(p.cpu)}%</td>
+        <td class="mono">${procEsc(p.mem_percent)}%</td>
+        <td class="mono">${procEsc(p.rss)}</td>
+        <td>${procEsc(p.status)}</td>
+        <td class="mono">${procEsc(p.started)}</td>
+        <td class="cmd-cell" title="${procAttr(p.cmd)}">${procEsc(p.cmd)}</td>
+    </tr>`).join('');
+}
+async function loadProcesses(force = false) {
+    try {
+        const q = encodeURIComponent(document.getElementById('process-search')?.value || '');
+        const sort = encodeURIComponent(document.getElementById('process-sort')?.value || 'cpu');
+        const data = await (await fetch(`/system/api/processes?q=${q}&sort=${sort}&limit=160`, {cache:'no-store'})).json();
+        renderProcessRows(data.processes || []);
+        procSetText('processes-last', `${data.shown ?? 0}/${data.total ?? 0} processus — ${data.generated_at || ''}`);
+    } catch (e) {
+        const tbody = document.getElementById('processes-tbody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Erreur lecture processus.</td></tr>';
+    }
+}
+document.addEventListener('DOMContentLoaded', function () {
+    loadProcesses();
+    setInterval(loadProcesses, Math.max(2, {{ process_refresh_seconds|int }}) * 1000);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,449 @@
+{% extends "services_base.html" %}
+
+{% macro sftp_status_badge(value) -%}
+  {%- set raw = (value|string)|trim -%}
+  {%- set norm = raw|lower -%}
+  {%- set ok_values = ['active', 'enabled', 'enable', 'oui', 'yes', 'true', 'running', 'ok', 'source ok', 'prêt', 'pret', 'actif', 'activée'] -%}
+  {%- set ko_values = ['inactive', 'disabled', 'disable', 'non', 'no', 'false', 'failed', 'dead', 'not-found', 'not found', 'missing', 'absent', 'error', 'erreur', 'arrêté', 'arrete', 'exited'] -%}
+  <span class="sftp-status-pill {{ 'sftp-status-ok' if norm in ok_values else ('sftp-status-ko' if norm in ko_values else 'sftp-status-neutral') }}">{{ raw }}</span>
+{%- endmacro %}
+
+{% block route_content %}
+{% set sftp_edit_active = active_subtab in ['users', 'ssh'] %}
+<div class="sftp-wrap sftp-mobile-classic">
+              <div class="sftp-panel">
+                  {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                  <div class="flash-stack yoleo-page-flash">
+                      {% for category, message in messages %}
+                      <div class="flash {{ category }}">{{ message }}</div>
+                      {% endfor %}
+                  </div>
+                  {% endif %}
+                  {% endwith %}
+
+                  <div class="service-section-shell">
+                      <div id="sftp-tab-main" class="service-sub-panel sftp-sub-panel {{ 'active' if active_subtab == 'main' else '' }}">
+                          <section class="card sftp-service-card">
+                              <div class="summary-grid sftp-summary-grid-compact">
+                                  <div class="summary-card"><div class="summary-label">État</div><div class="summary-value">{{ sftp_status_badge(status.active) }}</div></div>
+                                  <div class="summary-card"><div class="summary-label">Docker</div><div class="summary-value">{{ sftp_status_badge(status.docker) }}</div></div>
+                                  <div class="summary-card"><div class="summary-label">IP Docker</div><div class="summary-value small">{{ sftp_status_badge(status.docker_ip or '-') }}</div></div>
+                                  <div class="summary-card"><div class="summary-label">Utilisateurs</div><div class="summary-value">{{ sftp_status_badge(status.users) }}</div></div>
+                                  <div class="summary-card"><div class="summary-label">Réseau</div><div class="summary-value small">{{ sftp_status_badge(status.network) }}</div></div>
+                                  <div class="summary-card"><div class="summary-label">Port</div><div class="summary-value small">{{ sftp_status_badge(status.port or '-') }}</div></div>
+                              </div>
+                              {% if error %}
+                              <div class="error-box">
+                                  {% if status.setup_checks is defined and status.setup_checks %}
+                                      {% for check in status.setup_checks %}
+                                          <div class="sftp-setup-line {{ 'ok' if check.ok else 'ko' }}">{{ '✅' if check.ok else '❌' }} {{ check.text }}</div>
+                                      {% endfor %}
+                                  {% else %}
+                                      {{ error|replace('\n', '<br>')|safe }}
+                                  {% endif %}
+                              </div>
+                              {% endif %}
+                          </section>
+
+                          {% if not error %}
+                          <div class="card">
+                              <div class="info-split sftp-info-list no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                  <div class="table-wrap sftp-info-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                      <table class="info-table sftp-info-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                          <tr><th>Container</th><td>{{ basic.container_name }}</td></tr>
+                                          <tr><th>Hostname</th><td>{{ basic.hostname }}</td></tr>
+                                          <tr><th>Image</th><td>{{ basic.image }}</td></tr>
+                                          <tr><th>Restart</th><td>{{ basic.restart }}</td></tr>
+                                          <tr><th>Réseau</th><td>{{ network.mode }}{% if network.network_name %} / {{ network.network_name }}{% endif %}{% if network.ip_address %} / {{ network.ip_address }}{% endif %}</td></tr>
+                                          <tr><th>Ports</th><td>{{ basic.host_port }}:{{ basic.container_port }}</td></tr>
+                                          <tr>
+                                              <th>YAML détecté</th>
+                                              <td class="sftp-yaml-detected-cell">
+                                                  <span>{{ conf.YAML or 'aucun YAML SFTP détecté' }}</span>
+                                                  <button class="yoleo-btn yoleo-btn-orange sftp-icon-btn" type="button" onclick="checkYaml(event, 'checkOutputMain')" title="Vérifier la configuration YAML" aria-label="Vérifier la configuration YAML">🧪</button>
+                                              </td>
+                                          </tr>
+                                      </table>
+                                  </div>
+                                  <div class="table-wrap sftp-info-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                      <table class="info-table sftp-info-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                          <tr><th>/data</th><td>{{ basic.data_path }}:{{ basic.data_mode }}</td></tr>
+                                          <tr><th>TZ</th><td>{{ env_values.TZ }}</td></tr>
+                                          <tr><th>PUID / PGID</th><td>{{ env_values.PUID }} / {{ env_values.PGID }}</td></tr>
+                                          <tr><th>CPU set</th><td>{{ basic.cpuset }}</td></tr>
+                                          <tr><th>Logo</th><td>{{ basic.icon }}</td></tr>
+                                          <tr><th>.env détecté</th><td>{{ env_file if env_file is defined else state.env_file }}</td></tr>
+                                      </table>
+                                  </div>
+                              </div>
+                          </div>
+                          {% endif %}
+                          <pre id="checkOutputMain" class="terminal"></pre>
+                      </div>
+                       {% if error %}
+                       <div id="sftp-tab-users" class="service-sub-panel sftp-sub-panel {{ 'active' if sftp_edit_active else '' }}">
+                           <div class="error-box">
+                                   {% if status.setup_checks is defined and status.setup_checks %}
+                                       {% for check in status.setup_checks %}
+                                           <div class="sftp-setup-line {{ 'ok' if check.ok else 'ko' }}">{{ '✅' if check.ok else '❌' }} {{ check.text }}</div>
+                                       {% endfor %}
+                                   {% else %}
+                                       {{ error|replace('\n', '<br>')|safe }}
+                                   {% endif %}
+                               </div>
+                       </div>
+                       {% else %}
+                       <form method="post" action="{{ url_for('services_bp.sftp_sftp_save') }}" id="sftpForm" class="sftp-users-form sftp-access-form" data-return-subtab="{{ 'ssh' if active_subtab == 'ssh' else 'users' }}" onsubmit="sftpPrepareSubmit(this)">
+                           <div id="sftp-tab-users" class="service-sub-panel sftp-sub-panel {{ 'active' if sftp_edit_active else '' }}">
+                               <section class="card sftp-form-card sftp-users-card">
+                                   <div class="sftp-card-header">
+                                       <div>
+                                           <div class="sftp-card-kicker">Accès Docker</div>
+                                           <h2 class="sftp-card-title">Utilisateurs et dossiers publiés</h2>
+                                           <div class="sftp-card-subtitle">Montage vers <span>/home/&lt;user&gt;/Data</span> avec les UID/GID du compte Linux.</div>
+                                       </div>
+                                       <div class="sftp-card-actions">
+                                           <span class="sftp-count-pill">{{ users|length }} dossier{{ 's' if users|length != 1 else '' }}</span>
+                                           <button class="yoleo-btn yoleo-btn-green" type="button" onclick="addUserRow('usersTable')">➕ Ajouter</button>
+                                       </div>
+                                   </div>
+                                   <div class="table-wrap sftp-users-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                       <table id="usersTable" class="compact-table users-table sftp-users-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                                           <thead>
+                                               <tr><th>Compte Linux</th><th>Dossier hôte publié</th><th class="col-actions">Actions</th></tr>
+                                           </thead>
+                                           <tbody>
+                                           {% for user in users %}
+                                               <tr>
+                                                   <td>
+                                                       <div class="sftp-field-stack">
+                                                           <input type="hidden" name="user_original[]" value="{{ user.name }}">
+                                                           <select name="user_name[]" class="sftp-linux-user-select" onchange="sftpApplyLinuxUser(this)">
+                                                               <option value="">Choisir un utilisateur</option>
+                                                               {% for linux_user in linux_users %}
+                                                               <option value="{{ linux_user.name }}" data-uid="{{ linux_user.uid }}" data-gid="{{ linux_user.gid }}" {% if linux_user.name == user.name %}selected{% endif %}>{{ linux_user.name }}</option>
+                                                               {% endfor %}
+                                                           </select>
+                                                           <div class="sftp-user-meta" data-user-meta>UID {{ user.uid or '-' }} / GID {{ user.gid or '-' }}</div>
+                                                       </div>
+                                                       <input type="hidden" name="user_password[]" value="0000">
+                                                       <input type="hidden" name="user_uid[]" value="{{ user.uid }}">
+                                                       <input type="hidden" name="user_gid[]" value="{{ user.gid }}">
+                                                       <input type="hidden" name="user_mode[]" value="rw">
+                                                   </td>
+                                                   <td>
+                                                       <div class="inline sftp-path-control">
+                                                           <input name="user_host_path[]" value="{{ user.host_path }}" class="host-path">
+                                                           <button class="yoleo-btn yoleo-btn-muted yoleo-btn-mini sftp-browse-btn" type="button" onclick="openSFTPStandardBrowser(this)" title="Parcourir" aria-label="Parcourir">📂</button>
+                                                       </div>
+                                                       <div class="sftp-path-meta" data-target-meta>/home/{{ user.name or 'user' }}/Data</div>
+                                                   </td>
+                                                   <td class="col-actions"><button class="yoleo-btn yoleo-btn-red yoleo-btn-mini sftp-delete-btn" type="button" onclick="askRemoveRow(this, 'Supprimer ce dossier partagé SFTP ?')" title="Supprimer" aria-label="Supprimer">🗑️</button></td>
+                                               </tr>
+                                           {% endfor %}
+                                           </tbody>
+                                       </table>
+                                   </div>
+                               </section>
+
+                               <section class="card sftp-form-card sftp-ssh-card" id="sftp-ssh-settings">
+                                   <div class="sftp-card-header">
+                                       <div>
+                                           <div class="sftp-card-kicker">Serveur SSH</div>
+                                           <h2 class="sftp-card-title">Options d’authentification</h2>
+                                           <div class="sftp-card-subtitle">Ces valeurs alimentent les variables SSH du conteneur SFTP.</div>
+                                       </div>
+                                   </div>
+                                   <div class="sftp-ssh-layout">
+                                       <div class="sftp-ssh-key-block">
+                                           <label>Taille/type clé</label>
+                                           <select name="env_KEY_VAR">
+                                               <option value="2048" {% if env_values.KEY_VAR == '2048' %}selected{% endif %}>rsa 2048</option>
+                                               <option value="3072" {% if env_values.KEY_VAR == '3072' or not env_values.KEY_VAR %}selected{% endif %}>rsa 3072</option>
+                                               <option value="4096" {% if env_values.KEY_VAR == '4096' %}selected{% endif %}>rsa 4096</option>
+                                               <option value="ed25519" {% if env_values.KEY_VAR|lower == 'ed25519' %}selected{% endif %}>ed25519</option>
+                                           </select>
+                                       </div>
+                                       <div class="sftp-switch-grid">
+                                           {% for key, label in [
+                                               ('SSH_PUBKEY_AUTH','Clé publique'),
+                                               ('SSH_PASS_AUTH','Mot de passe SSH'),
+                                               ('SSH_PERMIT_ROOT','Root login'),
+                                               ('SSH_CHALLENGE_AUTH','Challenge auth'),
+                                               ('SSH_EMPTY_PASS','Mot de passe vide'),
+                                               ('SSH_USE_PAM','PAM'),
+                                               ('SSH_TCP_FORWARD','TCP forwarding'),
+                                               ('SSH_X11_FORWARD','X11 forwarding')
+                                           ] %}
+                                           <label class="sftp-toggle-field">
+                                               <input type="hidden" name="env_{{ key }}__off" value="no">
+                                               <input class="sftp-toggle-input" type="checkbox" name="env_{{ key }}" value="yes" {% if env_values[key] == 'yes' %}checked{% endif %}>
+                                               <span class="sftp-toggle-visual" aria-hidden="true"></span>
+                                               <span class="sftp-toggle-label">{{ label }}</span>
+                                           </label>
+                                           {% endfor %}
+                                       </div>
+                                   </div>
+                               </section>
+
+                               <div class="sftp-form-footer">
+                                   <div class="sftp-form-context">
+                                       <span>YAML</span>
+                                       <strong>{{ conf.YAML or 'non détecté' }}</strong>
+                                   </div>
+                                   <button class="yoleo-btn yoleo-btn-primary sftp-ssh-save-btn" type="submit">💾 Enregistrer accès SFTP</button>
+                               </div>
+                           </div>
+                       </form>
+                       {% endif %}
+
+                  </div>
+              </div>
+          </div>
+
+          <div id="confirmModal" class="modal-overlay">
+              <div class="modal-box" style="max-width:440px;">
+                  <div class="modal-head"><div class="modal-title">Confirmation</div></div>
+                  <div class="modal-body" id="confirmText">Confirmer ?</div>
+                  <div class="modal-footer">
+                      <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="closeConfirm()">Annuler</button>
+                      <button class="yoleo-btn yoleo-btn-red" type="button" onclick="confirmRemove()">Supprimer</button>
+                  </div>
+              </div>
+          </div>
+
+          <div id="toast" class="toast"></div>
+
+          <script>
+          let browseInput = null;
+          let rowToRemove = null;
+          const SFTP_LINUX_USERS = {{ linux_users|default([])|tojson }};
+
+          function sftpBuildLinuxUserOptions(selectedName) {
+              const selected = selectedName || '';
+              let html = '<option value="">Choisir un utilisateur</option>';
+              SFTP_LINUX_USERS.forEach((user) => {
+                  const name = String(user.name || '');
+                  if (!name) return;
+                  const uid = String(user.uid || '');
+                  const gid = String(user.gid || '');
+                  html += `<option value="${sftpEscapeHtml(name)}" data-uid="${sftpEscapeHtml(uid)}" data-gid="${sftpEscapeHtml(gid)}" ${name === selected ? 'selected' : ''}>${sftpEscapeHtml(name)}</option>`;
+              });
+              return html;
+          }
+
+          function sftpEscapeHtml(value) {
+              return String(value || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+          }
+
+          function sftpFitLinuxUserSelect(select) {
+              if (!select) return;
+              select.style.width = '100%';
+          }
+
+          function sftpApplyLinuxUser(select) {
+              sftpFitLinuxUserSelect(select);
+              const tr = select ? select.closest('tr') : null;
+              if (!tr) return;
+              const opt = select.selectedOptions && select.selectedOptions[0] ? select.selectedOptions[0] : null;
+              const uidInput = tr.querySelector('input[name="user_uid[]"]');
+              const gidInput = tr.querySelector('input[name="user_gid[]"]');
+              const passInput = tr.querySelector('input[name="user_password[]"]');
+              const modeInput = tr.querySelector('input[name="user_mode[]"]');
+              if (uidInput && opt) uidInput.value = opt.dataset.uid || '';
+              if (gidInput && opt) gidInput.value = opt.dataset.gid || '';
+              if (passInput) passInput.value = '0000';
+              if (modeInput) modeInput.value = 'rw';
+              const uid = uidInput ? uidInput.value : '';
+              const gid = gidInput ? gidInput.value : '';
+              const meta = tr.querySelector('[data-user-meta]');
+              if (meta) meta.textContent = (uid || gid) ? `UID ${uid || '-'} / GID ${gid || '-'}` : 'UID/GID du compte Linux';
+              const targetMeta = tr.querySelector('[data-target-meta]');
+              if (targetMeta) targetMeta.textContent = `/home/${select.value || 'user'}/Data`;
+          }
+
+          function switchSftpTab(name) {
+              if (name === 'ssh') name = 'users';
+              document.querySelectorAll('.sftp-sub-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
+              document.querySelectorAll('.sftp-sub-panel').forEach(panel => panel.classList.toggle('active', panel.id === 'sftp-tab-' + name));
+              if (window.history && window.history.replaceState) {
+                  window.history.replaceState(null, '', '#sftp-' + name);
+              }
+          }
+          (function initSftpTabFromHash() {
+              const name = (window.location.hash || '').replace('#sftp-', '');
+              if (['main', 'users', 'ssh'].includes(name)) switchSftpTab(name);
+          })();
+
+          function toast(msg) {
+              const box = document.getElementById('toast');
+              box.textContent = msg;
+              box.style.display = 'block';
+              clearTimeout(window.__sftpToastTimer);
+              window.__sftpToastTimer = setTimeout(() => box.style.display = 'none', 3200);
+          }
+          function basenamePath(path) {
+              const clean = (path || '').replace(/\/+$/g, '');
+              return clean.split('/').pop() || '';
+          }
+          function addUserRow(tableId) {
+              const tbody = document.querySelector('#' + (tableId || 'usersTable') + ' tbody');
+              if (!tbody) return;
+              const tr = document.createElement('tr');
+              tr.innerHTML = `<td>
+                      <div class="sftp-field-stack">
+                       <input type="hidden" name="user_original[]" value="">
+                       <select name="user_name[]" class="sftp-linux-user-select" onchange="sftpApplyLinuxUser(this)"></select>
+                       <div class="sftp-user-meta" data-user-meta>UID/GID du compte Linux</div>
+                      </div>
+                       <input type="hidden" name="user_password[]" value="0000">
+                       <input type="hidden" name="user_uid[]" value="">
+                       <input type="hidden" name="user_gid[]" value="">
+                       <input type="hidden" name="user_mode[]" value="rw">
+                   </td>
+                   <td>
+                      <div class="inline sftp-path-control"><input name="user_host_path[]" class="host-path" placeholder="/mnt/user/Yoan"><button class="yoleo-btn yoleo-btn-muted yoleo-btn-mini sftp-browse-btn" type="button" onclick="openSFTPStandardBrowser(this)" title="Parcourir" aria-label="Parcourir">📂</button></div>
+                      <div class="sftp-path-meta" data-target-meta>/home/user/Data</div>
+                   </td>
+                   <td class="col-actions"><button class="yoleo-btn yoleo-btn-red yoleo-btn-mini sftp-delete-btn" type="button" onclick="askRemoveRow(this, 'Supprimer ce dossier partagé SFTP ?')" title="Supprimer" aria-label="Supprimer">🗑️</button></td>`;
+              tbody.appendChild(tr);
+              const select = tr.querySelector('select[name="user_name[]"]');
+              if (select) {
+                  select.innerHTML = sftpBuildLinuxUserOptions('');
+                  sftpApplyLinuxUser(select);
+                  sftpFitLinuxUserSelect(select);
+                  select.focus();
+              }
+              tr.scrollIntoView({behavior: 'smooth', block: 'center'});
+          }
+
+          function sftpAddUserFromTop(event) {
+              if (event) event.preventDefault();
+              const table = document.querySelector('#usersTable tbody');
+              const panel = document.querySelector('#sftp-tab-users');
+              if (table && panel && panel.classList.contains('active')) {
+                  addUserRow('usersTable');
+                  return false;
+              }
+              try { sessionStorage.setItem('sftpAddUserAfterOpen', '1'); } catch(e) {}
+              window.location.href = '/services/sftp/users';
+              return false;
+          }
+
+          document.addEventListener('DOMContentLoaded', function(){
+              let shouldAdd = false;
+              try {
+                  shouldAdd = sessionStorage.getItem('sftpAddUserAfterOpen') === '1';
+                  if (shouldAdd) sessionStorage.removeItem('sftpAddUserAfterOpen');
+              } catch(e) {}
+              document.querySelectorAll('select.sftp-linux-user-select').forEach((select) => {
+                  sftpApplyLinuxUser(select);
+                  sftpFitLinuxUserSelect(select);
+              });
+              const panel = document.querySelector('#sftp-tab-users');
+              if (shouldAdd && panel && panel.classList.contains('active')) addUserRow('usersTable');
+          });
+          function askRemoveRow(btn, text) {
+              rowToRemove = btn.closest('tr');
+              document.getElementById('confirmText').textContent = text;
+              document.getElementById('confirmModal').style.display = 'flex';
+          }
+          function closeConfirm() {
+              rowToRemove = null;
+              document.getElementById('confirmModal').style.display = 'none';
+          }
+          function confirmRemove() {
+              if (rowToRemove) rowToRemove.remove();
+              closeConfirm();
+          }
+          function openSFTPStandardBrowser(btn) {
+              browseInput = btn.closest('.inline').querySelector('input.host-path');
+              const start = browseInput && browseInput.value ? browseInput.value : '{{ allowed_roots[0] if allowed_roots else "/mnt/user" }}';
+              const params = new URLSearchParams({path: start || '/', target: ''});
+              window.open('/browser/folder?' + params.toString(), 'yoleo_services_sftp_browser', 'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+          }
+          window.addEventListener('message', function(event) {
+              const data = event.data || {};
+              if (data.type !== 'yoleo-browser-select') return;
+              if (data.mode !== 'folder') return;
+              if (!browseInput) return;
+              browseInput.value = data.path || '';
+              prepareUserRow(browseInput.closest('tr'));
+              browseInput.dispatchEvent(new Event('input', {bubbles:true}));
+              browseInput.dispatchEvent(new Event('change', {bubbles:true}));
+          });
+
+          function prepareUserRow(tr) {
+              if (!tr) return;
+              const select = tr.querySelector('select[name="user_name[]"]');
+              if (select) sftpApplyLinuxUser(select);
+          }
+          document.querySelectorAll('form.sftp-users-form').forEach((form) => {
+              form.addEventListener('submit', () => {
+                  form.querySelectorAll('table.users-table tbody tr').forEach(prepareUserRow);
+              });
+          });
+          function sftpCheckOutputElement(outputId) {
+              return document.getElementById(outputId || '')
+                  || document.getElementById('checkOutputMain')
+                  || document.getElementById('checkOutput');
+          }
+          function checkYaml(event, outputId) {
+              if (event) event.preventDefault();
+              const out = sftpCheckOutputElement(outputId);
+              if (!out) return false;
+              out.style.display = 'block';
+              out.textContent = 'Vérification en cours...';
+              out.scrollIntoView({behavior:'smooth', block:'end'});
+              fetch(`{{ url_for('services_bp.sftp_sftp_check') }}`, {method:'POST'})
+                  .then(r => r.json())
+                  .then(data => {
+                      out.textContent = (data.ok ? '✅ OK\n\n' : '❌ ERREUR\n\n') + (data.output || '');
+                      out.scrollIntoView({behavior:'smooth', block:'end'});
+                  })
+                  .catch(err => { out.textContent = '❌ ' + err; });
+              return false;
+          }
+          function sftpCheckYamlFromTop(event) {
+              return checkYaml(event, 'checkOutputMain');
+          }
+
+          function sftpSaveSshFromTop(event) {
+              if (event) event.preventDefault();
+              const panel = document.querySelector('#sftp-tab-users');
+              const form = document.querySelector('#sftpForm');
+              if (!form || !panel || !panel.classList.contains('active')) {
+                  window.location.href = '/services/sftp/ssh';
+                  return false;
+              }
+              const submitter = panel.querySelector('.sftp-ssh-save-btn') || panel.querySelector('button[type="submit"]');
+              if (form.requestSubmit && submitter) form.requestSubmit(submitter);
+              else form.submit();
+              return false;
+          }
+          </script>
+
+<script>
+function sftpPrepareSubmit(form){
+  if(!form) return true;
+  const panel = form.closest('.sftp-sub-panel') || document.querySelector('.sftp-sub-panel.active');
+  let value = form.dataset.returnSubtab || 'users';
+  if(panel && panel.id){
+    if(panel.id.includes('main')) value = 'main';
+    else if(panel.id.includes('ssh')) value = 'ssh';
+    else if(!form.dataset.returnSubtab) value = 'users';
+  }
+  let input = form.querySelector('input[name="return_subtab"]');
+  if(!input){
+    input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'return_subtab';
+    form.appendChild(input);
+  }
+  input.value = value;
+  return true;
+}
+</script>
+
+{% endblock %}

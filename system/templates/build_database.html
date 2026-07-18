@@ -1,0 +1,75 @@
+{% extends "build_base.html" %}
+
+{% block route_content %}
+<div id="tab-base_de_donnees" class="tab-panel active build-database-page no-mobile-mosaic" data-mobile-mosaic="off">
+                    <section class="card">
+                        <div class="table-tools database-toolbar">
+                            <div class="database-search" style="flex:0 0 auto;">
+                                <label for="dbSearch">Rechercher :</label>
+                                <input class="search-input" id="dbSearch" type="text" placeholder="Filtrer la base…" oninput="filterDbRows()">
+                            </div>
+                            <div class="database-auto-note" style="flex:1 1 auto; max-width:none; margin-left:0; text-align:center; display:flex; align-items:center; justify-content:center; font-size:10px; line-height:1.25; opacity:.82;">
+                                Synchronisation automatique : la base suit la liste réelle des dossiers Build. Ajout d’un dossier = ligne créée, suppression d’un dossier = ligne retirée. Corrections manuelles possibles ici.
+                            </div>
+                            <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-orange yoleo-btn-icon database-auto-all-btn" title="Remplir auto all" aria-label="Remplir automatiquement toute la base et enregistrer" onclick="fillDbAllAndSave(this)">◎</button>
+                        </div>
+                        {% if not builds %}
+                            <div class="empty-state">Aucune entrée à afficher.</div>
+                        {% else %}
+                        <form method="post" action="{{ url_for('builds_bp.builds_base_de_donnees_route') }}" id="databaseForm">
+                            <input type="hidden" name="form_action" value="save_database">
+                            <div class="db-scroll-top" id="dbScrollTop"><div class="db-scroll-top-inner" id="dbScrollTopInner"></div></div>
+                            <div class="table-wrap db-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" id="dbTableWrap">
+                                <table class="build-table db-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" id="dbTable">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:16%;">Entrée</th>
+                                            <th style="width:42%;">registre.conf</th>
+                                            <th style="width:20%;">platforms.conf</th>
+                                            <th style="width:12%;">mode.conf</th>
+                                            <th style="width:110px; text-align:center;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for b in builds %}
+                                        <tr data-db-filter="{{ b.name|lower }} {{ b.registry_display|lower }} {{ b.platform_effective|lower }} {{ b.mode_label|lower }}">
+                                            <td>
+                                                <input type="hidden" name="db_name" value="{{ b.name }}">
+                                                <div class="name-main">{{ b.name }}</div>
+                                                {% if b.meta_missing %}<div class="hint"><span class="badge badge-warn">incomplet</span></div>{% else %}<div class="hint"><span class="badge badge-ok">OK</span></div>{% endif %}
+                                            </td>
+                                            <td><input class="text-input" type="text" name="db_registry" value="{{ b.registry }}" placeholder="{{ b.registry_suggested }}" data-suggest="{{ b.registry_suggested }}"></td>
+                                            <td>
+                                                {% set selected_platform = b.platforms or b.platform_suggested %}
+                                                <select class="select-input" name="db_platforms" data-suggest="{{ b.platform_suggested }}">
+                                                    <option value="" hidden {{ 'selected' if not selected_platform else '' }}></option>
+                                                    <option value="linux/amd64" {{ 'selected' if selected_platform == 'linux/amd64' else '' }}>linux/amd64</option>
+                                                    <option value="linux/amd64,linux/arm64" {{ 'selected' if selected_platform == 'linux/amd64,linux/arm64' else '' }}>linux/amd64 + linux/arm64</option>
+                                                    <option value="linux/arm64" {{ 'selected' if selected_platform == 'linux/arm64' else '' }}>linux/arm64</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <select class="select-input" name="db_mode" data-suggest="{{ b.mode_value or '0' }}">
+                                                    <option value="0" {{ 'selected' if b.mode_value == '0' else '' }}>HTTP</option>
+                                                    <option value="1" {{ 'selected' if b.mode_value == '1' else '' }}>HTTPS</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <div class="actions-cell db-actions-cell">
+                                                    <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Vider" aria-label="Vider cette ligne" onclick="clearDbRow(this)">⏹</button>
+                                                    <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-green yoleo-btn-icon" title="Auto" aria-label="Compléter automatiquement cette ligne" onclick="fillDbRow(this)">▶</button>
+                                                    <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-primary yoleo-btn-icon" title="Enregistrer" aria-label="Enregistrer la base" onclick="saveDbRow(this)">⏺</button>
+                                                    <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" aria-label="Supprimer cette entrée de la base" onclick="deleteDbRow(this)">🗑</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="hint">Par ligne : ⏹ vider, ▶ auto, ⏺ enregistrer, 🗑 supprimer l’entrée de la base. Une case vide supprime la ligne correspondante dans le fichier texte concerné.</div>
+                        </form>
+                        {% endif %}
+                    </section>
+                </div>
+{% endblock %}

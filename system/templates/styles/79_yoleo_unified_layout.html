@@ -1,0 +1,489 @@
+/* ------------------------------------------------------------------
+   Charte commune Yoleo
+   Derniere couche CSS volontairement chargee apres les correctifs par module.
+   Elle aligne les espacements, onglets, titres secondaires et panneaux.
+   ------------------------------------------------------------------ */
+:root {
+    --yoleo-page-gap-top: 14px;
+    --yoleo-page-gap-x: 18px;
+    --yoleo-page-gap-bottom: 34px;
+    --yoleo-content-max: 1500px;
+    --yoleo-content-wide: 1680px;
+    --yoleo-topbar-height: 64px;
+    --yoleo-card-bg: linear-gradient(180deg, #131d2b 0%, #101722 100%);
+    --yoleo-card-border: #26364b;
+    --yoleo-card-radius: 14px;
+    --yoleo-card-shadow: 0 14px 30px rgba(0, 0, 0, .18);
+    --yoleo-title-color: #1AEBFF;
+    --yoleo-title-sub: #99acc2;
+}
+
+.yoleo-topbar {
+    height: var(--yoleo-topbar-height);
+    min-height: var(--yoleo-topbar-height);
+    max-height: var(--yoleo-topbar-height);
+    flex: 0 0 var(--yoleo-topbar-height);
+    align-items: flex-start;
+    padding: 8px 18px;
+    box-sizing: border-box;
+    overflow: visible;
+}
+
+.yoleo-page-title {
+    align-self: flex-start;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.yoleo-page-title h1 {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 1.15;
+    min-height: 22px;
+}
+
+.yoleo-page-title p {
+    font-size: 12px;
+    line-height: 1.25;
+    margin: 0;
+    min-height: 16px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yoleo-top-actions {
+    align-self: flex-start;
+}
+
+.system-page,
+.svc-page,
+.mdns-page,
+.lan-page,
+.page-wrap,
+.services-page,
+.terminal-page {
+    width: 100%;
+    padding: var(--yoleo-page-gap-top) var(--yoleo-page-gap-x) var(--yoleo-page-gap-bottom) !important;
+}
+
+.pers-page {
+    width: min(var(--yoleo-content-max), calc(100% - (var(--yoleo-page-gap-x) * 2)));
+    margin: var(--yoleo-page-gap-top) auto var(--yoleo-page-gap-bottom) !important;
+}
+
+.services-page {
+    display: flex;
+    justify-content: center;
+}
+
+.services-panel,
+.mini-panel,
+.archive-panel,
+.cache-panel,
+.backup-page .max-w,
+.mdns-page .mdns-panel,
+.lan-page .lan-panel,
+.svc-panel,
+.system-shell,
+.page-inner,
+.proftpd-panel,
+.sftp-panel {
+    width: 100%;
+    max-width: var(--yoleo-content-max);
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.svc-panel,
+.system-shell {
+    max-width: var(--yoleo-content-wide);
+}
+
+.services-page .services-content > :where(.mini-page, .proftpd-wrap, .sftp-wrap, .archive-page, .cache-page, .backup-page) {
+    padding: 0 !important;
+    width: 100%;
+}
+
+.services-page .services-content > .ffoi-page {
+    width: 100%;
+    max-width: var(--yoleo-content-max);
+    margin: 0 auto;
+}
+
+body.yoleo-has-page-settings .services-page,
+body.yoleo-has-page-settings .system-page,
+body.yoleo-has-page-settings .svc-page,
+body.yoleo-has-page-settings .mdns-page,
+body.yoleo-has-page-settings .lan-page,
+body.yoleo-has-page-settings .page-wrap,
+body.yoleo-has-page-settings .terminal-page {
+    padding-top: var(--yoleo-page-gap-top) !important;
+}
+
+body.yoleo-has-page-settings .services-page .services-content > :where(.mini-page, .proftpd-wrap, .sftp-wrap, .archive-page, .cache-page, .backup-page),
+body.yoleo-has-page-settings .services-page .services-content > .ffoi-page {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+body.yoleo-has-page-settings .service-section-shell,
+body.yoleo-has-page-settings .tabs-shell,
+body.yoleo-has-page-settings .system-tabs,
+body.yoleo-has-page-settings .backup-page .wrapper,
+body.yoleo-has-page-settings .backup-page .max-w {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+body.yoleo-has-page-settings .service-under-title {
+    margin: 0 0 10px !important;
+    padding: 0 !important;
+}
+
+body.yoleo-has-page-settings .tab-panel.active,
+body.yoleo-has-page-settings .service-sub-panel.active,
+body.yoleo-has-page-settings .cache-tab-panel.active,
+body.yoleo-has-page-settings .system-tab-panel.active,
+body.yoleo-has-page-settings .mdns-page .mdns-tab-panel {
+    padding-top: 0 !important;
+}
+
+.yoleo-subnav,
+.terminal-subnav {
+    min-height: 48px;
+    padding: 7px !important;
+    margin: 0 0 14px !important;
+    border: 1px solid var(--yoleo-border-soft);
+    border-radius: 12px;
+    background: rgba(18, 26, 36, .82);
+}
+
+.yoleo-subnav-link,
+.terminal-subnav-link,
+.tab-btn,
+.system-tab-btn,
+.mdns-page .mdns-tab-btn,
+.backup-page .tab-btn {
+    min-height: 32px;
+    padding: 7px 11px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 850;
+    letter-spacing: 0;
+}
+
+.tabs-shell,
+.system-tabs,
+.mdns-page .tabs-shell,
+.backup-page .tabs-shell {
+    border: 1px solid var(--yoleo-card-border);
+    border-radius: var(--yoleo-card-radius);
+    background: rgba(18, 26, 36, .86);
+    box-shadow: var(--yoleo-card-shadow);
+}
+
+.backup-page .tabs-shell {
+    margin-top: 0 !important;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+}
+
+.tabs-bar,
+.system-tabs-bar,
+.mdns-page .tabs-bar,
+.backup-page .tabs-bar {
+    min-height: 48px;
+    align-items: center;
+    background: #0f1620;
+    border-bottom: 1px solid #273447;
+}
+
+.tab-panel,
+.system-tab-panel.active,
+.mdns-page .mdns-tab-panel,
+.backup-page .tab-panel,
+.cache-tab-panel {
+    padding: 14px;
+}
+
+.topbar,
+.mdns-page .topbar,
+.archive-page .topbar,
+.cache-page .topbar,
+.ffoi-topbar,
+.proftpd-panel .pro-service-topbar {
+    gap: 14px;
+    margin-bottom: 14px;
+    align-items: flex-start;
+}
+
+.title-block h1,
+.title-block h2,
+.mdns-page .title-block h1,
+.mdns-page .title-block h2,
+.partage-page .title-block h1,
+.partage-page .title-block h2,
+.builds-page .title-block h1,
+.builds-page .title-block h2,
+.vm-page .title-block h1,
+.vm-page .title-block h2 {
+    margin: 0;
+    color: #fff;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 1.2;
+}
+
+.title-block h1,
+.mdns-page .title-block h1,
+.partage-page .title-block h1,
+.builds-page .title-block h1,
+.vm-page .title-block h1 {
+    font-size: 22px;
+}
+
+.title-block h2,
+.mdns-page .title-block h2,
+.partage-page .title-block h2,
+.builds-page .title-block h2,
+.vm-page .title-block h2 {
+    font-size: 18px;
+}
+
+.page-title {
+    margin: 0 0 10px;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-align: left;
+    text-shadow: none;
+}
+
+.page-subtitle,
+.subtitle,
+.hint,
+.table-subtitle,
+.system-tool-subtitle,
+.info-subtitle,
+.backup-page .page-subtitle,
+.backup-page .title-meta {
+    color: var(--yoleo-title-sub);
+    line-height: 1.45;
+    letter-spacing: 0;
+}
+
+.card,
+.table-card,
+.details-card,
+.system-tool-card,
+.info-card,
+.host-kv,
+.field-box,
+.menu-card,
+.pers-menu-folder,
+.summary-card,
+.backup-page .card,
+.backup-page .mini-stat,
+.backup-page .mobile-card,
+.proftpd-panel .card,
+.archive-page .card,
+.cache-page .card,
+.mdns-page .card {
+    background: var(--yoleo-card-bg);
+    border: 1px solid var(--yoleo-card-border);
+    border-radius: var(--yoleo-card-radius);
+    box-shadow: var(--yoleo-card-shadow);
+}
+
+.card,
+.backup-page .card,
+.proftpd-panel .card,
+.archive-page .card,
+.cache-page .card,
+.mdns-page .card {
+    padding: 14px;
+    margin-bottom: 14px;
+}
+
+.card-head,
+.table-head,
+.system-tool-head,
+.proftpd-panel .card-head,
+.archive-page .card-head,
+.modal-head {
+    border-bottom: 1px solid #273447;
+    background: #111822;
+}
+
+.card-title,
+.section-title,
+.table-title,
+.details-title,
+.system-tool-title,
+.pers-menu-section-title,
+.modal-title,
+.backup-page .section-title,
+.proftpd-panel .card-title,
+.archive-page .card-title,
+.mdns-page .card-title {
+    margin-top: 0;
+    color: var(--yoleo-title-color);
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 1.25;
+    text-transform: none;
+}
+
+.section-title,
+.backup-page .section-title {
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #273447;
+}
+
+.yoleo-content :where(.card-title, .section-title, .table-title, .details-title, .system-tool-title, .pers-menu-section-title) {
+    color: var(--yoleo-title-color) !important;
+}
+
+.summary-grid,
+.backup-page .stat-grid,
+.mdns-page .summary-grid,
+.archive-page .summary-grid,
+.cache-page .summary-grid {
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.summary-card,
+.backup-page .mini-stat {
+    background: #0e1723;
+    border-color: #25364b;
+    padding: 10px 12px;
+}
+
+.summary-label,
+.backup-page .mini-stat .label,
+.host-k,
+.field-label,
+.menu-field-label,
+.backup-page .form-group label,
+.backup-page th {
+    color: #8ba0b8;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.summary-value,
+.backup-page .mini-stat .value {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 900;
+}
+
+input,
+select,
+textarea,
+.input,
+.system-input,
+.system-select,
+.search-input,
+.filter-select,
+.backup-page .form-control,
+.mdns-page .text-input,
+.mdns-page .search-input {
+    border-radius: 10px;
+    border-color: #2b3d55;
+    background: #07101b;
+    color: #eaf2ff;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.input:focus,
+.system-input:focus,
+.system-select:focus,
+.search-input:focus,
+.filter-select:focus,
+.backup-page .form-control:focus {
+    border-color: var(--yoleo-accent-2);
+    box-shadow: 0 0 0 3px rgba(26, 235, 255, .12);
+}
+
+.table-wrap,
+.desktop-table-wrap,
+.system-table-wrap,
+.backup-page .desktop-table-wrap {
+    border: 1px solid var(--yoleo-card-border);
+    border-radius: var(--yoleo-card-radius);
+    background: #0c131e;
+}
+
+th,
+.system-table th,
+.mini-table th,
+.archive-table th,
+.cache-table th,
+.mdns-table th,
+.lan-table th,
+.backup-page th {
+    background: #1a2636;
+    color: #a8eaff;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+    :root {
+        --yoleo-page-gap-top: 10px;
+        --yoleo-page-gap-x: 10px;
+        --yoleo-page-gap-bottom: 28px;
+    }
+
+    .yoleo-topbar {
+        height: 56px;
+        min-height: 56px;
+        padding: 7px 10px;
+    }
+
+    .pers-page {
+        width: calc(100% - (var(--yoleo-page-gap-x) * 2));
+    }
+
+    .tab-panel,
+    .system-tab-panel.active,
+    .mdns-page .mdns-tab-panel,
+    .backup-page .tab-panel,
+    .cache-tab-panel {
+        padding: 10px;
+    }
+}
+
+/* Services Linux : largeur alignée sur les pages stockage/disques.
+   On réduit seulement la marge horizontale de cette page pour éviter que
+   la colonne Actions du tableau systemd soit mangée sur les petits écrans. */
+.yoleo-content > .system-tab-panel.active > .svc-page,
+body.yoleo-has-page-settings .svc-page {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+}
+
+.yoleo-content > .system-tab-panel.active > .svc-page > .svc-panel,
+.svc-page > .svc-panel {
+    max-width: none;
+}

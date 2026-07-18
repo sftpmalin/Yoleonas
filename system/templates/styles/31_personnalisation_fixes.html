@@ -1,0 +1,59 @@
+    /* Correctif Personnalisation > Menu : une entrée = une seule ligne complète.
+       Les champs restent compacts, les boutons ▲ ▼ 🗑️ ne repassent plus sur une 2e ligne. */
+    .pers-menu-folder-page .pers-menu-top-grid {
+        grid-template-columns:1fr;
+        justify-content:stretch;
+    }
+    .pers-menu-folder-page .pers-menu-identity-card {
+        width:100%;
+        max-width:none;
+    }
+    .pers-menu-folder-page .pers-menu-identity-grid {
+        grid-template-columns:minmax(150px, 220px) minmax(170px, 240px) minmax(280px, 360px);
+        justify-content:start;
+        align-items:end;
+    }
+    .pers-menu-folder-page .pers-menu-identity-grid .field-row,
+    .pers-menu-folder-page .pers-menu-entry-row .menu-icon-row,
+    .pers-menu-folder-page .pers-menu-folder-edit-actions {
+        display:flex;
+        flex-direction:row;
+        flex-wrap:nowrap;
+        align-items:center;
+    }
+    .pers-menu-folder-page .pers-menu-identity-grid .input,
+    .pers-menu-folder-page .pers-menu-entry-row .input,
+    .pers-menu-folder-page .pers-menu-folder-edit-grid .input {
+        min-width:0;
+    }
+    .pers-menu-folder-page .pers-menu-folder-edit-grid {
+        grid-template-columns:minmax(130px, 180px) minmax(165px, 1fr) minmax(190px, 240px) max-content;
+        align-items:end;
+    }
+    .pers-menu-folder-page .pers-menu-folder-children {
+        overflow-x:auto;
+        overflow-y:visible;
+    }
+    .pers-menu-folder-page .pers-menu-entry-row {
+        grid-template-columns:30px minmax(110px, 180px) minmax(180px, 1fr) minmax(115px, 170px) repeat(4, 30px);
+        min-width:590px;
+        gap:5px;
+        align-items:center;
+    }
+    .pers-menu-folder-page .pers-menu-entry-icon {
+        display:flex;
+    }
+    .pers-menu-folder-page .pers-menu-entry-icon-field {
+        min-width:0;
+    }
+    .pers-menu-folder-page .pers-menu-entry-row .yoleo-btn-icon {
+        width:30px;
+        min-width:30px;
+        flex:0 0 30px;
+    }
+    @media (max-width: 760px) {
+        .pers-menu-folder-page .pers-menu-top-grid { grid-template-columns:1fr; }
+        .pers-menu-folder-page .pers-menu-identity-card { width:100%; }
+        .pers-menu-folder-page .pers-menu-identity-grid { grid-template-columns:1fr; }
+    }
+

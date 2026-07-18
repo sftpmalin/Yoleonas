@@ -1,0 +1,54 @@
+/* Build / Base de données : sur mobile, pas de mosaïque.
+   La table contient des champs éditables ; on garde donc le tableau horizontal. */
+@media (max-width: 900px) {
+    .builds-page .build-database-page,
+    .builds-page .db-table-wrap {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .builds-page .db-table-wrap,
+    body.yoleo-mobile-mosaic-ready .builds-page .db-table-wrap {
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .builds-page .db-table,
+    body.yoleo-mobile-mosaic-ready .builds-page .db-table {
+        display: table !important;
+        width: max-content !important;
+        min-width: 780px !important;
+        table-layout: fixed;
+    }
+
+    .builds-page .db-table-wrap.yoleo-mobile-source-wrap {
+        display: block !important;
+    }
+
+    .builds-page .db-table-wrap + .yoleo-mobile-table-grid,
+    .builds-page .db-table + .yoleo-mobile-table-grid,
+    .builds-page .build-database-page .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .builds-page .database-toolbar {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+
+    .builds-page .database-search,
+    .builds-page .database-search .search-input {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .builds-page .database-auto-note {
+        width: 100% !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
+        font-size: 12px;
+        line-height: 1.35;
+    }
+}

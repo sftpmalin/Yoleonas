@@ -1,0 +1,672 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<section id="tab-confmgr" class="confmgr-route-page">
+
+
+<div id="rebootOverlay">
+    <div class="spinner"></div>
+    <h2 id="rebootTitle">Redémarrage de l’interface…</h2>
+    <p id="rebootMessage" class="small-text">La page se rechargera automatiquement.</p>
+</div>
+
+<div class="page-wrap">
+    <div class="panel">
+        {% if mode in ['list', 'options'] %}
+            {% if not show_options %}
+                <nav class="yoleo-subnav yoleo-subnav-keep-with-settings confmgr-file-subnav" aria-label="Navigation gestionnaire de configuration">
+                    <a href="/system/gestionnaire-conf" class="yoleo-subnav-link is-active">📂 Fichiers conf</a>
+                    <span id="openConfFilesTabs" class="conf-open-tabs-inline" aria-label="Fichiers ouverts"></span>
+                </nav>
+                {% if grouped_configs %}
+                    {% for folder, files in grouped_configs.items() %}
+                        <section class="card conf-folder-section">
+                            <div class="folder-panel-head">
+                                <div class="folder-panel-title">📂 {{ folder }}</div>
+                                <div class="folder-panel-subtitle">{{ files|length }} fichier{% if files|length > 1 %}s{% endif %} détecté{% if files|length > 1 %}s{% endif %} dans ce dossier.</div>
+                            </div>
+                            <div class="folder-files-grid">
+                                {% for c in files %}
+                                    <a href="/system/gestionnaire-conf/edit?file={{ c.path|urlencode }}" class="file-card" onclick='rememberOpenConfFile({{ c.path|tojson }}, {{ c.name|tojson }})'>
+                                        <div class="file-icon">{{ c.icon }}</div>
+                                        <div>
+                                            <div class="file-name">{{ c.name }}</div>
+                                            <div class="file-path">{{ c.path }}</div>
+                                        </div>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        </section>
+                    {% endfor %}
+                {% else %}
+                    <div class="card empty-state">Aucun fichier de configuration détecté.</div>
+                {% endif %}
+            {% else %}
+                <form method="POST" action="/system/gestionnaire-conf/options" id="confSourcesForm">
+                    <div class="options-head confmgr-options-head-v4">
+                        <div class="small-text confmgr-options-help-v4">Ces valeurs modifient seulement les dossiers parcourus de <b>[WATCH_DIRS]</b> dans <b>system.conf</b>.</div>
+                        <div class="toolbar confmgr-options-toolbar-v4">
+                            <button type="button" class="yoleo-btn yoleo-btn-muted confmgr-options-icon-add-v4" onclick="addConfSourceRow()" title="Ajouter un dossier" aria-label="Ajouter un dossier">📂</button>
+                            <button type="submit" class="yoleo-btn yoleo-btn-primary">💾 Enregistrer</button>
+                        </div>
+                    </div>
+                    <div class="options-grid">
+                        <div class="card">
+                            <h3 class="section-title">📂 Dossiers parcourus</h3>
+                            <div class="hint">Le dossier <b>../conf</b> reste le dossier NAS par défaut en <b>DIR1</b>. Tu peux ajouter /etc, /etc/ssh ou d’autres dossiers si besoin.</div>
+                            <table class="source-table">
+                                <thead><tr><th>Clé</th><th>Chemin</th><th>État</th><th>Action</th></tr></thead>
+                                <tbody id="optionsDirRows">
+                                    {% for item in conf_manager_sources.watch_dirs %}
+                                        <tr class="source-row">
+                                            <td class="source-index">DIR{{ loop.index }}</td>
+                                            <td>
+                                                <div class="source-value">
+                                                    <input id="watch_dir_{{ loop.index0 }}" type="text" name="watch_dirs[]" value="{{ item.raw }}" {% if loop.first %}readonly{% endif %}>
+                                                    {% if not loop.first %}<button type="button" class="browse-trigger" onclick='openBrowse({{ ("watch_dir_" ~ loop.index0)|tojson }}, "folder")'>📂</button>{% else %}<button type="button" class="browse-trigger placeholder" tabindex="-1" aria-hidden="true">🔒</button>{% endif %}
+                                                </div>
+                                            </td>
+                                            <td><span class="source-state {{ 'ok' if item.exists else 'bad' }}">{{ 'OK' if item.exists else 'Absent' }}</span></td>
+                                            <td>{% if loop.first %}<button type="button" class="yoleo-btn yoleo-btn-mini" disabled>Défaut</button>{% else %}<button type="button" class="yoleo-btn yoleo-btn-mini" onclick="removeSourceRow(this)">🗑️</button>{% endif %}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    {% if not conf_manager_sources.watch_dirs %}
+                                        <tr class="source-row">
+                                            <td class="source-index">DIR1</td>
+                                            <td>
+                                                <div class="source-value">
+                                                    <input id="watch_dir_default" type="text" name="watch_dirs[]" value="../conf" readonly>
+                                                    <button type="button" class="browse-trigger placeholder" tabindex="-1" aria-hidden="true">🔒</button>
+                                                </div>
+                                            </td>
+                                            <td><span class="source-state ok">Défaut</span></td>
+                                            <td><button type="button" class="yoleo-btn yoleo-btn-mini" disabled>Défaut</button></td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </form>
+            {% endif %}
+        {% elif mode == 'edit' %}
+            <div class="page-head">
+                <div class="page-subtitle">Les dossiers restent accessibles pour ouvrir d’autres fichiers à comparer.</div>
+                <div class="inline-actions">
+                    <button type="submit" form="configForm" class="yoleo-btn yoleo-btn-primary">💾 Enregistrer tout</button>
+                    <button type="button" class="yoleo-btn yoleo-btn-muted" onclick='closeOpenConfFile({{ filepath|tojson }})'>Fermer</button>
+                </div>
+            </div>
+
+            <nav class="yoleo-subnav yoleo-subnav-keep-with-settings confmgr-file-subnav" aria-label="Navigation gestionnaire de configuration">
+                <a href="/system/gestionnaire-conf" class="yoleo-subnav-link">📂 Fichiers conf</a>
+                <span id="openConfFilesTabs" class="conf-open-tabs-inline" aria-label="Fichiers ouverts"></span>
+            </nav>
+
+            <div class="conf-editor-section">
+                    <form method="POST" action="/system/gestionnaire-conf/edit?file={{ filepath|urlencode }}" id="configForm" data-current-file="{{ filepath }}">
+                        <input type="hidden" name="original_mode" value="{{ file_mode }}">
+
+                        <div class="edit-layout">
+                            <div class="stack-col">
+                                <div class="card">
+                                    <h2 class="section-title">Recherche</h2>
+                                    <label for="filterInput">Filtrer les clés ou les sections</label>
+                                    <input type="text" id="filterInput" class="search-input" placeholder="Exemple : ffmpeg, path, ssh, network…">
+                                    <div class="hint">Le filtre masque seulement visuellement, il ne supprime rien du formulaire.</div>
+                                </div>
+
+                                <div id="sectionsRoot" class="stack-col">
+                                    {% if config %}
+                                        {% for section_name, keys in config.items() %}
+                                            {% set section_idx = loop.index0 %}
+                                            <section class="section-card js-section-card" data-section-name="{{ section_name|lower }}">
+                                                <div class="section-head">
+                                                    <div class="section-name">📦 {{ section_name }}</div>
+                                                    <div class="inline-actions">
+                                                        {% if section_name != 'DEFAULT' %}
+                                                            <button type="button" class="yoleo-btn yoleo-btn-mini" onclick='addField("section_fields_{{ section_idx }}", {{ section_name|tojson }}, "text")'>➕ Texte</button>
+                                                            <button type="button" class="yoleo-btn yoleo-btn-mini" onclick='addField("section_fields_{{ section_idx }}", {{ section_name|tojson }}, "file")'>📄 Fichier</button>
+                                                            <button type="button" class="yoleo-btn yoleo-btn-mini" onclick='addField("section_fields_{{ section_idx }}", {{ section_name|tojson }}, "folder")'>📂 Dossier</button>
+                                                        {% endif %}
+                                                        <button type="button" class="yoleo-btn yoleo-btn-mini" onclick='removeSection(this, {{ section_name|tojson }})'>🗑️ Section</button>
+                                                    </div>
+                                                </div>
+                                                <div class="section-body">
+                                                    <div id="section_fields_{{ section_idx }}" class="stack-col">
+                                                        {% for key, value in keys.items() %}
+                                                            {% set key_upper = key.upper() %}
+                                                            {% set browse_type = '' %}
+                                                            {% if ('FILE' in key_upper) or ('KEY' in key_upper) or ('SSH' in key_upper) or ('FFMPEG' in key_upper) or ('BIN' in key_upper) %}
+                                                                {% if value is none or value == '' or '/' in value %}
+                                                                    {% set browse_type = 'file' %}
+                                                                {% endif %}
+                                                            {% elif ('DIR' in key_upper) or ('FOLDER' in key_upper) or ('ROOT' in key_upper) or ('PATH' in key_upper) %}
+                                                                {% if value is none or value == '' or '/' in value %}
+                                                                    {% set browse_type = 'folder' %}
+                                                                {% endif %}
+                                                            {% endif %}
+                                                            <div class="config-row js-config-row" data-search="{{ (section_name ~ ' ' ~ key ~ ' ' ~ value)|lower }}">
+                                                                <input type="hidden" name="sections[]" value="{{ section_name }}">
+                                                                <input type="hidden" name="original_keys[]" value="{{ key }}">
+                                                                <input type="text" name="keys[]" value="{{ key }}" placeholder="Nom de la clé">
+                                                                <div class="equal-sign">=</div>
+                                                                <div class="value-wrap">
+                                                                    <textarea id="inp_{{ section_idx }}_{{ loop.index0 }}" name="values[]" class="auto-grow" rows="1" oninput="autoResize(this)" placeholder="Valeur">{{ value }}</textarea>
+                                                                    {% if browse_type %}
+                                                                        <button type="button" class="browse-trigger" onclick='openBrowse({{ ("inp_" ~ section_idx ~ "_" ~ loop.index0)|tojson }}, {{ browse_type|tojson }})'>{{ '📄' if browse_type == 'file' else '📂' }}</button>
+                                                                    {% else %}
+                                                                        <button type="button" class="browse-trigger placeholder" tabindex="-1" aria-hidden="true">⚙️</button>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <button type="button" class="remove-btn" onclick="removeRow(this)" title="Supprimer ce paramètre">🗑️</button>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    <div class="muted-note">Tu peux supprimer une ligne, ajouter des champs ou retirer une section complète.</div>
+                                                </div>
+                                            </section>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="card empty-state">Ce fichier est vide ou n’a pas encore de structure reconnue. Tu peux quand même créer une section.</div>
+                                    {% endif %}
+                                </div>
+
+                                <div id="newSectionsArea" class="card">
+                                    <h2 class="section-title">Nouvelle section</h2>
+                                    <div class="toolbar">
+                                        <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="addSection()">➕ Créer une section</button>
+                                    </div>
+                                    <div class="hint">Ajoute le nom de la section, enregistre, puis elle apparaîtra comme les autres au prochain chargement.</div>
+                                    <div id="newSectionList" class="stack-col sys-inline-015"></div>
+                                </div>
+
+                                <div class="sticky-actions">
+                                    <div class="toolbar">
+                                        <button type="submit" class="yoleo-btn yoleo-btn-primary">💾 Enregistrer tout</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <aside class="stack-col">
+                                <div class="card">
+                                    <h2 class="section-title">Résumé</h2>
+                                    <div class="meta-grid">
+                                        <div class="meta-box">
+                                            <div class="meta-label">Fichier</div>
+                                            <div class="meta-value">{{ filename }}</div>
+                                        </div>
+                                        <div class="meta-box">
+                                            <div class="meta-label">Mode détecté</div>
+                                            <div class="meta-value">{{ file_mode }}</div>
+                                        </div>
+                                        <div class="meta-box">
+                                            <div class="meta-label">Chemin</div>
+                                            <div class="meta-value">{{ filepath }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card">
+                                    <h2 class="section-title">Actions rapides</h2>
+                                    <div class="toolbar">
+                                        <button type="submit" form="configForm" class="yoleo-btn yoleo-btn-primary">💾 Sauvegarder</button>
+                                        <button type="button" class="yoleo-btn yoleo-btn-muted" onclick='closeOpenConfFile({{ filepath|tojson }})'>Fermer</button>
+                                    </div>
+                                    <div class="hint">La sauvegarde utilise désormais un vrai POST/Redirect/GET, donc plus de re-post forcé au refresh.</div>
+                                </div>
+                            </aside>
+                        </div>
+                    </form>
+                </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Helper local : cette page est souvent chargée en layout_blank, donc system.html
+    // n'est pas forcément présent. Sans ce helper, les boutons Options appellent
+    // addConfSourceRow(), puis le script casse sur `$ is not defined`.
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    let browseTargetInputId = null;
+    let browsePath = '/';
+    let browseType = 'folder';
+    let browseParentPath = '/';
+    const OPEN_CONF_FILES_KEY = 'system_confmgr_open_files_v1';
+    let openConfFilesFallback = [];
+
+    function getOpenConfFiles() {
+        try {
+            const raw = window.localStorage ? window.localStorage.getItem(OPEN_CONF_FILES_KEY) : JSON.stringify(openConfFilesFallback);
+            const parsed = JSON.parse(raw || '[]');
+            return Array.isArray(parsed) ? parsed.filter(item => item && item.path) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function setOpenConfFiles(items) {
+        const clean = [];
+        const seen = new Set();
+        (items || []).forEach(item => {
+            const path = String(item && item.path || '').trim();
+            if (!path || seen.has(path)) return;
+            seen.add(path);
+            clean.push({path, name: String(item.name || path.split('/').pop() || path)});
+        });
+        openConfFilesFallback = clean.slice(-12);
+        if (window.localStorage) window.localStorage.setItem(OPEN_CONF_FILES_KEY, JSON.stringify(openConfFilesFallback));
+    }
+
+    function rememberOpenConfFile(path, name) {
+        path = String(path || '').trim();
+        if (!path) return;
+
+        const cleanName = String(name || path.split('/').pop() || path);
+        const items = getOpenConfFiles();
+        const existing = items.find(item => item.path === path);
+
+        // Important : ne jamais déplacer un onglet déjà ouvert.
+        // Avant, le fichier courant était retiré puis repoussé à la fin à chaque reload.
+        // Résultat : l'ordre des onglets changeait et le premier onglet fichier semblait
+        // "basculer" entre deux fichiers au lieu de pointer vers un fichier précis.
+        if (existing) {
+            existing.name = cleanName;
+            setOpenConfFiles(items);
+            return;
+        }
+
+        items.push({path, name: cleanName});
+        setOpenConfFiles(items);
+    }
+
+    function forgetOpenConfFile(path) {
+        path = String(path || '').trim();
+        if (!path) return;
+        setOpenConfFiles(getOpenConfFiles().filter(item => item.path !== path));
+    }
+
+    function currentOpenConfFile() {
+        const form = $('configForm');
+        return form && form.dataset.currentFile ? String(form.dataset.currentFile) : '';
+    }
+
+    function closeOpenConfFile(path) {
+        const target = String(path || currentOpenConfFile() || '').trim();
+        if (target) forgetOpenConfFile(target);
+        const current = currentOpenConfFile();
+        if (current && current === target) {
+            window.location.href = '/system/gestionnaire-conf';
+            return;
+        }
+        renderOpenConfFileTabs();
+    }
+
+    function renderOpenConfFileTabs() {
+        const tabs = $('openConfFilesTabs');
+        if (!tabs) return;
+
+        const items = getOpenConfFiles();
+        const current = currentOpenConfFile();
+        if (!items.length) {
+            tabs.innerHTML = '';
+            tabs.classList.remove('is-visible');
+            return;
+        }
+
+        tabs.classList.add('is-visible');
+        tabs.innerHTML = items.map(item => {
+            const path = String(item.path || '');
+            const name = String(item.name || path.split('/').pop() || path);
+            const href = '/system/gestionnaire-conf/edit?file=' + encodeURIComponent(path);
+            const activeClass = current && current === path ? ' is-active' : '';
+            return `
+                <span class="conf-open-tab-shell" title="${escapeHtml(path)}">
+                    <a class="yoleo-subnav-link conf-open-tab-link conf-open-tab${activeClass}" href="${href}">${escapeHtml(name)}</a>
+                    <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-mini conf-open-tab-close" aria-label="Fermer ${escapeHtml(name)}" data-path="${escapeHtml(path)}">×</button>
+                </span>
+            `;
+        }).join('');
+
+        tabs.querySelectorAll('.conf-open-tab-close').forEach(button => {
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                closeOpenConfFile(button.dataset.path || '');
+            });
+        });
+    }
+
+    function autoResize(el) {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+    function removeRow(button) {
+        const row = button.closest('.config-row');
+        if (row) row.remove();
+    }
+
+    function removeSection(button, sectionName) {
+        const card = button.closest('.section-card');
+        if (!card) return;
+
+        const form = $('configForm');
+        if (form && sectionName) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'removed_sections[]';
+            hidden.value = sectionName;
+            form.appendChild(hidden);
+        }
+
+        card.remove();
+    }
+
+    function addField(containerId, sectionName, type) {
+        const container = $(containerId);
+        if (!container) return;
+
+        const uniqueId = `new_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        let browseButton = '<button type="button" class="browse-trigger placeholder" tabindex="-1" aria-hidden="true">⚙️</button>';
+        if (type === 'file') {
+            browseButton = `<button type="button" class="browse-trigger" onclick='openBrowse(${JSON.stringify(uniqueId)}, "file")'>📄</button>`;
+        } else if (type === 'folder') {
+            browseButton = `<button type="button" class="browse-trigger" onclick='openBrowse(${JSON.stringify(uniqueId)}, "folder")'>📂</button>`;
+        }
+
+        const row = document.createElement('div');
+        row.className = 'config-row js-config-row';
+        row.dataset.search = String(sectionName || '').toLowerCase();
+        row.innerHTML = `
+            <input type="hidden" name="sections[]" value="${escapeHtml(sectionName)}">
+            <input type="hidden" name="original_keys[]" value="">
+            <input type="text" name="keys[]" placeholder="Nom de la clé">
+            <div class="equal-sign">=</div>
+            <div class="value-wrap">
+                <textarea id="${escapeHtml(uniqueId)}" name="values[]" class="auto-grow" rows="1" oninput="autoResize(this)" placeholder="Valeur"></textarea>
+                ${browseButton}
+            </div>
+            <button type="button" class="remove-btn" onclick="removeRow(this)">🗑️</button>
+        `;
+        container.appendChild(row);
+        const textarea = row.querySelector('textarea');
+        autoResize(textarea);
+    }
+
+    function addSection() {
+        const list = $('newSectionList');
+        if (!list) return;
+
+        const box = document.createElement('div');
+        box.className = 'meta-box';
+        box.innerHTML = `
+            <label>Nom de la section</label>
+            <div class="toolbar">
+                <input class="sys-inline-017" type="text" name="new_section_name[]" placeholder="Exemple : NETWORK">
+                <button type="button" class="yoleo-btn yoleo-btn-red" onclick="this.closest('.meta-box').remove()">Supprimer</button>
+            </div>
+            <div class="hint">Enregistre pour créer la section, puis elle sera éditable comme les autres.</div>
+        `;
+        list.appendChild(box);
+    }
+
+    async function loadFolder(path) {
+        browsePath = path || '/';
+        $('browseCurrentPath').textContent = browsePath;
+        $('browseList').innerHTML = '<div class="empty-state">Chargement…</div>';
+
+        const formData = new FormData();
+        formData.append('path', browsePath);
+
+        try {
+            const response = await fetch('/system/conf/browse', { method: 'POST', body: formData });
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Erreur lors du chargement du dossier.');
+            }
+
+            browsePath = data.current_path || '/';
+            browseParentPath = data.parent_path || '/';
+            $('browseCurrentPath').textContent = browsePath;
+
+            const list = $('browseList');
+            list.innerHTML = '';
+
+            const addEntry = (icon, name, kind, onClick) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'browse-entry';
+                button.innerHTML = `
+                    <span class="browse-left">
+                        <span>${icon}</span>
+                        <span class="browse-name">${escapeHtml(name)}</span>
+                    </span>
+                    <span class="browse-kind">${escapeHtml(kind)}</span>
+                `;
+                button.addEventListener('click', onClick);
+                list.appendChild(button);
+            };
+
+            data.folders.forEach(folder => {
+                addEntry('📁', folder.name, 'Dossier', () => loadFolder(folder.path));
+            });
+
+            if (browseType === 'file') {
+                data.files.forEach(file => {
+                    addEntry('📄', file.name, 'Fichier', () => selectFile(file.path));
+                });
+            }
+
+            if (!list.children.length) {
+                list.innerHTML = '<div class="empty-state">Ce dossier est vide.</div>';
+            }
+        } catch (error) {
+            $('browseList').innerHTML = `<div class="empty-state">${escapeHtml(error.message || 'Erreur inconnue')}</div>`;
+        }
+    }
+
+    function openBrowse(inputId, type) {
+        const mode = (type === 'file') ? 'file' : 'folder';
+        currentBrowseTarget = inputId || '';
+        const input = $(inputId);
+        const start = input && input.value ? input.value : '/';
+        const params = new URLSearchParams({target: inputId, path: start});
+        const safeTarget = String(inputId || 'target').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const popup = window.open(
+            '/browser/' + mode + '?' + params.toString(),
+            'yoleo_confmgr_browser_' + mode + '_' + safeTarget,
+            'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+        );
+        if (popup) popup.focus();
+    }
+
+    function closeBrowse() {
+        $('browseModal').style.display = 'none';
+        browseTargetInputId = null;
+    }
+
+    function selectCurrentFolder() {
+        if (!browseTargetInputId || browseType !== 'folder') {
+            closeBrowse();
+            return;
+        }
+        const input = $(browseTargetInputId);
+        if (input) {
+            input.value = browsePath;
+            autoResize(input);
+        }
+        closeBrowse();
+    }
+
+    function selectFile(path) {
+        if (!browseTargetInputId || browseType !== 'file') {
+            closeBrowse();
+            return;
+        }
+        const input = $(browseTargetInputId);
+        if (input) {
+            input.value = path;
+            autoResize(input);
+        }
+        closeBrowse();
+    }
+
+    async function restartSystem() {
+        const overlay = $('rebootOverlay');
+        const title = $('rebootTitle');
+        const message = $('rebootMessage');
+
+        if (title) title.textContent = 'Redémarrage de l’interface…';
+        if (message) message.textContent = 'Commande envoyée au système. La page se rechargera automatiquement.';
+        if (overlay) overlay.style.display = 'flex';
+
+        try {
+            const response = await fetch('/system/conf/restart', { method: 'POST' });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.status === 'error') {
+                throw new Error(data.message || 'Erreur pendant le redémarrage.');
+            }
+            setTimeout(() => window.location.reload(), 4000);
+        } catch (error) {
+            if (title) title.textContent = 'Redémarrage non lancé';
+            if (message) message.textContent = error.message || 'Erreur réseau ou serveur injoignable.';
+            setTimeout(() => { if (overlay) overlay.style.display = 'none'; }, 3500);
+        }
+    }
+
+    function applyFilter(value) {
+        const query = String(value || '').trim().toLowerCase();
+        document.querySelectorAll('.js-section-card').forEach(section => {
+            const sectionName = String(section.dataset.sectionName || '');
+            let visibleRows = 0;
+
+            section.querySelectorAll('.js-config-row').forEach(row => {
+                const haystack = String(row.dataset.search || '');
+                const visible = !query || haystack.includes(query) || sectionName.includes(query);
+                row.style.display = visible ? '' : 'none';
+                if (visible) visibleRows += 1;
+            });
+
+            const showSection = !query || visibleRows > 0 || sectionName.includes(query);
+            section.style.display = showSection ? '' : 'none';
+        });
+    }
+
+
+    function removeSourceRow(button) {
+        const row = button.closest('tr');
+        if (row) row.remove();
+        refreshSourceIndexes();
+    }
+
+    function refreshSourceIndexes() {
+        const dirs = document.querySelectorAll('#optionsDirRows .source-row .source-index');
+        dirs.forEach((cell, idx) => { cell.textContent = `DIR${idx + 1}`; });
+    }
+
+    function addConfSourceRow(value='') {
+        const tbody = $('optionsDirRows');
+        if (!tbody) return;
+        const uniqueId = `watch_dir_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        const row = document.createElement('tr');
+        row.className = 'source-row';
+        row.innerHTML = `
+            <td class="source-index">DIR?</td>
+            <td>
+                <div class="source-value">
+                    <input id="${uniqueId}" type="text" name="watch_dirs[]" value="${escapeHtml(value)}" placeholder="/etc/ssh">
+                    <button type="button" class="browse-trigger" onclick='openBrowse(${JSON.stringify(uniqueId)}, "folder")'>📂</button>
+                </div>
+            </td>
+            <td><span class="source-state">Nouveau</span></td>
+            <td><button type="button" class="yoleo-btn yoleo-btn-mini" onclick="removeSourceRow(this)">🗑️</button></td>
+        `;
+        tbody.appendChild(row);
+        refreshSourceIndexes();
+        const input = document.getElementById(uniqueId);
+        if (input) input.focus();
+
+        // Confort UI : le bouton "Ajouter un dossier" ouvre directement
+        // la pop-up de parcours, au lieu d'ajouter seulement une ligne vide.
+        openBrowse(uniqueId, 'folder');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('textarea.auto-grow').forEach(autoResize);
+
+        const confRoot = document.getElementById('tab-confmgr') || document;
+
+        const filterInput = $('filterInput');
+        if (filterInput) {
+            filterInput.addEventListener('input', (event) => applyFilter(event.target.value));
+        }
+
+        const configForm = $('configForm');
+        if (configForm && configForm.dataset.currentFile) {
+            rememberOpenConfFile(configForm.dataset.currentFile, {{ filename|default('')|tojson }});
+        }
+
+        if ($('browseCloseBtn')) $('browseCloseBtn').addEventListener('click', closeBrowse);
+        if ($('browseRootBtn')) $('browseRootBtn').addEventListener('click', () => loadFolder('/'));
+        if ($('browseParentBtn')) $('browseParentBtn').addEventListener('click', () => loadFolder(browseParentPath || '/'));
+        if ($('browseValidateBtn')) $('browseValidateBtn').addEventListener('click', selectCurrentFolder);
+
+        const modal = $('browseModal');
+        if (modal) {
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeBrowse();
+            });
+        }
+
+        renderOpenConfFileTabs();
+
+        if (configForm && configForm.dataset.currentFile) {
+            configForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const currentFile = configForm.dataset.currentFile;
+                const submitButtons = document.querySelectorAll('button[form="configForm"], #configForm button[type="submit"]');
+                submitButtons.forEach(btn => { btn.disabled = true; });
+                try {
+                    const response = await fetch(window.location.href, { method: 'POST', body: new FormData(configForm) });
+                    if (!response.ok) throw new Error('Sauvegarde impossible.');
+                    window.location.href = '/system/gestionnaire-conf';
+                } catch (error) {
+                    const message = error.message || 'Erreur pendant la sauvegarde.';
+                    if (typeof window.yoleoToast === 'function') {
+                        window.yoleoToast(message, 'danger');
+                    } else {
+                        console.error(message);
+                    }
+                    submitButtons.forEach(btn => { btn.disabled = false; });
+                }
+            });
+        }
+    });
+
+    // Exposition explicite pour les attributs onclick déjà présents dans le HTML.
+    window.rememberOpenConfFile = rememberOpenConfFile;
+    window.forgetOpenConfFile = forgetOpenConfFile;
+    window.closeOpenConfFile = closeOpenConfFile;
+    window.renderOpenConfFileTabs = renderOpenConfFileTabs;
+    window.addConfSourceRow = addConfSourceRow;
+    window.removeSourceRow = removeSourceRow;
+    window.openBrowse = openBrowse;
+    window.closeBrowse = closeBrowse;
+    window.selectCurrentFolder = selectCurrentFolder;
+    window.selectFile = selectFile;
+</script>
+</section>
+{% endblock %}

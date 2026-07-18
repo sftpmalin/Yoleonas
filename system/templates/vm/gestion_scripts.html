@@ -1,0 +1,1153 @@
+<script>
+const vmgUrls = {
+    deviceAction: {{ url_for('vm_bp.vm_device_action')|tojson }},
+    update: {{ url_for('vm_bp.vm_update')|tojson }},
+    xml: {{ url_for('vm_bp.xml')|tojson }}
+};
+const vmgState = {
+    mode: {{ mode|tojson }},
+    currentVm: {{ current_vm|tojson }},
+    devices: {{ devices|tojson }},
+    vms: {{ vms|tojson }},
+    pools: {{ pools|default([])|tojson }},
+    networks: {{ networks|default([])|tojson }},
+    host_disks: {{ host_disks|default([])|tojson }},
+    host_optical_drives: {{ host_optical_drives|default([])|tojson }},
+    host_interfaces: {{ host_interfaces|default([])|tojson }},
+    host_bridges: {{ host_bridges|default([])|tojson }},
+    host_cpus: {{ host_cpus|default([])|tojson }},
+    render_nodes: {{ render_nodes|default([])|tojson }},
+    pci_devices: {{ pci_devices|default([])|tojson }},
+    usb_devices: {{ usb_devices|default([])|tojson }},
+    isos: {{ isos|default([])|tojson }},
+    firmware_options: {{ firmware_options|default([])|tojson }},
+    nvme_virtual_disk: {{ nvme_virtual_disk|default({})|tojson }},
+    modal: { type: '', mode: 'add', old: null },
+    pendingRemove: null
+};
+
+function vmg$(id){ return document.getElementById(id); }
+function vmgEsc(v){ return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function vmgOptionSelected(a,b){ return String(a ?? '') === String(b ?? '') ? ' selected' : ''; }
+function vmgNvmeDiskOption(current=''){
+    const status = vmgState.nvme_virtual_disk || {};
+    if(status.supported) return `<option value="nvme"${vmgOptionSelected('nvme', current)}>NVMe</option>`;
+    const installed = status.version || 'inconnue';
+    const required = status.required || '11.5.0';
+    return `<option value="" disabled>NVMe (libvirt ${required}+ requis ; ${installed} installe)</option>`;
+}
+function vmgNvmeDiskHelp(){
+    const status = vmgState.nvme_virtual_disk || {};
+    return status.supported
+        ? 'NVMe virtuel est disponible sur cet hote.'
+        : `NVMe virtuel sera disponible apres la mise a jour Debian vers libvirt ${status.required || '11.5.0'} ou plus recent.`;
+}
+function vmgUniq(values){
+    const out=[]; const seen=new Set();
+    values.map(v=>String(v||'').trim()).filter(Boolean).forEach(v=>{ if(!seen.has(v)){ seen.add(v); out.push(v); } });
+    return out;
+}
+function vmgStatus(msg, kind='ok'){
+    const box = vmg$('vmgStatus');
+    if(!box) return;
+    box.textContent = msg;
+    box.className = 'status-box vmg-status is-visible ' + (kind === 'error' ? 'error' : 'ok');
+    clearTimeout(vmgStatus.t);
+    vmgStatus.t = setTimeout(()=>box.classList.remove('is-visible'), 9000);
+}
+function vmgSetBusy(btn, busy=true){
+    if(!btn) return;
+    if(!btn.dataset.old) btn.dataset.old = btn.innerHTML;
+    btn.disabled = busy;
+    btn.innerHTML = busy ? '<span class="spinner"></span> En cours...' : btn.dataset.old;
+}
+async function vmgApiPost(url, body, btn=null){
+    vmgSetBusy(btn, true);
+    try{
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(body || {})
+        });
+        const data = await res.json().catch(()=>({ok:false, message:'Reponse JSON invalide'}));
+        if(!res.ok || data.ok === false) throw new Error(data.message || ('HTTP ' + res.status));
+        vmgStatus(data.message || 'Operation terminee.');
+        return data;
+    } finally {
+        vmgSetBusy(btn, false);
+    }
+}
+function vmgShowDevice(key){
+    const wanted = String(key || 'general');
+    document.querySelectorAll('[data-vmg-menu]').forEach(item => item.classList.toggle('is-active', item.dataset.vmgMenu === wanted));
+    document.querySelectorAll('[data-vmg-panel]').forEach(panel => panel.classList.toggle('is-active', panel.dataset.vmgPanel === wanted));
+    if(wanted !== 'general') history.replaceState(null, '', '#'+encodeURIComponent(wanted));
+    else history.replaceState(null, '', window.location.pathname);
+}
+function vmgSwitchTab(key, tab){
+    const wanted = `${key}:${tab}`;
+    document.querySelectorAll(`[data-vmg-tab^="${CSS.escape(key)}:"]`).forEach(btn => btn.classList.toggle('is-active', btn.dataset.vmgTab === wanted));
+    document.querySelectorAll(`[data-vmg-tab-panel^="${CSS.escape(key)}:"]`).forEach(panel => panel.classList.toggle('is-active', panel.dataset.vmgTabPanel === wanted));
+}
+function vmgInitHash(){
+    if(vmgState.mode !== 'vm') return;
+    const raw = decodeURIComponent((window.location.hash || '').replace(/^#/, ''));
+    if(raw && document.querySelector('[data-vmg-panel="'+CSS.escape(raw)+'"]')) vmgShowDevice(raw);
+    else vmgShowDevice('general');
+}
+function vmgOpenAddDeviceModal(){
+    vmgState.modal = { type: '', mode: 'add', old: null };
+    vmgShowDeviceChoices();
+    const modal = vmg$('vmgAddDeviceModal');
+    if(modal) modal.style.display = 'flex';
+}
+function vmgCloseModal(id){ const modal = vmg$(id); if(modal) modal.style.display = 'none'; }
+function vmgOverlayClose(e,id){ if(e.target && e.target.id === id) vmgCloseModal(id); }
+function vmgShowDeviceChoices(){
+    const title = vmg$('vmgDeviceModalTitle');
+    if(title) title.textContent = 'Ajouter un peripherique - ' + (vmgState.currentVm?.name || '');
+    const choices = vmg$('vmgDeviceChoices');
+    const form = vmg$('vmgDeviceForm');
+    if(choices) choices.style.display = 'grid';
+    if(form) form.innerHTML = '';
+    vmgDeviceModalError('');
+    ['vmgDeviceBackBtn','vmgDeviceSaveBtn'].forEach(id => { const el=vmg$(id); if(el) el.style.display='none'; });
+}
+function vmgDeviceModalError(msg){
+    const box = vmg$('vmgDeviceModalError');
+    if(!box) return;
+    box.textContent = msg || '';
+    box.style.display = msg ? 'block' : 'none';
+}
+function vmgTitleName(){
+    return String(vmgState.currentVm?.name || '').trim();
+}
+function vmgStartTitleRename(){
+    const box = vmg$('vmgTitleBox');
+    const input = vmg$('vmgTitleInput');
+    if(!box || !input) return;
+    input.value = vmgTitleName();
+    box.classList.add('is-editing');
+    window.requestAnimationFrame(() => {
+        input.focus();
+        input.select();
+    });
+}
+function vmgCancelTitleRename(){
+    const box = vmg$('vmgTitleBox');
+    const input = vmg$('vmgTitleInput');
+    if(input) input.value = vmgTitleName();
+    if(box) box.classList.remove('is-editing');
+}
+async function vmgCommitTitleRename(){
+    if(vmgState.renameSaving) return;
+    const box = vmg$('vmgTitleBox');
+    const input = vmg$('vmgTitleInput');
+    const currentName = vmgTitleName();
+    const nextName = String(input?.value || '').trim();
+    if(!box || !input) return;
+    if(!nextName){
+        vmgStatus('Nom de VM manquant.', 'error');
+        input.focus();
+        return;
+    }
+    if(nextName === currentName){
+        vmgCancelTitleRename();
+        return;
+    }
+    vmgState.renameSaving = true;
+    try{
+        const data = await vmgApiPost(vmgUrls.update, {name: currentName, new_name: nextName});
+        const finalName = String(data?.name || nextName);
+        window.location.href = data?.redirect || '/vm/gestion/vm/' + encodeURIComponent(finalName);
+    } catch(e){
+        vmgStatus(e.message || e, 'error');
+        input.focus();
+        input.select();
+    } finally {
+        vmgState.renameSaving = false;
+    }
+}
+function vmgInitTitleRename(){
+    const input = vmg$('vmgTitleInput');
+    if(!input) return;
+    input.addEventListener('keydown', event => {
+        if(event.key === 'Enter'){
+            event.preventDefault();
+            vmgCommitTitleRename();
+        }
+        if(event.key === 'Escape'){
+            event.preventDefault();
+            vmgCancelTitleRename();
+        }
+    });
+    input.addEventListener('blur', () => {
+        window.setTimeout(() => {
+            if(vmg$('vmgTitleBox')?.classList.contains('is-editing')) vmgCommitTitleRename();
+        }, 80);
+    });
+}
+
+function vmgMemoryGbFrom(value){
+    const raw = String(value || '').toLowerCase().replace(',', '.');
+    const match = raw.match(/([0-9.]+)/);
+    if(!match) return '';
+    const n = parseFloat(match[1]);
+    if(!Number.isFinite(n)) return '';
+    if(raw.includes('tib') || raw.includes('tb') || raw.includes('to')) return (n * 1024).toFixed(2).replace(/\.00$/,'');
+    if(raw.includes('mib') || raw.includes('mb') || raw.includes('mo')) return (n / 1024).toFixed(2).replace(/\.00$/,'');
+    if(raw.includes('kib') || raw.includes('kb') || raw.includes('ko')) return (n / 1024 / 1024).toFixed(2).replace(/\.00$/,'');
+    return String(n).replace(/\.00$/,'');
+}
+function vmgReadMemoryGb(kind='min'){
+    if(kind === 'max') return vmgMemoryGbFrom(vmgState.currentVm?.memory || '');
+    return vmgMemoryGbFrom(vmgState.currentVm?.current_memory || vmgState.currentVm?.memory || '');
+}
+function vmgBootOptions(current=''){
+    const boot = ['', 'hd', 'cdrom', 'network', 'fd'];
+    const labels = {'':'-', hd:'Disque', cdrom:'CD-ROM / ISO', network:'Reseau', fd:'Disquette'};
+    return boot.map(v => `<option value="${v}"${vmgOptionSelected(v,current)}>${labels[v]}</option>`).join('');
+}
+
+function vmgCpuNumber(value){
+    const n = Number.parseInt(String(value ?? '').trim(), 10);
+    return Number.isFinite(n) ? n : null;
+}
+function vmgVmActiveVcpu(){
+    return vmgCpuNumber(vmgState.currentVm?.vcpu_current || vmgState.currentVm?.vcpu || '') || 0;
+}
+function vmgVmMaxVcpu(){
+    return vmgCpuNumber(vmgState.currentVm?.vcpu || vmgState.currentVm?.vcpu_current || '') || 0;
+}
+function vmgCurrentPinset(){
+    return vmgUniq(String(vmgState.currentVm?.cpu_pinset || '').split(/[,\s]+/)).map(v => Number.parseInt(v,10)).filter(Number.isFinite);
+}
+function vmgHostCpuRows(){
+    return Array.isArray(vmgState.host_cpus) ? vmgState.host_cpus : [];
+}
+function vmgSelectedHostCpus(){
+    return [...document.querySelectorAll('.vmg-cpu-chip input[type="checkbox"]:checked')]
+        .map(box => Number.parseInt(box.value, 10))
+        .filter(Number.isFinite)
+        .sort((a,b)=>a-b);
+}
+function vmgCpuTopologyTotal(){
+    return vmgCpuNumber(vmg$('vmgCpuMax')?.value || '') || vmgVmMaxVcpu() || vmgVmActiveVcpu() || 1;
+}
+function vmgSyncCpuTopologyControls(){
+    const mode = vmg$('vmgCpuTopologyMode');
+    const sockets = vmg$('vmgCpuTopologySockets');
+    if(!mode || !sockets) return;
+    const value = String(mode.value || 'cores');
+    const total = vmgCpuTopologyTotal();
+    const custom = value === 'custom';
+    sockets.disabled = !custom;
+    sockets.closest('.vmg-field-cpu-sockets')?.classList.toggle('is-disabled', !custom);
+    if(value === 'cores') sockets.value = '1';
+    else if(value === 'sockets') sockets.value = String(total);
+    else if(!sockets.value) sockets.value = '1';
+}
+function vmgUpdateCpuSelection(){
+    const selected = vmgSelectedHostCpus();
+    const active = vmg$('vmgCpuCurrent');
+    const maximum = vmg$('vmgCpuMax');
+    if(selected.length){
+        if(active) active.value = selected.length;
+        if(maximum){
+            const maxValue = Number.parseInt(maximum.value || '0', 10) || 0;
+            if(maxValue < selected.length) maximum.value = selected.length;
+        }
+    }
+    const count = vmg$('vmgCpuSelectedCount');
+    if(count) count.textContent = selected.length ? `${selected.length} CPU hote selectionne(s)` : 'Aucun CPU hote epingle';
+    const hidden = vmg$('vmgCpuPinset');
+    if(hidden) hidden.value = selected.join(',');
+    vmgSyncCpuTopologyControls();
+}
+function vmgSetCpuSelection(values){
+    const wanted = new Set((values || []).map(v => String(v)));
+    document.querySelectorAll('.vmg-cpu-chip input[type="checkbox"]').forEach(box => { box.checked = wanted.has(String(box.value)); });
+    vmgUpdateCpuSelection();
+}
+function vmgSelectAllCpus(){
+    vmgSetCpuSelection(vmgHostCpuRows().map(row => row.cpu));
+}
+function vmgClearCpuSelection(){
+    vmgSetCpuSelection([]);
+}
+function vmgSelectLastPhysicalCores(){
+    const rows = vmgHostCpuRows();
+    const groups = new Map();
+    rows.forEach(row => {
+        const key = `${row.socket ?? 0}:${row.node ?? 0}:${row.core ?? row.cpu}`;
+        if(!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(Number(row.cpu));
+    });
+    const sortedGroups = [...groups.entries()].sort((a,b) => {
+        const ac = Math.min(...a[1]);
+        const bc = Math.min(...b[1]);
+        return ac - bc;
+    });
+    const half = Math.max(1, Math.floor(sortedGroups.length / 2));
+    const selected = sortedGroups.slice(-half).flatMap(x => x[1]).sort((a,b)=>a-b);
+    vmgSetCpuSelection(selected);
+}
+function vmgSelectFirstActiveCpus(){
+    const count = vmgVmActiveVcpu() || vmgVmMaxVcpu();
+    const selected = vmgHostCpuRows().slice(0, count).map(row => row.cpu);
+    vmgSetCpuSelection(selected);
+}
+function vmgRenderCpuGrid(){
+    const grid = vmg$('vmgCpuGrid');
+    if(!grid) return;
+    const rows = vmgHostCpuRows();
+    if(!rows.length){
+        grid.innerHTML = '<div class="vmg-empty">Inventaire CPU hote indisponible. Installe/autorise lscpu pour afficher la grille.</div>';
+        return;
+    }
+    const groups = new Map();
+    rows.forEach(row => {
+        const key = `${row.socket ?? 0}:${row.node ?? 0}:${row.core ?? row.cpu}`;
+        if(!groups.has(key)) groups.set(key, {socket:row.socket ?? 0, node:row.node ?? 0, core:row.core ?? row.cpu, cpus:[]});
+        groups.get(key).cpus.push(row);
+    });
+    const currentPins = vmgCurrentPinset();
+    const initial = new Set(currentPins.length ? currentPins.map(String) : []);
+    grid.innerHTML = [...groups.values()].map(group => {
+        group.cpus.sort((a,b)=>Number(a.cpu)-Number(b.cpu));
+        const chips = group.cpus.map(row => {
+            const cpu = String(row.cpu);
+            const checked = initial.has(cpu) ? ' checked' : '';
+            return `<label class="vmg-cpu-chip" title="CPU ${vmgEsc(cpu)} / coeur ${vmgEsc(row.core)}"><input type="checkbox" value="${vmgEsc(cpu)}"${checked} onchange="vmgUpdateCpuSelection()"><span>CPU ${vmgEsc(cpu)}</span></label>`;
+        }).join('');
+        return `<div class="vmg-cpu-core-row"><div class="vmg-cpu-core-label">Core ${vmgEsc(group.core)}</div><div class="vmg-cpu-core-cpus">${chips}</div></div>`;
+    }).join('');
+    vmgUpdateCpuSelection();
+}
+
+function vmgInitGeneralForm(){
+    const cpuCurrent = vmg$('vmgCpuCurrent');
+    if(cpuCurrent) cpuCurrent.value = vmgVmActiveVcpu() || '';
+    const cpuMax = vmg$('vmgCpuMax');
+    if(cpuMax) cpuMax.value = vmgVmMaxVcpu() || '';
+    const cpuMode = vmg$('vmgCpuMode');
+    if(cpuMode){
+        const currentCpuMode = String(vmgState.currentVm?.cpu_choice || '');
+        const knownCpuModes = ['emulated','host-passthrough','host-model'];
+        cpuMode.value = knownCpuModes.includes(currentCpuMode) ? currentCpuMode : '';
+        cpuMode.dataset.originalValue = cpuMode.value;
+    }
+    const topologyMode = vmg$('vmgCpuTopologyMode');
+    if(topologyMode){
+        const currentTopology = String(vmgState.currentVm?.cpu_topology_mode || 'cores');
+        const knownTopologies = ['cores','sockets','custom'];
+        topologyMode.value = knownTopologies.includes(currentTopology) ? currentTopology : 'cores';
+        topologyMode.addEventListener('change', vmgSyncCpuTopologyControls);
+    }
+    const topologySockets = vmg$('vmgCpuTopologySockets');
+    if(topologySockets){
+        topologySockets.value = String(vmgState.currentVm?.cpu_topology_sockets || topologySockets.value || '1');
+    }
+    ['vmgCpuCurrent','vmgCpuMax'].forEach(id => vmg$(id)?.addEventListener('input', vmgSyncCpuTopologyControls));
+    vmgRenderCpuGrid();
+    vmgSyncCpuTopologyControls();
+    const memMin = vmg$('vmgMemoryMinGb');
+    if(memMin) memMin.value = vmgReadMemoryGb('min');
+    const memMax = vmg$('vmgMemoryMaxGb');
+    if(memMax) memMax.value = vmgReadMemoryGb('max');
+    const autostart = String(vmgState.currentVm?.autostart || '').toLowerCase();
+    const autoEl = vmg$('vmgAutostart');
+    if(autoEl){
+        autoEl.checked = ['enable','enabled','yes','on','true','1','active','activé'].some(x => autostart.includes(x));
+    }
+    const machine = String(vmgState.currentVm?.machine || '').toLowerCase();
+    const machineEl = vmg$('vmgMachineType');
+    if(machineEl) machineEl.value = machine.includes('q35') ? 'q35' : (machine ? 'pc' : '');
+    const hypervEl = vmg$('vmgHyperv');
+    if(hypervEl) hypervEl.checked = !!vmgState.currentVm?.hyperv_enabled;
+}
+function vmgFirmwareRows(){
+    return (vmgState.firmware_options && vmgState.firmware_options.length) ? vmgState.firmware_options : [
+        {id:'bios', label:'BIOS legacy / SeaBIOS', mode:'bios', loader:'', nvram:'', secure_boot:false},
+        {id:'uefi', label:'UEFI auto', mode:'uefi', loader:'', nvram:'', secure_boot:false}
+    ];
+}
+function vmgFirmwareIsSecure(row){
+    if(!row) return false;
+    if(row.secure_boot === true || row.secure_boot === 'true' || row.secure_boot === 1) return true;
+    return /secboot|secure boot|ms keys|windows|\.ms\.fd/i.test(`${row.label || ''} ${row.loader || ''} ${row.nvram || ''}`);
+}
+function vmgFirmwareIsBios(row){
+    return String(row?.mode || row?.id || '').toLowerCase() === 'bios';
+}
+function vmgFirmwareById(id){
+    return vmgFirmwareRows().find(row => String(row.id || '') === String(id || '')) || {id, mode:id, loader:'', nvram:'', secure_boot:false};
+}
+function vmgFindSecureBootVariant(row, secure){
+    if(!row || String(row.mode || '') !== 'loader') return null;
+    const arch = String(row.arch || '');
+    const rows = vmgFirmwareRows();
+    return rows.find(candidate =>
+        String(candidate.mode || '') === 'loader' &&
+        String(candidate.arch || '') === arch &&
+        vmgFirmwareIsSecure(candidate) === secure
+    ) || null;
+}
+function vmgSyncSecureBootControl(fromCurrentVm=false){
+    const select = vmg$('vmgFirmwareSelect');
+    const box = vmg$('vmgSecureBoot');
+    if(!select || !box) return;
+    const row = vmgFirmwareById(select.value);
+    const disabled = vmgFirmwareIsBios(row);
+    box.disabled = disabled;
+    box.closest('.vmg-secure-boot-field')?.classList.toggle('is-disabled', disabled);
+    if(disabled){
+        box.checked = false;
+        return;
+    }
+    if(fromCurrentVm){
+        box.checked = !!vmgState.currentVm?.secure_boot_enabled || vmgFirmwareIsSecure(row);
+    } else {
+        box.checked = vmgFirmwareIsSecure(row);
+    }
+}
+function vmgApplySecureBootChoice(){
+    const select = vmg$('vmgFirmwareSelect');
+    const box = vmg$('vmgSecureBoot');
+    if(!select || !box || box.disabled) return;
+    const row = vmgFirmwareById(select.value);
+    const variant = vmgFindSecureBootVariant(row, box.checked);
+    if(variant) select.value = variant.id || select.value;
+}
+function vmgInitFirmwareForm(){
+    const select = vmg$('vmgFirmwareSelect');
+    if(!select) return;
+    const rows = vmgFirmwareRows();
+    const currentLoader = String(vmgState.currentVm?.loader || '');
+    const currentNvram = String(vmgState.currentVm?.nvram || '');
+    const currentRow = rows.find(row => String(row.loader || '') === currentLoader && (!row.nvram || !currentNvram || String(row.nvram || '') === currentNvram))
+        || rows.find(row => currentLoader && String(row.loader || '') === currentLoader);
+    const current = currentLoader ? (currentRow?.id || (String(vmgState.currentVm?.firmware || '').toLowerCase() === 'efi' ? 'uefi' : 'bios')) : (String(vmgState.currentVm?.firmware || '').toLowerCase() === 'efi' ? 'uefi' : 'bios');
+    select.innerHTML = rows.map(row => {
+        const label = row.label || row.id || '';
+        return `<option value="${vmgEsc(row.id || '')}" title="${vmgEsc(row.loader || row.id || '')}"${vmgOptionSelected(row.id,current)}>${vmgEsc(label)}</option>`;
+    }).join('');
+    if(!select.value && rows.length) select.value = rows[0].id || '';
+    select.addEventListener('change', () => vmgSyncSecureBootControl(false));
+    const secureBox = vmg$('vmgSecureBoot');
+    if(secureBox) secureBox.addEventListener('change', vmgApplySecureBootChoice);
+    vmgSyncSecureBootControl(true);
+}
+async function vmgSaveFirmware(btn=null){
+    vmgApplySecureBootChoice();
+    const id = vmg$('vmgFirmwareSelect')?.value || '';
+    const fw = vmgFirmwareById(id);
+    const secureBox = vmg$('vmgSecureBoot');
+    try{
+        await vmgApiPost(vmgUrls.update, {
+            name: vmgState.currentVm?.name || '',
+            firmware_id: id,
+            firmware_mode: fw.mode || id,
+            firmware_loader: fw.loader || '',
+            firmware_nvram_template: fw.nvram || '',
+            secure_boot: secureBox && !secureBox.disabled && secureBox.checked ? 'on' : 'off'
+        }, btn);
+        setTimeout(()=>window.location.reload(), 700);
+    } catch(e){ vmgStatus(e.message || e, 'error'); }
+}
+async function vmgSubmitGeneral(event){
+    event.preventDefault();
+    const btn = event.submitter;
+    const cpuModeEl = vmg$('vmgCpuMode');
+    const originalCpuMode = String(cpuModeEl?.dataset.originalValue || vmg$('vmgCpuModeOriginal')?.value || '');
+    const selectedCpuMode = String(cpuModeEl?.value || '');
+    const cpuModeChanged = selectedCpuMode && selectedCpuMode !== originalCpuMode;
+    const body = {
+        name: vmgState.currentVm?.name || '',
+        vcpu_current: vmg$('vmgCpuCurrent')?.value || '',
+        vcpu_max: vmg$('vmgCpuMax')?.value || '',
+        cpu_mode: cpuModeChanged ? selectedCpuMode : '',
+        cpu_mode_changed: cpuModeChanged ? '1' : '0',
+        cpu_mode_original: originalCpuMode,
+        cpu_topology_mode: vmg$('vmgCpuTopologyMode')?.value || 'cores',
+        cpu_topology_sockets: vmg$('vmgCpuTopologySockets')?.value || '',
+        cpu_pinset: vmg$('vmgCpuPinset')?.value || '',
+        cpu_pinning: '1',
+        memory_min_gb: vmg$('vmgMemoryMinGb')?.value || '',
+        memory_max_gb: vmg$('vmgMemoryMaxGb')?.value || '',
+        autostart: vmg$('vmgAutostart')?.checked ? 'on' : 'off',
+        machine_type: vmg$('vmgMachineType')?.value || '',
+        hyperv: vmg$('vmgHyperv')?.checked ? 'on' : 'off'
+    };
+    try{
+        const data = await vmgApiPost(vmgUrls.update, body, btn);
+        const currentName = String(vmgState.currentVm?.name || '');
+        const nextName = String(data?.name || currentName);
+        const redirect = data?.redirect || (nextName && nextName !== currentName ? '/vm/gestion/vm/' + encodeURIComponent(nextName) : '');
+        setTimeout(()=>{ if(redirect) window.location.href = redirect; else window.location.reload(); }, 700);
+    } catch(e){ vmgStatus(e.message || e, 'error'); }
+}
+function vmgRenderDeviceJson(){
+    document.querySelectorAll('[data-vmg-xml]').forEach(el => {
+        el.textContent = String(vmgState.currentVm?.xml || 'XML indisponible.');
+    });
+    document.querySelectorAll('[data-vmg-json]').forEach(el => {
+        try{
+            const data = JSON.parse(el.getAttribute('data-vmg-json') || '{}');
+            el.textContent = JSON.stringify(data, null, 2);
+        } catch(e){ el.textContent = '{}'; }
+    });
+}
+function vmgDeviceByKey(key){ return (vmgState.devices || []).find(d => d.key === key) || null; }
+function vmgKv(label, value){
+    const text = String(value ?? '').trim() || '-';
+    return `<div class="vmg-info-card"><b>${vmgEsc(label)}</b><span>${vmgEsc(text)}</span></div>`;
+}
+function vmgDeviceTypeForApi(dev){
+    if(!dev) return '';
+    if(dev.kind === 'cdrom') return 'iso';
+    return dev.kind;
+}
+function vmgCanEdit(dev){
+    return ['disk','physical_disk','cdrom','nic','pci','usb','graphics','video','console','channel','tpm','controller'].includes(dev?.kind);
+}
+function vmgIsBootable(dev){
+    return ['disk','physical_disk','cdrom','nic'].includes(dev?.kind);
+}
+function vmgBootClass(dev){
+    if(dev?.kind === 'cdrom') return 'cdrom';
+    if(dev?.kind === 'nic') return 'network';
+    return 'hd';
+}
+function vmgBootLabel(dev){
+    const d = dev?.data || {};
+    const source = d.source ? ' - ' + d.source : '';
+    if(dev?.kind === 'nic') return `${dev.label || 'Carte reseau'}${d.source ? ' - ' + d.source : ''}`;
+    return `${dev?.label || 'Peripherique'}${source}`;
+}
+function vmgInitialBootItems(){
+    const items = (vmgState.devices || []).filter(vmgIsBootable).map((dev, index) => ({...dev, originalIndex:index}));
+    const explicit = items.filter(item => Number.parseInt(item.data?.boot_order || '', 10) > 0);
+    if(explicit.length){
+        explicit.sort((a,b) => Number.parseInt(a.data?.boot_order || '999', 10) - Number.parseInt(b.data?.boot_order || '999', 10));
+        const used = new Set(explicit.map(x => x.key));
+        return [...explicit, ...items.filter(x => !used.has(x.key))];
+    }
+    const classOrder = vmgState.currentVm?.boot_devs || [];
+    if(classOrder.length){
+        return items.sort((a,b) => {
+            const ai = classOrder.indexOf(vmgBootClass(a));
+            const bi = classOrder.indexOf(vmgBootClass(b));
+            const av = ai < 0 ? 99 : ai;
+            const bv = bi < 0 ? 99 : bi;
+            if(av !== bv) return av - bv;
+            return a.originalIndex - b.originalIndex;
+        });
+    }
+    return items;
+}
+function vmgRenderBootList(){
+    if(!vmgState.bootItems) vmgState.bootItems = vmgInitialBootItems();
+    const slot = vmg$('vmgBootList');
+    if(!slot) return;
+    const items = vmgState.bootItems || [];
+    if(!items.length){
+        slot.innerHTML = '<div class="vmg-empty">Aucun disque, ISO ou reseau bootable dans cette VM.</div>';
+        return;
+    }
+    slot.innerHTML = items.map((dev, index) => `
+        <div class="vmg-boot-item">
+            <div class="vmg-boot-rank">${index + 1}</div>
+            <div class="vmg-boot-main">
+                <b>${vmgEsc(dev.icon || '')} ${vmgEsc(dev.label || dev.kind)}</b>
+                <span>${vmgEsc(vmgBootLabel(dev))}</span>
+            </div>
+            <div class="vmg-boot-actions">
+                <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" ${index === 0 ? 'disabled' : ''} onclick="vmgMoveBootItem(${index}, -1)">↑</button>
+                <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" ${index === items.length - 1 ? 'disabled' : ''} onclick="vmgMoveBootItem(${index}, 1)">↓</button>
+            </div>
+        </div>
+    `).join('');
+}
+function vmgMoveBootItem(index, delta){
+    const items = vmgState.bootItems || [];
+    const next = index + delta;
+    if(next < 0 || next >= items.length) return;
+    const tmp = items[index];
+    items[index] = items[next];
+    items[next] = tmp;
+    vmgRenderBootList();
+}
+function vmgBootPayloadItem(dev){
+    const d = dev.data || {};
+    return {
+        type: dev.kind,
+        target: d.target || '',
+        source: d.source || '',
+        mac: d.mac || ''
+    };
+}
+async function vmgSaveBootOrder(btn=null){
+    const items = (vmgState.bootItems || []).filter(vmgIsBootable);
+    try{
+        await vmgApiPost(vmgUrls.update, {name: vmgState.currentVm?.name || '', boot_items: items.map(vmgBootPayloadItem)}, btn);
+        setTimeout(()=>window.location.reload(), 700);
+    } catch(e){ vmgStatus(e.message || e, 'error'); }
+}
+function vmgRenderDeviceVisuals(){
+    document.querySelectorAll('[data-vmg-visual]').forEach(slot => {
+        const dev = vmgDeviceByKey(slot.dataset.vmgVisual);
+        if(!dev){ slot.innerHTML = '<div class="vmg-empty">Peripherique introuvable.</div>'; return; }
+        const d = dev.data || {};
+        let rows = [];
+        if(['disk','physical_disk','cdrom'].includes(dev.kind)){
+            rows = [
+                vmgKv('Type', dev.kind === 'cdrom' ? 'Lecteur CD-ROM / ISO' : (dev.kind === 'physical_disk' ? 'Disque physique' : 'Disque virtuel')),
+                vmgKv('Source', d.source),
+                vmgKv('Target', d.target),
+                vmgKv('Bus', d.bus),
+                vmgKv('Format', d.format),
+                vmgKv('Taille', d.size),
+                vmgKv('Lecture seule', d.readonly || (dev.kind === 'cdrom' ? 'oui' : 'non')),
+                vmgKv('Boot order', d.boot_order)
+            ];
+        } else if(dev.kind === 'nic'){
+            rows = [
+                vmgKv('Type reseau', d.type),
+                vmgKv('Source', d.source),
+                vmgKv('Mode source', d.source_kind),
+                vmgKv('Modele', d.model),
+                vmgKv('MAC', d.mac),
+                vmgKv('Target', d.target)
+            ];
+        } else if(dev.kind === 'pci'){
+            rows = [vmgKv('Adresse PCI', d.address), vmgKv('Libelle hote', d.label), vmgKv('Managed', d.managed), vmgKv('Mode', d.mode)];
+        } else if(dev.kind === 'usb'){
+            rows = [vmgKv('Vendor', d.vendor), vmgKv('Product', d.product), vmgKv('Libelle', d.label), vmgKv('Managed', d.managed)];
+        } else {
+            rows = Object.keys(d).map(k => vmgKv(k, d[k]));
+        }
+        slot.innerHTML = `<div class="vmg-grid">${rows.join('')}</div>`;
+    });
+    document.querySelectorAll('[data-vmg-actions]').forEach(slot => {
+        const dev = vmgDeviceByKey(slot.dataset.vmgActions);
+        if(!vmgCanEdit(dev)){
+            slot.innerHTML = '<span class="vmg-muted">Element gere par libvirt. Edition directe reservee au XML expert.</span>';
+            return;
+        }
+        slot.innerHTML = `
+            <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="vmgOpenDeviceForm('${vmgEsc(vmgDeviceTypeForApi(dev))}','edit', vmgDeviceByKey('${vmgEsc(dev.key)}')?.data || {})">Modifier</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red" onclick="vmgRemoveDevice('${vmgEsc(dev.key)}', this)">Supprimer</button>
+        `;
+    });
+}
+
+function vmgAllPoolVolumes(){
+    const out=[];
+    (vmgState.pools||[]).forEach(p => (p.volumes||[]).forEach(v => out.push({name:v.name||'', path:v.path||'', size:v.capacity||v.allocation||'', pool:p.name||''})));
+    return out.filter(x => x.path);
+}
+function vmgFileExt(path){ const name=String(path||'').toLowerCase().split(/[?#]/)[0]; const i=name.lastIndexOf('.'); return i>=0 ? name.slice(i+1) : ''; }
+function vmgDiskChoices(){
+    const exts = new Set(['qcow2','raw','img','vmdk','vdi','vhd','vhdx']);
+    const seen = new Set();
+    return vmgAllPoolVolumes().filter(v => exts.has(vmgFileExt(v.path)) || !vmgFileExt(v.path)).filter(v => { if(seen.has(v.path)) return false; seen.add(v.path); return true; });
+}
+function vmgIsoChoices(){
+    const rows = [...(vmgState.isos||[]).map(i=>({name:i.name||'', path:i.path||'', size:i.size||'', pool:'ISO'})), ...vmgAllPoolVolumes().filter(v => ['iso','img'].includes(vmgFileExt(v.path)))];
+    const seen = new Set();
+    return rows.filter(v => { if(!v.path || seen.has(v.path)) return false; seen.add(v.path); return true; });
+}
+function vmgOpticalChoices(){
+    const seen = new Set();
+    return (vmgState.host_optical_drives || []).filter(row => {
+        const path = String(row.path || '').trim();
+        if(!path || seen.has(path)) return false;
+        seen.add(path);
+        return true;
+    });
+}
+function vmgOpticalSourceOptions(current=''){
+    const rows = vmgOpticalChoices();
+    const cur = String(current || '');
+    const options = [];
+    const seen = new Set();
+    if(cur && cur.startsWith('/dev/') && !rows.some(row => row.path === cur || row.real === cur)){
+        options.push(`<option value="${vmgEsc(cur)}" selected>${vmgEsc(cur)}</option>`);
+        seen.add(cur);
+    }
+    rows.forEach(row => {
+        const path = String(row.path || '');
+        if(!path || seen.has(path)) return;
+        seen.add(path);
+        const bits = [
+            row.display || row.label || path,
+            row.real && row.real !== path ? row.real : '',
+            row.qemu_access === false ? 'acces QEMU a verifier' : ''
+        ].filter(Boolean);
+        options.push(`<option value="${vmgEsc(path)}"${vmgOptionSelected(path, cur)}>${vmgEsc(bits.join(' - '))}</option>`);
+    });
+    return options.join('') || '<option value="">aucun lecteur optique detecte</option>';
+}
+function vmgOptions(rows, valueKey, labelFn, current=''){
+    const list = rows || [];
+    if(!list.length) return '<option value="">aucune entree detectee</option>';
+    return list.map(row => {
+        const value = row[valueKey] || '';
+        return `<option value="${vmgEsc(value)}"${vmgOptionSelected(value,current)}>${vmgEsc(labelFn(row))}</option>`;
+    }).join('');
+}
+function vmgSelectOptions(values, current=''){
+    const rows=[]; const seen=new Set(); const cur=String(current||'');
+    if(cur){ rows.push(`<option value="${vmgEsc(cur)}" selected>${vmgEsc(cur)}</option>`); seen.add(cur); }
+    (values || []).forEach(v => { if(!v || seen.has(v)) return; seen.add(v); rows.push(`<option value="${vmgEsc(v)}">${vmgEsc(v)}</option>`); });
+    return rows.join('') || '<option value="">aucune source detectee</option>';
+}
+function vmgHostBridgeNames(){
+    return vmgUniq([
+        ...(vmgState.host_bridges||[]).map(b=>b.name),
+        ...(vmgState.networks||[]).map(n=>n.bridge),
+        ...((vmgState.vms||[]).flatMap(vm => (vm.nics||[]).filter(n=>n.source_kind==='bridge' || n.type==='bridge').map(n=>n.source)))
+    ]);
+}
+function vmgLibvirtNetworkNames(){
+    return vmgUniq([...(vmgState.networks||[]).map(n=>n.name), ...((vmgState.vms||[]).flatMap(vm => (vm.nics||[]).filter(n=>n.source_kind==='network' || n.type==='network').map(n=>n.source)))]);
+}
+function vmgDirectInterfaceNames(){
+    return vmgUniq([...(vmgState.host_interfaces||[]).map(i=>i.name).filter(n=>n && n!=='lo'), ...((vmgState.vms||[]).flatMap(vm => (vm.nics||[]).filter(n=>n.source_kind==='dev' || n.type==='direct').map(n=>n.source)))]);
+}
+function vmgNicKindFromOld(old){
+    const sk = String(old?.source_kind || '').toLowerCase();
+    const typ = String(old?.type || '').toLowerCase();
+    if(sk === 'network' || typ === 'network') return 'network';
+    if(sk === 'dev' || typ === 'direct') return 'direct';
+    return 'bridge';
+}
+function vmgNicSourceValues(kind){
+    if(kind === 'network') return vmgLibvirtNetworkNames();
+    if(kind === 'direct') return vmgDirectInterfaceNames();
+    return vmgHostBridgeNames();
+}
+function vmgUpdateNicSourceOptions(current=''){
+    const kind = vmg$('devKind')?.value || 'bridge';
+    const src = vmg$('devSource');
+    if(!src) return;
+    const values = vmgNicSourceValues(kind);
+    const keep = current || src.value || values[0] || '';
+    src.innerHTML = vmgSelectOptions(values, keep);
+}
+function vmgField(id, label, html, help=''){
+    return `<label class="vmg-field" for="${vmgEsc(id)}">${vmgEsc(label)}${html}${help ? `<small>${vmgEsc(help)}</small>` : ''}</label>`;
+}
+function vmgSelect(id, optionsHtml){ return `<select id="${vmgEsc(id)}" class="select-input">${optionsHtml}</select>`; }
+function vmgInput(id, value='', placeholder=''){
+    return `<input id="${vmgEsc(id)}" class="text-input" value="${vmgEsc(value)}" placeholder="${vmgEsc(placeholder)}">`;
+}
+function vmgRenderNodes(){
+    return Array.isArray(vmgState.render_nodes) ? vmgState.render_nodes : [];
+}
+function vmgPreferredRenderNode(){
+    const nodes = vmgRenderNodes();
+    const preferred = nodes.find(node => node && node.preferred && node.path);
+    if(preferred) return String(preferred.path || '');
+    const intel = nodes.find(node => node && node.path && /intel|uhd|iris|raptor lake/i.test(String(node.display || node.label || '')));
+    if(intel) return String(intel.path || '');
+    const accessible = nodes.find(node => node && node.path && node.qemu_access);
+    if(accessible) return String(accessible.path || '');
+    return String(nodes.find(node => node && node.path)?.path || '');
+}
+function vmgRenderNodeOptions(current='', preferDefault=false){
+    const cur = String(current || (preferDefault ? vmgPreferredRenderNode() : ''));
+    const rows = [`<option value=""${vmgOptionSelected('', cur)}>Auto (Intel si possible)</option>`];
+    vmgRenderNodes().forEach(node => {
+        const path = String(node.path || '');
+        if(!path) return;
+        const label = String(node.display || node.label || path);
+        const suffix = node.preferred ? ' - recommandé' : '';
+        rows.push(`<option value="${vmgEsc(path)}"${vmgOptionSelected(path, cur)}>${vmgEsc(label + suffix)}</option>`);
+    });
+    return rows.join('');
+}
+function vmgRenderNodeWarning(){
+    const nodes = vmgRenderNodes();
+    if(!nodes.length) return 'Aucun GPU de rendu /dev/dri/renderD* detecte.';
+    const warnings = [];
+    nodes.forEach(node => (node.warnings || []).forEach(item => warnings.push(String(item || '').trim())));
+    return vmgUniq(warnings).join(' ');
+}
+function vmgVideoAccelEnabled(old={}){
+    const raw = String(old?.accel3d || '').toLowerCase();
+    return ['yes','true','1','on'].includes(raw);
+}
+function vmgSyncVideo3dControls(event=null){
+    const model = vmg$('devModel');
+    const accel = vmg$('devAccel3d');
+    const row = vmg$('devVideo3dRow');
+    const renderWrap = vmg$('devRenderNodeWrap');
+    const render = vmg$('devRenderNode');
+    if(!model || !row) return;
+    const source = event?.target?.id || '';
+    let currentModel = String(model.value || '');
+    if(source === 'devModel' && currentModel === 'virtio-3d' && accel){
+        accel.value = 'yes';
+    }
+    if(source === 'devAccel3d' && accel && accel.value !== 'yes' && currentModel === 'virtio-3d'){
+        model.value = 'virtio';
+        currentModel = 'virtio';
+    }
+    const isVirtio = currentModel === 'virtio' || currentModel === 'virtio-3d';
+    row.hidden = !isVirtio;
+    if(!isVirtio && accel) accel.value = 'no';
+    const enabled = isVirtio && ((accel?.value || 'no') === 'yes' || currentModel === 'virtio-3d');
+    if(renderWrap) renderWrap.hidden = !enabled;
+    if(render){
+        render.disabled = !enabled;
+        if(enabled && !render.value){
+            const preferred = vmgPreferredRenderNode();
+            if(preferred) render.value = preferred;
+        }
+    }
+}
+function vmgInputBrowse(id, value='', kind='file', placeholder=''){
+    return `<div class="input-button-row"><input id="${vmgEsc(id)}" class="text-input" value="${vmgEsc(value)}" placeholder="${vmgEsc(placeholder)}"><button type="button" class="yoleo-btn yoleo-btn-muted vm-browse-btn" title="Parcourir" aria-label="Parcourir" onclick="vmgOpenYoleoBrowser('${vmgEsc(kind)}','${vmgEsc(id)}')">📁</button></div>`;
+}
+function vmgBrowserStartPath(targetId){
+    const value = String(vmg$(targetId)?.value || '').trim();
+    if(!value) return '/';
+    if(value.includes('.') || value.startsWith('/dev/')){
+        const i = value.lastIndexOf('/');
+        return i > 0 ? value.slice(0, i) : '/';
+    }
+    return value;
+}
+function vmgOpenYoleoBrowser(kind, targetId){
+    const params = new URLSearchParams();
+    params.set('target', targetId || '');
+    params.set('path', vmgBrowserStartPath(targetId));
+    const mode = String(kind || 'file') === 'folder' ? 'folder' : 'file';
+    const url = '/browser/' + mode + '?' + params.toString();
+    const popup = window.open(url, 'yoleo_browser_' + String(targetId || mode), 'width=1100,height=760,resizable=yes,scrollbars=yes');
+    if(popup && popup.focus) popup.focus();
+    if(!popup) window.location.href = url;
+}
+window.addEventListener('message', function(event){
+    const data = event.data || {};
+    if(data.type !== 'yoleo-browser-select' || !['file','folder'].includes(data.mode) || !data.target) return;
+    const target = vmg$(data.target);
+    if(target){
+        target.value = data.path || '';
+        target.dispatchEvent(new Event('input', {bubbles:true}));
+        target.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+});
+function vmgPoolsWithVolumes(type){
+    const exts = type === 'iso' ? new Set(['iso','img']) : new Set(['qcow2','raw','img','vmdk','vdi','vhd','vhdx']);
+    return (vmgState.pools || []).map(pool => {
+        const volumes = (pool.volumes || []).filter(v => {
+            const ext = vmgFileExt(v.path || v.name || '');
+            return exts.has(ext) || (type !== 'iso' && !ext);
+        });
+        return {...pool, volumes};
+    }).filter(pool => String(pool.name || '').trim() && pool.volumes.length);
+}
+function vmgPoolOptions(type, currentPath=''){
+    const pools = vmgPoolsWithVolumes(type);
+    if(!pools.length) return '<option value="">aucune pool avec volume</option>';
+    const found = pools.find(p => (p.volumes || []).some(v => v.path === currentPath));
+    const current = found?.name || pools[0].name || '';
+    return pools.map(p => {
+        const label = `${p.name || ''}${p.path ? ' - ' + p.path : ''}${p.available ? ' - libre ' + p.available : ''}`;
+        return `<option value="${vmgEsc(p.name || '')}"${vmgOptionSelected(p.name,current)}>${vmgEsc(label)}</option>`;
+    }).join('');
+}
+function vmgPoolVolumeOptions(type, poolName='', currentPath=''){
+    const pool = vmgPoolsWithVolumes(type).find(p => String(p.name || '') === String(poolName || '')) || vmgPoolsWithVolumes(type)[0];
+    const volumes = pool?.volumes || [];
+    if(!volumes.length) return '<option value="">aucun volume</option>';
+    return volumes.map(v => {
+        const value = v.path || '';
+        const label = `${v.name || value}${v.capacity || v.allocation ? ' - ' + (v.capacity || v.allocation) : ''}`;
+        return `<option value="${vmgEsc(value)}"${vmgOptionSelected(value,currentPath)}>${vmgEsc(label)}</option>`;
+    }).join('');
+}
+function vmgUpdatePoolVolumes(type, currentPath=''){
+    const poolName = vmg$('devPoolName')?.value || '';
+    const volume = vmg$('devPoolVolume');
+    if(volume) volume.innerHTML = vmgPoolVolumeOptions(type, poolName, currentPath);
+}
+function vmgSourcePicker(type, old){
+    const choices = type === 'iso' ? vmgIsoChoices() : vmgDiskChoices();
+    const current = old?.source || '';
+    const inPool = choices.some(v => v.path === current);
+    const inOptical = type === 'iso' && (vmgOpticalChoices().some(v => v.path === current || v.real === current) || /^\/dev\/(cdrom|dvd|sr\d+)/.test(String(current || '')));
+    const currentPool = (vmgPoolsWithVolumes(type).find(p => (p.volumes || []).some(v => v.path === current)) || {}).name || '';
+    const sourceMode = inOptical ? 'physical_cd' : (inPool ? 'pool' : 'direct');
+    const modeOptions = [
+        `<option value="direct"${vmgOptionSelected('direct', sourceMode)}>chemin direct</option>`,
+        `<option value="pool"${vmgOptionSelected('pool', sourceMode)}>pool libvirt</option>`,
+        type === 'iso' ? `<option value="physical_cd"${vmgOptionSelected('physical_cd', sourceMode)}>lecteur optique physique</option>` : ''
+    ].join('');
+    return `
+        ${vmgField('devSourceMode','Source', vmgSelect('devSourceMode', modeOptions))}
+        <div id="devDirectWrap">${vmgField('devSource','Chemin direct', vmgInputBrowse('devSource', current, 'file', type === 'iso' ? '/mnt/isos/debian.iso' : '/var/lib/libvirt/images/vm.qcow2'), 'Utilise Parcourir pour ouvrir le composant /browser existant.')}</div>
+        <div id="devPoolWrap">
+            ${vmgField('devPoolName','Pool', vmgSelect('devPoolName', vmgPoolOptions(type, current)))}
+            ${vmgField('devPoolVolume','Volume', vmgSelect('devPoolVolume', vmgPoolVolumeOptions(type, currentPool, current)))}
+        </div>
+        ${type === 'iso' ? `<div id="devOpticalWrap">${vmgField('devOpticalSource','Lecteur optique physique', vmgSelect('devOpticalSource', vmgOpticalSourceOptions(current)), 'Lecteur CD/DVD/Blu-ray de l hote, expose a la VM comme lecteur CD-ROM.')}</div>` : ''}
+    `;
+}
+function vmgSyncSourceMode(){
+    const mode = vmg$('devSourceMode')?.value || 'direct';
+    const direct = vmg$('devDirectWrap');
+    const pool = vmg$('devPoolWrap');
+    const optical = vmg$('devOpticalWrap');
+    if(direct) direct.style.display = mode === 'direct' ? 'block' : 'none';
+    if(pool) pool.style.display = mode === 'pool' ? 'block' : 'none';
+    if(optical) optical.style.display = mode === 'physical_cd' ? 'block' : 'none';
+}
+function vmgControllerModelOptions(type, current=''){
+    const rowsByType = {
+        usb: [
+            ['qemu-xhci', 'USB 3.x - qemu-xhci'],
+            ['nec-xhci', 'USB 3.x - nec-xhci'],
+            ['ich9-ehci1', 'USB 2.0 - ich9-ehci1'],
+            ['piix3-uhci', 'USB 1.1 - piix3-uhci']
+        ],
+        sata: [
+            ['ich9-ahci', 'AHCI - ich9-ahci']
+        ],
+        scsi: [
+            ['virtio-scsi', 'virtio-scsi'],
+            ['lsilogic', 'LSI Logic']
+        ],
+        'virtio-serial': [
+            ['', 'auto']
+        ]
+    };
+    const rows = rowsByType[type] || [['', 'auto']];
+    const cur = String(current || '');
+    const hasCurrent = rows.some(row => row[0] === cur);
+    const allRows = hasCurrent || !cur ? rows : [[cur, cur], ...rows];
+    return allRows.map(row => `<option value="${vmgEsc(row[0])}"${vmgOptionSelected(row[0], cur || (type === 'usb' ? 'qemu-xhci' : row[0]))}>${vmgEsc(row[1])}</option>`).join('');
+}
+function vmgRefreshControllerModel(){
+    const type = vmg$('devControllerType')?.value || 'usb';
+    const model = vmg$('devModel');
+    if(!model) return;
+    const current = model.value || (type === 'usb' ? 'qemu-xhci' : '');
+    model.innerHTML = vmgControllerModelOptions(type, current);
+}
+function vmgOpenDeviceForm(type, mode='add', old=null){
+    const vmName = vmgState.currentVm?.name || '';
+    if(!vmName){ vmgStatus('Aucune VM ouverte.', 'error'); return; }
+    const modal = vmg$('vmgAddDeviceModal');
+    if(modal) modal.style.display = 'flex';
+    vmgState.modal = { type, mode, old: old || null };
+    const title = vmg$('vmgDeviceModalTitle');
+    if(title) title.textContent = (mode === 'edit' ? 'Modifier ' : 'Ajouter ') + type + ' - ' + vmName;
+    const choices = vmg$('vmgDeviceChoices');
+    if(choices) choices.style.display = 'none';
+    ['vmgDeviceBackBtn','vmgDeviceSaveBtn'].forEach(id => { const el=vmg$(id); if(el) el.style.display='inline-flex'; });
+    vmgDeviceModalError('');
+    let html = '';
+    if(type === 'disk'){
+        html = vmgSourcePicker('disk', old || {}) +
+            vmgField('devBus','Bus', vmgSelect('devBus', `<option value="virtio"${vmgOptionSelected('virtio',old?.bus||'virtio')}>virtio</option><option value="sata"${vmgOptionSelected('sata',old?.bus)}>sata</option><option value="scsi"${vmgOptionSelected('scsi',old?.bus)}>scsi</option><option value="usb"${vmgOptionSelected('usb',old?.bus)}>USB</option>${vmgNvmeDiskOption(old?.bus)}`), vmgNvmeDiskHelp()) +
+            vmgField('devTarget','Target', vmgInput('devTarget', old?.target || '', 'auto : vda/sda/nvme0n1')) +
+            vmgField('devFormat','Format', vmgSelect('devFormat', `<option value="qcow2"${vmgOptionSelected('qcow2',old?.format||'qcow2')}>qcow2</option><option value="raw"${vmgOptionSelected('raw',old?.format)}>raw</option>`));
+    }
+    if(type === 'physical_disk'){
+        html = vmgField('devSource','Disque physique', vmgSelect('devSource', vmgOptions(vmgState.host_disks, 'path', d => `${d.id || d.path} ${d.size || ''} ${d.real || ''}`, old?.source || '')), 'Chemin stable /dev/disk/by-id') +
+            vmgField('devBus','Bus', vmgSelect('devBus', `<option value="sata"${vmgOptionSelected('sata',old?.bus||'sata')}>sata</option><option value="virtio"${vmgOptionSelected('virtio',old?.bus)}>virtio</option><option value="scsi"${vmgOptionSelected('scsi',old?.bus)}>scsi</option><option value="usb"${vmgOptionSelected('usb',old?.bus)}>USB</option>${vmgNvmeDiskOption(old?.bus)}`), vmgNvmeDiskHelp()) +
+            vmgField('devTarget','Target', vmgInput('devTarget', old?.target || '', 'auto : sda/nvme0n1')) +
+            vmgField('devFormat','Format', vmgSelect('devFormat', '<option value="raw">raw</option>'));
+    }
+    if(type === 'iso'){
+        html = vmgSourcePicker('iso', old || {}) +
+            vmgField('devBus','Bus', vmgSelect('devBus', `<option value="sata"${vmgOptionSelected('sata',old?.bus||'sata')}>sata</option><option value="ide"${vmgOptionSelected('ide',old?.bus)}>ide</option>`)) +
+            vmgField('devTarget','Target', vmgInput('devTarget', old?.target || '', 'auto')) +
+            vmgField('devFormat','Format', vmgSelect('devFormat', '<option value="raw">raw</option>'));
+    }
+    if(type === 'nic'){
+        const kind = vmgNicKindFromOld(old || {});
+        const source = old?.source || vmgNicSourceValues(kind)[0] || '';
+        html = vmgField('devKind','Type reseau', vmgSelect('devKind', `<option value="bridge"${vmgOptionSelected('bridge',kind)}>bridge hote</option><option value="network"${vmgOptionSelected('network',kind)}>reseau libvirt</option><option value="direct"${vmgOptionSelected('direct',kind)}>direct</option>`)) +
+            vmgField('devSource','Source', vmgSelect('devSource', vmgSelectOptions(vmgNicSourceValues(kind), source))) +
+            vmgField('devModel','Modele', vmgSelect('devModel', `<option value="virtio"${vmgOptionSelected('virtio',old?.model||'virtio')}>virtio</option><option value="e1000e"${vmgOptionSelected('e1000e',old?.model)}>e1000e</option><option value="e1000"${vmgOptionSelected('e1000',old?.model)}>e1000</option><option value="rtl8139"${vmgOptionSelected('rtl8139',old?.model)}>rtl8139</option><option value="vmxnet3"${vmgOptionSelected('vmxnet3',old?.model)}>vmxnet3</option>`)) +
+            vmgField('devMac','MAC', vmgInput('devMac', old?.mac || '', 'vide = auto'));
+    }
+    if(type === 'pci'){
+        html = vmgField('devAddress','Peripherique PCI', vmgSelect('devAddress', vmgOptions(vmgState.pci_devices, 'address', p => `${p.address || ''} ${p.label || ''}`, old?.address || ''))) +
+            vmgField('devManaged','Managed', vmgSelect('devManaged', `<option value="yes"${vmgOptionSelected('yes',old?.managed||'yes')}>yes</option><option value="no"${vmgOptionSelected('no',old?.managed)}>no</option>`));
+    }
+    if(type === 'usb'){
+        const current = old?.vendor && old?.product ? `${old.vendor}:${old.product}` : '';
+        const usbOptions = (vmgState.usb_devices || []).map(u => {
+            const val = `${u.vendor || ''}:${u.product || ''}`;
+            return `<option value="${vmgEsc(val)}"${vmgOptionSelected(val,current)}>${vmgEsc(val + ' ' + (u.label || u.raw || ''))}</option>`;
+        }).join('') || '<option value="">aucun USB detecte</option>';
+        html = vmgField('devUsb','Peripherique USB', vmgSelect('devUsb', usbOptions)) +
+            vmgField('devManaged','Managed', vmgSelect('devManaged', `<option value="yes"${vmgOptionSelected('yes',old?.managed||'yes')}>yes</option><option value="no"${vmgOptionSelected('no',old?.managed)}>no</option>`));
+    }
+    if(type === 'graphics'){
+        html = vmgField('devKind','Type affichage', vmgSelect('devKind', `<option value="vnc"${vmgOptionSelected('vnc',old?.type||'vnc')}>VNC</option><option value="spice"${vmgOptionSelected('spice',old?.type)}>SPICE</option>`)) +
+            vmgField('devListen','Ecoute', vmgInput('devListen', old?.listen || '0.0.0.0', '0.0.0.0'));
+    }
+    if(type === 'video'){
+        const videoModelRaw = String(old?.type || old?.model || 'bochs').toLowerCase();
+        const accel3d = vmgVideoAccelEnabled(old || {});
+        const videoModel = accel3d && videoModelRaw === 'virtio' ? 'virtio-3d' : videoModelRaw;
+        const renderWarn = vmgRenderNodeWarning();
+        html = vmgField('devModel','Modele video', vmgSelect('devModel', `<option value="bochs"${vmgOptionSelected('bochs',videoModel)}>bochs</option><option value="virtio"${vmgOptionSelected('virtio',videoModel)}>virtio</option><option value="virtio-3d"${vmgOptionSelected('virtio-3d',videoModel)}>virtio (3D)</option><option value="qxl"${vmgOptionSelected('qxl',videoModel)}>qxl</option><option value="vga"${vmgOptionSelected('vga',videoModel)}>vga</option><option value="cirrus"${vmgOptionSelected('cirrus',videoModel)}>cirrus</option>`)) +
+            vmgField('devHeads','Ecrans', vmgInput('devHeads', old?.heads || '1', '1')) +
+            vmgField('devPrimary','Primary', vmgSelect('devPrimary', `<option value="yes"${vmgOptionSelected('yes',old?.primary||'yes')}>oui</option><option value="no"${vmgOptionSelected('no',old?.primary)}>non</option>`)) +
+            `<div id="devVideo3dRow" class="vmg-video-3d-row vmg-field-wide" hidden>
+                ${vmgField('devAccel3d','Acceleration 3D', vmgSelect('devAccel3d', `<option value="no"${vmgOptionSelected('no',accel3d ? 'yes' : 'no')}>non</option><option value="yes"${vmgOptionSelected('yes',accel3d ? 'yes' : 'no')}>oui</option>`))}
+                <div id="devRenderNodeWrap" class="vmg-video-render-wrap">
+                    ${vmgField('devRenderNode','GPU de rendu', vmgSelect('devRenderNode', vmgRenderNodeOptions(old?.rendernode || '', accel3d)))}
+                </div>
+                <div class="vmg-video-note">Virtio 3D / VirGL : recommande pour VM Linux uniquement.</div>
+                <div class="vmg-video-warning">Virtio 3D est surtout destine aux invites Linux. Pour Windows, utiliser plutot bochs/qxl/vga ou un vrai passthrough GPU.</div>
+                ${renderWarn ? `<div class="vmg-video-warning">${vmgEsc(renderWarn)}</div>` : ''}
+            </div>`;
+    }
+    if(type === 'console'){
+        html = vmgField('devTargetType','Type console', vmgSelect('devTargetType', `<option value="virtio"${vmgOptionSelected('virtio',old?.target_type||'virtio')}>virtio</option><option value="serial"${vmgOptionSelected('serial',old?.target_type)}>serial</option>`), 'Virtio permet le terminal serie integre quand la VM demarre.');
+    }
+    if(type === 'channel'){
+        html = vmgField('devTargetName','Nom channel', vmgInput('devTargetName', old?.target_name || 'org.qemu.guest_agent.0', 'org.qemu.guest_agent.0')) +
+            vmgField('devTargetType','Type', vmgSelect('devTargetType', '<option value="virtio">virtio</option>'));
+    }
+    if(type === 'tpm'){
+        html = vmgField('devModel','Modele TPM', vmgSelect('devModel', `<option value="tpm-crb"${vmgOptionSelected('tpm-crb',old?.model||'tpm-crb')}>tpm-crb</option><option value="tpm-tis"${vmgOptionSelected('tpm-tis',old?.model)}>tpm-tis</option>`)) +
+            vmgField('devVersion','Version', vmgSelect('devVersion', `<option value="2.0"${vmgOptionSelected('2.0',old?.version||'2.0')}>2.0</option><option value="1.2"${vmgOptionSelected('1.2',old?.version)}>1.2</option>`));
+    }
+    if(type === 'controller'){
+        const controllerType = old?.type || 'usb';
+        html = vmgField('devControllerType','Type controleur', vmgSelect('devControllerType', `<option value="usb"${vmgOptionSelected('usb',controllerType)}>USB</option><option value="sata"${vmgOptionSelected('sata',controllerType)}>SATA</option><option value="scsi"${vmgOptionSelected('scsi',controllerType)}>SCSI</option><option value="virtio-serial"${vmgOptionSelected('virtio-serial',controllerType)}>virtio-serial</option>`)) +
+            vmgField('devModel','Modele', vmgSelect('devModel', vmgControllerModelOptions(controllerType, old?.model || (controllerType === 'usb' ? 'qemu-xhci' : ''))));
+    }
+    const form = vmg$('vmgDeviceForm');
+    if(form) form.innerHTML = `<div class="vmg-form-grid">${html || '<div class="vmg-empty">Type non gere.</div>'}</div>`;
+    if(vmg$('devSourceMode')){
+        vmg$('devSourceMode').addEventListener('change', vmgSyncSourceMode);
+        vmgSyncSourceMode();
+    }
+    if(vmg$('devPoolName')){
+        vmg$('devPoolName').addEventListener('change', () => vmgUpdatePoolVolumes(type));
+    }
+    if(vmg$('devKind')) vmg$('devKind').addEventListener('change', () => vmgUpdateNicSourceOptions());
+    if(vmg$('devControllerType')) vmg$('devControllerType').addEventListener('change', vmgRefreshControllerModel);
+    if(vmg$('devModel')) vmg$('devModel').addEventListener('change', vmgSyncVideo3dControls);
+    if(vmg$('devAccel3d')) vmg$('devAccel3d').addEventListener('change', vmgSyncVideo3dControls);
+    if(type === 'video') vmgSyncVideo3dControls();
+}
+function vmgReadDevicePayload(){
+    const {type, mode, old} = vmgState.modal;
+    const body = { name: vmgState.currentVm?.name || '', type, action: mode === 'edit' ? 'edit' : 'add', old: old || {} };
+    if(['disk','physical_disk','iso'].includes(type)){
+        const sourceMode = vmg$('devSourceMode')?.value || 'direct';
+        body.source = sourceMode === 'pool'
+            ? (vmg$('devPoolVolume')?.value || '')
+            : (sourceMode === 'physical_cd' ? (vmg$('devOpticalSource')?.value || '') : (vmg$('devSource')?.value || ''));
+        body.bus = vmg$('devBus')?.value || '';
+        body.target = vmg$('devTarget')?.value || '';
+        body.format = vmg$('devFormat')?.value || (type === 'iso' ? 'raw' : 'qcow2');
+        if(!body.source) throw new Error(sourceMode === 'physical_cd' ? 'Selectionne un lecteur optique physique.' : (type === 'physical_disk' ? 'Selectionne un disque physique.' : 'Indique une source.'));
+    }
+    if(type === 'nic'){
+        body.kind = vmg$('devKind')?.value || 'bridge';
+        body.source = vmg$('devSource')?.value || '';
+        body.model = vmg$('devModel')?.value || 'virtio';
+        body.mac = vmg$('devMac')?.value || '';
+        if(!body.source) throw new Error('Selectionne une source reseau.');
+    }
+    if(type === 'pci'){
+        body.address = vmg$('devAddress')?.value || '';
+        body.managed = vmg$('devManaged')?.value || 'yes';
+        if(!body.address) throw new Error('Selectionne un peripherique PCI.');
+    }
+    if(type === 'usb'){
+        const [vendor, product] = String(vmg$('devUsb')?.value || ':').split(':');
+        body.vendor = vendor || '';
+        body.product = product || '';
+        body.managed = vmg$('devManaged')?.value || 'yes';
+        if(!body.vendor || !body.product) throw new Error('Selectionne un peripherique USB.');
+    }
+    if(type === 'graphics'){
+        body.kind = vmg$('devKind')?.value || 'vnc';
+        body.listen = vmg$('devListen')?.value || '0.0.0.0';
+    }
+    if(type === 'video'){
+        const modelRaw = vmg$('devModel')?.value || 'bochs';
+        const accel3d = modelRaw === 'virtio-3d' || (vmg$('devAccel3d')?.value || 'no') === 'yes';
+        body.model = modelRaw === 'virtio-3d' ? 'virtio' : modelRaw;
+        body.heads = vmg$('devHeads')?.value || '1';
+        body.primary = vmg$('devPrimary')?.value || 'yes';
+        body.accel3d = accel3d ? 'yes' : 'no';
+        body.rendernode = accel3d ? (vmg$('devRenderNode')?.value || '') : '';
+    }
+    if(type === 'console'){
+        body.target_type = vmg$('devTargetType')?.value || 'virtio';
+    }
+    if(type === 'channel'){
+        body.target_name = vmg$('devTargetName')?.value || 'org.qemu.guest_agent.0';
+        body.target_type = vmg$('devTargetType')?.value || 'virtio';
+    }
+    if(type === 'tpm'){
+        body.model = vmg$('devModel')?.value || 'tpm-crb';
+        body.version = vmg$('devVersion')?.value || '2.0';
+    }
+    if(type === 'controller'){
+        body.controller_type = vmg$('devControllerType')?.value || 'usb';
+        body.model = vmg$('devModel')?.value || '';
+    }
+    return body;
+}
+async function vmgSubmitDevice(btn=null){
+    vmgDeviceModalError('');
+    try{
+        await vmgApiPost(vmgUrls.deviceAction, vmgReadDevicePayload(), btn);
+        setTimeout(()=>window.location.reload(), 700);
+    } catch(e){ vmgDeviceModalError(e.message || String(e)); }
+}
+async function vmgRemoveDevice(key, btn=null){
+    const dev = vmgDeviceByKey(key);
+    if(!dev || !vmgCanEdit(dev)) return;
+    vmgState.pendingRemove = { key, dev };
+    const title = vmg$('vmgConfirmTitle');
+    const text = vmg$('vmgConfirmText');
+    const error = vmg$('vmgConfirmError');
+    if(title) title.textContent = 'Supprimer le peripherique';
+    if(text) text.textContent = `Retirer "${dev.label || dev.kind}" de ${vmgState.currentVm?.name || 'la VM'} ? Le fichier disque n'est pas efface, seul le materiel est retire du XML libvirt.`;
+    if(error){ error.textContent = ''; error.style.display = 'none'; }
+    const modal = vmg$('vmgConfirmModal');
+    if(modal) modal.style.display = 'flex';
+}
+async function vmgConfirmRemoveDevice(btn=null){
+    const pending = vmgState.pendingRemove;
+    const dev = pending?.dev;
+    if(!dev || !vmgCanEdit(dev)) return;
+    const old = dev.data || {};
+    const type = vmgDeviceTypeForApi(dev);
+    try{
+        await vmgApiPost(vmgUrls.deviceAction, {...old, name: vmgState.currentVm?.name || '', type, action:'remove'}, btn);
+        setTimeout(()=>window.location.reload(), 700);
+    } catch(e){
+        const error = vmg$('vmgConfirmError');
+        if(error){ error.textContent = e.message || String(e); error.style.display = 'block'; }
+        else vmgStatus(e.message || e, 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    vmgRenderDeviceJson();
+    vmgInitTitleRename();
+    vmgInitGeneralForm();
+    vmgInitFirmwareForm();
+    vmgRenderDeviceVisuals();
+    vmgRenderBootList();
+    vmgInitHash();
+});
+</script>

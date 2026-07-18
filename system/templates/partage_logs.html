@@ -1,0 +1,53 @@
+{% extends "partage_base.html" %}
+
+{% block title %}Logs Samba / NFS - Yoleo{% endblock %}
+{% block page_title %}Logs Samba / NFS{% endblock %}
+{% block page_subtitle %}Logs Partage : Samba, NFS serveur, NFS client, console des opérations et éditions brutes techniques.{% endblock %}
+
+{% block route_content %}
+<div id="tab-logs" class="tab-panel active partage-logs-page-v4">
+                <section class="card partage-logs-main-v4">
+                    <div class="toolbar partage-logs-actions-v4">
+                        <select class="select-input" id="logKind">
+                            <option value="all">Tout</option>
+                            <option value="samba">Samba</option>
+                            <option value="nfs">NFS</option>
+                            <option value="nfs_client">NFS client</option>
+                        </select>
+                        <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="refreshLogs(this)">🔄 Actualiser</button>
+                    </div>
+                    <textarea id="live-log-output" readonly></textarea>
+                </section>
+
+                <section class="card">
+                    <div class="title-block">
+                        <h2>Console opérations</h2>
+                        <div class="subtitle">Les commandes lancées depuis les boutons s’affichent ici aussi.</div>
+                    </div>
+                    <textarea id="terminal-output" readonly></textarea>
+                </section>
+
+                <section class="card">
+                    <div class="topbar">
+                        <div class="title-block">
+                            <h2>Édition brute avancée</h2>
+                            <div class="subtitle">Zone technique déplacée dans Logs pour ne pas encombrer l’onglet Options. Les backups partent dans les dossiers <b>SAV_*_BACKUP</b>.</div>
+                        </div>
+                        <div class="toolbar">
+                            <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="saveRaw('samba', this)">💾 Sauver samba.conf brut</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="saveRaw('nfs', this)">💾 Sauver nfs_server.conf brut</button>
+                        </div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label>samba.conf source : {{ state.samba.conf_path }}</label>
+                            <textarea id="rawSamba" class="raw-editor">{{ state.raw_samba }}</textarea>
+                        </div>
+                        <div class="field">
+                            <label>NFS conf serveur : {{ state.nfs.exports_file }}</label>
+                            <textarea id="rawNfs" class="raw-editor">{{ state.raw_nfs }}</textarea>
+                        </div>
+                    </div>
+                </section>
+            </div>
+{% endblock %}

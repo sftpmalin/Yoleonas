@@ -1,0 +1,38 @@
+
+    /* Système > Personnalisation > Accueil : alignement GPU SSH + champs SSH. */
+    .pers-home-ssh-group {
+        align-items: start;
+    }
+
+    .pers-home-ssh-toggle-row {
+        grid-column: 1;
+        grid-row: 2;
+        align-self: start;
+    }
+
+    .pers-home-ssh-grid {
+        grid-column: 2;
+        grid-row: 2;
+        align-self: start;
+        margin-top: 0;
+    }
+
+    .pers-home-ssh-note {
+        grid-column: 2;
+        grid-row: 3;
+        margin: 4px 0 0;
+        align-self: start;
+    }
+
+    @media (max-width: 1180px) {
+        .pers-home-ssh-toggle-row,
+        .pers-home-ssh-grid,
+        .pers-home-ssh-note {
+            grid-column: 1;
+            grid-row: auto;
+        }
+
+        .pers-home-ssh-note {
+            margin-top: 0;
+        }
+    }

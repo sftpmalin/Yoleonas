@@ -1,0 +1,2297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/manifest.json">
+    {% set effective_dashboard_config = system_dashboard_config if system_dashboard_config is defined and system_dashboard_config else (dashboard_config if dashboard_config is defined else none) %}
+    {% set yoleo_nav_icon = (effective_dashboard_config.nav_icons if effective_dashboard_config and effective_dashboard_config.nav_icons else '/static/logo/dashboard_flask.png') %}
+    <link rel="icon" type="image/png" href="{{ yoleo_nav_icon }}">
+    <link rel="shortcut icon" href="{{ yoleo_nav_icon }}">
+    <meta name="theme-color" content="#0e1218">
+    <title>{% block title %}{{ effective_dashboard_config.titre_tab if effective_dashboard_config and effective_dashboard_config.titre_tab else 'Yoleo' }}{% endblock %}</title>
+    {% include "style.html" %}
+    {% block head_extra %}{% endblock %}
+
+    <style>
+    /* Flash global : succès flottant court, erreurs visibles sans auto-hide. */
+    .yoleo-global-flash-layer {
+        position: fixed;
+        z-index: 2147482500;
+        top: 92px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(760px, calc(100vw - 32px));
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+    }
+    .yoleo-global-flash-layer:empty { display: none; }
+    .yoleo-global-flash-item {
+        margin: 0 !important;
+        box-sizing: border-box;
+        width: 100%;
+        border-radius: 14px;
+        padding: 12px 16px;
+        font-size: 14px;
+        line-height: 1.35;
+        box-shadow: 0 18px 48px rgba(0,0,0,.38);
+        animation: yoleoGlobalFlashIn .16s ease-out both;
+        pointer-events: none;
+    }
+    .yoleo-global-flash-item.yoleo-global-flash-ok {
+        background: rgba(6, 52, 31, .96) !important;
+        color: #baffc9 !important;
+        border: 1px solid rgba(75, 255, 130, .42) !important;
+    }
+    .yoleo-global-flash-item.yoleo-global-flash-error {
+        background: rgba(76, 11, 20, .98) !important;
+        color: #ffd3d9 !important;
+        border: 1px solid rgba(255, 83, 112, .55) !important;
+        pointer-events: auto;
+    }
+    .yoleo-global-flash-item.yoleo-global-flash-hide {
+        opacity: 0;
+        transform: translateY(-8px) scale(.985);
+        transition: opacity .18s ease, transform .18s ease;
+    }
+    @keyframes yoleoGlobalFlashIn {
+        from { opacity: 0; transform: translateY(-6px) scale(.985); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @media (max-width: 720px) {
+        .yoleo-global-flash-layer {
+            top: 76px;
+            width: calc(100vw - 20px);
+        }
+        .yoleo-global-flash-item {
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+    }
+
+
+    /* Flashs de page marqués explicitement : flottants dès le premier rendu HTML.
+       On ne dépend pas du JS pour éviter le saut de mise en page. */
+    .yoleo-page-flash {
+        position: fixed !important;
+        z-index: 2147482400 !important;
+        top: 112px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: min(860px, calc(100vw - 34px)) !important;
+        display: grid !important;
+        gap: 8px !important;
+        margin: 0 !important;
+        pointer-events: none !important;
+    }
+    .yoleo-page-flash > * {
+        margin: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        box-shadow: 0 18px 48px rgba(0,0,0,.38) !important;
+        pointer-events: auto !important;
+    }
+    .yoleo-page-flash > .success,
+    .yoleo-page-flash > .ok,
+    .yoleo-page-flash > .flash-msg.success,
+    .yoleo-page-flash > .action-message.ok,
+    .yoleo-page-flash > .top-flash.success {
+        border-color: rgba(75,255,130,.45) !important;
+        background: rgba(6,52,31,.96) !important;
+        color: #baffc9 !important;
+    }
+    .yoleo-page-flash > .error,
+    .yoleo-page-flash > .bad,
+    .yoleo-page-flash > .flash-msg.error,
+    .yoleo-page-flash > .action-message.bad,
+    .yoleo-page-flash > .top-flash.error {
+        border-color: rgba(255,83,112,.58) !important;
+        background: rgba(76,11,20,.98) !important;
+        color: #ffd3d9 !important;
+    }
+    @media (max-width: 720px) {
+        .yoleo-page-flash {
+            top: 78px !important;
+            width: calc(100vw - 20px) !important;
+        }
+    }
+
+    
+
+    /* Icônes du menu : même boîte pour emoji et PNG.
+       Les anciens PNG étaient trop petits car .yoleo-menu-img était forcé à 19px. */
+    /* Règle UNIQUE des icônes du menu latéral : aucune exception par nom de PNG. */
+    .yoleo-menu-icon {
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        font-size: 22px;
+        line-height: 1;
+    }
+    .yoleo-menu-img {
+        width: 40px;
+        height: 40px;
+        max-width: 40px;
+        max-height: 40px;
+        object-fit: contain;
+        display: block;
+    }
+    .yoleo-submenu .yoleo-menu-icon {
+        width: 26px;
+        min-width: 26px;
+        height: 26px;
+        font-size: 17px;
+        line-height: 1;
+    }
+    .yoleo-submenu .yoleo-menu-img {
+        width: 32px;
+        height: 32px;
+        max-width: 32px;
+        max-height: 32px;
+    }
+    .yoleo-page-title-icon {
+        width: 30px;
+        height: 30px;
+        font-size: 22px;
+        line-height: 1;
+    }
+    .yoleo-page-title-img {
+        width: 30px;
+        height: 30px;
+        max-width: 30px;
+        max-height: 30px;
+        object-fit: contain;
+        display: block;
+    }
+
+/* Menu contextuel PC : clic droit dans les zones tableau/liste marquées. */
+.yoleo-table-context-menu {
+  position: fixed;
+  z-index: 99999;
+  min-width: 210px;
+  max-width: min(360px, calc(100vw - 16px));
+  padding: 7px;
+  border: 1px solid rgba(139,92,246,.58);
+  border-radius: 14px;
+  background: rgba(15,23,42,.98);
+  box-shadow: 0 20px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(34,211,238,.10) inset;
+  backdrop-filter: blur(10px);
+}
+.yoleo-table-context-menu a {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:34px;
+  padding:8px 10px;
+  border-radius:10px;
+  color:#f8fafc;
+  text-decoration:none;
+  font-weight:800;
+  outline:none;
+}
+.yoleo-table-context-menu a:hover,
+.yoleo-table-context-menu a:focus {
+  background:rgba(124,58,237,.34);
+  color:#fff;
+}
+.yoleo-table-context-menu .page-settings-icon {
+  width:22px;
+  min-width:22px;
+  display:inline-grid;
+  place-items:center;
+}
+.yoleo-table-context-menu img.yoleo-menu-img {
+  max-width:20px;
+  max-height:20px;
+  object-fit:contain;
+}
+</style>
+</head>
+{% set _path = request.path %}
+{% set _page_settings_prefixes = [
+    '/system/personnalisation',
+    '/system/lan',
+    '/system/mdns',
+    '/disk/mergerfs',
+    '/disk/margefs',
+    '/disk/ramdrive',
+    '/disk/ram',
+    '/disk/tmpfs',
+    '/build',
+    '/docker',
+    '/users',
+    '/partage/samba',
+    '/services/minidnla',
+    '/services/proftpd',
+    '/services/sftp',
+    '/services/cache',
+    '/services/archive',
+    '/services/backup',
+    '/services/ffmpeg',
+    '/system/task',
+    '/system/uibackup'
+] %}
+{# Certaines pages ont leur propre sous-navigation visuelle et ne doivent pas être
+   converties en menu de page dans la barre haute. Exemple : Docker > YML. #}
+{% set _page_settings_disabled = namespace(active=false) %}
+{% if _path.startswith('/docker/yml') %}
+    {% set _page_settings_disabled.active = true %}
+{% endif %}
+{% set _page_settings_state = namespace(active=false) %}
+{% for _prefix in _page_settings_prefixes %}
+    {% if _path.startswith(_prefix) and not _page_settings_disabled.active %}
+        {% set _page_settings_state.active = true %}
+    {% endif %}
+{% endfor %}
+{% set _menu_top_section = menu_top_current if menu_top_current is defined else none %}
+{% set _menu_top_active = _menu_top_section and _menu_top_section.enabled and _menu_top_section.items %}
+<body class="{% if request.path in ['/', '/index'] %}is-home-page{% endif %}{% if _menu_top_active %} yoleo-has-page-settings{% endif %}">
+    {% macro yoleo_icon(icon_value, span_class='yoleo-menu-icon', img_class='yoleo-menu-img') -%}
+        {% set icon_text = (icon_value|string).strip() %}
+        {% set icon_lower = icon_text.lower() %}
+        {% set icon_is_image = icon_text.startswith('http://')
+            or icon_text.startswith('https://')
+            or icon_text.startswith('/static/')
+            or icon_text.startswith('/logo/')
+            or icon_text.startswith('./')
+            or icon_text.startswith('../')
+            or icon_text.startswith('static/')
+            or icon_text.startswith('logo/')
+            or icon_lower.endswith('.png')
+            or icon_lower.endswith('.jpg')
+            or icon_lower.endswith('.jpeg')
+            or icon_lower.endswith('.webp')
+            or icon_lower.endswith('.gif')
+            or icon_lower.endswith('.svg') %}
+        {% if icon_text %}
+            <span class="{{ span_class }}">
+                {% if icon_is_image %}
+                    {% if icon_text.startswith('static/') %}
+                        {% set icon_src = '/' ~ icon_text %}
+                    {% elif icon_text.startswith('logo/') %}
+                        {% set icon_src = '/static/' ~ icon_text %}
+                    {% else %}
+                        {% set icon_src = icon_text %}
+                    {% endif %}
+                    <img src="{{ icon_src }}" class="{{ img_class }}" alt="">
+                {% else %}
+                    {{ icon_text }}
+                {% endif %}
+            </span>
+        {% endif %}
+    {%- endmacro %}
+    {% macro yoleo_menu_icon(icon_value) -%}
+        {{ yoleo_icon(icon_value, 'yoleo-menu-icon', 'yoleo-menu-img') }}
+    {%- endmacro %}
+    {% macro yoleo_page_icon(icon_value) -%}
+        {{ yoleo_icon(icon_value, 'yoleo-page-title-icon', 'yoleo-page-title-img') }}
+    {%- endmacro %}
+    {% set nav_menu_items = system_global_menu if system_global_menu is defined and system_global_menu else (raccourcis_menu if raccourcis_menu is defined else []) %}
+    {% set page_icon = namespace(value='/static/logo/01_accueil.png' if request.path in ['/', '/index'] else '') %}
+    {% for bouton in nav_menu_items %}
+        {% set item_url = bouton.lien if bouton.lien is defined else (bouton.url if bouton.url is defined else '#') %}
+        {% set item_path = item_url.split('?')[0] %}
+        {% set children = bouton.children if bouton.children is defined and bouton.children else [] %}
+        {% set matched_child = namespace(value=false) %}
+        {% for enfant in children %}
+            {% set child_url = enfant.lien if enfant.lien is defined else (enfant.url if enfant.url is defined else '#') %}
+            {% set child_path = child_url.split('?')[0] %}
+            {% set child_is_module_root = (child_path == item_path) %}
+            {% if child_url != '#' and (request.path == child_path or ((not child_is_module_root) and child_path not in ['', '/'] and request.path.startswith(child_path ~ '/'))) %}
+                {% set page_icon.value = enfant.icone if enfant.icone is defined else (enfant.icons if enfant.icons is defined else enfant.icon) %}
+                {% set matched_child.value = true %}
+            {% endif %}
+        {% endfor %}
+        {% if not matched_child.value and item_url != '#' and (request.path == item_path or (item_path not in ['', '/'] and request.path.startswith(item_path ~ '/'))) %}
+            {% set page_icon.value = bouton.icone if bouton.icone is defined else (bouton.icons if bouton.icons is defined else bouton.icon) %}
+        {% endif %}
+    {% endfor %}
+    {% if page_icon_override is defined and page_icon_override %}
+        {% set page_icon.value = page_icon_override %}
+    {% endif %}
+    <div class="yoleo-shell">
+        <aside class="yoleo-sidebar" id="yoleoSidebar" aria-label="Navigation principale">
+            <div class="yoleo-brand">
+                <img src="{{ yoleo_nav_icon }}" alt="Yoleo" class="yoleo-brand-logo">
+                <div class="yoleo-brand-text">
+                    <div class="yoleo-brand-title">{{ effective_dashboard_config.titre_logo if effective_dashboard_config and effective_dashboard_config.titre_logo else 'Yoleo' }}</div>
+                    <div class="yoleo-brand-subtitle">Interface NAS Debian</div>
+                </div>
+                <button type="button" class="yoleo-sidebar-toggle" id="yoleoCompactToggle" title="Compacter le menu" aria-label="Compacter le menu">☰</button>
+            </div>
+
+            <nav class="yoleo-nav-scroll">
+                <a href="/index" class="yoleo-menu-item {% if request.path in ['/', '/index'] %}is-active{% endif %}">
+                    {{ yoleo_menu_icon('/static/logo/01_accueil.png') }}
+                    <span class="yoleo-menu-label">Accueil</span>
+                </a>
+
+                {% for bouton in nav_menu_items %}
+                    {% set item_url = bouton.lien if bouton.lien is defined else (bouton.url if bouton.url is defined else '#') %}
+                    {% set item_path = item_url.split('?')[0] %}
+                    {% set children = bouton.children if bouton.children is defined and bouton.children else [] %}
+                    {% set group_id = bouton.safe_id if bouton.safe_id is defined else (bouton.id if bouton.id is defined else loop.index|string) %}
+                    {% set ns = namespace(active=(item_url != '#' and (request.path == item_path or (item_path not in ['', '/'] and request.path.startswith(item_path ~ '/'))))) %}
+                    {% for enfant in children %}
+                        {% set child_url = enfant.lien if enfant.lien is defined else (enfant.url if enfant.url is defined else '#') %}
+                        {% set child_path = child_url.split('?')[0] %}
+                        {# Une entrée enfant qui pointe vers la racine du module ne doit pas rester active
+                           sur toutes les sous-routes du module. Exemple : /build ne doit pas rester
+                           sélectionné quand on est sur /build/system. #}
+                        {% set child_is_module_root = (child_path == item_path) %}
+                        {% if child_url != '#' and (request.path == child_path or ((not child_is_module_root) and child_path not in ['', '/'] and request.path.startswith(child_path ~ '/'))) %}
+                            {% set ns.active = true %}
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if children %}
+                        <button type="button" class="yoleo-menu-parent {% if ns.active %}is-active{% endif %}" data-menu-group="{{ group_id }}" aria-expanded="false">
+                            {{ yoleo_menu_icon(bouton.icone if bouton.icone is defined else bouton.icon) }}
+                            <span class="yoleo-menu-label">{{ bouton.nom if bouton.nom is defined else bouton.label }}</span>
+                            <span class="yoleo-menu-chevron">›</span>
+                        </button>
+                        <div class="yoleo-submenu" data-submenu="{{ group_id }}">
+                            {% for enfant in children %}
+                                {% set child_url = enfant.lien if enfant.lien is defined else (enfant.url if enfant.url is defined else '#') %}
+                                {% set child_path = child_url.split('?')[0] %}
+                                {% set child_is_module_root = (child_path == item_path) %}
+                                {% set child_active = child_url != '#' and (request.path == child_path or ((not child_is_module_root) and child_path not in ['', '/'] and request.path.startswith(child_path ~ '/'))) %}
+                                <a href="{{ child_url }}" class="yoleo-menu-item {% if child_active %}is-active{% endif %}">
+                                    {{ yoleo_menu_icon(enfant.icone if enfant.icone is defined else enfant.icon) }}
+                                    <span class="yoleo-menu-label">{{ enfant.nom if enfant.nom is defined else enfant.label }}</span>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <a href="{{ item_url }}" class="yoleo-menu-item {% if ns.active %}is-active{% endif %}">
+                            {{ yoleo_menu_icon(bouton.icone if bouton.icone is defined else bouton.icon) }}
+                            <span class="yoleo-menu-label">{{ bouton.nom if bouton.nom is defined else bouton.label }}</span>
+                        </a>
+                    {% endif %}
+                {% endfor %}
+            </nav>
+            <div class="yoleo-sidebar-resizer" id="yoleoSidebarResizer" title="Ajuster la largeur du menu" aria-hidden="true"></div>
+        </aside>
+
+        <div class="yoleo-mobile-backdrop" id="yoleoMobileBackdrop"></div>
+
+        <main class="yoleo-main">
+            <header class="yoleo-topbar">
+                <button type="button" class="yoleo-mobile-toggle" id="yoleoMobileToggle" aria-label="Ouvrir le menu">☰</button>
+                <div class="yoleo-page-title">
+                    <h1>
+                        {{ yoleo_page_icon(page_icon.value) }}
+                        <span class="yoleo-page-title-text">{% block page_title %}{% endblock %}</span>
+                    </h1>
+                    <p>{% block page_subtitle %}{% endblock %}</p>
+                </div>
+                <div class="yoleo-top-actions" id="yoleoTopActions">
+                    <span id="yoleoTopbarMeteoData" hidden
+                          data-enabled="{% if meteo_top is defined and meteo_top.enabled %}1{% else %}0{% endif %}"
+                          data-city="{% if meteo_top is defined and meteo_top.enabled %}{{ meteo_top.city }}{% endif %}"
+                          data-icon="{% if meteo_top is defined and meteo_top.enabled %}{{ meteo_top.icon }}{% endif %}"
+                          data-temperature="{% if meteo_top is defined and meteo_top.enabled %}{{ meteo_top.temperature }}{% endif %}"></span>
+                    {% set _topbar_items = topbar_items if topbar_items is defined and topbar_items else [
+                        {'key':'DATE','enabled':true},
+                        {'key':'TIME','enabled':true},
+                        {'key':'METEO','enabled':true},
+                        {'key':'LAN','enabled':false}
+                    ] %}
+                    {% for top_item in _topbar_items %}
+                        {% set top_key = top_item.key|upper %}
+                        {% if top_item.enabled %}
+                            {% if top_key == 'DATE' %}
+                                <time class="yoleo-clock yoleo-clock-date-only" id="yoleoTopDate" data-yoleo-top-item="DATE" datetime=""><span class="yoleo-clock-date">--/--/--</span></time>
+                            {% elif top_key == 'TIME' %}
+                                <time class="yoleo-clock yoleo-clock-time-only" id="yoleoTopTime" data-yoleo-top-item="TIME" datetime=""><span class="yoleo-clock-time">--:--:--</span></time>
+                            {% elif top_key == 'METEO' and meteo_top is defined and meteo_top.enabled %}
+                                <span class="yoleo-top-weather" data-yoleo-top-item="METEO" title="Météo {{ meteo_top.city }}">
+                                    <span class="yoleo-top-weather-icon">{{ meteo_top.icon }}</span>
+                                    <span class="yoleo-top-weather-temp">{{ meteo_top.temperature }}</span>
+                                </span>
+                            {% elif top_key == 'LAN' %}
+                                <span class="yoleo-top-lan" id="yoleoTopLan" data-yoleo-top-item="LAN" title="Débit réseau LAN">
+                                    <span class="yoleo-top-lan-down">⬇ <b data-lan-down>--</b></span>
+                                    <span class="yoleo-top-lan-up">⬆ <b data-lan-up>--</b></span>
+                                </span>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    {% include "partials/page_settings_menu.html" %}
+                    {% set _top_action_map = topbar_action_map if topbar_action_map is defined else {} %}
+                    {% set _show_restart_flask = (topbar_action_map is not defined) or _top_action_map.get('RESTART_FLASK') %}
+                    {% set _show_restart_flask_unraid = (topbar_action_map is not defined) or _top_action_map.get('RESTART_FLASK_UNRAID') %}
+                    {% set _show_poweroff_server = (topbar_action_map is not defined) or _top_action_map.get('POWEROFF_SERVER') %}
+                    {% set _show_reboot_server = (topbar_action_map is not defined) or _top_action_map.get('REBOOT_SERVER') %}
+                    <div class="yoleo-actions-menu" id="yoleoActionsMenu" {% if not (_show_restart_flask or _show_restart_flask_unraid or _show_poweroff_server or _show_reboot_server) %}hidden{% endif %}>
+                        <button type="button" class="yoleo-actions-toggle" id="yoleoActionsToggle" aria-label="Actions système" aria-expanded="false" aria-controls="yoleoActionsDropdown">&#9211;</button>
+                        <div class="yoleo-actions-dropdown" id="yoleoActionsDropdown" hidden>
+                            <button type="button" data-yoleo-top-action-key="RESTART_FLASK" data-yoleo-power-action="restart-flask" data-url="/index/dev/restart-flask" data-working="Redémarrage Flask demandé..." {% if not _show_restart_flask %}hidden{% endif %}>🔄 Redémarrer Flask</button>
+                            <button type="button" data-yoleo-top-action-key="RESTART_FLASK_UNRAID" data-yoleo-power-action="restart-flask-unraid" data-url="/index/dev/restart-flask-unraid" data-working="Redémarrage Flask Unraid demandé..." {% if not _show_restart_flask_unraid %}hidden{% endif %}>🔄 Redémarrer Flask (Unraid)</button>
+                            <button type="button" data-yoleo-top-action-key="POWEROFF_SERVER" data-yoleo-power-action="poweroff-server" data-url="/index/dev/poweroff-server" data-working="Arrêt serveur demandé..." data-confirm="Arrêter le serveur maintenant ?" {% if not _show_poweroff_server %}hidden{% endif %}>⏻ Arrêter le serveur</button>
+                            <button type="button" data-yoleo-top-action-key="REBOOT_SERVER" data-yoleo-power-action="reboot-server" data-url="/index/dev/reboot-server" data-working="Redémarrage serveur demandé..." data-confirm="Redémarrer le serveur maintenant ?" {% if not _show_reboot_server %}hidden{% endif %}>↻ Redémarrer le serveur</button>
+                            <div class="yoleo-actions-status" id="yoleoActionsStatus" aria-live="polite"></div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <section class="yoleo-content">
+                {% block content %}{% endblock %}
+            </section>
+        </main>
+    </div>
+
+    <div class="yoleo-browser-modal" id="yoleoBrowserModal" hidden aria-hidden="true">
+        <div class="yoleo-browser-modal-backdrop" data-yoleo-browser-close></div>
+        <section class="yoleo-browser-modal-box" role="dialog" aria-modal="true" aria-labelledby="yoleoBrowserModalTitle">
+            <header class="yoleo-browser-modal-header">
+                <div class="yoleo-browser-modal-titlebox">
+                    <strong id="yoleoBrowserModalTitle">Parcourir</strong>
+                </div>
+                <button type="button" class="yoleo-browser-modal-close" data-yoleo-browser-close aria-label="Fermer">×</button>
+            </header>
+            <iframe class="yoleo-browser-modal-frame" id="yoleoBrowserFrame" title="Navigateur de fichiers Yoleo"></iframe>
+        </section>
+    </div>
+
+    <div class="yoleo-power-confirm-modal" id="yoleoPowerConfirmModal" hidden aria-hidden="true">
+        <div class="yoleo-power-confirm-backdrop" data-yoleo-power-confirm-cancel></div>
+        <section class="yoleo-power-confirm-box" role="dialog" aria-modal="true" aria-labelledby="yoleoPowerConfirmTitle" aria-describedby="yoleoPowerConfirmMessage">
+            <header class="yoleo-power-confirm-header">
+                <div class="yoleo-power-confirm-titlebox">
+                    <span class="yoleo-power-confirm-icon" aria-hidden="true">⚠️</span>
+                    <strong id="yoleoPowerConfirmTitle" data-yoleo-power-confirm-title>Confirmation système</strong>
+                </div>
+                <button type="button" class="yoleo-power-confirm-close" data-yoleo-power-confirm-cancel aria-label="Fermer">×</button>
+            </header>
+            <div class="yoleo-power-confirm-body">
+                <p class="yoleo-power-confirm-message" id="yoleoPowerConfirmMessage" data-yoleo-power-confirm-message></p>
+                <p class="yoleo-power-confirm-detail" data-yoleo-power-confirm-detail></p>
+                <label class="yoleo-power-confirm-checkline">
+                    <input type="checkbox" id="yoleoPowerConfirmCheck" data-yoleo-power-confirm-check>
+                    <span data-yoleo-power-confirm-check-text>Je confirme cette action.</span>
+                </label>
+            </div>
+            <footer class="yoleo-power-confirm-footer">
+                <button type="button" class="yoleo-power-confirm-btn" data-yoleo-power-confirm-cancel>Annuler</button>
+                <button type="button" class="yoleo-power-confirm-btn yoleo-power-confirm-btn-danger" id="yoleoPowerConfirmOk" data-yoleo-power-confirm-ok disabled>Confirmer</button>
+            </footer>
+        </section>
+    </div>
+
+    <div class="yoleo-restart-progress-modal" id="yoleoRestartProgressModal" hidden aria-hidden="true">
+        <div class="yoleo-restart-progress-backdrop"></div>
+        <section class="yoleo-restart-progress-box" role="status" aria-live="assertive" aria-labelledby="yoleoRestartProgressTitle">
+            <header class="yoleo-restart-progress-header">
+                <span class="yoleo-restart-progress-icon" data-yoleo-restart-progress-icon aria-hidden="true">↻</span>
+                <div>
+                    <strong id="yoleoRestartProgressTitle" data-yoleo-restart-progress-title>Redémarrage en cours</strong>
+                    <span class="yoleo-restart-progress-subtitle">La page reste ouverte pendant la reconnexion.</span>
+                </div>
+            </header>
+            <div class="yoleo-restart-progress-body">
+                <div class="yoleo-restart-progress-timer" aria-label="Temps écoulé">
+                    <span class="yoleo-restart-progress-timer-label">Temps écoulé</span>
+                    <strong data-yoleo-restart-progress-elapsed>00:00</strong>
+                </div>
+                <p class="yoleo-restart-progress-status" data-yoleo-restart-progress-status>Préparation du redémarrage…</p>
+                <p class="yoleo-restart-progress-detail" data-yoleo-restart-progress-detail></p>
+                <div class="yoleo-restart-progress-probe" data-yoleo-restart-progress-probe>
+                    <span class="yoleo-restart-progress-probe-dot" aria-hidden="true"></span>
+                    <span>Vérification silencieuse de l’interface</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        (function () {
+            const compactKey = 'yoleo.sidebar.compact';
+            const openGroupsKey = 'yoleo.sidebar.openGroups';
+            const body = document.body;
+            const sidebar = document.getElementById('yoleoSidebar');
+            const navScroll = document.querySelector('.yoleo-nav-scroll');
+            const sidebarResizer = document.getElementById('yoleoSidebarResizer');
+            const sidebarWidthKey = 'yoleo.sidebar.width';
+            const sidebarScrollKey = 'yoleo.sidebar.scrollTop';
+            const sidebarMinWidth = 210;
+            const sidebarMaxWidth = 380;
+            const compactToggle = document.getElementById('yoleoCompactToggle');
+            const mobileToggle = document.getElementById('yoleoMobileToggle');
+            const mobileBackdrop = document.getElementById('yoleoMobileBackdrop');
+            const clock = document.getElementById('yoleoClock');
+            const topDate = document.getElementById('yoleoTopDate');
+            const topTime = document.getElementById('yoleoTopTime');
+            const topLan = document.getElementById('yoleoTopLan');
+            const actionsToggle = document.getElementById('yoleoActionsToggle');
+            const actionsDropdown = document.getElementById('yoleoActionsDropdown');
+            const actionsStatus = document.getElementById('yoleoActionsStatus');
+            let pageSettingsMenu = document.getElementById('yoleoPageSettingsMenu');
+            const powerConfirmModal = document.getElementById('yoleoPowerConfirmModal');
+            const powerConfirmCheckbox = document.getElementById('yoleoPowerConfirmCheck');
+            const powerConfirmOk = document.getElementById('yoleoPowerConfirmOk');
+            const restartProgressModal = document.getElementById('yoleoRestartProgressModal');
+            const browserModal = document.getElementById('yoleoBrowserModal');
+            const browserFrame = document.getElementById('yoleoBrowserFrame');
+            const browserModalTitle = document.getElementById('yoleoBrowserModalTitle');
+            let powerConfirmResolve = null;
+            let restartProgressElapsedTimer = null;
+            let restartProgressProbeTimer = null;
+            let restartProgressStartDelayTimer = null;
+            let restartProgressStartAt = 0;
+            let restartProgressProbeRunning = false;
+            let yoleoRuntimeTopbarItems = {{ (topbar_items if topbar_items is defined and topbar_items else [
+                {'key':'DATE','enabled':true},
+                {'key':'TIME','enabled':true},
+                {'key':'METEO','enabled':true},
+                {'key':'LAN','enabled':false}
+            ])|tojson }};
+
+            function clampSidebarWidth(value) {
+                const parsed = parseInt(value, 10);
+                if (!Number.isFinite(parsed)) return 252;
+                return Math.max(sidebarMinWidth, Math.min(sidebarMaxWidth, parsed));
+            }
+
+            function applySidebarWidth(value, saveLocal) {
+                const width = clampSidebarWidth(value);
+                document.documentElement.style.setProperty('--yoleo-sidebar-width', width + 'px');
+                if (saveLocal) localStorage.setItem(sidebarWidthKey, String(width));
+                return width;
+            }
+
+            async function loadSidebarWidth() {
+                const localWidth = localStorage.getItem(sidebarWidthKey);
+                if (localWidth) applySidebarWidth(localWidth, false);
+                try {
+                    const response = await fetch('/index/api/menu-conf', {headers: {'Accept': 'application/json'}});
+                    const data = await response.json();
+                    if (response.ok && data.ok !== false && data.sidebar_width) {
+                        applySidebarWidth(data.sidebar_width, true);
+                    }
+                } catch (err) {
+                    // En cas d'indisponibilité de l'API, on garde la largeur locale/CSS.
+                }
+            }
+
+            async function saveSidebarWidth(width) {
+                const safeWidth = applySidebarWidth(width, true);
+                try {
+                    await fetch('/index/api/menu-conf', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                        body: JSON.stringify({sidebar_width: safeWidth})
+                    });
+                } catch (err) {
+                    // La largeur reste au moins mémorisée localement.
+                }
+            }
+
+            function initSidebarResize() {
+                if (!sidebar || !sidebarResizer) return;
+                let startX = 0;
+                let startWidth = 0;
+                let currentWidth = 0;
+                let resizing = false;
+
+                sidebarResizer.addEventListener('pointerdown', function (event) {
+                    if (window.matchMedia('(max-width: 900px)').matches) return;
+                    if (body.classList.contains('yoleo-sidebar-compact')) return;
+                    resizing = true;
+                    startX = event.clientX;
+                    startWidth = sidebar.getBoundingClientRect().width;
+                    currentWidth = startWidth;
+                    body.classList.add('yoleo-sidebar-resizing');
+                    sidebarResizer.setPointerCapture(event.pointerId);
+                    event.preventDefault();
+                });
+
+                sidebarResizer.addEventListener('pointermove', function (event) {
+                    if (!resizing) return;
+                    currentWidth = applySidebarWidth(startWidth + event.clientX - startX, true);
+                    event.preventDefault();
+                });
+
+                function stopResize(event) {
+                    if (!resizing) return;
+                    resizing = false;
+                    body.classList.remove('yoleo-sidebar-resizing');
+                    try { sidebarResizer.releasePointerCapture(event.pointerId); } catch (err) {}
+                    saveSidebarWidth(currentWidth || sidebar.getBoundingClientRect().width);
+                }
+
+                sidebarResizer.addEventListener('pointerup', stopResize);
+                sidebarResizer.addEventListener('pointercancel', stopResize);
+                sidebarResizer.addEventListener('dblclick', function () {
+                    saveSidebarWidth(252);
+                });
+            }
+
+            function buildFallbackPageSettingsMenu() {
+                if (pageSettingsMenu) return;
+                const disabledToggle = document.querySelector('.yoleo-page-settings-toggle.is-disabled');
+                const sourceNav = document.querySelector('.yoleo-content .yoleo-subnav');
+                if (!disabledToggle || !sourceNav) return;
+
+                const sourceLinks = Array.from(sourceNav.querySelectorAll('a.yoleo-subnav-link[href]'))
+                    .filter(link => {
+                        const href = (link.getAttribute('href') || '').trim();
+                        return href && href !== '#';
+                    });
+                if (!sourceLinks.length) return;
+
+                const details = document.createElement('details');
+                details.className = 'yoleo-page-settings-menu';
+                details.id = 'yoleoPageSettingsMenu';
+
+                const summary = document.createElement('summary');
+                summary.className = 'yoleo-page-settings-toggle';
+                summary.setAttribute('aria-label', 'Menu de page');
+                summary.setAttribute('title', 'Menu de page');
+                summary.innerHTML = '&#9881;';
+                details.appendChild(summary);
+
+                const nav = document.createElement('nav');
+                nav.className = 'yoleo-page-settings-dropdown';
+                nav.setAttribute('aria-label', sourceNav.getAttribute('aria-label') || 'Menu de page');
+
+                sourceLinks.forEach(link => {
+                    const target = document.createElement('a');
+                    target.href = link.href;
+                    if (link.classList.contains('is-active')) target.classList.add('is-active');
+
+                    const icon = document.createElement('span');
+                    icon.className = 'page-settings-icon';
+                    icon.setAttribute('aria-hidden', 'true');
+                    icon.textContent = (link.textContent || '').trim().slice(0, 2).trim() || '•';
+
+                    const label = document.createElement('span');
+                    label.textContent = (link.textContent || '').replace(icon.textContent, '').trim() || link.textContent.trim();
+
+                    target.appendChild(icon);
+                    target.appendChild(label);
+                    nav.appendChild(target);
+                });
+
+                details.appendChild(nav);
+                disabledToggle.replaceWith(details);
+                pageSettingsMenu = details;
+                body.classList.add('yoleo-has-page-settings');
+            }
+
+            function syncPageTitleIconFromPageSettings() {
+                const title = document.querySelector('.yoleo-page-title h1');
+                const titleText = title ? title.querySelector('.yoleo-page-title-text') : null;
+                if (!title || !titleText) return;
+
+                let iconSlot = title.querySelector('.yoleo-page-title-icon');
+
+                /*
+                   Ne jamais remplacer l'icône déjà rendue par Flask.
+                   Elle vient du menu gauche actif et c'est la référence visuelle de la page.
+                   Avant, ce JS reprenait l'icône de l'entrée active du menu haut
+                   (.page-settings-dropdown). Sur /system/personnalisation/home,
+                   Flask affichait bien 🎨 puis le JS le remplaçait par 🏠 après le chargement,
+                   d'où l'effet fantôme vu à l'écran.
+
+                   On garde seulement le secours historique : si aucune icône n'a été rendue
+                   côté serveur, on peut encore remplir le trou depuis le menu de page.
+                */
+                if (iconSlot && ((iconSlot.textContent || '').trim() || iconSlot.querySelector('img'))) {
+                    return;
+                }
+
+                const activeIcon = document.querySelector('.yoleo-page-settings-dropdown a.is-active .page-settings-icon');
+                if (!activeIcon) return;
+                const value = (activeIcon.textContent || '').trim();
+                if (!value) return;
+
+                if (!iconSlot) {
+                    iconSlot = document.createElement('span');
+                    iconSlot.className = 'yoleo-page-title-icon';
+                    title.insertBefore(iconSlot, titleText);
+                }
+
+                iconSlot.innerHTML = '';
+                iconSlot.textContent = value;
+            }
+
+
+            function clearPageSettingsLoading(link) {
+                if (!link) return;
+                window.clearTimeout(link._yoleoPageSettingsLoadingTimer);
+                link.classList.remove('is-loading');
+                link.removeAttribute('aria-busy');
+            }
+
+            function setPageSettingsLoading(link) {
+                if (!link || link.classList.contains('is-disabled')) return;
+                const href = (link.getAttribute('href') || '').trim();
+                const isPureHash = !href || href === '#' || href === window.location.pathname + '#';
+
+                document.querySelectorAll('.yoleo-page-settings-dropdown a.is-loading').forEach(clearPageSettingsLoading);
+                link.classList.add('is-loading');
+                link.setAttribute('aria-busy', 'true');
+
+                // Pour les vraies navigations / formulaires submit, la page va changer.
+                // Pour les actions Ajax ou les modales, on garde juste un retour visuel court,
+                // puis on laisse le bouton redevenir normal si la page ne recharge pas.
+                const delay = isPureHash || link.classList.contains('is-action') ? 2200 : 4500;
+                link._yoleoPageSettingsLoadingTimer = window.setTimeout(() => clearPageSettingsLoading(link), delay);
+            }
+
+            function bindPageSettingsFeedback() {
+                document.addEventListener('click', function (event) {
+                    const link = event.target && event.target.closest ? event.target.closest('.yoleo-page-settings-dropdown a') : null;
+                    if (!link) return;
+                    if (link.hasAttribute('disabled') || link.getAttribute('aria-disabled') === 'true') return;
+                    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                    setPageSettingsLoading(link);
+                }, true);
+
+                window.addEventListener('pageshow', function () {
+                    document.querySelectorAll('.yoleo-page-settings-dropdown a.is-loading').forEach(clearPageSettingsLoading);
+                });
+            }
+
+            function loadOpenGroups() {
+                try {
+                    return JSON.parse(localStorage.getItem(openGroupsKey) || '[]');
+                } catch (err) {
+                    return [];
+                }
+            }
+
+            function saveOpenGroups() {
+                const groups = Array.from(document.querySelectorAll('.yoleo-submenu.is-open'))
+                    .map(el => el.getAttribute('data-submenu'))
+                    .filter(Boolean);
+                localStorage.setItem(openGroupsKey, JSON.stringify(groups));
+            }
+
+            function applyOpenGroups() {
+                const groups = new Set(loadOpenGroups());
+                document.querySelectorAll('[data-menu-group]').forEach(button => {
+                    const group = button.getAttribute('data-menu-group');
+                    const submenu = document.querySelector('[data-submenu="' + group + '"]');
+                    const isActive = button.classList.contains('is-active');
+                    const isOpen = groups.has(group) || isActive;
+                    button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                    if (submenu) submenu.classList.toggle('is-open', isOpen);
+                });
+            }
+
+            function saveSidebarScroll() {
+                if (!navScroll) return;
+                // La position de la sidebar est globale : après un clic de navigation,
+                // on doit revenir au même endroit du menu, même si request.path change.
+                localStorage.setItem(sidebarScrollKey, String(Math.max(0, Math.round(navScroll.scrollTop || 0))));
+            }
+
+            function restoreSidebarScroll() {
+                if (!navScroll) return;
+                const raw = localStorage.getItem(sidebarScrollKey) || '';
+                let saved = 0;
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === 'object') {
+                        // Compatibilité avec l'ancien format {path, top}, mais sans
+                        // bloquer la restauration parce que le chemin a changé.
+                        saved = parseInt(parsed.top || '0', 10);
+                    } else {
+                        saved = parseInt(parsed || '0', 10);
+                    }
+                } catch (err) {
+                    saved = parseInt(raw || '0', 10);
+                }
+                if (!Number.isFinite(saved) || saved <= 0) return;
+                navScroll.scrollTop = saved;
+                requestAnimationFrame(function () { navScroll.scrollTop = saved; });
+                setTimeout(function () { navScroll.scrollTop = saved; }, 80);
+            }
+
+            function yoleoSidebarText(value, fallback) {
+                const text = String(value ?? '').trim();
+                return text || fallback || '';
+            }
+
+            function yoleoSidebarSlug(value, fallback) {
+                let text = String(value || '').trim().toLowerCase();
+                try { text = text.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (err) {}
+                text = text.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+                return text || fallback || 'menu';
+            }
+
+            function yoleoSidebarLabel(item) {
+                return yoleoSidebarText(item?.nom ?? item?.label, 'Menu');
+            }
+
+            function yoleoSidebarUrl(item) {
+                return yoleoSidebarText(item?.lien ?? item?.url, '#');
+            }
+
+            function yoleoSidebarIconValue(item) {
+                return yoleoSidebarText(item?.icone ?? item?.icons ?? item?.icon, '');
+            }
+
+            function yoleoSidebarChildren(item) {
+                return Array.isArray(item?.children) ? item.children : [];
+            }
+
+            function yoleoSidebarGroupId(item, index) {
+                return yoleoSidebarText(item?.safe_id ?? item?.id, yoleoSidebarSlug(yoleoSidebarLabel(item), 'menu_' + index));
+            }
+
+            function yoleoSidebarIconNode(iconValue) {
+                const span = document.createElement('span');
+                span.className = 'yoleo-menu-icon';
+                const icon = yoleoSidebarText(iconValue, '•');
+                const lower = icon.toLowerCase();
+                const isImage = icon.startsWith('http://') || icon.startsWith('https://') ||
+                    icon.startsWith('/static/') || icon.startsWith('/logo/') ||
+                    icon.startsWith('./') || icon.startsWith('../') ||
+                    icon.startsWith('static/') || icon.startsWith('logo/') ||
+                    /\.(png|jpe?g|webp|gif|svg|ico|bmp|avif)$/i.test(lower);
+                if (isImage) {
+                    const img = document.createElement('img');
+                    img.className = 'yoleo-menu-img';
+                    img.alt = '';
+                    if (icon.startsWith('static/')) img.src = '/' + icon;
+                    else if (icon.startsWith('logo/')) img.src = '/static/' + icon;
+                    else img.src = icon;
+                    span.appendChild(img);
+                } else {
+                    span.textContent = icon;
+                }
+                return span;
+            }
+
+            function yoleoSidebarPath(rawUrl) {
+                const url = yoleoSidebarText(rawUrl, '#');
+                if (!url || url === '#') return '';
+                try { return new URL(url, window.location.origin).pathname; }
+                catch (err) { return url.split('?')[0].split('#')[0]; }
+            }
+
+            function yoleoSidebarUrlActive(rawUrl, moduleRootPath) {
+                const itemPath = yoleoSidebarPath(rawUrl);
+                if (!itemPath || itemPath === '#') return false;
+                const current = window.location.pathname || '/';
+                if (current === itemPath) return true;
+                if (moduleRootPath && itemPath === moduleRootPath) return false;
+                return itemPath !== '/' && current.startsWith(itemPath + '/');
+            }
+
+            function yoleoSidebarAnchor(item, active) {
+                const link = document.createElement('a');
+                link.href = yoleoSidebarUrl(item);
+                link.className = 'yoleo-menu-item' + (active ? ' is-active' : '');
+                link.appendChild(yoleoSidebarIconNode(yoleoSidebarIconValue(item)));
+                const label = document.createElement('span');
+                label.className = 'yoleo-menu-label';
+                label.textContent = yoleoSidebarLabel(item);
+                link.appendChild(label);
+                return link;
+            }
+
+            function bindSidebarLinks() {
+                if (!navScroll) return;
+                navScroll.querySelectorAll('a[href]').forEach(link => {
+                    if (link.dataset.yoleoSidebarLinkBound === '1') return;
+                    link.dataset.yoleoSidebarLinkBound = '1';
+                    link.addEventListener('click', saveSidebarScroll);
+                });
+            }
+
+            function yoleoEnsureSidebarGroupVisible(button, submenu) {
+                if (!navScroll || !button) return;
+                requestAnimationFrame(function () {
+                    const containerRect = navScroll.getBoundingClientRect();
+                    const buttonRect = button.getBoundingClientRect();
+                    const submenuRect = (submenu && submenu.classList.contains('is-open'))
+                        ? submenu.getBoundingClientRect()
+                        : buttonRect;
+                    const padding = 10;
+                    const wantedTop = Math.min(buttonRect.top, submenuRect.top);
+                    const wantedBottom = Math.max(buttonRect.bottom, submenuRect.bottom);
+                    let delta = 0;
+
+                    if (wantedBottom > containerRect.bottom - padding) {
+                        delta = wantedBottom - (containerRect.bottom - padding);
+                    } else if (wantedTop < containerRect.top + padding) {
+                        delta = wantedTop - (containerRect.top + padding);
+                    }
+
+                    if (delta) {
+                        navScroll.scrollTop += delta;
+                        saveSidebarScroll();
+                    }
+                });
+            }
+
+            function bindSidebarGroupButtons() {
+                document.querySelectorAll('[data-menu-group]').forEach(button => {
+                    if (button.dataset.yoleoSidebarGroupBound === '1') return;
+                    button.dataset.yoleoSidebarGroupBound = '1';
+                    button.addEventListener('click', function () {
+                        const group = button.getAttribute('data-menu-group');
+                        const submenu = document.querySelector('[data-submenu="' + group + '"]');
+                        const isOpen = submenu && submenu.classList.toggle('is-open');
+                        button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                        saveOpenGroups();
+                        if (isOpen) yoleoEnsureSidebarGroupVisible(button, submenu);
+                        else saveSidebarScroll();
+                    });
+                });
+            }
+
+            function rebuildSidebarMenu(items) {
+                if (!navScroll || !Array.isArray(items)) return;
+                const previousScroll = navScroll.scrollTop || 0;
+                navScroll.innerHTML = '';
+
+                const home = document.createElement('a');
+                home.href = '/index';
+                home.className = 'yoleo-menu-item' + ((window.location.pathname === '/' || window.location.pathname === '/index') ? ' is-active' : '');
+                const homeIcon = yoleoSidebarIconNode('/static/logo/01_accueil.png');
+                const homeLabel = document.createElement('span');
+                homeLabel.className = 'yoleo-menu-label';
+                homeLabel.textContent = 'Accueil';
+                home.append(homeIcon, homeLabel);
+                navScroll.appendChild(home);
+
+                items.forEach(function (item, index) {
+                    const children = yoleoSidebarChildren(item);
+                    const itemUrl = yoleoSidebarUrl(item);
+                    const itemPath = yoleoSidebarPath(itemUrl);
+                    let active = yoleoSidebarUrlActive(itemUrl, '');
+
+                    if (children.length) {
+                        children.forEach(function (child) {
+                            if (yoleoSidebarUrlActive(yoleoSidebarUrl(child), itemPath)) active = true;
+                        });
+
+                        const groupId = yoleoSidebarGroupId(item, index);
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'yoleo-menu-parent' + (active ? ' is-active' : '');
+                        button.setAttribute('data-menu-group', groupId);
+                        button.setAttribute('aria-expanded', 'false');
+                        button.appendChild(yoleoSidebarIconNode(yoleoSidebarIconValue(item)));
+                        const label = document.createElement('span');
+                        label.className = 'yoleo-menu-label';
+                        label.textContent = yoleoSidebarLabel(item);
+                        const chevron = document.createElement('span');
+                        chevron.className = 'yoleo-menu-chevron';
+                        chevron.textContent = '›';
+                        button.append(label, chevron);
+                        navScroll.appendChild(button);
+
+                        const submenu = document.createElement('div');
+                        submenu.className = 'yoleo-submenu';
+                        submenu.setAttribute('data-submenu', groupId);
+                        children.forEach(function (child) {
+                            const childActive = yoleoSidebarUrlActive(yoleoSidebarUrl(child), itemPath);
+                            submenu.appendChild(yoleoSidebarAnchor(child, childActive));
+                        });
+                        navScroll.appendChild(submenu);
+                    } else {
+                        navScroll.appendChild(yoleoSidebarAnchor(item, active));
+                    }
+                });
+
+                bindSidebarLinks();
+                bindSidebarGroupButtons();
+                applyOpenGroups();
+                navScroll.scrollTop = previousScroll;
+            }
+
+            window.yoleoRefreshSidebarMenuFromData = function (items) {
+                rebuildSidebarMenu(items);
+            };
+
+            loadSidebarWidth();
+            initSidebarResize();
+            syncPageTitleIconFromPageSettings();
+            bindPageSettingsFeedback();
+
+            if (localStorage.getItem(compactKey) === '1') {
+                body.classList.add('yoleo-sidebar-compact');
+            }
+
+            applyOpenGroups();
+            restoreSidebarScroll();
+
+            if (navScroll) {
+                navScroll.addEventListener('scroll', saveSidebarScroll, {passive: true});
+            }
+
+            bindSidebarLinks();
+
+            document.querySelectorAll('.yoleo-subnav-link[href]').forEach(link => {
+                link.addEventListener('click', function (event) {
+                    const href = link.getAttribute('href') || '';
+                    if (!href || href === '#') return;
+                    const target = new URL(href, window.location.origin);
+                    if (target.pathname === window.location.pathname && target.search === window.location.search) {
+                        event.preventDefault();
+                    }
+                });
+            });
+
+            window.addEventListener('beforeunload', saveSidebarScroll);
+
+            if (compactToggle) {
+                compactToggle.addEventListener('click', function () {
+                    body.classList.toggle('yoleo-sidebar-compact');
+                    localStorage.setItem(compactKey, body.classList.contains('yoleo-sidebar-compact') ? '1' : '0');
+                });
+            }
+
+            bindSidebarGroupButtons();
+
+            function openMobileMenu() {
+                body.classList.add('yoleo-mobile-open');
+            }
+
+            function closeMobileMenu() {
+                body.classList.remove('yoleo-mobile-open');
+            }
+
+            function updateClock() {
+                const liveTopDate = document.getElementById('yoleoTopDate');
+                const liveTopTime = document.getElementById('yoleoTopTime');
+                if (!clock && !liveTopDate && !liveTopTime) return;
+                const now = new Date();
+                const day = now.toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: '2-digit'
+                });
+                const hour = now.toLocaleTimeString('fr-FR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                if (clock) {
+                    clock.innerHTML = '<span class="yoleo-clock-date">' + day + '</span><span class="yoleo-clock-sep"> - </span><span class="yoleo-clock-time">' + hour + '</span>';
+                    clock.setAttribute('datetime', now.toISOString());
+                }
+                if (liveTopDate) {
+                    liveTopDate.innerHTML = '<span class="yoleo-clock-date">' + day + '</span>';
+                    liveTopDate.setAttribute('datetime', now.toISOString());
+                }
+                if (liveTopTime) {
+                    liveTopTime.innerHTML = '<span class="yoleo-clock-time">' + hour + '</span>';
+                    liveTopTime.setAttribute('datetime', now.toISOString());
+                }
+            }
+
+            async function updateTopLan() {
+                const liveTopLan = document.getElementById('yoleoTopLan');
+                if (!liveTopLan) return;
+                try {
+                    const response = await fetch('/system/api/sys_stats?nvidia_local=0&nvidia_ssh=0&intel_gpu=0', {cache: 'no-store'});
+                    const data = await response.json();
+                    const down = liveTopLan.querySelector('[data-lan-down]');
+                    const up = liveTopLan.querySelector('[data-lan-up]');
+                    if (down) down.textContent = (data.net && data.net.down) ? data.net.down : '--';
+                    if (up) up.textContent = (data.net && data.net.up) ? data.net.up : '--';
+                } catch (err) {
+                    const down = liveTopLan.querySelector('[data-lan-down]');
+                    const up = liveTopLan.querySelector('[data-lan-up]');
+                    if (down) down.textContent = '--';
+                    if (up) up.textContent = '--';
+                }
+            }
+
+            function topbarMeteoDataNode() {
+                return document.getElementById('yoleoTopbarMeteoData');
+            }
+
+            function setTopbarMeteoDataset(payload) {
+                const data = topbarMeteoDataNode();
+                if (!data) return;
+                const enabled = !!(payload && (payload.enabled === true || payload.enabled === 1 || payload.enabled === '1'));
+                data.dataset.enabled = enabled ? '1' : '0';
+                data.dataset.city = enabled ? String(payload.city || '') : '';
+                data.dataset.icon = enabled ? String(payload.icon || '🌤️') : '';
+                data.dataset.temperature = enabled ? String(payload.temperature || '') : '';
+            }
+
+            function createRuntimeTopbarDate() {
+                const node = document.createElement('time');
+                node.className = 'yoleo-clock yoleo-clock-date-only';
+                node.id = 'yoleoTopDate';
+                node.setAttribute('data-yoleo-top-item', 'DATE');
+                node.setAttribute('datetime', '');
+                node.innerHTML = '<span class="yoleo-clock-date">--/--/--</span>';
+                return node;
+            }
+
+            function createRuntimeTopbarTime() {
+                const node = document.createElement('time');
+                node.className = 'yoleo-clock yoleo-clock-time-only';
+                node.id = 'yoleoTopTime';
+                node.setAttribute('data-yoleo-top-item', 'TIME');
+                node.setAttribute('datetime', '');
+                node.innerHTML = '<span class="yoleo-clock-time">--:--:--</span>';
+                return node;
+            }
+
+            function createRuntimeTopbarMeteo() {
+                const data = topbarMeteoDataNode();
+                if (!data || data.dataset.enabled !== '1') return null;
+                const city = data.dataset.city || '';
+                const icon = data.dataset.icon || '🌤️';
+                const temperature = data.dataset.temperature || '';
+                const node = document.createElement('span');
+                node.className = 'yoleo-top-weather';
+                node.setAttribute('data-yoleo-top-item', 'METEO');
+                node.title = city ? ('Météo ' + city) : 'Météo';
+                const iconNode = document.createElement('span');
+                iconNode.className = 'yoleo-top-weather-icon';
+                iconNode.textContent = icon;
+                const tempNode = document.createElement('span');
+                tempNode.className = 'yoleo-top-weather-temp';
+                tempNode.textContent = temperature;
+                node.append(iconNode, tempNode);
+                return node;
+            }
+
+            function createRuntimeTopbarLan() {
+                const node = document.createElement('span');
+                node.className = 'yoleo-top-lan';
+                node.id = 'yoleoTopLan';
+                node.setAttribute('data-yoleo-top-item', 'LAN');
+                node.title = 'Débit réseau LAN';
+                node.innerHTML = '<span class="yoleo-top-lan-down">⬇ <b data-lan-down>--</b></span><span class="yoleo-top-lan-up">⬆ <b data-lan-up>--</b></span>';
+                return node;
+            }
+
+            function createRuntimeTopbarItem(key) {
+                key = String(key || '').toUpperCase();
+                if (key === 'DATE') return createRuntimeTopbarDate();
+                if (key === 'TIME') return createRuntimeTopbarTime();
+                if (key === 'METEO') return createRuntimeTopbarMeteo();
+                if (key === 'LAN') return createRuntimeTopbarLan();
+                return null;
+            }
+
+            function rebuildRuntimeTopbar(items) {
+                const topActions = document.getElementById('yoleoTopActions') || document.querySelector('.yoleo-top-actions');
+                if (!topActions) return;
+                if (Array.isArray(items)) yoleoRuntimeTopbarItems = items;
+
+                topActions.querySelectorAll('[data-yoleo-top-item]').forEach(function (node) {
+                    node.remove();
+                });
+
+                const anchor = topActions.querySelector('.yoleo-page-settings-menu')
+                    || topActions.querySelector('#yoleoActionsMenu')
+                    || topActions.querySelector('.yoleo-actions-menu')
+                    || null;
+
+                (yoleoRuntimeTopbarItems || []).forEach(function (item) {
+                    const key = String(item && item.key || '').toUpperCase();
+                    const enabled = item && (item.enabled === true || item.enabled === 1 || item.enabled === '1');
+                    if (!key || !enabled) return;
+                    const node = createRuntimeTopbarItem(key);
+                    if (node) topActions.insertBefore(node, anchor);
+                });
+
+                updateClock();
+                updateTopLan();
+            }
+
+            window.yoleoSetTopbarMeteoData = function (payload) {
+                setTopbarMeteoDataset(payload || {enabled: false});
+                rebuildRuntimeTopbar();
+            };
+
+            window.yoleoRebuildTopbarFromItems = function (items) {
+                rebuildRuntimeTopbar(items);
+            };
+
+            window.yoleoRefreshTopbarRuntime = function () {
+                updateClock();
+                updateTopLan();
+            };
+
+            function closeActionsMenu() {
+                if (!actionsDropdown || !actionsToggle) return;
+                actionsDropdown.hidden = true;
+                actionsToggle.setAttribute('aria-expanded', 'false');
+            }
+
+            function toggleActionsMenu() {
+                if (!actionsDropdown || !actionsToggle) return;
+                const willOpen = actionsDropdown.hidden;
+                actionsDropdown.hidden = !willOpen;
+                actionsToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            }
+
+            function getPowerActionLabel(button) {
+                const action = button ? button.getAttribute('data-yoleo-power-action') : '';
+                if (action === 'repair-kvm') return 'Reparer KVM';
+                if (action === 'poweroff-server') return 'Arrêter le serveur';
+                if (action === 'reboot-server') return 'Redémarrer le serveur';
+                if (action === 'restart-flask-unraid') return 'Redémarrer Flask (Unraid)';
+                if (action === 'restart-flask') return 'Redémarrer Flask';
+                return (button && button.textContent ? button.textContent : 'Action système').replace(/^[^A-Za-zÀ-ÿ0-9]+/, '').trim();
+            }
+
+            function setPowerConfirmOpen(open) {
+                if (!powerConfirmModal) return;
+                powerConfirmModal.hidden = !open;
+                powerConfirmModal.setAttribute('aria-hidden', open ? 'false' : 'true');
+                document.body.classList.toggle('yoleo-power-modal-open', open);
+                if (open) {
+                    if (powerConfirmCheckbox) powerConfirmCheckbox.checked = false;
+                    if (powerConfirmOk) powerConfirmOk.disabled = true;
+                    setTimeout(function () {
+                        if (powerConfirmCheckbox) powerConfirmCheckbox.focus();
+                    }, 40);
+                }
+            }
+
+            function closePowerConfirmModal(confirmed) {
+                if (!powerConfirmModal || powerConfirmModal.hidden) return;
+                const resolver = powerConfirmResolve;
+                powerConfirmResolve = null;
+                setPowerConfirmOpen(false);
+                if (resolver) resolver(Boolean(confirmed));
+            }
+
+            function askPowerConfirmation(button, message) {
+                if (!powerConfirmModal) return Promise.resolve(false);
+                const actionLabel = getPowerActionLabel(button);
+                const action = button ? button.getAttribute('data-yoleo-power-action') : '';
+                const title = powerConfirmModal.querySelector('[data-yoleo-power-confirm-title]');
+                const messageNode = powerConfirmModal.querySelector('[data-yoleo-power-confirm-message]');
+                const detailNode = powerConfirmModal.querySelector('[data-yoleo-power-confirm-detail]');
+                const checkText = powerConfirmModal.querySelector('[data-yoleo-power-confirm-check-text]');
+                if (title) title.textContent = actionLabel;
+                if (messageNode) messageNode.textContent = message || 'Confirmer cette action système ?';
+                if (detailNode) {
+                    if (action === 'repair-kvm') {
+                        detailNode.textContent = 'Yoleo verifiera /dev/kvm, le groupe kvm, la regle udev et redemarrera le service libvirt disponible. Si une VM est active, la reparation sera refusee.';
+                    } else if (action === 'poweroff-server') {
+                        detailNode.textContent = 'Le serveur va être arrêté. Les services, partages, conteneurs et machines virtuelles peuvent être interrompus.';
+                    } else if (action === 'reboot-server') {
+                        detailNode.textContent = 'Le serveur va redémarrer. Les services, partages, conteneurs et machines virtuelles seront temporairement coupés.';
+                    } else {
+                        detailNode.textContent = 'Cette action système peut interrompre temporairement l’interface.';
+                    }
+                }
+                if (checkText) checkText.textContent = 'Je confirme : ' + actionLabel.toLowerCase() + '.';
+                if (powerConfirmResolve) closePowerConfirmModal(false);
+                setPowerConfirmOpen(true);
+                return new Promise(function (resolve) {
+                    powerConfirmResolve = resolve;
+                });
+            }
+
+            function restartProgressElement(selector) {
+                return restartProgressModal ? restartProgressModal.querySelector(selector) : null;
+            }
+
+            function clearRestartProgressTimers() {
+                if (restartProgressElapsedTimer) window.clearInterval(restartProgressElapsedTimer);
+                if (restartProgressProbeTimer) window.clearInterval(restartProgressProbeTimer);
+                if (restartProgressStartDelayTimer) window.clearTimeout(restartProgressStartDelayTimer);
+                restartProgressElapsedTimer = null;
+                restartProgressProbeTimer = null;
+                restartProgressStartDelayTimer = null;
+                restartProgressProbeRunning = false;
+            }
+
+            function formatRestartElapsed(milliseconds) {
+                const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+            }
+
+            function updateRestartElapsed() {
+                const elapsed = restartProgressElement('[data-yoleo-restart-progress-elapsed]');
+                if (!elapsed || !restartProgressStartAt) return;
+                elapsed.textContent = formatRestartElapsed(Date.now() - restartProgressStartAt);
+            }
+
+            function setRestartProgressContent(status, detail, state) {
+                if (!restartProgressModal) return;
+                const statusNode = restartProgressElement('[data-yoleo-restart-progress-status]');
+                const detailNode = restartProgressElement('[data-yoleo-restart-progress-detail]');
+                const probeNode = restartProgressElement('[data-yoleo-restart-progress-probe]');
+                const icon = restartProgressElement('[data-yoleo-restart-progress-icon]');
+                if (statusNode) statusNode.textContent = status || '';
+                if (detailNode) detailNode.textContent = detail || '';
+                if (probeNode) probeNode.classList.toggle('is-restored', state === 'restored');
+                if (icon) icon.textContent = state === 'restored' ? '✓' : '↻';
+                restartProgressModal.classList.toggle('is-restored', state === 'restored');
+            }
+
+            function openRestartProgress(title, status, detail) {
+                if (!restartProgressModal) return false;
+                clearRestartProgressTimers();
+                restartProgressStartAt = Date.now();
+                const titleNode = restartProgressElement('[data-yoleo-restart-progress-title]');
+                if (titleNode) titleNode.textContent = title;
+                restartProgressModal.hidden = false;
+                restartProgressModal.setAttribute('aria-hidden', 'false');
+                body.classList.add('yoleo-restart-progress-open');
+                setRestartProgressContent(status, detail, 'pending');
+                updateRestartElapsed();
+                restartProgressElapsedTimer = window.setInterval(updateRestartElapsed, 250);
+                return true;
+            }
+
+            async function probeInterfaceAvailability() {
+                if (restartProgressProbeRunning) return false;
+                restartProgressProbeRunning = true;
+                let abortTimer = null;
+                let controller = null;
+                try {
+                    if (typeof AbortController !== 'undefined') {
+                        controller = new AbortController();
+                        abortTimer = window.setTimeout(function () { controller.abort(); }, 4000);
+                    }
+                    const response = await fetch('/index/dev/availability?_=' + Date.now(), {
+                        method: 'GET',
+                        cache: 'no-store',
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+                        signal: controller ? controller.signal : undefined,
+                    });
+                    if (!response.ok) return false;
+                    const data = await response.json().catch(() => ({}));
+                    return data && data.ok === true;
+                } catch (err) {
+                    // Le serveur peut être arrêté : l'échec reste dans la popup,
+                    // sans navigation ni page navigateur en erreur.
+                    return false;
+                } finally {
+                    if (abortTimer) window.clearTimeout(abortTimer);
+                    restartProgressProbeRunning = false;
+                }
+            }
+
+            function finishRestartProgress() {
+                clearRestartProgressTimers();
+                setRestartProgressContent(
+                    '✓ Le serveur est de nouveau disponible.',
+                    'Interface détectée. Rechargement de la page…',
+                    'restored'
+                );
+                window.setTimeout(function () {
+                    window.location.reload();
+                }, 1300);
+            }
+
+            function startFlaskRestartProgress(action) {
+                const isUnraid = action === 'restart-flask-unraid';
+                if (!openRestartProgress(
+                    isUnraid ? 'Redémarrage Flask Unraid en cours' : 'Redémarrage de l’interface Flask en cours',
+                    'Redémarrage demandé. L’interface revient dans quelques instants…',
+                    'La page reste ouverte pendant la reconnexion.'
+                )) return;
+
+                const verifyFlask = async function () {
+                    const available = await probeInterfaceAvailability();
+                    if (available) {
+                        finishRestartProgress();
+                    } else {
+                        setRestartProgressContent(
+                            'Redémarrage de Flask en cours…',
+                            'Vérification silencieuse de l’interface, sans recharger cette page.',
+                            'pending'
+                        );
+                    }
+                };
+                // L'action serveur attend une seconde avant de redémarrer Flask.
+                // On laisse d'abord l'animation s'installer et on ne recharge
+                // qu'après une réponse HTTP valide de l'interface.
+                restartProgressStartDelayTimer = window.setTimeout(function () {
+                    verifyFlask();
+                    restartProgressProbeTimer = window.setInterval(verifyFlask, 1000);
+                }, 2800);
+            }
+
+            window.yoleoStartFlaskRestartProgress = startFlaskRestartProgress;
+
+            function startServerRebootProgress() {
+                if (!openRestartProgress(
+                    'Redémarrage du serveur en cours',
+                    'Commande envoyée. Attente de l’arrêt du serveur…',
+                    'Le compteur continue pendant l’indisponibilité. La page ne sera pas quittée.'
+                )) return;
+
+                let serverWasUnavailable = false;
+                const verifyServer = async function () {
+                    const available = await probeInterfaceAvailability();
+                    if (!available) {
+                        serverWasUnavailable = true;
+                        setRestartProgressContent(
+                            'Serveur temporairement indisponible…',
+                            'Nouvelle vérification silencieuse de l’interface dans quelques secondes.',
+                            'pending'
+                        );
+                    } else if (serverWasUnavailable) {
+                        finishRestartProgress();
+                    } else {
+                        setRestartProgressContent(
+                            'Redémarrage demandé. Attente de la coupure du serveur…',
+                            'La disponibilité sera contrôlée automatiquement toutes les 5 secondes.',
+                            'pending'
+                        );
+                    }
+                };
+
+                // Cette sonde HTTP en arrière-plan n'est pas un ping réseau.
+                // Elle ne valide le retour que si une indisponibilité a d'abord
+                // été constatée, pour ne jamais annoncer un faux redémarrage.
+                restartProgressStartDelayTimer = window.setTimeout(function () {
+                    verifyServer();
+                    restartProgressProbeTimer = window.setInterval(verifyServer, 5000);
+                }, 5000);
+            }
+
+            async function runPowerAction(button) {
+                const url = button.getAttribute('data-url');
+                const confirmMessage = button.getAttribute('data-confirm');
+                const workingMessage = button.getAttribute('data-working') || 'Commande demandée...';
+                const action = button.getAttribute('data-yoleo-power-action');
+                if (!url) return;
+                if (confirmMessage) {
+                    closeActionsMenu();
+                    const confirmed = await askPowerConfirmation(button, confirmMessage);
+                    if (!confirmed) return;
+                }
+
+                const buttons = Array.from(document.querySelectorAll('[data-yoleo-power-action]'));
+                buttons.forEach(item => { item.disabled = true; });
+                if (actionsStatus) {
+                    actionsStatus.textContent = workingMessage;
+                    actionsStatus.classList.remove('is-ok', 'is-error');
+                }
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || data.ok === false) {
+                        throw new Error(data.message || 'Erreur pendant la commande.');
+                    }
+                    if (actionsStatus) actionsStatus.textContent = data.message || 'Commande envoyée.';
+                    if (actionsStatus) {
+                        actionsStatus.textContent = data.message || 'Commande envoyee.';
+                        actionsStatus.classList.remove('is-error');
+                        actionsStatus.classList.add('is-ok');
+                    }
+                    if (action === 'restart-flask' || action === 'restart-flask-unraid') {
+                        startFlaskRestartProgress(action);
+                    } else if (action === 'reboot-server') {
+                        startServerRebootProgress();
+                    } else {
+                        buttons.forEach(item => { item.disabled = false; });
+                    }
+                } catch (err) {
+                    buttons.forEach(item => { item.disabled = false; });
+                    if (actionsStatus) {
+                        actionsStatus.textContent = err.message || 'Erreur commande';
+                        actionsStatus.classList.remove('is-ok');
+                        actionsStatus.classList.add('is-error');
+                    }
+                }
+            }
+
+            function yoleoShowPageStatus(message, ok) {
+                const text = String(message || '').trim();
+                const box = document.getElementById('statusBox');
+                if (box) {
+                    window.clearTimeout(window.yoleoPageStatusTimer);
+                    box.className = 'status-box ' + (ok ? 'ok' : 'error');
+                    box.textContent = text || (ok ? 'OK' : 'Erreur');
+                    box.style.display = 'block';
+                    if (ok) {
+                        window.yoleoPageStatusTimer = window.setTimeout(function () {
+                            box.style.display = 'none';
+                        }, 850);
+                    }
+                    return;
+                }
+                if (!ok) window.alert(text || 'Erreur');
+            }
+
+            window.yoleoRepairKvmFromPageMenu = async function () {
+                const pageMenu = document.getElementById('yoleoPageSettingsMenu');
+                if (pageMenu) pageMenu.open = false;
+                const confirmButton = document.createElement('button');
+                confirmButton.setAttribute('data-yoleo-power-action', 'repair-kvm');
+                confirmButton.textContent = 'Reparer KVM';
+                const confirmed = await askPowerConfirmation(confirmButton, 'Reparer KVM ? Toutes les VM doivent etre arretees.');
+                if (!confirmed) return false;
+                yoleoShowPageStatus('Reparation KVM en cours...', true);
+                try {
+                    const response = await fetch('/vm/api/kvm/repair', {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json' },
+                        credentials: 'same-origin'
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || data.ok === false) throw new Error(data.message || 'Erreur pendant la reparation KVM.');
+                    yoleoShowPageStatus(data.message || 'Reparation KVM terminee.', true);
+                    if (typeof refreshAll === 'function') refreshAll(false).catch(() => {});
+                } catch (err) {
+                    yoleoShowPageStatus(err.message || 'Erreur pendant la reparation KVM.', false);
+                }
+                return false;
+            };
+
+            function setBrowserTargetValue(target, path) {
+                if (!target) return;
+                const safeTarget = String(target);
+                let field = document.getElementById(safeTarget);
+                if (!field) {
+                    try {
+                        field = document.querySelector('[name="' + CSS.escape(safeTarget) + '"]');
+                    } catch (err) {
+                        field = document.querySelector('[name="' + safeTarget.replace(/"/g, '\\"') + '"]');
+                    }
+                }
+                if (!field) return;
+                field.value = path || '';
+                field.dispatchEvent(new Event('input', {bubbles: true}));
+                field.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+
+            function closeBrowserModal() {
+                if (!browserModal) return;
+                browserModal.hidden = true;
+                browserModal.setAttribute('aria-hidden', 'true');
+                body.classList.remove('yoleo-browser-modal-open');
+                if (browserFrame) browserFrame.src = 'about:blank';
+            }
+
+            function openBrowserModal(rawUrl, title) {
+                if (!rawUrl) return;
+                if (!browserModal || !browserFrame) {
+                    window.open(rawUrl, 'yoleo_browser', 'width=1100,height=760,resizable=yes,scrollbars=yes');
+                    return;
+                }
+                const parsed = new URL(rawUrl, window.location.origin);
+                if (parsed.origin !== window.location.origin) {
+                    window.open(rawUrl, 'yoleo_browser', 'width=1100,height=760,resizable=yes,scrollbars=yes');
+                    return;
+                }
+                if (browserModalTitle) browserModalTitle.textContent = title || 'Parcourir';
+                browserFrame.src = parsed.pathname + parsed.search + parsed.hash;
+                browserModal.hidden = false;
+                browserModal.setAttribute('aria-hidden', 'false');
+                body.classList.add('yoleo-browser-modal-open');
+            }
+
+            window.yoleoOpenBrowserUrl = openBrowserModal;
+            window.yoleoCloseBrowserModal = closeBrowserModal;
+
+            window.addEventListener('message', function (event) {
+                const data = event.data || {};
+                if (!data || data.type === undefined) return;
+                if (data.type === 'yoleo-browser-select') {
+                    setBrowserTargetValue(data.target || '', data.path || '');
+                    window.setTimeout(closeBrowserModal, 20);
+                } else if (data.type === 'yoleo-browser-close') {
+                    closeBrowserModal();
+                }
+            });
+
+            updateClock();
+            setInterval(updateClock, 1000);
+            updateTopLan();
+            setInterval(updateTopLan, 3000);
+
+            if (powerConfirmCheckbox && powerConfirmOk) {
+                powerConfirmCheckbox.addEventListener('change', function () {
+                    powerConfirmOk.disabled = !powerConfirmCheckbox.checked;
+                });
+            }
+            if (powerConfirmOk) {
+                powerConfirmOk.addEventListener('click', function () {
+                    if (!powerConfirmOk.disabled) closePowerConfirmModal(true);
+                });
+            }
+            document.querySelectorAll('[data-yoleo-power-confirm-cancel]').forEach(button => {
+                button.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    closePowerConfirmModal(false);
+                });
+            });
+
+            if (actionsToggle) {
+                actionsToggle.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    toggleActionsMenu();
+                });
+            }
+
+            document.querySelectorAll('[data-yoleo-power-action]').forEach(button => {
+                button.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    runPowerAction(button);
+                });
+            });
+
+            document.addEventListener('click', function (event) {
+                if (actionsDropdown && !actionsDropdown.hidden && !event.target.closest('.yoleo-actions-menu')) {
+                    closeActionsMenu();
+                }
+                if (pageSettingsMenu && pageSettingsMenu.open && !event.target.closest('.yoleo-page-settings-menu')) {
+                    pageSettingsMenu.open = false;
+                }
+            });
+
+            if (mobileToggle) mobileToggle.addEventListener('click', openMobileMenu);
+            if (mobileBackdrop) mobileBackdrop.addEventListener('click', closeMobileMenu);
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    if (powerConfirmModal && !powerConfirmModal.hidden) {
+                        closePowerConfirmModal(false);
+                        return;
+                    }
+                    closeMobileMenu();
+                    closeActionsMenu();
+                    if (pageSettingsMenu) pageSettingsMenu.open = false;
+                    closeBrowserModal();
+                }
+            });
+
+            document.querySelectorAll('[data-yoleo-browser-close]').forEach(button => {
+                button.addEventListener('click', closeBrowserModal);
+            });
+
+            const mobileTableQuery = [
+                '.table-wrap',
+                '.desktop-table-wrap',
+                '.system-table-wrap',
+                '.terminal-table-wrap',
+                '.lu-table-wrap',
+                '.browser-table-wrap',
+                '.docker-stack-table-wrap',
+                '.meteo-table-wrap',
+                '.yoleo-table-wrap'
+            ].join(',');
+            const mobileTableMedia = window.matchMedia('(max-width: 900px)');
+            let mobileTableTimer = null;
+            let mobileRowModal = null;
+
+            function mobileText(value) {
+                return String(value || '').replace(/\s+/g, ' ').trim();
+            }
+
+            function mobileCellText(cell) {
+                if (!cell) return '';
+                const clone = cell.cloneNode(true);
+                clone.querySelectorAll('button, input, select, textarea').forEach(control => control.remove());
+                return mobileText(clone.innerText || clone.textContent || '');
+            }
+
+            function mobileHeaders(table) {
+                const headerCells = Array.from(table.querySelectorAll('thead th'));
+                if (headerCells.length) return headerCells.map(th => mobileCellText(th));
+                const firstRow = table.querySelector('tr');
+                if (!firstRow) return [];
+                return Array.from(firstRow.children).map((_, index) => 'Champ ' + (index + 1));
+            }
+
+            function mobileActionIndex(headers, row) {
+                const explicit = headers.findIndex(label => /action|commande|outil|operation|opération/i.test(label || ''));
+                if (explicit >= 0) return explicit;
+                const cells = Array.from(row.children || []);
+                for (let index = cells.length - 1; index >= 0; index -= 1) {
+                    if (cells[index].querySelector('button, a[href], input[type="submit"], input[type="button"]')) return index;
+                }
+                return -1;
+            }
+
+            function mobileTitleIndex(headers, actionIndex) {
+                const wanted = ['nom', 'name', 'service', 'image', 'partage', 'utilisateur', 'user', 'destination', 'cible', 'pool', 'fichier', 'script'];
+                const found = headers.findIndex((label, index) => {
+                    if (index === actionIndex) return false;
+                    const normalized = (label || '').toLowerCase();
+                    return wanted.some(item => normalized.includes(item));
+                });
+                return found >= 0 ? found : -1;
+            }
+
+            function mobileControls(cell) {
+                if (!cell) return [];
+                return Array.from(cell.querySelectorAll('button, a[href], input[type="submit"], input[type="button"]'))
+                    .filter(control => !control.closest('.yoleo-mobile-table-grid') && !control.closest('.yoleo-mobile-row-modal'));
+            }
+
+            function mobileShouldKeepClassicTable(table) {
+                const editable = table.querySelector('textarea, select, [contenteditable="true"], input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="email"], input[type="url"], input[type="password"], input[type="checkbox"], input[type="radio"], input[type="date"], input[type="time"], input[type="datetime-local"], input[type="color"], input[type="file"]');
+                return table.classList.contains('fm-table') ||
+                    table.classList.contains('docker-stack-table') ||
+                    table.classList.contains('docker-env-table') ||
+                    !!editable ||
+                    !!table.closest('.docker-stacks-section, .docker-env-section, .system-info-page, .pers-page, .personnalisation-page, .meteo-page, .confmgr-route-page, .browser-page, .build-database-page, .db-table-wrap, .db-table, .no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]');
+            }
+
+            function mobileKeepClassicTable(table) {
+                const wrap = table.closest(mobileTableQuery) || table;
+                wrap.classList.remove('yoleo-mobile-source-wrap');
+                if (wrap.nextElementSibling && wrap.nextElementSibling.classList.contains('yoleo-mobile-table-grid')) {
+                    wrap.nextElementSibling.remove();
+                }
+                delete table.dataset.yoleoMobileSignature;
+            }
+
+            function mobileControlLabel(control, index) {
+                const label = mobileText(
+                    control.getAttribute('aria-label') ||
+                    control.getAttribute('title') ||
+                    control.value ||
+                    control.textContent ||
+                    control.name ||
+                    ''
+                );
+                return label || ('Action ' + (index + 1));
+            }
+
+            function mobileIsMergerfsRow(row) {
+                return !!(row && row.closest && (row.dataset?.mobileKind === 'mergerfs' || row.classList.contains('mergerfs-row') || row.closest('#mergerfs-tbody')));
+            }
+
+            function mobileMergerfsState(row) {
+                if (!mobileIsMergerfsRow(row)) return '';
+                const datasetState = mobileText(row.dataset?.mobileState || '').toLowerCase();
+                if (/running|d[ée]marr[eé]|mounted|mont[eé]|actif|active|ok|succ[èe]s|success/.test(datasetState)) return 'running';
+                if (/stopped|arr[êe]t[eé]?|stop|failed|fail|erreur|error|probl[eè]me|problem|d[ée]sactiv[eé]|disabled/.test(datasetState)) return 'stopped';
+
+                // Pour MargeFS, on lit d'abord le badge d'état. Ne jamais se baser
+                // sur les boutons d'action de la ligne, sinon le bouton "Arrêter"
+                // ferait passer une ligne "démarré" en rouge sur mobile.
+                const badgeText = mobileText(row.querySelector('.badge')?.textContent || '').toLowerCase();
+                if (/d[ée]marr[eé]|mounted|mont[eé]|actif|active|running|ok|succ[èe]s|success/.test(badgeText)) return 'running';
+                if (/arr[êe]t[eé]?|stopped|stop|failed|fail|erreur|error|probl[eè]me|problem|d[ée]sactiv[eé]|disabled/.test(badgeText)) return 'stopped';
+                return '';
+            }
+
+            function mobileIsDiskRow(row) {
+                if (mobileIsMergerfsRow(row)) return false;
+                const table = row && row.closest ? row.closest('table') : null;
+                if (!table || !table.closest('.disk-page')) return false;
+                if (row.classList.contains('part-row') || row.classList.contains('maintenance-raid-row')) return true;
+                if (row.querySelector('.disk-name, .part-name, .mount-col, .status-power')) return true;
+                const rowText = mobileText(row.textContent).toLowerCase();
+                return /\/dev\/|monté|monte|démonté|demonte|non monté|non monte|standby|veille/.test(rowText);
+            }
+
+            function mobileDiskMountState(row) {
+                if (!mobileIsDiskRow(row)) return '';
+                const mountText = mobileText(row.querySelector('.mount-col')?.textContent || row.textContent).toLowerCase();
+                if (/non monté|non monte|démonté|demonte/.test(mountText)) return 'disk-unmounted';
+                if (/monté|monte|\/mnt\/|\/media\/|\/srv\//.test(mountText)) return 'disk-mounted';
+                return '';
+            }
+
+            function mobileDiskPowerState(row) {
+                if (!mobileIsDiskRow(row)) return '';
+                const dot = row.querySelector('.status-dot');
+                const stateText = mobileText(row.querySelector('.status-power, .status-cell, .state-col, .badge')?.textContent || row.textContent).toLowerCase();
+                if ((dot && dot.classList.contains('dot-standby')) || /standby|veille|sleep|dormi/.test(stateText)) return 'disk-sleeping';
+                if ((dot && dot.classList.contains('dot-active')) || /active|actif|running|ok/.test(stateText)) return 'disk-awake';
+                return '';
+            }
+
+            function mobileIconForRow(row, title) {
+                if (mobileIsDiskRow(row)) return {src: '', text: '', disk: true};
+                const img = row.querySelector('img');
+                if (img && img.getAttribute('src')) {
+                    return {src: img.getAttribute('src'), text: ''};
+                }
+                const status = mobileText(row.querySelector('.status-pill, .badge, .state-pill')?.textContent || '').toLowerCase();
+                if (/running|actif|active|ok|d[ée]marr[eé]/.test(status)) return {src: '', text: '✓'};
+                if (/stop|stopped|arr[êe]t[eé]?|bad|erreur|error|failed|exited/.test(status)) return {src: '', text: '!'};
+                const first = mobileText(title).charAt(0).toUpperCase();
+                return {src: '', text: first || '•'};
+            }
+
+            function mobileRowState(row) {
+                const status = mobileText(row.querySelector('.status-pill, .badge, .state-pill')?.textContent || '').toLowerCase();
+                if (/running|actif|active|ok|d[ée]marr[eé]/.test(status)) return 'running';
+                if (/stop|stopped|arr[êe]t[eé]?|bad|erreur|error|failed|exited/.test(status)) return 'stopped';
+                return '';
+            }
+
+            function mobileEnsureModal() {
+                if (mobileRowModal) return mobileRowModal;
+                mobileRowModal = document.createElement('div');
+                mobileRowModal.className = 'yoleo-mobile-row-modal';
+                mobileRowModal.setAttribute('aria-hidden', 'true');
+                mobileRowModal.innerHTML = [
+                    '<div class="yoleo-mobile-row-backdrop" data-mobile-row-close></div>',
+                    '<section class="yoleo-mobile-row-sheet" role="dialog" aria-modal="true" aria-labelledby="yoleoMobileRowTitle">',
+                    '<header class="yoleo-mobile-row-head">',
+                    '<span class="yoleo-mobile-tile-icon" id="yoleoMobileRowIcon"></span>',
+                    '<div><div class="yoleo-mobile-row-title" id="yoleoMobileRowTitle"></div><div class="yoleo-mobile-row-subtitle" id="yoleoMobileRowSubtitle"></div></div>',
+                    '<button type="button" class="yoleo-mobile-row-close" data-mobile-row-close aria-label="Fermer">×</button>',
+                    '</header>',
+                    '<div class="yoleo-mobile-row-body">',
+                    '<div class="yoleo-mobile-row-details" id="yoleoMobileRowDetails"></div>',
+                    '<div class="yoleo-mobile-row-actions" id="yoleoMobileRowActions"></div>',
+                    '</div>',
+                    '</section>'
+                ].join('');
+                document.body.appendChild(mobileRowModal);
+                mobileRowModal.addEventListener('click', function (event) {
+                    if (event.target.closest('[data-mobile-row-close]')) closeMobileRowModal();
+                });
+                return mobileRowModal;
+            }
+
+            function closeMobileRowModal() {
+                if (!mobileRowModal) return;
+                mobileRowModal.classList.remove('is-open');
+                mobileRowModal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('yoleo-mobile-row-open');
+            }
+
+            function openMobileRowModal(data) {
+                const modal = mobileEnsureModal();
+                const icon = modal.querySelector('#yoleoMobileRowIcon');
+                const title = modal.querySelector('#yoleoMobileRowTitle');
+                const subtitle = modal.querySelector('#yoleoMobileRowSubtitle');
+                const details = modal.querySelector('#yoleoMobileRowDetails');
+                const actions = modal.querySelector('#yoleoMobileRowActions');
+
+                icon.innerHTML = '';
+                if (data.icon.src) {
+                    const img = document.createElement('img');
+                    img.src = data.icon.src;
+                    img.alt = '';
+                    icon.appendChild(img);
+                } else if (data.icon.disk) {
+                    icon.innerHTML = '<span class="yoleo-mobile-disk-icon" aria-hidden="true"></span>';
+                } else {
+                    icon.textContent = data.icon.text || '•';
+                }
+                title.textContent = data.title || 'Détail';
+                subtitle.textContent = data.subtitle || '';
+                details.innerHTML = '';
+                actions.innerHTML = '';
+
+                data.details.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'yoleo-mobile-row-kv';
+                    const key = document.createElement('div');
+                    key.className = 'yoleo-mobile-row-k';
+                    key.textContent = item.key;
+                    const value = document.createElement('div');
+                    value.className = 'yoleo-mobile-row-v';
+                    value.textContent = item.value;
+                    row.append(key, value);
+                    details.appendChild(row);
+                });
+
+                data.controls.forEach((control, index) => {
+                    const button = document.createElement('button');
+                    const label = mobileControlLabel(control, index);
+                    button.type = 'button';
+                    button.className = 'yoleo-mobile-action-btn';
+                    button.textContent = label;
+                    button.disabled = !!control.disabled || control.getAttribute('aria-disabled') === 'true';
+                    if (/supprimer|delete|remove|stop|arrêter|arreter|rm|rmi|danger/i.test(label + ' ' + (control.value || ''))) {
+                        button.classList.add('is-danger');
+                    } else if (/start|démarrer|demarrer|ouvrir|open|edit|modifier|save|sauvegarder/i.test(label + ' ' + (control.value || ''))) {
+                        button.classList.add('is-primary');
+                    }
+                    button.addEventListener('click', function () {
+                        if (button.disabled) return;
+                        closeMobileRowModal();
+                        window.setTimeout(function () {
+                            if (control.tagName === 'A') {
+                                const href = control.getAttribute('href');
+                                const target = control.getAttribute('target');
+                                if (href && target === '_blank') window.open(href, '_blank');
+                                else if (href) window.location.href = href;
+                                return;
+                            }
+                            const type = (control.getAttribute('type') || '').toLowerCase();
+                            if ((control.tagName === 'BUTTON' || control.tagName === 'INPUT') && (type === '' || type === 'submit') && control.form && control.form.requestSubmit) {
+                                control.form.requestSubmit(control);
+                                return;
+                            }
+                            control.click();
+                        }, 40);
+                    });
+                    actions.appendChild(button);
+                });
+
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('yoleo-mobile-row-open');
+            }
+
+            function buildMobileGridForTable(table) {
+                if (!table || table.closest('.yoleo-mobile-row-modal') || table.closest('.yoleo-mobile-table-grid')) return;
+                if (mobileShouldKeepClassicTable(table)) {
+                    mobileKeepClassicTable(table);
+                    return;
+                }
+                const wrap = table.closest(mobileTableQuery) || table;
+                const rows = Array.from(table.querySelectorAll('tbody tr')).filter(row => {
+                    if (row.closest('thead')) return false;
+                    if (row.classList.contains('group-row')) return false;
+                    const cells = Array.from(row.children || []);
+                    if (!cells.length) return false;
+                    if (cells.length === 1 && cells[0].hasAttribute('colspan')) return false;
+                    return mobileText(row.textContent).length > 0;
+                });
+                const headers = mobileHeaders(table);
+                const signature = rows.length + '|' + mobileText(table.textContent).slice(0, 1200);
+                let grid = wrap.nextElementSibling && wrap.nextElementSibling.classList.contains('yoleo-mobile-table-grid')
+                    ? wrap.nextElementSibling
+                    : null;
+                if (grid && table.dataset.yoleoMobileSignature === signature) return;
+                if (!grid) {
+                    grid = document.createElement('div');
+                    grid.className = 'yoleo-mobile-table-grid';
+                    wrap.insertAdjacentElement('afterend', grid);
+                }
+                grid.innerHTML = '';
+                wrap.classList.add('yoleo-mobile-source-wrap');
+                table.dataset.yoleoMobileSignature = signature;
+
+                rows.forEach((row, rowIndex) => {
+                    const cells = Array.from(row.children || []);
+                    const actionIndex = mobileActionIndex(headers, row);
+                    const titleIndex = mobileTitleIndex(headers, actionIndex);
+                    const titleCell = cells[titleIndex >= 0 ? titleIndex : cells.findIndex((cell, index) => index !== actionIndex && mobileCellText(cell))];
+                    const title = mobileCellText(titleCell) || ('Ligne ' + (rowIndex + 1));
+                    const subtitleCell = cells.find((cell, index) => index !== actionIndex && cell !== titleCell && mobileCellText(cell));
+                    const subtitle = mobileCellText(subtitleCell);
+                    const icon = mobileIconForRow(row, title);
+                    const state = mobileMergerfsState(row) || mobileRowState(row);
+                    const controls = mobileControls(cells[actionIndex]);
+                    const details = cells.map((cell, index) => ({
+                        key: headers[index] || ('Champ ' + (index + 1)),
+                        value: mobileCellText(cell),
+                        index
+                    })).filter(item => item.index !== actionIndex && item.value);
+
+                    const tile = document.createElement('button');
+                    tile.type = 'button';
+                    tile.className = 'yoleo-mobile-table-tile';
+                    if (state) tile.classList.add('is-' + state);
+                    if (mobileIsMergerfsRow(row)) {
+                        tile.classList.add('is-mergerfs-tile');
+                    }
+                    if (mobileIsDiskRow(row)) {
+                        tile.classList.add('is-disk-tile');
+                        const mountState = mobileDiskMountState(row);
+                        const powerState = mobileDiskPowerState(row);
+                        if (mountState) tile.classList.add('is-' + mountState);
+                        if (powerState) tile.classList.add('is-' + powerState);
+                    }
+                    const iconEl = document.createElement('span');
+                    iconEl.className = 'yoleo-mobile-tile-icon';
+                    if (icon.src) {
+                        const img = document.createElement('img');
+                        img.src = icon.src;
+                        img.alt = '';
+                        iconEl.appendChild(img);
+                    } else if (icon.disk) {
+                        iconEl.innerHTML = '<span class="yoleo-mobile-disk-icon" aria-hidden="true"></span>';
+                    } else {
+                        iconEl.textContent = icon.text || '•';
+                    }
+                    const titleEl = document.createElement('span');
+                    titleEl.className = 'yoleo-mobile-tile-title';
+                    titleEl.textContent = title;
+                    const subEl = document.createElement('span');
+                    subEl.className = 'yoleo-mobile-tile-sub';
+                    subEl.textContent = subtitle || (controls.length ? (controls.length + ' action(s)') : 'Détail');
+                    tile.append(iconEl, titleEl, subEl);
+                    tile.addEventListener('click', function () {
+                        openMobileRowModal({icon, title, subtitle, details, controls});
+                    });
+                    grid.appendChild(tile);
+                });
+            }
+
+            function refreshMobileTables() {
+                document.body.classList.toggle('yoleo-mobile-mosaic-ready', mobileTableMedia.matches);
+                document.querySelectorAll('table').forEach(buildMobileGridForTable);
+            }
+
+            function scheduleMobileTables() {
+                window.clearTimeout(mobileTableTimer);
+                mobileTableTimer = window.setTimeout(refreshMobileTables, 80);
+            }
+
+            mobileTableMedia.addEventListener?.('change', scheduleMobileTables);
+            document.addEventListener('DOMContentLoaded', scheduleMobileTables);
+            window.addEventListener('load', scheduleMobileTables);
+            const mobileTableObserver = new MutationObserver(function (mutations) {
+                if (mutations.every(item => item.target.closest && item.target.closest('.yoleo-mobile-table-grid, .yoleo-mobile-row-modal'))) return;
+                scheduleMobileTables();
+            });
+            mobileTableObserver.observe(document.body, {childList: true, subtree: true});
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') closeMobileRowModal();
+            });
+            scheduleMobileTables();
+        })();
+    </script>
+
+    <script>
+        (function yoleoGlobalFloatingFlashes(){
+            const successSelectors = [
+                '.flash-stack > .flash-msg.success',
+                '.flash-stack > .flash.success',
+                '.flash-stack > .mini-flash.success',
+                '.docker-flash-stack > .action-message.ok',
+                '.top-flash-stack > .top-flash.success',
+                '.ffoi-flash-stack > .flash.success',
+                '.ffoi-flash-stack > .ffoi-flash.success',
+                '.service-flash-stack > .flash.success',
+                '.services-flash-stack > .flash.success'
+            ];
+            const errorSelectors = [
+                '.flash-stack > .flash-msg.error',
+                '.flash-stack > .flash.error',
+                '.flash-stack > .mini-flash.error',
+                '.docker-flash-stack > .action-message.bad',
+                '.top-flash-stack > .top-flash.error',
+                '.ffoi-flash-stack > .flash.error',
+                '.ffoi-flash-stack > .ffoi-flash.error',
+                '.service-flash-stack > .flash.error',
+                '.services-flash-stack > .flash.error'
+            ];
+
+            function layer() {
+                let box = document.getElementById('yoleoGlobalFlashLayer');
+                if (!box) {
+                    box = document.createElement('div');
+                    box.id = 'yoleoGlobalFlashLayer';
+                    box.className = 'yoleo-global-flash-layer';
+                    box.setAttribute('aria-live', 'polite');
+                    document.body.appendChild(box);
+                }
+                return box;
+            }
+
+            function alreadyFloating(el) {
+                if (!el || el.dataset.yoleoGlobalFlash === '1') return true;
+                const cls = String(el.className || '').toLowerCase();
+                const parentCls = String(el.parentElement && el.parentElement.className || '').toLowerCase();
+                if (cls.includes('floating') || cls.includes('float') || parentCls.includes('floating') || parentCls.includes('float')) return true;
+                const pos = window.getComputedStyle(el).position;
+                return pos === 'fixed';
+            }
+
+            function cleanupParent(parent) {
+                if (!parent) return;
+                if (parent.id === 'yoleoGlobalFlashLayer') return;
+                const hasMessages = parent.querySelector('.flash-msg, .flash, .mini-flash, .action-message, .top-flash, .ffoi-flash');
+                if (!hasMessages && /flash-stack|docker-flash-stack|top-flash-stack|service-flash-stack|services-flash-stack|yoleo-page-flash/.test(parent.className || '')) {
+                    parent.remove();
+                }
+            }
+
+            function floatMessage(el, ok) {
+                if (alreadyFloating(el)) return;
+                const originalParent = el.parentElement;
+                el.dataset.yoleoGlobalFlash = '1';
+                el.classList.add('yoleo-global-flash-item', ok ? 'yoleo-global-flash-ok' : 'yoleo-global-flash-error');
+                layer().appendChild(el);
+                cleanupParent(originalParent);
+                if (ok) {
+                    window.setTimeout(() => {
+                        el.classList.add('yoleo-global-flash-hide');
+                        window.setTimeout(() => el.remove(), 180);
+                    }, 780);
+                }
+            }
+
+            function scan(root) {
+                const scope = root && root.querySelectorAll ? root : document;
+                successSelectors.forEach(selector => scope.querySelectorAll(selector).forEach(el => floatMessage(el, true)));
+                errorSelectors.forEach(selector => scope.querySelectorAll(selector).forEach(el => floatMessage(el, false)));
+                if (root && root.matches) {
+                    successSelectors.forEach(selector => { if (root.matches(selector)) floatMessage(root, true); });
+                    errorSelectors.forEach(selector => { if (root.matches(selector)) floatMessage(root, false); });
+                }
+            }
+
+            function boot() {
+                scan(document);
+                const observer = new MutationObserver(mutations => {
+                    for (const mutation of mutations) {
+                        mutation.addedNodes.forEach(node => {
+                            if (node && node.nodeType === 1) scan(node);
+                        });
+                    }
+                });
+                observer.observe(document.body, {childList: true, subtree: true});
+            }
+
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+            else boot();
+        })();
+    </script>
+    {% block body_extra %}{% endblock %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  let yoleoTableContextMenu = null;
+
+  function yoleoTableContextLinks(){
+    const menu = document.querySelector('#yoleoPageSettingsMenu .yoleo-page-settings-dropdown');
+    if (!menu) return [];
+    return Array.from(menu.querySelectorAll('a')).filter(function(link){
+      /*
+       * Le menu cranté est un <details>. Fermé ou ouvert, ses entrées doivent
+       * rester disponibles pour le clic droit. On évite donc offsetParent ici.
+       */
+      if (link.hidden || link.getAttribute('aria-hidden') === 'true') return false;
+      if (link.classList && link.classList.contains('is-disabled')) return false;
+      return true;
+    });
+  }
+
+  function yoleoTableContextClose(){
+    if (yoleoTableContextMenu) {
+      yoleoTableContextMenu.remove();
+      yoleoTableContextMenu = null;
+    }
+    document.removeEventListener('mousedown', yoleoTableContextMouseDown, true);
+    document.removeEventListener('keydown', yoleoTableContextKeyDown, true);
+    window.removeEventListener('resize', yoleoTableContextClose, true);
+    window.removeEventListener('scroll', yoleoTableContextClose, true);
+  }
+
+  function yoleoTableContextMouseDown(event){
+    if (yoleoTableContextMenu && !yoleoTableContextMenu.contains(event.target)) yoleoTableContextClose();
+  }
+
+  function yoleoTableContextKeyDown(event){
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      yoleoTableContextClose();
+      return;
+    }
+    if (!yoleoTableContextMenu) return;
+    const items = Array.from(yoleoTableContextMenu.querySelectorAll('a'));
+    if (!items.length) return;
+    const current = document.activeElement;
+    let index = items.indexOf(current);
+    if (index < 0) index = 0;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      items[(index + 1) % items.length].focus();
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      items[(index - 1 + items.length) % items.length].focus();
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      items[0].focus();
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      items[items.length - 1].focus();
+    }
+  }
+
+  function yoleoBuildTableContextMenu(links){
+    const box = document.createElement('div');
+    box.className = 'yoleo-table-context-menu';
+    box.setAttribute('role', 'menu');
+    box.setAttribute('aria-label', 'Menu contextuel de la page');
+    links.forEach(function(link){
+      const clone = link.cloneNode(true);
+      clone.setAttribute('role', 'menuitem');
+      clone.removeAttribute('id');
+      clone.classList.remove('is-active');
+      clone.addEventListener('click', function(){
+        yoleoTableContextClose();
+      }, { once:false });
+      box.appendChild(clone);
+    });
+    return box;
+  }
+
+  function yoleoPositionTableContextMenu(box, x, y){
+    box.style.left = '0px';
+    box.style.top = '0px';
+    document.body.appendChild(box);
+    const rect = box.getBoundingClientRect();
+    const pad = 8;
+    const left = Math.min(Math.max(pad, x), Math.max(pad, window.innerWidth - rect.width - pad));
+    const top = Math.min(Math.max(pad, y), Math.max(pad, window.innerHeight - rect.height - pad));
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+  }
+
+  function yoleoShouldUseNativeContextMenu(target){
+    if (!target || !target.closest) return false;
+    const editable = target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""], .is-editing');
+    if (!editable) return false;
+    if (editable.matches && editable.matches('input')) {
+      const type = String(editable.getAttribute('type') || 'text').toLowerCase();
+      return !['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'image', 'range', 'color'].includes(type);
+    }
+    return true;
+  }
+
+  function yoleoOpenPageContextMenu(event, options){
+    const opts = options || {};
+    const target = event && event.target;
+    if (yoleoShouldUseNativeContextMenu(target)) {
+      yoleoTableContextClose();
+      return false;
+    }
+    const zone = target && target.closest ? target.closest('[data-yoleo-context-zone]') : null;
+    if (!zone && !opts.force) return false;
+
+    const links = yoleoTableContextLinks();
+    if (!links.length) return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+
+    yoleoTableContextClose();
+    yoleoTableContextMenu = yoleoBuildTableContextMenu(links);
+    yoleoPositionTableContextMenu(yoleoTableContextMenu, event.clientX, event.clientY);
+
+    const first = yoleoTableContextMenu.querySelector('a');
+    if (first) first.focus({ preventScroll:true });
+    setTimeout(function(){
+      document.addEventListener('mousedown', yoleoTableContextMouseDown, true);
+      document.addEventListener('keydown', yoleoTableContextKeyDown, true);
+      window.addEventListener('resize', yoleoTableContextClose, true);
+      window.addEventListener('scroll', yoleoTableContextClose, true);
+    }, 0);
+    return true;
+  }
+
+  window.yoleoOpenPageContextMenu = yoleoOpenPageContextMenu;
+  window.yoleoClosePageContextMenu = yoleoTableContextClose;
+
+  document.addEventListener('contextmenu', function(event){
+    yoleoOpenPageContextMenu(event, { force:false });
+  }, true);
+});
+</script>
+</body>
+</html>

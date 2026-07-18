@@ -1,0 +1,282 @@
+{% extends "partage_base.html" %}
+
+{% block title %}NFS client - Yoleo{% endblock %}
+{% block page_title %}NFS client{% endblock %}
+{% block page_subtitle %}Montage sur ce NAS des exports NFS distants publiés par un autre ordinateur ou serveur{% endblock %}
+
+{% block route_content %}
+{% set nc = nfs_client|default({}) %}
+{% set general = nc.general|default({}) %}
+{% set mounts = nc.mounts|default([]) %}
+{% set mounted_count = mounts|selectattr('mounted')|list|length %}
+
+<div id="tab-nfs-client" class="tab-panel active partage-nfs-client-page-v4">
+    <section class="card partage-nfs-client-header-v4">
+        <div class="topbar partage-nfs-client-topline-v5">
+            <div class="summary-grid partage-nfs-client-summary-v4 partage-nfs-client-summary-inline-v5">
+                <div class="summary-card">
+                    <div class="summary-label">Montages connus</div>
+                    <div class="summary-value" id="nfsClientKnownCount">{{ mounts|length }}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Montés</div>
+                    <div class="summary-value" id="nfsClientMountedCount">{{ mounted_count }}</div>
+                </div>
+                <div class="summary-card partage-nfs-client-wide-v4">
+                    <div class="summary-label">Base locale</div>
+                    <div class="summary-value code-inline">{{ general.host_base|default('/mnt/remotes/') }}</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="topbar">
+            <div class="title-block">
+                <h2>Rechercher des exports NFS</h2>
+                <div class="subtitle">Saisis une IP, un nom DNS local ou un nom de machine, puis affiche les partages publiés.</div>
+            </div>
+        </div>
+        <form method="GET" action="{{ url_for('partage_bp.show_nfs_client') }}" class="partage-nfs-client-search-v4">
+            <div class="field">
+                <label>IP ou nom de machine</label>
+                <input class="text-input" name="machine" value="{{ nfs_client_machine }}" placeholder="192.168.1.3 ou debian-backup">
+            </div>
+            <div class="field partage-nfs-client-button-field-v4">
+                <label>Action</label>
+                <button class="yoleo-btn yoleo-btn-primary" type="submit">🔎 Afficher les partages</button>
+            </div>
+        </form>
+
+        {% if nfs_client_machine and not nfs_client_exports %}
+            <div class="empty-state" data-yoleo-context-zone="nfs-client-search-empty">Aucun export NFS affiché pour <code>{{ nfs_client_machine }}</code>. Vérifie le serveur, le réseau ou le paquet <code>showmount</code>.</div>
+        {% endif %}
+
+        {% if nfs_client_exports %}
+            <form method="POST" action="{{ url_for('partage_bp.nfs_client_mount_route') }}" class="partage-nfs-client-mount-form-v4">
+                <input type="hidden" name="machine" value="{{ nfs_client_machine }}">
+                <div class="form-grid partage-nfs-client-options-v4">
+                    <div class="field">
+                        <label>Options de montage</label>
+                        <input class="text-input" name="options" value="{{ general.default_options|default('rw,soft,timeo=30,retrans=2') }}">
+                    </div>
+                    <label class="check-row partage-nfs-client-auto-v4">
+                        <input type="checkbox" name="auto_mount" value="1" checked>
+                        <span>Remonter automatiquement au démarrage de Flask</span>
+                    </label>
+                </div>
+
+                <div class="desktop-table-wrap partage-nfs-client-table-wrap-v4" data-yoleo-context-zone="nfs-client-exports-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Monter</th>
+                                <th>Export distant</th>
+                                <th>Point local prévu</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for export in nfs_client_exports %}
+                            <tr>
+                                <td><input type="checkbox" name="exports" value="{{ export.path }}" checked></td>
+                                <td><span class="path-pill"><span>{{ nfs_client_machine }}:{{ export.path }}</span></span></td>
+                                <td><span class="path-pill"><span>{{ export.mount_path }}</span></span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="toolbar partage-nfs-client-bottom-actions-v4">
+                    <button class="yoleo-btn yoleo-btn-primary" type="submit">🔌 Monter les partages cochés</button>
+                </div>
+            </form>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <div class="topbar">
+            <div class="title-block">
+                <h2>Montages connus</h2>
+            </div>
+        </div>
+
+        {% if not mounts %}
+            <div class="empty-state" data-yoleo-context-zone="nfs-client-known-empty">Aucun montage NFS client connu.</div>
+        {% else %}
+            <div class="desktop-table-wrap partage-nfs-client-known-wrap-v4" data-yoleo-context-zone="nfs-client-known-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Serveur / export</th>
+                            <th>Point local</th>
+                            <th>État</th>
+                            <th>Auto</th>
+                            <th>Aperçu</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for n in mounts %}
+                        <tr data-nfs-client-section="{{ n.section|e }}">
+                            <td>
+                                <div class="code-text">{{ n.machine }}:{{ n.export }}</div>
+                                <div class="tiny">{{ n.options }}</div>
+                            </td>
+                            <td><span class="path-pill"><span>{{ n.host_path }}</span></span></td>
+                            <td data-nfs-client-state="{{ n.section|e }}">
+                                {% if n.mounted %}
+                                    <span class="badge badge-ok">Monté</span>
+                                {% elif n.raw_mounted %}
+                                    <span class="badge badge-warn">Inaccessible</span><div class="tiny">Serveur éteint ou NFS bloqué</div>
+                                {% else %}
+                                    <span class="badge badge-no">Non monté</span>
+                                {% endif %}
+                            </td>
+                            <td data-nfs-client-auto="{{ n.section|e }}">
+                                {% if n.auto_mount %}<span class="badge badge-ok">Auto</span>{% else %}<span class="badge badge-muted">Manuel</span>{% endif %}
+                            </td>
+                            <td data-nfs-client-count="{{ n.section|e }}"><div class="tiny">{{ n.count if n.count != '' else '—' }} élément(s)</div></td>
+                            <td data-nfs-client-actions="{{ n.section|e }}">
+                                <div class="actions-cell partage-nfs-client-row-actions-v4">
+                                    {% if n.mounted %}
+                                        <form method="POST" action="{{ url_for('partage_bp.nfs_client_unmount_route') }}">
+                                            <input type="hidden" name="section" value="{{ n.section }}">
+                                            <button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" type="submit">⏏ Démonter</button>
+                                        </form>
+                                    {% else %}
+                                        <form method="POST" action="{{ url_for('partage_bp.nfs_client_mount_known_route') }}">
+                                            <input type="hidden" name="section" value="{{ n.section }}">
+                                            <button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" type="submit">🔌 Monter</button>
+                                        </form>
+                                    {% endif %}
+                                    <form method="POST" action="{{ url_for('partage_bp.nfs_client_toggle_auto_route') }}">
+                                        <input type="hidden" name="section" value="{{ n.section }}">
+                                        {% if not n.auto_mount %}<input type="hidden" name="auto_mount" value="1">{% endif %}
+                                        <button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" type="submit">{{ 'Auto off' if n.auto_mount else 'Auto on' }}</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('partage_bp.nfs_client_delete_route') }}">
+                                        <input type="hidden" name="section" value="{{ n.section }}">
+                                        <button class="yoleo-btn yoleo-btn-mini yoleo-btn-red" type="submit">🗑</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </section>
+
+</div>
+
+<script>
+(function () {
+    const apiUrl = "{{ url_for('partage_bp.api_nfs_client') }}";
+    const mountKnownUrl = "{{ url_for('partage_bp.nfs_client_mount_known_route') }}";
+    const unmountUrl = "{{ url_for('partage_bp.nfs_client_unmount_route') }}";
+    const toggleAutoUrl = "{{ url_for('partage_bp.nfs_client_toggle_auto_route') }}";
+    const deleteUrl = "{{ url_for('partage_bp.nfs_client_delete_route') }}";
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    function stateHtml(mount) {
+        const job = mount && mount.job ? mount.job : {};
+        if (job.state === 'queued') return '<span class="badge badge-warn">En attente</span><div class="tiny">' + escapeHtml(job.message || 'File de montage') + '</div>';
+        if (job.state === 'running') return '<span class="badge badge-warn">Montage...</span><div class="tiny">' + escapeHtml(job.message || 'En cours') + '</div>';
+        if (mount && mount.mounted) return '<span class="badge badge-ok">Monté</span>';
+        if (mount && mount.raw_mounted && !mount.reachable) return '<span class="badge badge-warn">Inaccessible</span><div class="tiny">Serveur éteint ou NFS bloqué</div>';
+        if (job.state === 'failed') return '<span class="badge badge-no">Montage impossible</span><div class="tiny">' + escapeHtml(job.message || 'Voir les logs') + '</div>';
+        return '<span class="badge badge-no">Non monté</span>';
+    }
+
+    function hidden(name, value) {
+        return '<input type="hidden" name="' + escapeHtml(name) + '" value="' + escapeHtml(value) + '">';
+    }
+
+    function postForm(action, inner) {
+        return '<form method="POST" action="' + escapeHtml(action) + '">' + inner + '</form>';
+    }
+
+    function actionHtml(mount) {
+        const section = mount && mount.section ? mount.section : '';
+        const job = mount && mount.job ? mount.job : {};
+        const busy = job.state === 'queued' || job.state === 'running';
+        const disabled = busy ? ' disabled' : '';
+        const main = mount && mount.mounted
+            ? postForm(unmountUrl, hidden('section', section) + '<button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" type="submit"' + disabled + '>&#x23CF; Démonter</button>')
+            : postForm(mountKnownUrl, hidden('section', section) + '<button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary" type="submit"' + disabled + '>&#x1F50C; Monter</button>');
+        const auto = postForm(
+            toggleAutoUrl,
+            hidden('section', section) +
+            (!mount.auto_mount ? hidden('auto_mount', '1') : '') +
+            '<button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" type="submit"' + disabled + '>' + (mount.auto_mount ? 'Auto off' : 'Auto on') + '</button>'
+        );
+        const remove = postForm(deleteUrl, hidden('section', section) + '<button class="yoleo-btn yoleo-btn-mini yoleo-btn-red" type="submit"' + disabled + '>&#x1F5D1;</button>');
+        return '<div class="actions-cell partage-nfs-client-row-actions-v4">' + main + auto + remove + '</div>';
+    }
+
+    function applyNfsClientPayload(data) {
+        const mounts = Array.isArray(data.mounts) ? data.mounts : [];
+        const seen = new Set();
+        mounts.forEach(mount => {
+            const section = mount.section || '';
+            seen.add(section);
+            const stateCell = document.querySelector('[data-nfs-client-state="' + CSS.escape(section) + '"]');
+            if (stateCell) stateCell.innerHTML = stateHtml(mount);
+            const countCell = document.querySelector('[data-nfs-client-count="' + CSS.escape(section) + '"]');
+            if (countCell) countCell.innerHTML = '<div class="tiny">' + escapeHtml(mount.count !== '' ? mount.count : '-') + ' élément(s)</div>';
+            const autoCell = document.querySelector('[data-nfs-client-auto="' + CSS.escape(section) + '"]');
+            if (autoCell) autoCell.innerHTML = mount.auto_mount ? '<span class="badge badge-ok">Auto</span>' : '<span class="badge badge-muted">Manuel</span>';
+            const actionsCell = document.querySelector('[data-nfs-client-actions="' + CSS.escape(section) + '"]');
+            if (actionsCell) actionsCell.innerHTML = actionHtml(mount);
+        });
+        document.querySelectorAll('[data-nfs-client-section]').forEach(row => {
+            const section = row.getAttribute('data-nfs-client-section') || '';
+            if (section && !seen.has(section)) row.remove();
+        });
+        const knownBox = document.getElementById('nfsClientKnownCount');
+        if (knownBox) knownBox.textContent = String(mounts.length);
+        const mountedCount = mounts.filter(m => m && m.mounted).length;
+        const mountedBox = document.getElementById('nfsClientMountedCount');
+        if (mountedBox) mountedBox.textContent = String(mountedCount);
+        const label = document.getElementById('nfsClientLiveStatus');
+        if (label) label.textContent = (data.refresh_running ? 'Rafraîchissement en cours - ' : 'Dernier contrôle : ') + (data.updated_at || '-');
+    }
+
+    window.refreshNfsClientStatus = function refreshNfsClientStatus() {
+        fetch(apiUrl + '?_=' + Date.now(), { cache: 'no-store' })
+            .then(r => r.json())
+            .then(applyNfsClientPayload)
+            .catch(() => {});
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('submit', function (event) {
+            const form = event.target;
+            if (!form || !form.matches('#tab-nfs-client form[method="POST"]')) return;
+            event.preventDefault();
+            Array.from(form.querySelectorAll('button')).forEach(button => { button.disabled = true; });
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'fetch'
+                },
+                cache: 'no-store'
+            })
+                .then(r => r.json())
+                .then(applyNfsClientPayload)
+                .catch(() => {})
+                .finally(() => { window.setTimeout(window.refreshNfsClientStatus, 500); });
+        });
+        window.refreshNfsClientStatus();
+        window.setInterval(window.refreshNfsClientStatus, 2500);
+    });
+})();
+</script>
+{% endblock %}

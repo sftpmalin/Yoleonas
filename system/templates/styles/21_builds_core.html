@@ -1,0 +1,125 @@
+    /* ============================================================
+       Build module migrated to single template: build.html
+       Uses generic .card, .yoleo-btn, .topbar, .toolbar, .badge and .yoleo-subnav.
+       Only Build-specific layout/table/runtime helpers live here.
+       ============================================================ */
+    .builds-page { padding:16px 18px 34px; display:flex; justify-content:center; }
+    .builds-panel { width:100%; max-width:1560px; }
+    .builds-page .yoleo-subnav { margin-bottom:14px; }
+    .builds-page .tab-panel { display:block; padding:0; }
+    .builds-page .title-block h1,
+    .builds-page .title-block h2 { margin:0; color:#fff; letter-spacing:-.2px; }
+    .builds-page .title-block h1 { font-size:24px; }
+    .builds-page .title-block h2 { font-size:21px; }
+    .builds-page .subtitle { margin-top:6px; color:#99acc2; line-height:1.45; }
+    .flash-stack { margin-bottom:14px; display:grid; gap:8px; }
+    .flash-msg { padding:11px 13px; border-radius:12px; border:1px solid #32455f; background:#111a27; white-space:pre-wrap; }
+    .flash-msg.success { color:#b7ffbf; border-color:rgba(76,175,80,.45); background:rgba(76,175,80,.13); }
+    .flash-msg.error { color:#ffd5d5; border-color:rgba(244,67,54,.45); background:rgba(244,67,54,.13); }
+    .builds-page .summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(105px,1fr)); gap:8px; margin-bottom:14px; }
+    .builds-page .summary-card { background:#0e1723; border:1px solid #25364b; border-radius:13px; padding:10px 12px; }
+    .builds-page .summary-label { color:#8ba0b8; font-size:10px; text-transform:uppercase; letter-spacing:.45px; }
+    .builds-page .summary-value { color:#fff; font-size:21px; font-weight:900; margin-top:4px; }
+    .options-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+    .options-card,
+    .system-action-card { background:#0e1723; border:1px solid #25364b; border-radius:14px; padding:13px; }
+    .options-title,
+    .system-action-title { color:#fff; font-weight:900; margin-bottom:10px; }
+    .field-grid { display:grid; gap:10px; }
+    .field-row { display:grid; gap:6px; }
+    .field-row label,
+    .modal-label { color:#a8eaff; font-size:11px; text-transform:uppercase; letter-spacing:.35px; font-weight:900; }
+    .field-row .text-input,
+    .field-row .select-input { width:100%; font-family:Consolas, Monaco, monospace; }
+    .check-row { display:flex; align-items:center; gap:8px; color:#dbe7f3; font-weight:800; }
+    .check-row input { width:18px; height:18px; accent-color:#1AEBFF; }
+    .path-input-row { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+    .builds-page .path-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:8px; margin-bottom:14px; }
+    .builds-page .path-pill { min-width:0; display:flex; gap:8px; align-items:center; padding:8px 10px; border-radius:12px; background:rgba(0,0,0,.22); border:1px solid #26364b; color:#cfe1f5; font-family:Consolas, Monaco, monospace; font-size:12px; }
+    .builds-page .path-pill b { color:#72eaff; white-space:nowrap; }
+    .builds-page .path-pill span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .builds-page .table-tools { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .builds-page .tar-registry-toolbar,
+    .builds-page .database-toolbar { flex-wrap:nowrap; gap:14px; }
+    .builds-page .tar-registry-search,
+    .builds-page .database-search { min-width:0; display:flex; align-items:center; gap:8px; flex:1 1 auto; }
+    .builds-page .tar-registry-search label,
+    .builds-page .database-search label { color:#cfe1f5; font-weight:800; white-space:nowrap; }
+    .builds-page .tar-registry-search .search-input,
+    .builds-page .database-search .search-input { width:360px; min-width:260px; max-width:42vw; flex:0 1 360px; }
+    .builds-page .tar-registry-toolbar > .yoleo-btn,
+    .builds-page .database-toolbar > .yoleo-btn { margin-left:auto; white-space:nowrap; }
+    .builds-page .build-title-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .builds-page #tab-builds_tar .topbar .build-tar-toolbar { flex-wrap:nowrap; }
+    .builds-page #tab-builds_tar .topbar .build-tar-toolbar .select-input { width:140px; min-width:140px; max-width:140px; flex:0 0 140px; }
+    .builds-page .table-wrap { border:1px solid #26364b; border-radius:14px; overflow:auto; background:#0c131e; }
+    .build-table { width:100%; min-width:980px; border-collapse:collapse; }
+    .build-table th { position:sticky; top:0; z-index:1; background:#1a2636; color:#a8eaff; text-transform:uppercase; letter-spacing:.35px; font-size:10px; text-align:left; padding:10px 9px; border-bottom:1px solid #30435b; }
+    .build-table td { padding:9px; border-bottom:1px solid #1d2c3f; vertical-align:middle; }
+    .build-table tr:last-child td { border-bottom:0; }
+    .build-table tbody tr:hover td { background:rgba(255,255,255,.025); }
+    .compact-table { min-width:860px; }
+    .db-table { min-width:1220px; table-layout:fixed; }
+    .db-scroll-top { height:16px; overflow-x:auto; overflow-y:hidden; border:1px solid #26364b; border-bottom:0; border-radius:14px 14px 0 0; background:#0c131e; }
+    .db-scroll-top-inner { height:1px; min-width:1220px; }
+    .db-table-wrap { border-radius:0 0 14px 14px; }
+    .db-table .text-input,
+    .db-table .select-input { width:100%; font-family:Consolas, Monaco, monospace; font-size:11px; padding:7px 8px; border-radius:8px; }
+    .db-table th,
+    .db-table td { padding:7px; }
+    .dock-cell { display:flex; gap:10px; align-items:center; min-width:0; }
+    .dock-icon,
+    .icon-placeholder { width:38px; height:38px; border-radius:10px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; }
+    .dock-icon { object-fit:contain; background:#fff; padding:4px; }
+    .icon-placeholder { background:rgba(26,235,255,.10); color:#9fefff; border:1px dashed rgba(26,235,255,.35); font-weight:900; }
+    .name-main { color:#fff; font-weight:900; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .name-sub,
+    .hint { color:#91a6bd; font-size:11px; margin-top:4px; line-height:1.35; word-break:break-word; }
+    .tag-val { display:inline-flex; max-width:100%; font-family:Consolas, Monaco, monospace; color:#dbe7f3; font-size:12px; background:rgba(0,0,0,.28); padding:5px 8px; border-radius:999px; border:1px solid #2b394d; word-break:break-word; }
+    .arch-row,
+    .actions-cell { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+    .actions-cell { justify-content:flex-end; }
+    .actions-cell.db-actions-cell { justify-content:center; gap:4px; flex-wrap:nowrap; white-space:nowrap; }
+    .actions-cell.db-actions-cell .yoleo-btn-icon { width:30px; min-width:30px; height:30px; padding:0; flex:0 0 30px; }
+    .empty-state { text-align:center; color:#91a3b7; border:1px dashed #2b394d; border-radius:14px; padding:24px 12px; }
+    #terminal-output { width:100%; min-height:580px; background:#05080d; border:1px solid #243246; color:#d9e7f5; padding:12px; border-radius:14px; resize:vertical; font-family:Consolas, Monaco, monospace; line-height:1.42; white-space:pre; }
+    .progress-box { margin-top:12px; background:#0c121b; border:1px solid #2b394d; border-radius:14px; padding:12px; }
+    .progress-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:9px; }
+    .progress-title { color:#cfe6ff; font-weight:900; }
+    .progress-value { color:#1AEBFF; font-weight:900; min-width:56px; text-align:right; }
+    .progress-track { width:100%; height:13px; border-radius:999px; overflow:hidden; background:#06090e; border:1px solid #263342; }
+    .progress-fill { height:100%; width:0%; background:linear-gradient(90deg,#1AEBFF 0%,#14c5d6 100%); transition:width .18s linear; }
+    
+
+    .builds-page .registry-inline-flash {
+        margin-bottom: 12px;
+        text-align: center;
+        transition: opacity .25s ease, transform .25s ease;
+    }
+    .builds-page .registry-inline-flash.is-hiding {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+
+/* Build registre : flash Ajax flottant, sans saut de mise en page. */
+.builds-page .registry-inline-flash:not([hidden]) {
+    position: fixed !important;
+    top: 128px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 2147482300 !important;
+    width: min(860px, calc(100vw - 34px)) !important;
+    margin: 0 !important;
+    box-shadow: 0 18px 48px rgba(0,0,0,.38) !important;
+    pointer-events: none !important;
+}
+.builds-page .registry-inline-flash.error:not([hidden]) {
+    pointer-events: auto !important;
+}
+@media (max-width: 720px) {
+    .builds-page .registry-inline-flash:not([hidden]) {
+        top: 78px !important;
+        width: calc(100vw - 20px) !important;
+    }
+}

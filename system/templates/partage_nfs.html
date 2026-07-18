@@ -1,0 +1,95 @@
+{% extends "partage_base.html" %}
+
+{% block title %}NFS server - Yoleo{% endblock %}
+{% block page_title %}NFS server{% endblock %}
+{% block page_subtitle %}Partages enregistrés dans le conf Yoleo en haut, exports réellement injectés dans Linux en bas{% endblock %}
+
+{% block route_content %}
+<div id="tab-nfs" class="tab-panel active">
+                <section class="card partage-nfs-server-hero-v6 partage-nfs-server-hero-v7">
+                    <div class="topbar partage-nfs-server-top-v6">
+                        <div class="summary-grid partage-nfs-summary-v4 partage-nfs-summary-in-header-v6" id="nfsSummaryCards">
+                            <div class="summary-card partage-nfs-summary-file-v4">
+                                <div class="summary-label">Fichier conf NFS</div>
+                                <div class="summary-value" id="nfsExportsFileValue" title="{{ state.nfs.exports_file }}">{{ state.nfs.exports_file }}</div>
+                            </div>
+                            <div class="summary-card partage-nfs-summary-count-v4">
+                                <div class="summary-label">Exports configurés</div>
+                                <div class="summary-value" id="nfsConfiguredCount">{{ state.nfs.entries|length }}</div>
+                            </div>
+                            <div class="summary-card partage-nfs-summary-count-v4">
+                                <div class="summary-label">Exports actifs</div>
+                                <div class="summary-value" id="nfsActiveCount">{{ state.nfs.active_exports|length }}</div>
+                            </div>
+                            <div class="summary-card partage-nfs-summary-client-v4">
+                                <div class="summary-label">Client défaut</div>
+                                <div class="summary-value" id="nfsDefaultClientValue">{{ state.nfs.default_client }}</div>
+                            </div>
+                            <div class="partage-nfs-services-inline-v4" id="nfsServicesSummary">
+                                {% for svc in state.services %}
+                                {% if 'nfs' in svc.name %}
+                                <div class="summary-card partage-nfs-service-mini-v4">
+                                    <div class="summary-label">{{ svc.name }}</div>
+                                    <div class="summary-value partage-service-badges-compact-v4">
+                                        {% if svc.active == 'active' %}<span class="badge badge-ok">active</span>{% elif svc.active in ['inactive','failed'] %}<span class="badge badge-no">{{ svc.active }}</span>{% else %}<span class="badge badge-warn">{{ svc.active }}</span>{% endif %}
+                                        <span class="badge badge-info">{{ svc.enabled }}</span>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card partage-nfs-exports-auto-v7">
+                    <div class="table-tools partage-nfs-exports-tools-v7">
+                        <div class="title-block">
+                            <h2>Exports NFS permanents</h2>
+                            <div class="subtitle">Partages enregistrés dans le conf Yoleo. Droit <b>rw</b> ou <b>ro</b>. NFS reste manuel : les droits Linux ne sont pas modifiés automatiquement.</div>
+                        </div>
+                        <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="addNfsRow()">➕ Ajouter export</button>
+                    </div>
+                    <div class="table-wrap partage-nfs-exports-table-wrap-v7" data-yoleo-context-zone="nfs-exports-table">
+                        <table class="share-table" id="nfsTable">
+                            <thead>
+                                <tr>
+                                    <th class="nfs-col-path">Chemin local</th><th class="nfs-col-client">Client autorisé</th><th class="nfs-col-access">Droit</th><th class="nfs-col-options">Options avancées</th><th class="nfs-col-state">État</th><th class="nfs-col-actions">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="nfsEntriesBody">
+                            {% for entry in state.nfs.entries %}
+                                <tr data-existing-nfs="1" tabindex="0">
+                                    <td><span class="path-pill" title="{{ entry.path }}"><span>{{ entry.path }}</span></span><input type="hidden" data-nfs="path" value="{{ entry.path }}"></td>
+                                    <td><span class="readonly-cell">{{ entry.client }}</span><input type="hidden" data-nfs="client" value="{{ entry.client }}"></td>
+                                    <td><span class="badge badge-info">{{ entry.access }}</span><input type="hidden" data-nfs="access" value="{{ entry.access }}"></td>
+                                    <td><span class="path-pill" title="{{ entry.advanced_options }}"><span>{{ entry.advanced_options }}</span></span><input type="hidden" data-nfs="advanced_options" value="{{ entry.advanced_options }}"></td>
+                                    <td data-nfs-status-cell>{% if entry.active %}<span class="badge badge-ok">actif</span>{% else %}<span class="badge badge-warn">pas actif</span>{% endif %} {% if entry.exists %}<span class="badge badge-ok">dossier OK</span>{% else %}<span class="badge badge-no">dossier absent</span>{% endif %}</td>
+                                    <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Modifier" onclick="editNfsRow(this)">✏️</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="removeNfsRow(this)">🗑</button></div></td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="title-block">
+                        <h2>Exports actifs vus par exportfs</h2>
+                        <div class="subtitle">Vue réelle injectée dans Linux/exportfs après reload.</div>
+                    </div>
+                    <div class="table-wrap partage-nfs-active-wrap-v4" data-yoleo-context-zone="nfs-active-table">
+                        <table class="share-table partage-nfs-active-table-v4" id="nfsActiveExportsTable">
+                            <thead><tr><th>Chemin</th><th>Client</th><th>Options actives</th></tr></thead>
+                            <tbody id="nfsActiveExportsBody">
+                            {% for entry in state.nfs.active_exports %}
+                                <tr><td><span class="path-pill"><span>{{ entry.path }}</span></span></td><td>{{ entry.client }}</td><td class="partage-nfs-options-active-cell-v4"><span class="partage-nfs-options-active-v4" title="{{ entry.options }}">{{ entry.options }}</span></td></tr>
+                            {% else %}
+                                <tr><td colspan="3">Aucun export actif visible ou exportfs indisponible.</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+{% endblock %}

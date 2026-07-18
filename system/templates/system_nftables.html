@@ -1,0 +1,253 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<section id="tab-nftables" class="system-tab-panel active no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+    <div class="mini-page nft-fw-page" id="systemNftables">
+        <div class="mini-panel nft-fw-panel">
+            <section class="card nft-fw-status-card">
+                <div class="action-message nft-fw-message nft-fw-message-top" id="nft-message" aria-live="polite"></div>
+
+                <div class="nft-fw-topline">
+                    <div class="summary-card nft-fw-top-card">
+                        <div class="summary-label">nftables</div>
+                        <div class="summary-value small"><span class="nft-fw-badge" id="nft-installed">—</span></div>
+                    </div>
+                    <div class="summary-card nft-fw-top-card">
+                        <div class="summary-label">Service</div>
+                        <div class="summary-value small"><span class="nft-fw-badge" id="nft-active">—</span></div>
+                    </div>
+                    <div class="summary-card nft-fw-top-card">
+                        <div class="summary-label">Démarrage auto</div>
+                        <div class="summary-value small"><span class="nft-fw-badge" id="nft-enabled">—</span></div>
+                    </div>
+                    <div class="path-pill nft-fw-port-pill">
+                        <b>Port Yoleo détecté</b>
+                        <span id="nft-yoleo-ports">Chargement...</span>
+                    </div>
+                </div>
+            </section>
+
+            <div class="summary-grid nft-fw-info-grid">
+                <div class="summary-card nft-fw-info-box">
+                    <div class="summary-label">Entrée</div>
+                    <div class="summary-value small">Refusée par défaut sauf les ports autorisés ci-dessous.</div>
+                </div>
+                <div class="summary-card nft-fw-info-box">
+                    <div class="summary-label">Sortie</div>
+                    <div class="summary-value small">Autorisée par défaut pour APT, Docker, DNS, NTP, certificats et mises à jour.</div>
+                </div>
+                <div class="summary-card nft-fw-info-box">
+                    <div class="summary-label">Anti-coupure</div>
+                    <div class="summary-value small">Yoleo rajoute automatiquement SSH et le port HTTP courant de l’interface.</div>
+                </div>
+            </div>
+
+            <section class="card nft-fw-rules-card">
+                <div class="card-head nft-fw-card-head">
+                    <div>
+                        <h2 class="card-title">Ports autorisés</h2>
+                        <div class="hint">Tout ce qui n’est pas dans cette liste est refusé en entrée.</div>
+                    </div>
+                </div>
+                <div class="table-wrap nft-fw-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                    <table class="mini-table nft-fw-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                        <thead>
+                            <tr>
+                                <th>Début</th>
+                                <th>Fin</th>
+                                <th>Protocole</th>
+                                <th>Service</th>
+                                <th>Origine</th>
+                                <th class="col-actions">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nft-rules-body">
+                            <tr><td colspan="6" class="nft-fw-empty">Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+</section>
+
+<div class="nft-fw-modal-backdrop" id="nft-add-modal" aria-hidden="true">
+    <div class="nft-fw-modal" role="dialog" aria-modal="true" aria-labelledby="nft-add-title">
+        <div class="nft-fw-modal-head">
+            <div>
+                <h3 id="nft-add-title">Ajouter un port ou une plage</h3>
+                <div class="hint">Ajoute une règle dans la liste blanche du pare-feu.</div>
+            </div>
+            <button class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" type="button" onclick="nftCloseAddModal()">✕</button>
+        </div>
+        <div class="nft-fw-modal-body">
+            <label>Plage début
+                <input id="nft-add-start" inputmode="numeric" placeholder="81">
+            </label>
+            <label>Plage fin
+                <input id="nft-add-end" inputmode="numeric" placeholder="81">
+            </label>
+            <label>Protocole
+                <select id="nft-add-proto">
+                    <option value="both">TCP + UDP</option>
+                    <option value="tcp">TCP</option>
+                    <option value="udp">UDP</option>
+                </select>
+            </label>
+            <label>Libellé
+                <input id="nft-add-label" placeholder="Service personnalisé">
+            </label>
+        </div>
+        <div class="nft-fw-modal-actions">
+            <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="nftCloseAddModal()">Annuler</button>
+            <button class="yoleo-btn yoleo-btn-primary" type="button" onclick="nftAddRule()">Ajouter</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let nftBusy = false;
+let nftMessageTimer = null;
+
+function nftSetMessage(text, ok = true, autoHideOk = true) {
+    const el = document.getElementById('nft-message');
+    if (!el) return;
+
+    if (nftMessageTimer) {
+        clearTimeout(nftMessageTimer);
+        nftMessageTimer = null;
+    }
+
+    el.textContent = text || '';
+    el.classList.toggle('nft-fw-message-ok', !!ok);
+    el.classList.toggle('nft-fw-message-error', !ok);
+
+    if (text && ok && autoHideOk) {
+        nftMessageTimer = setTimeout(() => {
+            el.textContent = '';
+            el.classList.remove('nft-fw-message-ok', 'nft-fw-message-error');
+            nftMessageTimer = null;
+        }, 780);
+    }
+}
+
+function nftSetBadge(id, text, state) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('is-ok', 'is-warn', 'is-bad');
+    if (state) el.classList.add(state);
+}
+
+function nftProtoLabel(proto) {
+    if (proto === 'both') return 'TCP + UDP';
+    return (proto || 'tcp').toUpperCase();
+}
+
+function nftRuleRow(rule) {
+    const tr = document.createElement('tr');
+    const auto = rule.auto ? 'Classique' : 'Manuel';
+    tr.innerHTML = `
+        <td>${rule.start || '—'}</td>
+        <td>${rule.end || rule.start || '—'}</td>
+        <td>${nftProtoLabel(rule.proto)}</td>
+        <td>${nftEscape(rule.label || 'Port autorisé')}</td>
+        <td><span class="nft-fw-pill ${rule.auto ? 'is-auto' : 'is-manual'}">${auto}</span></td>
+        <td class="col-actions"><button class="yoleo-btn yoleo-btn-small yoleo-btn-red" type="button" onclick="nftDeleteRule('${rule.id}')">Supprimer</button></td>
+    `;
+    return tr;
+}
+
+function nftEscape(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, function (ch) {
+        return ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'}[ch]);
+    });
+}
+
+function nftRender(data) {
+    nftSetBadge('nft-installed', data.installed ? 'installé' : 'absent', data.installed ? 'is-ok' : 'is-bad');
+    nftSetBadge('nft-active', data.active || '—', data.active === 'active' ? 'is-ok' : 'is-warn');
+    nftSetBadge('nft-enabled', data.enabled || '—', data.enabled === 'enabled' ? 'is-ok' : 'is-warn');
+
+    const yoleoPorts = document.getElementById('nft-yoleo-ports');
+    if (yoleoPorts) {
+        yoleoPorts.textContent = (data.current_ports || []).join(', ') || '—';
+    }
+
+    const body = document.getElementById('nft-rules-body');
+    if (!body) return;
+    body.innerHTML = '';
+    const rules = data.rules || [];
+    if (!rules.length) {
+        body.innerHTML = '<tr><td colspan="6" class="nft-fw-empty">Aucun port autorisé.</td></tr>';
+        return;
+    }
+    rules.forEach(rule => body.appendChild(nftRuleRow(rule)));
+}
+
+async function nftLoadStatus() {
+    try {
+        const response = await fetch('/system/api/nftables/status', {cache: 'no-store'});
+        const data = await response.json();
+        nftRender(data);
+    } catch (e) {
+        nftSetMessage('Erreur lecture état nftables.', false);
+    }
+}
+
+async function nftAction(action, extra = {}) {
+    if (nftBusy) return;
+    nftBusy = true;
+    nftSetMessage('Action en cours...', true, false);
+    try {
+        const response = await fetch('/system/api/nftables/action', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action, ...extra})
+        });
+        const data = await response.json();
+        nftRender(data);
+        nftSetMessage(data.message || (data.ok ? 'OK' : 'Erreur'), !!data.ok);
+    } catch (e) {
+        nftSetMessage('Erreur action nftables.', false);
+    } finally {
+        nftBusy = false;
+    }
+}
+
+function nftOpenAddModal() {
+    document.getElementById('nft-add-start').value = '';
+    document.getElementById('nft-add-end').value = '';
+    document.getElementById('nft-add-label').value = '';
+    document.getElementById('nft-add-proto').value = 'both';
+    const modal = document.getElementById('nft-add-modal');
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => document.getElementById('nft-add-start').focus(), 20);
+}
+
+function nftCloseAddModal() {
+    const modal = document.getElementById('nft-add-modal');
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+function nftAddRule() {
+    const start = document.getElementById('nft-add-start').value.trim();
+    const end = document.getElementById('nft-add-end').value.trim() || start;
+    const proto = document.getElementById('nft-add-proto').value;
+    const label = document.getElementById('nft-add-label').value.trim() || 'Port personnalisé';
+    nftCloseAddModal();
+    nftAction('add', {start, end, proto, label});
+}
+
+function nftDeleteRule(id) {
+    nftAction('delete', {id});
+}
+
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') nftCloseAddModal();
+});
+document.addEventListener('DOMContentLoaded', nftLoadStatus);
+</script>
+{% endblock %}

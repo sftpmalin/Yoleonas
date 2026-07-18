@@ -1,0 +1,617 @@
+{% extends "menu.html" %}
+
+{% block title %}Accueil - Yoleo{% endblock %}
+{% block page_title %}Tableau de bord NAS{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+
+{% macro detail_pill(href, label='détail') -%}
+<a class="nas-detail-pill" href="{{ href }}">{{ label }}</a>
+{%- endmacro %}
+
+{% macro terminal_pill(kind, label='detail') -%}
+<button type="button" class="nas-detail-pill nas-terminal-pill" data-gpu-terminal-button="{{ kind }}">{{ label }}</button>
+{%- endmacro %}
+
+{% macro home_block(block_key) -%}
+{% set key = block_key|lower %}
+{% if key == 'show_time' and home_config.get(key, '1')|int %}
+<div class="nas-stat nas-time-tile nas-block nas-block-time">
+    <div class="nas-clock" id="home-clock">{{ overview.time }}</div>
+    <div class="nas-date" id="home-date">{{ overview.date }}</div>
+</div>
+{% elif key == 'show_cpu' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-block nas-block-cpu nas-clickable-card" data-home-href="/system/processus">
+    <h2 class="nas-card-title"><span>Processeur</span>{{ detail_pill('/system/processus') }}</h2>
+    <div class="nas-gauge-card">
+        <div class="nas-gauge-wrap">
+            <svg class="nas-gauge-svg" viewBox="0 0 112 112">
+                <circle class="nas-gauge-bg" cx="56" cy="56" r="50"></circle>
+                <circle id="home-cpu-fill" class="nas-gauge-fill" cx="56" cy="56" r="50"></circle>
+            </svg>
+            <div class="nas-gauge-value">
+                <div id="home-cpu" class="nas-gauge-number">{{ overview.cpu.percent|default(0)|round|int }}%</div>
+                <div id="home-cpu-temp" class="nas-gauge-sub">CPU</div>
+            </div>
+        </div>
+        <div class="nas-meta-list">
+            <div class="nas-meta-row"><span>Load 1m</span><b id="home-load1">{{ overview.cpu.load1|default('—') }}</b></div>
+            <div class="nas-meta-row"><span>Load 5m</span><b id="home-load5">{{ overview.cpu.load5|default('—') }}</b></div>
+            <div class="nas-meta-row"><span>Load 15m</span><b id="home-load15">{{ overview.cpu.load15|default('—') }}</b></div>
+        </div>
+    </div>
+</div>
+{% elif key == 'show_ram' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-block nas-block-ram nas-clickable-card" data-home-href="/system/services">
+    <h2 class="nas-card-title"><span>Mémoire</span>{{ detail_pill('/system/services') }}</h2>
+    <div class="nas-gauge-card">
+        <div class="nas-gauge-wrap">
+            <svg class="nas-gauge-svg" viewBox="0 0 112 112">
+                <circle class="nas-gauge-bg" cx="56" cy="56" r="50"></circle>
+                <circle id="home-ram-fill" class="nas-gauge-fill ram" cx="56" cy="56" r="50"></circle>
+            </svg>
+            <div class="nas-gauge-value">
+                <div id="home-ram" class="nas-gauge-number">{{ overview.ram.percent|default(0)|round|int }}%</div>
+                <div class="nas-gauge-sub">RAM</div>
+            </div>
+        </div>
+        <div class="nas-meta-list">
+            <div class="nas-meta-row"><span>Utilisée</span><b id="home-ram-used">{{ overview.ram.used|default('—') }}</b></div>
+            <div class="nas-meta-row"><span>Total</span><b id="home-ram-total">{{ overview.ram.total|default('—') }}</b></div>
+            <div class="nas-meta-row"><span>Processus</span><b id="home-processes">{{ overview.processes.total|default('—') }}</b></div>
+        </div>
+    </div>
+</div>
+{% elif key == 'show_docker_total' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-block nas-block-docker-total nas-clickable-card" data-home-href="/docker/containers">
+    <h2 class="nas-card-title"><span>Docker</span><b class="nas-title-status" id="home-docker-engine">{{ 'OK' if overview.docker.available else 'N/A' }}</b>{{ detail_pill('/docker/containers') }}</h2>
+    <div class="nas-meta-list">
+        <div class="nas-meta-row"><span>Total Docker</span><b id="home-docker-total">{{ overview.docker.total|default(0) }}</b></div>
+        <div class="nas-meta-row"><span>Total arrêté</span><b id="home-docker-stopped">{{ (overview.docker.total|default(0)) - (overview.docker.running|default(0)) }}</b></div>
+        <div class="nas-meta-row"><span>Total exécution</span><b id="home-docker-running">{{ overview.docker.running|default(0) }}</b></div>
+    </div>
+</div>
+{% elif key == 'show_docker_running' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-block nas-block-vm-summary nas-clickable-card" data-home-href="/vms/main">
+    <h2 class="nas-card-title"><span>VM</span>{{ detail_pill('/vms/main') }}</h2>
+    <div class="nas-meta-list">
+        <div class="nas-meta-row"><span>Total VM</span><b id="home-vm-total">{{ overview.vms.total|default(0) }}</b></div>
+        <div class="nas-meta-row"><span>Total arrêté</span><b id="home-vm-stopped">{{ overview.vms.stopped|default(0) }}</b></div>
+        <div class="nas-meta-row"><span>Total exécution</span><b id="home-vm-running">{{ overview.vms.running|default(0) }}</b></div>
+    </div>
+</div>
+{% elif key == 'show_build' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-block nas-block-build nas-clickable-card" data-home-href="/build/main">
+    <h2 class="nas-card-title"><span>Build</span>{{ detail_pill('/build/main') }}</h2>
+    <div class="nas-tile-kpi" id="home-build-label">{{ overview.build.label|default('Cache vide') }}</div>
+    <div class="nas-stat-sub" id="home-build-sub">{{ overview.build.total|default(0) }} entrees · {{ overview.build.projects|default(0) }} projets</div>
+    <div class="nas-meta-list nas-build-detail">
+        <div class="nas-meta-row"><span>A builder</span><b id="home-build-needed">{{ overview.build.to_build|default(0) }}</b></div>
+        <div class="nas-meta-row"><span>A envoyer</span><b id="home-build-push">{{ overview.build.to_push|default(0) }}</b></div>
+        <div class="nas-meta-row"><span>Base</span><b id="home-build-meta">{{ overview.build.meta_missing|default(0) }}</b></div>
+    </div>
+</div>
+{% elif key == 'show_storage' and home_config.get(key, '1')|int %}
+<div class="nas-stat nas-block nas-block-storage nas-clickable-card" data-home-href="/disk/main">
+    <div class="nas-stat-label nas-label-with-detail"><span>Stockage</span>{{ detail_pill('/disk/main') }}</div>
+    <div class="nas-stat-value" id="home-disk">{{ overview.disk.percent|default(0)|round|int }}%</div>
+    <div class="nas-progress" aria-hidden="true"><span id="home-disk-bar" style="width: {{ overview.disk.percent|default(0)|round|int }}%"></span></div>
+    <div class="nas-stat-sub" id="home-disk-sub">{{ overview.disk.mount|default('/') }} · {{ overview.disk.used|default('—') }}/{{ overview.disk.total|default('—') }}</div>
+    <div class="nas-meta-list nas-storage-detail">
+        <div class="nas-meta-row"><span>Point</span><b id="home-disk-mount">{{ overview.disk.mount|default('/') }}</b></div>
+        <div class="nas-meta-row"><span>Utilisé</span><b id="home-disk-used">{{ overview.disk.used|default('—') }}</b></div>
+        <div class="nas-meta-row"><span>Total</span><b id="home-disk-total">{{ overview.disk.total|default('—') }}</b></div>
+    </div>
+</div>
+{% elif key == 'show_disk_mounts' and home_config.get(key, '0')|int %}
+{% set mount_usage_rows = overview.mounts.usage_rows|default([]) %}
+{% set mount_visible_rows = mount_usage_rows[:5] %}
+{% set mount_row_count = mount_visible_rows|length %}
+{% set mount_left_count = mount_row_count - 3 if mount_row_count > 3 else 0 %}
+{% set mount_left_rows = mount_visible_rows[:mount_left_count] %}
+{% set mount_right_rows = mount_visible_rows[mount_left_count:] %}
+<div class="nas-card nas-mount-card nas-block nas-block-mounts nas-clickable-card {% if mount_usage_rows %}nas-mount-card-has-usage{% endif %} {% if mount_row_count > 3 %}nas-mount-card-many-usage{% endif %}" data-home-href="{{ url_for('system_bp.system_personalization_disk_route') }}">
+    <h2 class="nas-card-title"><span>Montages disque</span></h2>
+    <div class="nas-mount-grid">
+        <div class="nas-mount-left">
+            <div class="nas-stat nas-mount-status nas-mount-status-{{ overview.mounts.state|default('empty') }}">
+                <div class="nas-stat-label">État</div>
+                <div class="nas-stat-value" id="home-mounts-state">{{ overview.mounts.label|default('Non configuré') }}</div>
+                <div class="nas-stat-sub" id="home-mounts-sub">
+                    <span id="home-mounts-count">{{ overview.mounts.ok|default(0) }}/{{ overview.mounts.total|default(0) }} OK</span>
+                    <a class="nas-detail-pill nas-mount-detail-link" href="{{ url_for('system_bp.system_personalization_disk_route') }}">détail</a>
+                </div>
+            </div>
+            <div class="nas-mount-usage-list nas-mount-usage-left" id="home-mounts-left-usage-list" {% if not mount_left_rows %}hidden{% endif %}>
+                {% for row in mount_left_rows %}
+                {% set mount_pct = row.percent|default(0)|round|int %}
+                <div class="nas-mount-usage-row nas-mount-usage-{{ row.status|default('unknown') }}">
+                    <div class="nas-mount-usage-head"><span>{{ row.label|default(row.path) }}</span><b>{{ mount_pct }}%</b></div>
+                    <div class="nas-progress nas-mount-usage-progress" aria-hidden="true"><span style="width: {{ mount_pct }}%"></span></div>
+                    <div class="nas-stat-sub">{{ row.used|default('—') }}/{{ row.total|default('—') }} · {{ row.path }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="nas-mount-usage-list nas-mount-usage-right" id="home-mounts-right-usage-list" {% if not mount_right_rows %}hidden{% endif %}>
+            {% for row in mount_right_rows %}
+            {% set mount_pct = row.percent|default(0)|round|int %}
+            <div class="nas-mount-usage-row nas-mount-usage-{{ row.status|default('unknown') }}">
+                <div class="nas-mount-usage-head"><span>{{ row.label|default(row.path) }}</span><b>{{ mount_pct }}%</b></div>
+                <div class="nas-progress nas-mount-usage-progress" aria-hidden="true"><span style="width: {{ mount_pct }}%"></span></div>
+                <div class="nas-stat-sub">{{ row.used|default('—') }}/{{ row.total|default('—') }} · {{ row.path }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% elif key == 'show_fans' and home_config.get(key, '0')|int %}
+<div class="nas-card nas-wide nas-fans-card nas-block nas-block-fans">
+    <h2 class="nas-card-title">Ventilation</h2>
+    <div class="nas-fans-head">
+        <div class="nas-fans-count">Fan count : <b id="home-fans-count">{{ overview.fans.count|default(0) }}</b></div>
+        <div class="nas-fans-source" id="home-fans-source">{{ overview.fans.source|default('') }}</div>
+    </div>
+    <div class="nas-fan-grid" id="home-fans-list">
+        {% for fan in overview.fans.rows|default([]) %}
+        <div class="nas-fan-tile nas-fan-{{ fan.status|default('unknown') }}">
+            <div class="nas-fan-name">{{ fan.label|default('FAN ' ~ loop.index) }}</div>
+            <div class="nas-fan-rpm">{{ fan.rpm_label|default('—') }}</div>
+            {% if fan.chip %}<div class="nas-fan-chip">{{ fan.chip }}</div>{% endif %}
+        </div>
+        {% else %}
+        <div class="nas-fan-empty">Aucun capteur ventilateur détecté par Linux.</div>
+        {% endfor %}
+    </div>
+</div>
+{% elif key == 'show_services' and home_config.get(key, '1')|int %}
+<div class="nas-stat nas-block nas-block-services nas-clickable-card" data-home-href="/system/services">
+    <div class="nas-stat-label nas-label-with-detail"><span>Services</span>{{ detail_pill('/system/services') }}</div>
+    <div class="nas-stat-value cyan" id="home-services">{{ overview.services.active|default(0) }} actifs</div>
+    <div class="nas-stat-sub" id="home-services-sub">{{ overview.services.total|default(0) }} services · {{ overview.services.failed|default(0) }} erreurs</div>
+</div>
+{% elif key == 'show_uptime' and home_config.get(key, '1')|int %}
+<div class="nas-stat nas-block nas-block-uptime">
+    <div class="nas-stat-label">Uptime</div>
+    <div class="nas-stat-value" id="home-uptime">{{ overview.uptime|default('—') }}</div>
+    <div class="nas-stat-sub" id="home-kernel">kernel {{ overview.host.kernel|default('—') }}</div>
+</div>
+{% elif key == 'show_nvidia_local' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-wide nas-block nas-block-gpu nas-block-nvidia-local nas-gpu-terminal-card" data-gpu-terminal="nvidia-local">
+    <h2 class="nas-card-title"><span>NVIDIA GPU (local)</span>{{ terminal_pill('nvidia-local') }}</h2>
+    <div class="nas-gpu-row" id="home-nvidia-local">
+        <div class="nas-gpu-gauge"><div class="nas-gpu-name">GPU</div><div class="nas-gauge-wrap"></div></div>
+        <div class="nas-gpu-gauge"><div class="nas-gpu-name">VRAM</div><div class="nas-gauge-wrap"></div></div>
+        <div class="nas-gpu-gauge"><div class="nas-gpu-name">Power</div><div class="nas-gauge-wrap"></div></div>
+    </div>
+</div>
+{% elif key == 'show_nvidia_ssh' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-wide nas-block nas-block-gpu nas-block-nvidia-ssh nas-gpu-terminal-card" data-gpu-terminal="nvidia-ssh">
+    <h2 class="nas-card-title"><span>NVIDIA GPU (SSH)</span>{{ terminal_pill('nvidia-ssh') }}</h2>
+    <div class="nas-gpu-row" id="home-nvidia-ssh">
+        <div class="nas-gpu-gauge"><div class="nas-gpu-name">GPU</div><div class="nas-gauge-wrap"></div></div>
+        <div class="nas-gpu-gauge"><div class="nas-gpu-name">VRAM</div><div class="nas-gauge-wrap"></div></div>
+        <div class="nas-gpu-gauge"><div class="nas-gpu-name">Power</div><div class="nas-gauge-wrap"></div></div>
+    </div>
+</div>
+{% elif key == 'show_intel_gpu' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-wide nas-block nas-block-gpu nas-block-intel nas-gpu-terminal-card" data-gpu-terminal="intel">
+    <h2 class="nas-card-title"><span>Intel GPU</span>{{ terminal_pill('intel') }}</h2>
+    <div class="nas-gpu-row" id="home-intel">
+        <div class="nas-gpu-gauge"><div class="nas-gpu-name">3D</div><div class="nas-gauge-wrap"></div></div>
+        <div class="nas-gpu-gauge"><div class="nas-gpu-name">Vidéo</div><div class="nas-gauge-wrap"></div></div>
+        <div class="nas-gpu-gauge"><div class="nas-gpu-name">Power</div><div class="nas-gauge-wrap"></div></div>
+    </div>
+</div>
+{% elif key == 'show_network' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-wide nas-block nas-block-network nas-clickable-card" data-home-href="/system/lan">
+    <h2 class="nas-card-title"><span>Réseau local</span>{{ detail_pill('/system/lan') }}</h2>
+    <div class="nas-meta-list">
+        <div class="nas-meta-row"><span>IP locale</span><b id="home-ip">{{ overview.network.ip|default('—') }}</b></div>
+        <div class="nas-meta-row"><span>Download</span><b id="home-net-down">—</b></div>
+        <div class="nas-meta-row"><span>Upload</span><b id="home-net-up">—</b></div>
+        <div class="nas-meta-row"><span>Lien</span><b id="home-net-link">{{ overview.network.speed|default('—') }}</b></div>
+        <div class="nas-meta-row"><span>Gateway</span><b id="home-gateway">{{ overview.network.gateway|default('—') }}</b></div>
+        <div class="nas-meta-row"><span>Public</span><b id="home-ip-public">—</b></div>
+    </div>
+</div>
+{% elif key == 'show_local_resolution' and home_config.get(key, '1')|int and not home_config.get('show_network', '1')|int %}
+<div class="nas-card nas-wide nas-block nas-block-local-resolution nas-clickable-card" data-home-href="/system/lan">
+    <h2 class="nas-card-title"><span>Résolution locale</span>{{ detail_pill('/system/lan') }}</h2>
+    <div class="nas-meta-list">
+        <div class="nas-meta-row"><span>IP locale</span><b id="home-ip">{{ overview.network.ip|default('—') }}</b></div>
+        <div class="nas-meta-row"><span>Lien</span><b id="home-net-link">{{ overview.network.speed|default('—') }}</b></div>
+        <div class="nas-meta-row"><span>Gateway</span><b id="home-gateway">{{ overview.network.gateway|default('—') }}</b></div>
+        <div class="nas-meta-row"><span>Public</span><b id="home-ip-public">—</b></div>
+    </div>
+</div>
+{% elif key == 'show_host' and home_config.get(key, '1')|int %}
+<div class="nas-card nas-block nas-block-host">
+    <h2 class="nas-card-title">Hôte</h2>
+    <div class="nas-meta-list">
+        <div class="nas-meta-row"><span>Hostname</span><b id="home-hostname">{{ overview.host.hostname|default('—') }}</b></div>
+        <div class="nas-meta-row"><span>Système</span><b id="home-os">{{ overview.host.os|default('—') }}</b></div>
+        <div class="nas-meta-row"><span>Démarrage</span><b id="home-boot">{{ overview.host.boot_time|default('—') }}</b></div>
+    </div>
+</div>
+{% endif %}
+{%- endmacro %}
+
+<main class="nas-home">
+    <section class="nas-live-grid">
+        {% for item in home_top_items|default([]) %}
+            {{ home_block(item.key) }}
+        {% endfor %}
+    </section>
+</main>
+
+<div class="nas-terminal-modal" id="homeGpuModal" hidden aria-hidden="true">
+    <div class="nas-terminal-modal-backdrop" data-gpu-terminal-close></div>
+    <section class="nas-terminal-modal-box" role="dialog" aria-modal="true" aria-labelledby="homeGpuModalTitle">
+        <header class="nas-terminal-modal-header">
+            <strong id="homeGpuModalTitle">GPU</strong>
+            <button type="button" class="nas-terminal-modal-close" data-gpu-terminal-close aria-label="Fermer">×</button>
+        </header>
+        <iframe class="nas-terminal-modal-frame" id="homeGpuModalFrame" title="Terminal GPU ttyd"></iframe>
+    </section>
+</div>
+
+<script>
+(function () {
+    'use strict';
+    const gaugeMax = 314;
+    const flags = {{ home_config|tojson }};
+
+    function flag(name) {
+        const v = flags[String(name).toLowerCase()];
+        return v === undefined || v === null || String(v) === '1';
+    }
+
+    document.querySelectorAll('[data-home-href]').forEach((tile) => {
+        const href = tile.getAttribute('data-home-href');
+        if (!href) return;
+        tile.setAttribute('role', 'link');
+        tile.setAttribute('tabindex', '0');
+        tile.addEventListener('click', (event) => {
+            if (event.target.closest('a, button, input, select, textarea')) return;
+            window.location.href = href;
+        });
+        tile.addEventListener('keydown', (event) => {
+            if (event.target.closest('a, button, input, select, textarea')) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            window.location.href = href;
+        });
+    });
+
+    const gpuModal = document.getElementById('homeGpuModal');
+    const gpuModalFrame = document.getElementById('homeGpuModalFrame');
+    const gpuModalTitle = document.getElementById('homeGpuModalTitle');
+
+    function closeGpuTerminalModal() {
+        if (!gpuModal) return;
+        gpuModal.hidden = true;
+        gpuModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('nas-terminal-modal-open');
+        if (gpuModalFrame) gpuModalFrame.src = 'about:blank';
+    }
+
+    async function openGpuTerminal(kind) {
+        if (!kind) return;
+        try {
+            const url = new URL('/system/api/gpu_ttyd', window.location.origin);
+            url.searchParams.set('kind', kind);
+            const response = await fetch(url, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            const data = await response.json();
+            if (!response.ok || !data.ok || !data.url) throw new Error(data.message || 'Impossible d ouvrir ttyd GPU.');
+            if (gpuModalTitle) gpuModalTitle.textContent = data.title || 'GPU';
+            if (gpuModalFrame) gpuModalFrame.src = data.url;
+            if (gpuModal) {
+                gpuModal.hidden = false;
+                gpuModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('nas-terminal-modal-open');
+            }
+        } catch (err) {
+            alert(err.message || 'Impossible d ouvrir ttyd GPU.');
+        }
+    }
+
+    document.querySelectorAll('[data-gpu-terminal]').forEach((tile) => {
+        const kind = tile.getAttribute('data-gpu-terminal');
+        if (!kind) return;
+        tile.setAttribute('role', 'button');
+        tile.setAttribute('tabindex', '0');
+        tile.addEventListener('click', (event) => {
+            if (event.target.closest('a, button, input, select, textarea')) return;
+            openGpuTerminal(kind);
+        });
+        tile.addEventListener('keydown', (event) => {
+            if (event.target.closest('a, button, input, select, textarea')) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            openGpuTerminal(kind);
+        });
+    });
+
+    document.querySelectorAll('[data-gpu-terminal-button]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openGpuTerminal(button.getAttribute('data-gpu-terminal-button'));
+        });
+    });
+
+    document.querySelectorAll('[data-gpu-terminal-close]').forEach((button) => {
+        button.addEventListener('click', closeGpuTerminalModal);
+    });
+
+    window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && gpuModal && !gpuModal.hidden) closeGpuTerminalModal();
+    });
+
+    function setText(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = (value === undefined || value === null || value === '') ? '—' : value;
+    }
+
+    function setGauge(id, pct) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const value = Math.max(0, Math.min(100, Number(pct) || 0));
+        el.setAttribute('stroke-dashoffset', String(gaugeMax - (value / 100) * gaugeMax));
+    }
+
+    function updateLocalClock() {
+        if (!flag('show_time')) return;
+        const now = new Date();
+        setText('home-clock', now.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit', second: '2-digit'}));
+        setText('home-date', now.toLocaleDateString('fr-FR', {weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'}));
+    }
+
+    function esc(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'}[c]));
+    }
+
+    function mountUsageRowHtml(row) {
+        const pct = Math.max(0, Math.min(100, Math.round(Number(row.percent) || 0)));
+        const status = String(row.status || 'unknown').replace(/[^a-z0-9_-]/gi, '') || 'unknown';
+        return `<div class="nas-mount-usage-row nas-mount-usage-${status}">
+            <div class="nas-mount-usage-head"><span>${esc(row.label || row.path || 'Montage')}</span><b>${pct}%</b></div>
+            <div class="nas-progress nas-mount-usage-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
+            <div class="nas-stat-sub">${esc(row.used || '-')}/${esc(row.total || '-')} - ${esc(row.path || '')}</div>
+        </div>`;
+    }
+
+    function renderMountUsageRows(mounts) {
+        const card = document.querySelector('.nas-mount-card');
+        const leftList = document.getElementById('home-mounts-left-usage-list');
+        const rightList = document.getElementById('home-mounts-right-usage-list');
+        if (!leftList && !rightList) return;
+        const rows = (Array.isArray(mounts?.usage_rows) ? mounts.usage_rows : []).slice(0, 5);
+        const leftCount = rows.length > 3 ? rows.length - 3 : 0;
+        const leftRows = rows.slice(0, leftCount);
+        const rightRows = rows.slice(leftCount);
+        if (card) {
+            card.classList.toggle('nas-mount-card-has-usage', rows.length > 0);
+            card.classList.toggle('nas-mount-card-many-usage', rows.length > 3);
+        }
+        if (!rows.length) {
+            if (leftList) {
+                leftList.hidden = true;
+                leftList.innerHTML = '';
+            }
+            if (rightList) {
+                rightList.hidden = true;
+                rightList.innerHTML = '';
+            }
+            return;
+        }
+        if (leftList) {
+            leftList.hidden = leftRows.length === 0;
+            leftList.innerHTML = leftRows.map(mountUsageRowHtml).join('');
+        }
+        if (rightList) {
+            rightList.hidden = rightRows.length === 0;
+            rightList.innerHTML = rightRows.map(mountUsageRowHtml).join('');
+        }
+    }
+
+    function renderMounts(mounts) {
+        if (!mounts) return;
+        const state = document.getElementById('home-mounts-state');
+        const count = document.getElementById('home-mounts-count');
+        const sub = document.getElementById('home-mounts-sub');
+        const tile = document.querySelector('.nas-mount-status');
+        const label = mounts.label || 'Non configuré';
+        const summary = `${mounts.ok || 0}/${mounts.total || 0} OK`;
+        if (state) state.textContent = label;
+        if (count) count.textContent = summary;
+        else if (sub) sub.textContent = summary;
+        if (tile) {
+            tile.classList.remove('nas-mount-status-ok', 'nas-mount-status-error', 'nas-mount-status-warning', 'nas-mount-status-empty');
+            tile.classList.add('nas-mount-status-' + String(mounts.state || 'empty'));
+        }
+        renderMountUsageRows(mounts);
+    }
+
+    function renderFans(fans) {
+        const rows = (fans && Array.isArray(fans.rows)) ? fans.rows : [];
+        setText('home-fans-count', fans?.count ?? rows.length ?? 0);
+        setText('home-fans-source', fans?.source || '');
+        const list = document.getElementById('home-fans-list');
+        if (!list) return;
+        if (!rows.length) {
+            list.innerHTML = '<div class="nas-fan-empty">Aucun capteur ventilateur détecté par Linux.</div>';
+            return;
+        }
+        list.innerHTML = rows.map((fan, idx) => {
+            const status = String(fan.status || 'unknown').replace(/[^a-z0-9_-]/gi, '') || 'unknown';
+            const name = fan.label || `FAN ${idx + 1}`;
+            const rpm = fan.rpm_label || (fan.rpm === 0 ? '0 RPM' : (fan.rpm ? `${fan.rpm} RPM` : '—'));
+            const chip = fan.chip ? `<div class="nas-fan-chip">${esc(fan.chip)}</div>` : '';
+            return `<div class="nas-fan-tile nas-fan-${status}">
+                <div class="nas-fan-name">${esc(name)}</div>
+                <div class="nas-fan-rpm">${esc(rpm)}</div>
+                ${chip}
+            </div>`;
+        }).join('');
+    }
+
+    function gaugeHtml(value, display, label, colorClass) {
+        const pct = Math.max(0, Math.min(100, Number(value) || 0));
+        const safeClass = String(colorClass || '').replace(/[^a-z0-9_-]/gi, '');
+        return `
+            <div class="nas-gauge-wrap">
+                <svg class="nas-gauge-svg" viewBox="0 0 112 112">
+                    <circle class="nas-gauge-bg" cx="56" cy="56" r="50"></circle>
+                    <circle class="nas-gauge-fill ${safeClass}" cx="56" cy="56" r="50" data-pct="${pct}"></circle>
+                </svg>
+                <div class="nas-gauge-value">
+                    <div class="nas-gauge-number">${esc(display)}</div>
+                    <div class="nas-gauge-sub">${esc(label)}</div>
+                </div>
+            </div>`;
+    }
+
+    function applyGaugeOffsets(root) {
+        (root || document).querySelectorAll('.nas-gauge-fill[data-pct]').forEach(el => {
+            const value = Math.max(0, Math.min(100, Number(el.dataset.pct) || 0));
+            el.setAttribute('stroke-dashoffset', String(gaugeMax - (value / 100) * gaugeMax));
+        });
+    }
+
+    function renderGpu(containerId, gpu, config) {
+        const box = document.getElementById(containerId);
+        if (!box) return;
+        if (!gpu) {
+            box.innerHTML = config.map(item => `
+                <div class="nas-gpu-gauge">
+                    <div class="nas-gpu-name">${esc(item.label)}</div>
+                    ${gaugeHtml(0, '—', item.short, item.colorClass)}
+                </div>`).join('');
+            applyGaugeOffsets(box);
+            return;
+        }
+
+        box.innerHTML = config.map(item => {
+            const raw = item.value(gpu);
+            const pct = item.percent(raw);
+            return `
+                <div class="nas-gpu-gauge">
+                    <div class="nas-gpu-name">${esc(item.label)}</div>
+                    ${gaugeHtml(pct, item.display(raw), item.short, item.colorClass)}
+                </div>`;
+        }).join('');
+        applyGaugeOffsets(box);
+    }
+
+    async function loadOverview() {
+        try {
+            const data = await (await fetch('/system/api/overview', {cache: 'no-store'})).json();
+            setText('home-hostname', data.host?.hostname);
+            setText('home-os', data.host?.os);
+            setText('home-kernel', 'kernel ' + (data.host?.kernel || '—'));
+            setText('home-boot', data.host?.boot_time);
+            setText('home-uptime', data.uptime);
+            setText('home-cpu', `${Math.round(data.cpu?.percent ?? 0)}%`);
+            setText('home-load1', data.cpu?.load1);
+            setText('home-load5', data.cpu?.load5);
+            setText('home-load15', data.cpu?.load15);
+            setGauge('home-cpu-fill', data.cpu?.percent);
+            setText('home-ram', `${Math.round(data.ram?.percent ?? 0)}%`);
+            setText('home-ram-used', data.ram?.used);
+            setText('home-ram-total', data.ram?.total);
+            setGauge('home-ram-fill', data.ram?.percent);
+            setText('home-disk', `${Math.round(data.disk?.percent ?? 0)}%`);
+            setText('home-disk-sub', `${data.disk?.mount || '/'} · ${data.disk?.used || '—'}/${data.disk?.total || '—'}`);
+            const diskBar = document.getElementById('home-disk-bar');
+            if (diskBar) diskBar.style.width = `${Math.max(0, Math.min(100, Math.round(data.disk?.percent ?? 0)))}%`;
+            setText('home-disk-mount', data.disk?.mount || '/');
+            setText('home-disk-used', data.disk?.used);
+            setText('home-disk-total', data.disk?.total);
+            setText('home-ip', data.network?.ip);
+            setText('home-gateway', data.network?.gateway);
+            const sv = data.services || {};
+            setText('home-services', `${sv.active ?? 0} actifs`);
+            setText('home-services-sub', `${sv.total ?? 0} services · ${sv.failed ?? 0} erreurs`);
+            if (data.docker?.available) {
+                const dockerTotal = Number(data.docker?.total ?? 0) || 0;
+                const dockerRunning = Number(data.docker?.running ?? 0) || 0;
+                const dockerStopped = Math.max(0, dockerTotal - dockerRunning);
+                setText('home-docker-total', dockerTotal);
+                setText('home-docker-running', dockerRunning);
+                setText('home-docker-stopped', dockerStopped);
+                setText('home-docker-engine', 'OK');
+            } else {
+                setText('home-docker-total', 'N/A');
+                setText('home-docker-running', 'N/A');
+                setText('home-docker-stopped', 'N/A');
+                setText('home-docker-engine', 'N/A');
+            }
+            if (data.vms?.available) {
+                setText('home-vm-total', data.vms?.total ?? 0);
+                setText('home-vm-running', data.vms?.running ?? 0);
+                setText('home-vm-stopped', data.vms?.stopped ?? Math.max(0, Number(data.vms?.total ?? 0) - Number(data.vms?.running ?? 0)));
+            } else {
+                setText('home-vm-total', 'N/A');
+                setText('home-vm-running', 'N/A');
+                setText('home-vm-stopped', 'N/A');
+            }
+            setText('home-processes', data.processes?.total);
+            const build = data.build || {};
+            setText('home-build-label', build.label || 'Cache vide');
+            setText('home-build-sub', `${build.total ?? 0} entrees · ${build.projects ?? 0} projets`);
+            setText('home-build-needed', build.to_build ?? 0);
+            setText('home-build-push', build.to_push ?? 0);
+            setText('home-build-meta', build.meta_missing ?? 0);
+            renderMounts(data.mounts);
+            renderFans(data.fans);
+        } catch (err) {
+            setText('home-hostname', 'Erreur API');
+        }
+    }
+
+    async function loadLiveStats() {
+        try {
+            const params = new URLSearchParams({
+                nvidia_local: flag('show_nvidia_local') ? '1' : '0',
+                nvidia_ssh: flag('show_nvidia_ssh') ? '1' : '0',
+                intel_gpu: flag('show_intel_gpu') ? '1' : '0'
+            });
+            const data = await (await fetch('/system/api/sys_stats?' + params.toString(), {cache: 'no-store'})).json();
+            setText('home-cpu-temp', data.cpu?.temp ? `${data.cpu.temp}°C` : 'CPU');
+            setText('home-net-down', data.net?.down);
+            setText('home-net-up', data.net?.up);
+            setText('home-net-link', data.network_direct?.speed || data.network_direct?.status || '—');
+            setText('home-ip-public', data.ips?.public);
+
+            const gpus = data.gpus || [];
+            const nvidiaLocal = gpus.find(g => g.type === 'nvidia_local' || (g.type === 'nvidia' && g.source === 'local'));
+            const nvidiaSsh = gpus.find(g => g.type === 'nvidia_ssh' || (g.type === 'nvidia' && g.source === 'ssh') || (g.type === 'nvidia' && !g.source));
+            const intel = gpus.find(g => g.type === 'intel');
+            const nvidiaConfig = [
+                {label:'GPU', short:'GPU', colorClass:'gpu', value:g => g.load, percent:v => Number(v) || 0, display:v => `${Math.round(Number(v) || 0)}%`},
+                {label:'VRAM', short:'VRAM', colorClass:'mem', value:g => g.mem, percent:v => Number(v) || 0, display:v => `${Math.round(Number(v) || 0)}%`},
+                {label:'Power', short:'PWR', colorClass:'power', value:g => g.power, percent:v => Math.min((Number(v) || 0) / 350 * 100, 100), display:v => `${v || '—'} W`}
+            ];
+            renderGpu('home-nvidia-local', nvidiaLocal, nvidiaConfig);
+            renderGpu('home-nvidia-ssh', nvidiaSsh, nvidiaConfig);
+            renderGpu('home-intel', intel, [
+                {label:'3D', short:'3D', colorClass:'intel', value:g => g.load, percent:v => Number(v) || 0, display:v => `${Math.round(Number(v) || 0)}%`},
+                {label:'Vidéo', short:'VID', colorClass:'video', value:g => g.mem, percent:v => Number(v) || 0, display:v => `${Math.round(Number(v) || 0)}%`},
+                {label:'Power', short:'PWR', colorClass:'intel-power', value:g => g.power, percent:v => Math.min((Number(v) || 0) / 65 * 100, 100), display:v => `${v || '—'} W`}
+            ]);
+        } catch (err) {}
+    }
+
+    updateLocalClock();
+    loadOverview();
+    loadLiveStats();
+    setInterval(updateLocalClock, 1000);
+    setInterval(loadOverview, 5000);
+    setInterval(loadLiveStats, 3000);
+})();
+</script>
+{% endblock %}

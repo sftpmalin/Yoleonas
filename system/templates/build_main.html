@@ -1,0 +1,1029 @@
+{% extends "build_base.html" %}
+
+{% block route_content %}
+<div id="tab-builds_tar" class="tab-panel active build-mobile-simple-list build-main-mobile-list">
+                    <section class="card">
+                        <div class="topbar">
+                            <div class="title-block build-title-row">
+                                <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="openClientImportModal()">📥 Importer</button>
+                            </div>
+                            <div class="build-main-overall-progress" id="buildMainOverallProgress" data-total="{{ builds|length if builds else 0 }}">
+                                <div class="build-main-overall-head">
+                                    <span id="buildMainOverallLabel">Prêt</span>
+                                    <b id="buildMainOverallValue">0%</b>
+                                </div>
+                                <div class="build-main-overall-track">
+                                    <div class="build-main-overall-fill" id="buildMainOverallFill"></div>
+                                </div>
+                                <div class="build-main-overall-detail" id="buildMainOverallDetail">Progression globale Build → Registre</div>
+                            </div>
+                            <div class="toolbar build-tar-toolbar">
+                                <button type="button" class="yoleo-btn yoleo-btn-orange" data-running-text="Cache…" onclick="runCacheRefresh(this)">🔄 Mise à jour du cache</button>
+                                <select class="select-input" id="buildMode">
+                                    <option value="normal">Mode normal</option>
+                                    <option value="check">Check updates</option>
+                                    <option value="force">Force rebuild</option>
+                                    <option value="nocache">No cache</option>
+                                    <option value="nopull">No pull</option>
+                                </select>
+                                <button type="button" class="yoleo-btn yoleo-btn-green" onclick="runMainBuildAll(this)">🧱 Tout builder + registre</button>
+                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon build-main-ttyd-btn" onclick="openBuildMainTtyd(this)" title="Ouvrir le vrai log Build dans ttyd">📜</button>
+                            </div>
+                        </div>
+                        <div class="summary-grid">
+                            <div class="summary-card"><div class="summary-label">Entrées</div><div class="summary-value">{{ summary.total }}</div></div>
+                            <div class="summary-card"><div class="summary-label">Dossiers</div><div class="summary-value">{{ summary.projects }}</div></div>
+                            <div class="summary-card"><div class="summary-label">Dockerfile</div><div class="summary-value">{{ summary.dockerfiles }}</div></div>
+                            <div class="summary-card"><div class="summary-label">TAR</div><div class="summary-value">{{ summary.tars }}</div></div>
+                            <div class="summary-card"><div class="summary-label">Registre</div><div class="summary-value">{{ summary.registry }}</div></div>
+                            <div class="summary-card"><div class="summary-label">ARM64</div><div class="summary-value">{{ summary.arm64 }}</div></div>
+                        </div>
+                        <div class="table-tools">
+                            <input class="search-input" id="buildSearch" type="text" placeholder="Filtrer : nom, registre, plateforme…" oninput="filterTable('buildTable', this.value)">
+                        </div>
+                        {% if not builds %}
+                            <div class="empty-state" data-yoleo-context-zone="build-main-empty">Aucun Docker dans le cache. Clique sur <b>Mise à jour du cache</b> pour initialiser ou rafraîchir la liste.</div>
+                        {% else %}
+                        <div class="table-wrap" data-yoleo-context-zone="build-main-table">
+                            <table class="build-table compact-table" id="buildTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:25%;">Docker</th>
+                                        <th style="width:14%;">Dossier</th>
+                                        <th style="width:16%;">Plateformes</th>
+                                        <th style="width:18%;">TAR actuel</th>
+                                        <th style="width:17%;">Registre</th>
+                                        <th style="width:10%; text-align:right;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for b in builds %}
+                                    <tr data-build-name="{{ b.name }}" data-filter="{{ b.name|lower }} {{ b.registry_display|lower }} {{ b.platform_effective|lower }} {{ 'tar' if b.tar_exists else 'notar' }} {{ 'dockerfile' if b.dockerfile else 'nodockerfile' }}">
+                                        <td>
+                                            <div class="dock-cell">
+                                                <div style="min-width:0;">
+                                                    <div class="name-main">{{ b.name }}</div>
+                                                    <div class="hint" data-build-meta-hint>
+                                                        {% if b.meta_missing %}<span class="badge badge-warn">base incomplète</span>{% else %}<span class="badge badge-ok">base OK</span>{% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="actions-cell" style="justify-content:flex-start; gap:6px;">
+                                                {% if b.has_context %}<span class="badge {{ 'badge-ok' if b.dockerfile else 'badge-warn' }}">{{ 'Dockerfile OK' if b.dockerfile else 'sans Dockerfile' }}</span>{% else %}<span class="badge badge-no">absent</span>{% endif %}
+                                                {% if b.has_context %}
+                                                <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-mini" title="Supprimer ce Docker" onclick='openDeleteBuildProject({{ b.name|tojson }})'>✖</button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td data-build-platform-cell>
+                                            <span class="tag-val">{{ b.platform_effective }}</span>
+                                            <div class="arch-row">
+                                                <span class="badge {{ 'badge-info' if b.amd64 else 'badge-muted' }}">amd64</span>
+                                                <span class="badge {{ 'badge-info' if b.arm64 else 'badge-muted' }}">arm64</span>
+                                            </div>
+                                        </td>
+                                        <td data-tar-cell="build" data-tar-name="{{ b.name }}">
+                                            <div class="build-main-tar-line">
+                                                {% if b.tar_exists %}<span class="badge badge-ok">{{ b.tar_size_h }}</span>{% else %}<span class="badge badge-no">pas de TAR</span>{% endif %}
+                                                {% if not b.registry %}
+                                                    <span class="badge badge-warn build-main-registry-status" data-main-registry-status data-main-registry-name="{{ b.name }}">Registre ?</span>
+                                                {% elif b.registry_current %}
+                                                    <span class="badge badge-ok build-main-registry-status" data-main-registry-status data-main-registry-name="{{ b.name }}" title="{{ b.registry_status_message }}">Registre OK</span>
+                                                {% elif b.can_import %}
+                                                    <span class="badge badge-warn build-main-registry-status" data-main-registry-status data-main-registry-name="{{ b.name }}" title="{{ b.registry_status_message }}">À envoyer</span>
+                                                {% else %}
+                                                    <span class="badge badge-muted build-main-registry-status" data-main-registry-status data-main-registry-name="{{ b.name }}" title="{{ b.registry_status_message }}">{{ b.registry_status_label or 'Registre attente' }}</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if b.tar_exists %}<div class="name-sub">{{ b.tar_mtime }}</div><div class="name-sub">sha256 : {{ 'oui' if b.sha else 'non' }}</div>{% endif %}
+                                        </td>
+                                        <td data-build-registry-cell>
+                                            {% if b.registry %}<span class="badge badge-ok">OK</span><div class="name-sub">{{ b.registry }}</div>{% else %}<span class="badge badge-warn">à compléter</span><div class="name-sub">{{ b.registry_suggested }}</div>{% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="actions-cell build-row-actions">
+                                                <button type="button"
+                                                        class="yoleo-btn yoleo-btn-mini yoleo-btn-orange yoleo-btn-icon build-db-option-btn"
+                                                        title="Options Build"
+                                                        aria-label="Options Build pour {{ b.name }}"
+                                                        data-name="{{ b.name }}"
+                                                        data-registry="{{ b.registry }}"
+                                                        data-registry-suggested="{{ b.registry_suggested }}"
+                                                        data-platforms="{{ b.platforms or b.platform_suggested }}"
+                                                        data-platform-suggested="{{ b.platform_suggested }}"
+                                                        data-mode="{{ b.mode_value or '0' }}"
+                                                        onclick="openBuildDbOptionModalFromButton(this)">⚙</button>
+                                                <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-green smart-action-button" onclick='runMainBuildOne({{ b.name|tojson }}, this)' data-status-kind="build" data-status-name="{{ b.name }}" data-base-disabled="{{ '0' if (b.can_build or b.can_import) else '1' }}" data-main-action="1" data-action-label="Build" data-current-label="À jour" data-running-text="Build…" {{ '' if (b.can_build or b.can_import) else 'disabled' }}>{% if b.build_current and b.can_import %}Envoyer{% elif b.build_current and b.registry_current %}À jour{% else %}Build{% endif %}</button>
+                                                <span class="badge badge-muted smart-status is-hidden" data-status-kind="build" data-status-name="{{ b.name }}"></span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                    </section>
+                </div>
+
+<style>
+/* Build Main : quand la roue crantée est active, les actions passent dans le menu haut.
+   Sans roue crantée, la page garde son affichage historique complet. */
+body.yoleo-has-page-settings .builds-page #tab-builds_tar > .card {
+    display:grid;
+    grid-template-columns:repeat(6, minmax(86px, 1fr)) minmax(230px, 340px) auto;
+    gap:8px;
+    align-items:stretch;
+}
+body.yoleo-has-page-settings .builds-page #tab-builds_tar > .card > .topbar,
+body.yoleo-has-page-settings .builds-page #tab-builds_tar > .card > .summary-grid,
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-tar-toolbar {
+    display:contents !important;
+}
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-title-row,
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-tar-toolbar > :not(.build-main-ttyd-btn) {
+    display:none !important;
+}
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .summary-card {
+    min-width:0;
+    margin:0;
+    padding:8px 10px;
+}
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .summary-label {
+    font-size:9px;
+    letter-spacing:.35px;
+}
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .summary-value {
+    font-size:18px;
+    margin-top:3px;
+}
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-overall-progress {
+    grid-column:7;
+    grid-row:1;
+    width:100%;
+    min-width:0;
+    max-width:none;
+    align-self:stretch;
+    margin:0;
+}
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-ttyd-btn {
+    grid-column:8;
+    grid-row:1;
+    align-self:center;
+    justify-self:end;
+    margin:0;
+}
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .table-tools,
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .empty-state,
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .table-wrap {
+    grid-column:1 / -1;
+}
+@media (max-width: 1100px) {
+    body.yoleo-has-page-settings .builds-page #tab-builds_tar > .card {
+        grid-template-columns:repeat(3, minmax(88px, 1fr)) minmax(210px, 1fr) auto;
+    }
+    body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-overall-progress {
+        grid-column:4;
+        grid-row:1 / span 2;
+    }
+    body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-ttyd-btn {
+        grid-column:5;
+        grid-row:1 / span 2;
+    }
+}
+@media (max-width: 760px) {
+    body.yoleo-has-page-settings .builds-page #tab-builds_tar > .card {
+        grid-template-columns:1fr auto;
+    }
+    body.yoleo-has-page-settings .builds-page #tab-builds_tar .summary-card,
+    body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-overall-progress {
+        grid-column:1 / -1;
+    }
+    body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-ttyd-btn {
+        grid-column:2;
+        grid-row:auto;
+    }
+}
+
+/* Build Main mobile : le tableau devient une liste de cartes lisibles.
+   Desktop inchangé. */
+@media (max-width: 760px) {
+    .builds-page #tab-builds_tar .table-wrap {
+        overflow:visible;
+        border:0;
+        background:transparent;
+    }
+    .builds-page #tab-builds_tar #buildTable,
+    .builds-page #tab-builds_tar #buildTable tbody,
+    .builds-page #tab-builds_tar #buildTable tr,
+    .builds-page #tab-builds_tar #buildTable td {
+        display:block;
+        width:100%;
+    }
+    .builds-page #tab-builds_tar #buildTable thead {
+        display:none;
+    }
+    .builds-page #tab-builds_tar #buildTable tr {
+        margin:0 0 12px;
+        padding:10px;
+        border:1px solid rgba(89, 194, 255, .24);
+        border-radius:16px;
+        background:rgba(9, 20, 35, .82);
+        box-shadow:0 0 0 1px rgba(0, 0, 0, .18) inset;
+    }
+    .builds-page #tab-builds_tar #buildTable tr.is-selected,
+    .builds-page #tab-builds_tar #buildTable tr:hover {
+        background:rgba(45, 18, 100, .72);
+    }
+    .builds-page #tab-builds_tar #buildTable td {
+        padding:8px 4px;
+        border:0;
+        border-bottom:1px solid rgba(120, 160, 210, .14);
+        min-width:0;
+    }
+    .builds-page #tab-builds_tar #buildTable td:last-child {
+        border-bottom:0;
+        padding-bottom:0;
+    }
+    .builds-page #tab-builds_tar #buildTable td::before {
+        display:block;
+        margin:0 0 5px;
+        color:#9fdcff;
+        font-size:10px;
+        font-weight:800;
+        text-transform:uppercase;
+        letter-spacing:.45px;
+        opacity:.95;
+    }
+    .builds-page #tab-builds_tar #buildTable td:nth-child(1)::before { content:"Docker"; }
+    .builds-page #tab-builds_tar #buildTable td:nth-child(2)::before { content:"Dossier"; }
+    .builds-page #tab-builds_tar #buildTable td:nth-child(3)::before { content:"Plateformes"; }
+    .builds-page #tab-builds_tar #buildTable td:nth-child(4)::before { content:"TAR actuel"; }
+    .builds-page #tab-builds_tar #buildTable td:nth-child(5)::before { content:"Registre"; }
+    .builds-page #tab-builds_tar #buildTable td:nth-child(6)::before { content:"Action"; }
+    .builds-page #tab-builds_tar .dock-cell,
+    .builds-page #tab-builds_tar .actions-cell,
+    .builds-page #tab-builds_tar .build-row-actions,
+    .builds-page #tab-builds_tar .build-main-tar-line,
+    .builds-page #tab-builds_tar .arch-row {
+        flex-wrap:wrap;
+        justify-content:flex-start !important;
+        gap:6px;
+        min-width:0;
+    }
+    .builds-page #tab-builds_tar .name-main,
+    .builds-page #tab-builds_tar .name-sub,
+    .builds-page #tab-builds_tar .tag-val,
+    .builds-page #tab-builds_tar .badge {
+        white-space:normal;
+        overflow-wrap:anywhere;
+    }
+    .builds-page #tab-builds_tar .build-row-actions .smart-action-button {
+        min-width:110px;
+        justify-content:center;
+    }
+}
+
+
+/* Correctif mobile Build Main : les cartes utilisent toute la largeur.
+   Le premier essai empilait bien les champs, mais la valeur restait trop tassée à gauche. */
+@media (max-width: 760px) {
+    .builds-page #tab-builds_tar #buildTable {
+        width:100%;
+        table-layout:auto;
+    }
+    .builds-page #tab-builds_tar #buildTable tbody {
+        display:block;
+        width:100%;
+    }
+    .builds-page #tab-builds_tar #buildTable tr {
+        display:grid !important;
+        grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+        gap:9px 10px;
+        width:100%;
+        box-sizing:border-box;
+        align-items:stretch;
+    }
+    .builds-page #tab-builds_tar #buildTable td {
+        display:block !important;
+        width:auto !important;
+        min-width:0;
+        box-sizing:border-box;
+        padding:8px 10px;
+        border:1px solid rgba(120, 160, 210, .16);
+        border-radius:12px;
+        background:rgba(2, 10, 22, .22);
+    }
+    .builds-page #tab-builds_tar #buildTable td:last-child {
+        padding-bottom:8px;
+    }
+    .builds-page #tab-builds_tar #buildTable td::before {
+        margin-bottom:6px;
+    }
+    .builds-page #tab-builds_tar #buildTable td:nth-child(1),
+    .builds-page #tab-builds_tar #buildTable td:nth-child(2),
+    .builds-page #tab-builds_tar #buildTable td:nth-child(3),
+    .builds-page #tab-builds_tar #buildTable td:nth-child(4),
+    .builds-page #tab-builds_tar #buildTable td:nth-child(5),
+    .builds-page #tab-builds_tar #buildTable td:nth-child(6) {
+        grid-column:auto;
+    }
+    .builds-page #tab-builds_tar .dock-cell,
+    .builds-page #tab-builds_tar .actions-cell,
+    .builds-page #tab-builds_tar .build-row-actions,
+    .builds-page #tab-builds_tar .build-main-tar-line,
+    .builds-page #tab-builds_tar .arch-row {
+        width:100%;
+        max-width:100%;
+        justify-content:flex-start !important;
+        align-items:flex-start;
+    }
+    .builds-page #tab-builds_tar .build-row-actions {
+        align-content:flex-start;
+    }
+    .builds-page #tab-builds_tar .build-row-actions .smart-action-button {
+        min-width:0;
+        flex:1 1 120px;
+    }
+}
+@media (max-width: 480px) {
+    .builds-page #tab-builds_tar #buildTable tr {
+        grid-template-columns:1fr;
+    }
+    .builds-page #tab-builds_tar #buildTable td {
+        grid-column:1 / -1 !important;
+    }
+}
+
+/* Build Main mobile final : cartes larges et espace utile complet.
+   Cette couche reste limitee a /build/main via data-active-build-section="main". */
+@media (max-width: 900px) {
+    .builds-page[data-active-build-section="main"] {
+        display:block !important;
+        width:100% !important;
+        max-width:100% !important;
+        padding:10px 8px 24px !important;
+        justify-content:stretch !important;
+    }
+
+    .builds-page[data-active-build-section="main"] .builds-panel,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar > .card {
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+        margin:0 !important;
+        box-sizing:border-box !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar > .card {
+        display:block !important;
+        padding:10px !important;
+        overflow:visible !important;
+    }
+
+    body.yoleo-has-page-settings .builds-page[data-active-build-section="main"] #tab-builds_tar > .card > .summary-grid,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar > .card > .summary-grid {
+        display:grid !important;
+        grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+        gap:8px !important;
+        width:100% !important;
+        margin:0 0 10px !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .summary-card {
+        min-width:0 !important;
+        padding:9px 10px !important;
+        border-radius:12px !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .summary-value {
+        font-size:19px !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-main-overall-progress {
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+        margin:0 0 10px !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .table-tools {
+        display:block !important;
+        width:100% !important;
+        margin:0 0 10px !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildSearch {
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+        height:38px !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .builds-page[data-active-build-section="main"] #tab-builds_tar .table-wrap.yoleo-mobile-source-wrap,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .table-wrap,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .table-wrap.yoleo-mobile-source-wrap {
+        display:block !important;
+        visibility:visible !important;
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+        overflow:visible !important;
+        padding:0 !important;
+        border:0 !important;
+        border-radius:0 !important;
+        background:transparent !important;
+        box-sizing:border-box !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready .builds-page[data-active-build-section="main"] #tab-builds_tar .table-wrap + .yoleo-mobile-table-grid,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .table-wrap + .yoleo-mobile-table-grid {
+        display:none !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable tbody {
+        display:block !important;
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+        table-layout:auto !important;
+        border-collapse:separate !important;
+        border-spacing:0 !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable thead {
+        display:none !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable tbody {
+        display:flex !important;
+        flex-direction:column !important;
+        gap:12px !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable tr {
+        display:grid !important;
+        grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+        gap:9px !important;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:100% !important;
+        min-height:0 !important;
+        margin:0 !important;
+        padding:12px !important;
+        border:1px solid rgba(89, 194, 255, .24) !important;
+        border-left:4px solid rgba(26, 235, 255, .72) !important;
+        border-radius:14px !important;
+        background:rgba(10, 19, 32, .94) !important;
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.03) !important;
+        overflow:visible !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable td {
+        display:block !important;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:100% !important;
+        padding:9px 10px !important;
+        border:1px solid rgba(120, 160, 210, .16) !important;
+        border-radius:11px !important;
+        background:rgba(2, 10, 22, .24) !important;
+        overflow:visible !important;
+        box-sizing:border-box !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable td::before {
+        display:block !important;
+        margin:0 0 6px !important;
+        color:#9fdcff !important;
+        font-size:10px !important;
+        font-weight:900 !important;
+        text-transform:uppercase !important;
+        letter-spacing:.04em !important;
+        line-height:1.15 !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable td:nth-child(1) {
+        grid-column:1 / -1 !important;
+        grid-row:auto !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable td:nth-child(2),
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable td:nth-child(3),
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable td:nth-child(4),
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable td:nth-child(5) {
+        grid-column:auto !important;
+        grid-row:auto !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable td:nth-child(6) {
+        grid-column:1 / -1 !important;
+        grid-row:auto !important;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:100% !important;
+        justify-self:stretch !important;
+        align-self:stretch !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .dock-cell,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .actions-cell,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-main-tar-line,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .arch-row {
+        display:flex !important;
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+        flex-wrap:wrap !important;
+        justify-content:flex-start !important;
+        align-items:flex-start !important;
+        gap:6px !important;
+        overflow:visible !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .name-main {
+        max-width:100% !important;
+        color:#fff !important;
+        font-size:16px !important;
+        line-height:1.22 !important;
+        white-space:normal !important;
+        overflow-wrap:anywhere !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .name-sub,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .hint,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .tag-val {
+        max-width:100% !important;
+        font-size:11px !important;
+        line-height:1.3 !important;
+        white-space:normal !important;
+        overflow-wrap:anywhere !important;
+        overflow:visible !important;
+        text-overflow:clip !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar td:nth-child(5) .name-sub {
+        display:block !important;
+        width:100% !important;
+        margin:5px 0 0 !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .badge {
+        min-height:21px !important;
+        max-width:100% !important;
+        padding:4px 8px !important;
+        font-size:10px !important;
+        line-height:1.15 !important;
+        white-space:normal !important;
+        overflow-wrap:anywhere !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-row-actions {
+        display:flex !important;
+        flex-direction:row !important;
+        flex-wrap:wrap !important;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:100% !important;
+        justify-content:flex-start !important;
+        align-items:center !important;
+        gap:8px !important;
+        overflow:visible !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-row-actions .yoleo-btn,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-row-actions .build-db-option-btn,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-row-actions .smart-action-button {
+        width:auto !important;
+        min-width:38px !important;
+        max-width:100% !important;
+        height:34px !important;
+        min-height:34px !important;
+        padding:0 11px !important;
+        border-radius:9px !important;
+        font-size:12px !important;
+        line-height:1 !important;
+        text-indent:0 !important;
+        justify-content:center !important;
+        white-space:nowrap !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-row-actions .smart-action-button {
+        flex:1 1 132px !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-row-actions .smart-action-button::after,
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-row-actions .smart-action-button:disabled::after {
+        content:none !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-row-actions .smart-status {
+        display:inline-flex !important;
+        width:auto !important;
+        min-width:0 !important;
+        max-width:100% !important;
+        justify-content:flex-start !important;
+    }
+}
+
+@media (max-width: 520px) {
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable tr {
+        grid-template-columns:1fr !important;
+    }
+
+    .builds-page[data-active-build-section="main"] #tab-builds_tar #buildTable td {
+        grid-column:1 / -1 !important;
+    }
+}
+
+</style>
+
+    <div class="docker-ttyd-modal" id="buildMainTtydModal" hidden aria-hidden="true">
+        <div class="docker-ttyd-modal-backdrop" onclick="closeBuildMainTtyd()"></div>
+        <section class="docker-ttyd-modal-box" role="dialog" aria-modal="true" aria-labelledby="buildMainTtydModalTitle">
+            <header class="docker-ttyd-modal-header">
+                <strong id="buildMainTtydModalTitle">Log Build Main</strong>
+                <button type="button" class="docker-ttyd-modal-close" onclick="closeBuildMainTtyd()" aria-label="Fermer">×</button>
+            </header>
+            <iframe class="docker-ttyd-modal-frame" id="buildMainTtydFrame" title="Log Build Main ttyd"></iframe>
+        </section>
+    </div>
+
+    <input id="clientImportInput" type="file" webkitdirectory directory mozdirectory multiple style="display:none;">
+    <script>
+    const clientImportUploadUrl = {{ url_for('builds_bp.import_client_dirs')|tojson }};
+    const buildDeleteProjectUrl = {{ url_for('builds_bp.delete_project_route')|tojson }};
+    const clientImportBuildsDir = {{ conf.DOCKER_BUILDS_DIR|tojson }};
+    let clientImportItems = []; // {file, rel}
+    let clientImportSeen = new Set();
+    let clientImportOverlay = null;
+    function clientImportDoc() {
+        try {
+            if (window.top && window.top.document && window.top.location.origin === window.location.origin) return window.top.document;
+        } catch (e) {}
+        return document;
+    }
+    function clientImportEscape(text) {
+        return String(text || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
+    function clientImportModalHtml() {
+        return `
+        <div id="clientImportTopOverlay" class="client-import-top-overlay">
+            <div class="client-import-top-box">
+                <div class="client-import-head">
+                    <div>
+                        <div class="client-import-title">Importer des dossiers depuis ce PC</div>
+                        <div class="client-import-subtitle">Destination serveur : <b>${clientImportEscape(clientImportBuildsDir)}</b></div>
+                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon client-import-x" data-action="close">×</button>
+                <div class="client-import-drop" id="clientImportDropZone">
+                    <div class="client-import-drop-title">Dépose un ou plusieurs dossiers ici</div>
+                    <div class="client-import-drop-sub">Tu peux aussi cliquer sur “Ajouter dossier”. Selon le navigateur, il faudra ajouter les dossiers un par un.</div>
+                <div class="client-import-toolbar">
+                    <button type="button" class="yoleo-btn yoleo-btn-primary" data-action="pick">📁 Ajouter dossier</button>
+                    <button type="button" class="yoleo-btn yoleo-btn-muted" data-action="clear">🧹 Vider</button>
+                <div class="client-import-status" id="clientImportStatusTop">Aucun dossier sélectionné.</div>
+                <div class="client-import-list" id="clientImportListTop">Aucun dossier sélectionné.</div>
+                <div class="client-import-progress-box">
+                    <div class="client-import-progress-head">
+                        <span id="clientImportProgressTitleTop">Importation</span>
+                        <b id="clientImportProgressValueTop">0%</b>
+                    <div class="client-import-progress-track"><div class="client-import-progress-fill" id="clientImportProgressFillTop"></div></div>
+                <pre class="client-import-log" id="clientImportLogTop"></pre>
+                <div class="client-import-footer">
+                    <button type="button" class="yoleo-btn yoleo-btn-muted" id="clientImportCloseBtnTop" data-action="close">Fermer</button>
+                    <button type="button" class="yoleo-btn yoleo-btn-green" id="clientImportRunBtnTop" data-action="run">Importer</button>
+        </div>`;
+    }
+    function destroyClientImportOverlay() {
+        const doc = clientImportDoc();
+        const overlay = doc.getElementById('clientImportTopOverlay');
+        if (overlay) overlay.remove();
+        const style = doc.getElementById('clientImportTopStyle');
+        if (style) style.remove();
+        clientImportOverlay = null;
+    }
+    function ensureClientImportOverlay() {
+        const doc = clientImportDoc();
+        // Important : la popup vit dans la page parente pour ne pas être coupée
+        // par l'iframe. Si l'iframe Build a été rechargée entre deux imports,
+        // l'ancienne popup garde des anciens handlers JS et voit parfois
+        // "Aucun dossier sélectionné" alors que le nouvel iframe a bien reçu les fichiers.
+        // On recrée donc toujours une popup fraîche avec les handlers du frame courant.
+        destroyClientImportOverlay();
+        const wrap = doc.createElement('div');
+        wrap.innerHTML = clientImportModalHtml();
+        const overlay = wrap.firstElementChild;
+        doc.body.appendChild(overlay);
+        overlay.addEventListener('click', event => {
+            const action = event.target && event.target.getAttribute && event.target.getAttribute('data-action');
+            if (action === 'close') closeClientImportModal();
+            if (action === 'pick') pickClientImportFolders();
+            if (action === 'clear') clearClientImportSelection();
+            if (action === 'run') runClientImport();
+        });
+        const drop = doc.getElementById('clientImportDropZone');
+        if (drop) {
+            ['dragenter','dragover'].forEach(name => drop.addEventListener(name, event => {
+                event.preventDefault();
+                event.stopPropagation();
+                drop.classList.add('is-over');
+            }));
+            ['dragleave','drop'].forEach(name => drop.addEventListener(name, event => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (name === 'dragleave') drop.classList.remove('is-over');
+            }));
+            drop.addEventListener('drop', handleClientImportDrop);
+        }
+        clientImportOverlay = overlay;
+        return overlay;
+    }
+    function openClientImportModal() {
+        const overlay = ensureClientImportOverlay();
+        overlay.style.display = 'flex';
+        setClientImportProgress(0);
+        setClientImportLog('');
+        setClientImportStatus('Dépose un ou plusieurs dossiers, ou ajoute des dossiers avec le bouton.');
+        renderClientImportSelection();
+    }
+    function closeClientImportModal() {
+        destroyClientImportOverlay();
+    }
+    function pickClientImportFolders() {
+        const input = document.getElementById('clientImportInput');
+        if (!input) return;
+        input.value = '';
+        input.click();
+    }
+    function clientImportRelPath(file) {
+        return file.webkitRelativePath || file.relativePath || file._clientRelativePath || file.name || '';
+    }
+    function addClientImportFile(file, relPath) {
+        const rel = String(relPath || clientImportRelPath(file) || '').replace(/\\/g, '/').replace(/^\/+/, '');
+        if (!rel || rel === file.name || rel.split('/').filter(Boolean).length < 2) return false;
+        file._clientRelativePath = rel;
+        const key = rel + '|' + file.size + '|' + file.lastModified;
+        if (clientImportSeen.has(key)) return false;
+        clientImportSeen.add(key);
+        clientImportItems.push({file, rel});
+        return true;
+    }
+    function topFolderFromRelPath(path) {
+        const clean = String(path || '').replace(/\\/g, '/').replace(/^\/+/, '');
+        return clean.split('/').filter(Boolean)[0] || 'dossier';
+    }
+    function renderClientImportSelection() {
+        const doc = clientImportDoc();
+        const box = doc.getElementById('clientImportListTop');
+        if (!box) return;
+        if (!clientImportItems.length) {
+            box.textContent = 'Aucun dossier sélectionné.';
+            return;
+        }
+        const folders = new Map();
+        let totalBytes = 0;
+        clientImportItems.forEach(item => {
+            const top = topFolderFromRelPath(item.rel);
+            totalBytes += Number(item.file.size || 0);
+            folders.set(top, (folders.get(top) || 0) + 1);
+        });
+        const sizeMb = totalBytes / 1024 / 1024;
+        const items = Array.from(folders.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => `<li><b>${clientImportEscape(name)}</b> — ${count} fichier(s)</li>`).join('');
+        box.innerHTML = `<div>${clientImportItems.length} fichier(s), ${folders.size} dossier(s), ${sizeMb.toFixed(1)} Mo</div><ul>${items}</ul>`;
+    }
+    function clearClientImportSelection() {
+        clientImportItems = [];
+        clientImportSeen = new Set();
+        renderClientImportSelection();
+        setClientImportProgress(0);
+        setClientImportLog('');
+        setClientImportStatus('Sélection vidée.');
+    }
+    function setClientImportProgress(value) {
+        const doc = clientImportDoc();
+        const safe = Math.max(0, Math.min(100, Number(value) || 0));
+        const fill = doc.getElementById('clientImportProgressFillTop');
+        const val = doc.getElementById('clientImportProgressValueTop');
+        if (fill) fill.style.width = safe + '%';
+        if (val) val.textContent = Math.round(safe) + '%';
+    }
+    function setClientImportStatus(text) {
+        const el = clientImportDoc().getElementById('clientImportStatusTop');
+        if (el) el.textContent = text || '';
+    }
+    function setClientImportLog(text) {
+        const el = clientImportDoc().getElementById('clientImportLogTop');
+        if (el) el.textContent = text || '';
+    }
+    async function readAllDirectoryEntries(reader) {
+        const entries = [];
+        while (true) {
+            const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+            if (!batch || !batch.length) break;
+            entries.push(...batch);
+        }
+        return entries;
+    }
+    async function walkDroppedEntry(entry, prefix) {
+        const out = [];
+        if (entry.isFile) {
+            const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+            out.push({file, rel: `${prefix}${file.name}`});
+            return out;
+        }
+        if (entry.isDirectory) {
+            const dirPrefix = `${prefix}${entry.name}/`;
+            const reader = entry.createReader();
+            const entries = await readAllDirectoryEntries(reader);
+            for (const child of entries) out.push(...await walkDroppedEntry(child, dirPrefix));
+        }
+        return out;
+    }
+    async function handleClientImportDrop(event) {
+        const doc = clientImportDoc();
+        const drop = doc.getElementById('clientImportDropZone');
+        if (drop) drop.classList.remove('is-over');
+        setClientImportLog('Lecture des dossiers déposés…');
+        let added = 0;
+        const items = Array.from(event.dataTransfer?.items || []);
+        if (items.length && items[0] && typeof items[0].webkitGetAsEntry === 'function') {
+            for (const item of items) {
+                const entry = item.webkitGetAsEntry();
+                if (!entry) continue;
+                if (!entry.isDirectory) continue;
+                const files = await walkDroppedEntry(entry, '');
+                files.forEach(({file, rel}) => { if (addClientImportFile(file, rel)) added += 1; });
+            }
+        } else {
+            const files = Array.from(event.dataTransfer?.files || []);
+            files.forEach(file => { if (addClientImportFile(file, file.webkitRelativePath || file.name)) added += 1; });
+        }
+        if (!added) setClientImportLog('Aucun dossier lisible reçu. Ton navigateur ne donne peut-être pas accès aux dossiers déposés. Essaie “Ajouter dossier”.');
+        else setClientImportLog(`${added} fichier(s) ajouté(s) depuis le dépôt.`);
+        renderClientImportSelection();
+    }
+    document.getElementById('clientImportInput')?.addEventListener('change', function() {
+        const files = Array.from(this.files || []);
+        let added = 0;
+        files.forEach(file => {
+            const rel = clientImportRelPath(file);
+            if (addClientImportFile(file, rel)) added += 1;
+        });
+        if (!added && files.length) {
+            setClientImportLog('Le navigateur a ouvert un sélecteur de fichiers au lieu d’un vrai dossier. Sur Firefox, l’import de dossiers dépend du support navigateur. Tu peux ajouter un dossier à la fois ou utiliser le glisser-déposer si disponible.');
+        } else if (added) {
+            setClientImportLog(`${added} fichier(s) ajouté(s). Tu peux ajouter un autre dossier avant de lancer l’import.`);
+        }
+        renderClientImportSelection();
+    });
+    function runClientImport() {
+        if (!clientImportItems.length) {
+            setClientImportLog('Aucun dossier sélectionné.');
+            return;
+        }
+        const doc = clientImportDoc();
+        const runBtn = doc.getElementById('clientImportRunBtnTop');
+        const closeBtn = doc.getElementById('clientImportCloseBtnTop');
+        if (runBtn) runBtn.disabled = true;
+        if (closeBtn) closeBtn.disabled = true;
+        setClientImportStatus('Importation en cours…\nEnvoi des dossiers du PC client vers le serveur.');
+        setClientImportLog('Préparation de l’envoi…');
+        setClientImportProgress(0);
+        const form = new FormData();
+        clientImportItems.forEach(item => {
+            form.append('files[]', item.file, item.rel);
+            form.append('relative_paths[]', item.rel);
+        });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', clientImportUploadUrl, true);
+        xhr.responseType = 'json';
+        xhr.upload.onprogress = function(event) {
+            if (event.lengthComputable) {
+                const pct = (event.loaded / event.total) * 100;
+                setClientImportProgress(pct);
+                setClientImportLog(`Importation en cours… ${Math.round(pct)}%`);
+            } else {
+                setClientImportLog('Importation en cours…');
+            }
+        };
+        xhr.onload = function() {
+            const payload = xhr.response || {};
+            if (xhr.status >= 200 && xhr.status < 300 && payload.ok) {
+                setClientImportProgress(100);
+                setClientImportStatus('Importation terminée.\nActualisation de la liste…');
+                setClientImportLog(payload.message || 'Import terminé.');
+                if (runBtn) runBtn.disabled = false;
+                if (closeBtn) closeBtn.disabled = false;
+                // Fermer la popup tout de suite : elle est dans la page parente.
+                // Ensuite seulement on prévient la page maître et on recharge l'iframe.
+                closeClientImportModal();
+                clientImportItems = [];
+                clientImportSeen = new Set();
+                const localInput = document.getElementById('clientImportInput');
+                if (localInput) localInput.value = '';
+                try {
+                    if (window.top && window.top !== window && window.top.postMessage) {
+                        window.top.postMessage({ type: 'builds:import-finished', tab: 'builds_tar' }, window.location.origin);
+                    }
+                } catch (e) {}
+                window.setTimeout(() => {
+                    window.location.reload();
+                }, 180);
+            } else {
+                setClientImportStatus('Erreur importation.');
+                setClientImportLog(payload.message || `Erreur HTTP ${xhr.status}`);
+                if (runBtn) runBtn.disabled = false;
+                if (closeBtn) closeBtn.disabled = false;
+            }
+        };
+        xhr.onerror = function() {
+            setClientImportStatus('Erreur réseau pendant l’importation.');
+            setClientImportLog('La connexion avec le serveur a échoué pendant l’envoi.');
+            if (runBtn) runBtn.disabled = false;
+            if (closeBtn) closeBtn.disabled = false;
+        };
+        xhr.send(form);
+    }
+    // ---------------------------------------------------------------------------
+    // Suppression dossier build : popup moderne, pas de confirm navigateur.
+    // ---------------------------------------------------------------------------
+    function buildDeleteDoc() {
+        try {
+            if (window.top && window.top.document && window.top.location.origin === window.location.origin) return window.top.document;
+        } catch (e) {}
+        return document;
+    }
+    function buildDeleteEscape(text) {
+        return String(text || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
+    function openDeleteBuildProject(name) {
+        const doc = buildDeleteDoc();
+        let overlay = doc.getElementById('buildDeleteOverlay');
+        if (!overlay) {
+            const wrap = doc.createElement('div');
+            wrap.innerHTML = `
+            <div id="buildDeleteOverlay" class="build-delete-overlay" style="display:none;">
+                <div class="build-delete-box">
+                    <div class="build-delete-title" id="buildDeleteTitle">Supprimer</div>
+                    <div class="build-delete-text" id="buildDeleteText"></div>
+                    <div class="build-delete-warn" id="buildDeleteWarn"></div>
+                    <pre class="build-delete-log" id="buildDeleteLog"></pre>
+                    <div class="build-delete-actions">
+                        <button type="button" class="yoleo-btn yoleo-btn-muted" data-action="cancel">Annuler</button>
+                        <button type="button" class="yoleo-btn yoleo-btn-red" data-action="confirm">Supprimer</button>
+            </div>`;
+            overlay = wrap.firstElementChild;
+            doc.body.appendChild(overlay);
+            overlay.addEventListener('click', event => {
+                const action = event.target && event.target.getAttribute && event.target.getAttribute('data-action');
+                if (action === 'cancel') overlay.style.display = 'none';
+                if (action === 'confirm') runDeleteBuildProject(overlay.dataset.name || '');
+            });
+        }
+        overlay.dataset.name = name;
+        doc.getElementById('buildDeleteTitle').textContent = 'Supprimer le Docker';
+        doc.getElementById('buildDeleteText').innerHTML = `Docker : <b>${buildDeleteEscape(name)}</b>`;
+        doc.getElementById('buildDeleteWarn').textContent = 'Suppression complète : dossier build, TAR éventuel, états internes et lignes registre/platforms/mode.';
+        doc.getElementById('buildDeleteLog').textContent = '';
+        overlay.querySelectorAll('button').forEach(btn => btn.disabled = false);
+        overlay.style.display = 'flex';
+    }
+    async function runDeleteBuildProject(name) {
+        const doc = buildDeleteDoc();
+        const overlay = doc.getElementById('buildDeleteOverlay');
+        const log = doc.getElementById('buildDeleteLog');
+        if (!overlay || !name) return;
+        overlay.querySelectorAll('button').forEach(btn => btn.disabled = true);
+        if (log) log.textContent = 'Suppression en cours…';
+        try {
+            const response = await fetch(buildDeleteProjectUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+            if (log) log.textContent = payload.message || 'Docker supprimé.';
+            // IMPORTANT : la popup est dans le document parent. Si on prévient le parent
+            // avant de la fermer, l'iframe peut se recharger et le setTimeout est annulé,
+            // ce qui laisse la popup bloquée à l'écran. On la retire donc AVANT toute
+            // notification/reload.
+            try { overlay.remove(); } catch (e) { overlay.style.display = 'none'; }
+            try {
+                localStorage.setItem('builds_refresh_stamp', String(Date.now()));
+                if (window.top && window.top !== window && window.top.postMessage) {
+                    window.top.postMessage({ type: 'builds:task-finished', action: 'delete_project', name }, window.location.origin);
+                }
+            } catch (e) {}
+            window.setTimeout(() => { window.location.reload(); }, 80);
+        } catch (err) {
+            if (log) log.textContent = String(err && (err.message || err) || 'Erreur suppression.');
+            overlay.querySelectorAll('button').forEach(btn => btn.disabled = false);
+        }
+    }
+    </script>
+{% endblock %}

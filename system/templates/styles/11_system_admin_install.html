@@ -1,0 +1,492 @@
+    /* ------------------------------------------------------------------
+       Module Système - styles migrés depuis system_system.html
+       CSS centralisé : les templates system*.html ne contiennent pas de <style>.
+       ------------------------------------------------------------------ */
+* { box-sizing: border-box; }
+    html, body { background:#0b111a; color:#eaf2ff; overflow-x:hidden; }
+
+    .mini-page { padding:16px 18px 34px; display:flex; justify-content:center; }
+    .mini-panel { width:100%; max-width:1420px; }
+
+    .tabs-shell {
+        background:#121a26;
+        border:1px solid #273447;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 12px 26px rgba(0,0,0,.24);
+    }
+    .tabs-bar {
+        display:flex;
+        gap:0;
+        background:#0f1620;
+        border-bottom:1px solid #273447;
+        overflow-x:auto;
+    }
+    .tab-btn {
+        border:0;
+        background:transparent;
+        color:#b8c7d8;
+        padding:14px 18px;
+        min-height:48px;
+        cursor:pointer;
+        font-weight:900;
+        white-space:nowrap;
+        border-bottom:3px solid transparent;
+    }
+    .tab-btn.active {
+        color:#1AEBFF;
+        border-bottom-color:#1AEBFF;
+        background:rgba(26,235,255,.07);
+    }
+    .tab-panel { display:none; padding:16px; }
+    .tab-panel.active { display:block; }
+
+    .topbar {
+        display:grid;
+        grid-template-columns:1fr auto;
+        gap:14px;
+        align-items:start;
+        margin-bottom:14px;
+    }
+    .title-block h1, .title-block h2 {
+        margin:0;
+        color:#fff;
+        letter-spacing:-.2px;
+    }
+    .title-block h1 { font-size:24px; }
+    .title-block h2 { font-size:21px; }
+    .subtitle, .hint {
+        color:#99acc2;
+        line-height:1.45;
+    }
+    .subtitle { margin-top:6px; }
+    .hint { font-size:12px; margin-top:6px; }
+
+    .toolbar {
+        display:flex;
+        gap:8px;
+        flex-wrap:wrap;
+        justify-content:flex-end;
+        align-items:center;
+    }
+
+    .card {
+        background:linear-gradient(180deg,#131d2b 0%,#101722 100%);
+        border:1px solid #26364b;
+        border-radius:16px;
+        padding:14px;
+        margin-bottom:14px;
+        box-shadow:0 14px 30px rgba(0,0,0,.18);
+    }
+    .card-head {
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:12px;
+        flex-wrap:wrap;
+        border-bottom:1px solid #273447;
+        padding-bottom:10px;
+        margin-bottom:12px;
+    }
+    .card-title {
+        color:#1AEBFF;
+        margin:0;
+        font-size:17px;
+    }
+
+    .summary-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+        gap:8px;
+        margin-bottom:14px;
+    }
+    .summary-card {
+        background:#0e1723;
+        border:1px solid #25364b;
+        border-radius:13px;
+        padding:10px 12px;
+        min-width:0;
+    }
+    .summary-label {
+        color:#8ba0b8;
+        font-size:10px;
+        text-transform:uppercase;
+        letter-spacing:.45px;
+    }
+    .summary-value {
+        color:#fff;
+        font-size:21px;
+        font-weight:900;
+        margin-top:4px;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+    }
+    .summary-value.small {
+        font-size:13px;
+        font-family:Consolas, Monaco, monospace;
+    }
+
+    input, select {
+        width:100%;
+        background:#07101b;
+        border:1px solid #2b3d55;
+        color:#eaf2ff;
+        border-radius:10px;
+        padding:9px 10px;
+        outline:none;
+        min-height:38px;
+    }
+    input:focus, select:focus {
+        border-color:#1AEBFF;
+        box-shadow:0 0 0 3px rgba(26,235,255,.12);
+    }
+    .filter-input { min-width:260px; max-width:360px; }
+
+    .mono { font-family:Consolas, Monaco, monospace; }
+
+    .badge {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:999px;
+        padding:5px 8px;
+        font-size:10px;
+        font-weight:900;
+        white-space:nowrap;
+        border:1px solid rgba(26,235,255,.25);
+        background:rgba(26,235,255,.10);
+        color:#9debff;
+    }
+    .badge-ok {
+        background:rgba(76,175,80,.15);
+        color:#98f2a2;
+        border-color:rgba(76,175,80,.28);
+    }
+    .badge-no {
+        background:rgba(244,67,54,.13);
+        color:#ff9e9e;
+        border-color:rgba(244,67,54,.27);
+    }
+    .badge-warn {
+        background:rgba(249,168,37,.14);
+        color:#ffd089;
+        border-color:rgba(249,168,37,.28);
+    }
+    .badge-muted {
+        background:rgba(145,166,189,.10);
+        color:#b7c5d4;
+        border-color:rgba(145,166,189,.20);
+    }
+
+    .table-wrap {
+        border:1px solid #26364b;
+        border-radius:14px;
+        overflow:auto;
+        background:#0c131e;
+    }
+    .mini-table {
+        width:100%;
+        min-width:900px;
+        border-collapse:collapse;
+    }
+    .mini-table th {
+        position:sticky;
+        top:0;
+        z-index:1;
+        background:#1a2636;
+        color:#a8eaff;
+        text-transform:uppercase;
+        letter-spacing:.35px;
+        font-size:10px;
+        text-align:left;
+        padding:10px 9px;
+        border-bottom:1px solid #30435b;
+    }
+    .mini-table td {
+        padding:8px 9px;
+        border-bottom:1px solid #1d2c3f;
+        vertical-align:middle;
+    }
+    .mini-table tr:last-child td { border-bottom:none; }
+    .mini-table tbody tr:hover td { background:rgba(255,255,255,.025); }
+    .col-actions { width:220px; text-align:right; }
+    .row-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+
+    .name-main { color:#fff; font-weight:900; }
+    .name-sub {
+        color:#99acc2;
+        font-size:12px;
+        margin-top:3px;
+        line-height:1.35;
+    }
+    .detail-text {
+        color:#cfe1f5;
+        font-size:12px;
+        max-width:540px;
+        white-space:pre-wrap;
+        word-break:break-word;
+    }
+
+    .install-progress-wrap {
+        display:grid;
+        gap:6px;
+        min-width:220px;
+        max-width:360px;
+    }
+    .install-progress-line {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        color:#dceaff;
+        font-size:12px;
+        font-weight:800;
+    }
+    .install-progress-line b {
+        color:#8fa5bb;
+        font-size:10px;
+        text-transform:uppercase;
+        letter-spacing:.35px;
+        white-space:nowrap;
+    }
+    .install-progress-line a {
+        color:#ff9e9e;
+        font-size:10px;
+        font-weight:900;
+        text-transform:uppercase;
+        letter-spacing:.35px;
+        text-decoration:none;
+        white-space:nowrap;
+    }
+    .install-progress-line a:hover {
+        color:#ffd5d5;
+        text-decoration:underline;
+    }
+    .install-progress-track {
+        height:10px;
+        border-radius:999px;
+        overflow:hidden;
+        border:1px solid rgba(255,255,255,.08);
+        background:#050a11;
+    }
+    .install-progress-track span {
+        display:block;
+        height:100%;
+        border-radius:999px;
+        background:#6d7885;
+        transition:width .22s ease;
+    }
+    .install-progress-wrap.is-running .install-progress-track span {
+        background:linear-gradient(90deg,#1AEBFF,#8e5cff,#1AEBFF);
+        background-size:220% 100%;
+        animation:systemInstallProgress 1.1s linear infinite;
+    }
+    .install-progress-wrap.is-running .install-progress-line b {
+        color:#ffd089;
+    }
+    .install-progress-wrap.is-success .install-progress-track span {
+        background:#4caf50;
+    }
+    .install-progress-wrap.is-success .install-progress-line b {
+        color:#98f2a2;
+    }
+    .install-progress-wrap.is-error .install-progress-track span {
+        background:#f44336;
+    }
+    .install-progress-wrap.is-error .install-progress-line b {
+        color:#ff9e9e;
+    }
+    .install-progress-wrap.is-idle {
+        opacity:.78;
+    }
+    @keyframes systemInstallProgress {
+        from { background-position:0% 0; }
+        to { background-position:220% 0; }
+    }
+
+    .path-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+        gap:8px;
+        margin-bottom:14px;
+    }
+    .path-pill {
+        min-width:0;
+        display:flex;
+        gap:8px;
+        align-items:center;
+        padding:8px 10px;
+        border-radius:12px;
+        background:rgba(0,0,0,.22);
+        border:1px solid #26364b;
+        color:#cfe1f5;
+        font-family:Consolas, Monaco, monospace;
+        font-size:12px;
+    }
+    .path-pill b {
+        color:#72eaff;
+        white-space:nowrap;
+    }
+    .path-pill span {
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+    }
+
+    .code-box {
+        background:#05080d;
+        border:1px solid #26364b;
+        color:#d9e7f5;
+        border-radius:12px;
+        padding:12px;
+        white-space:pre-wrap;
+        font-family:Consolas, Monaco, monospace;
+        font-size:12px;
+        line-height:1.42;
+        max-height:420px;
+        overflow:auto;
+    }
+
+    .status-line {
+        display:grid;
+        grid-template-columns:180px 1fr;
+        gap:8px;
+        padding:8px 0;
+        border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .status-line:last-child { border-bottom:0; }
+    .status-k {
+        color:#9fdfff;
+        text-transform:uppercase;
+        font-size:10px;
+        font-weight:900;
+        letter-spacing:.35px;
+    }
+    .status-v {
+        min-width:0;
+        word-break:break-word;
+        color:#dbe7f3;
+    }
+
+    .update-check {
+        width:18px;
+        height:18px;
+        accent-color:#1AEBFF;
+        min-height:18px;
+        padding:0;
+    }
+
+    .conf-reset-check {
+        width:18px;
+        height:18px;
+        min-height:18px;
+        padding:0;
+        accent-color:#1AEBFF;
+    }
+    .danger-note {
+        background:rgba(201,58,58,.10);
+        border:1px solid rgba(201,58,58,.34);
+        color:#ffd5d5;
+        border-radius:13px;
+        padding:12px;
+        line-height:1.45;
+        margin-bottom:12px;
+    }
+    .log-box-tall {
+        min-height:360px;
+        height:min(54vh, 620px);
+        max-height:72vh;
+        resize:vertical;
+    }
+    .action-modal {
+        position:fixed;
+        inset:0;
+        z-index:99999;
+        display:none;
+        align-items:center;
+        justify-content:center;
+        padding:18px;
+        background:rgba(0,0,0,.78);
+        backdrop-filter:blur(4px);
+    }
+    .action-modal-box {
+        width:min(1080px, 96vw);
+        height:min(760px, calc(100vh - 36px));
+        max-height:92vh;
+        background:#121d2b;
+        border:1px solid #33475f;
+        border-radius:18px;
+        box-shadow:0 24px 70px rgba(0,0,0,.58);
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+    }
+    .action-modal-head {
+        padding:14px 16px;
+        border-bottom:1px solid #2b3d55;
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        align-items:flex-start;
+        background:#0f1724;
+    }
+    .action-modal-title {
+        margin:0;
+        color:#1AEBFF;
+        font-size:19px;
+        font-weight:900;
+    }
+    .action-modal-subtitle {
+        margin-top:5px;
+        color:#9bb0c5;
+        font-size:12px;
+        line-height:1.35;
+    }
+    .action-modal-body {
+        flex:1 1 auto;
+        min-height:0;
+        display:flex;
+        padding:14px 16px;
+        overflow:hidden;
+    }
+    .action-modal-log {
+        flex:1 1 auto;
+        min-height:0;
+        background:#04070c;
+        border:1px solid #26364b;
+        color:#d9e7f5;
+        border-radius:14px;
+        padding:12px;
+        overflow:auto;
+        white-space:pre-wrap;
+        font-family:Consolas, Monaco, monospace;
+        font-size:12px;
+        line-height:1.42;
+    }
+    .action-modal-foot {
+        display:flex;
+        gap:8px;
+        justify-content:flex-end;
+        padding:12px 16px;
+        border-top:1px solid #2b3d55;
+        background:#0f1724;
+    }
+
+    @media (max-width:900px) {
+        .mini-page { padding:10px; }
+        .tab-panel { padding:10px; }
+        .topbar { grid-template-columns:1fr; }
+        .toolbar { justify-content:stretch; }
+        .filter-input { min-width:0; max-width:none; }
+        .summary-grid { grid-template-columns:repeat(2,minmax(110px,1fr)); }
+        .status-line { grid-template-columns:1fr; }
+        .mini-table, .mini-table thead, .mini-table tbody, .mini-table th, .mini-table td, .mini-table tr { display:block; }
+        .mini-table { min-width:0; }
+        .mini-table thead { display:none; }
+        .mini-table tr { border-bottom:1px solid #26364b; padding:8px 0; }
+        .mini-table td { border-bottom:0; padding:7px 10px; }
+        .row-actions { justify-content:flex-start; }
+        .col-actions { width:auto; text-align:left; }
+    }
+

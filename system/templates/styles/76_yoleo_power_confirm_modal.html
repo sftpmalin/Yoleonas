@@ -1,0 +1,394 @@
+
+    /* ------------------------------------------------------------------
+       Popup de confirmation pour arrêt / redémarrage serveur
+       ------------------------------------------------------------------ */
+    .yoleo-power-confirm-modal[hidden],
+    .yoleo-power-confirm-modal[aria-hidden="true"] {
+        display: none !important;
+    }
+
+    .yoleo-power-confirm-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 10050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+    }
+
+    .yoleo-power-confirm-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, .68);
+        backdrop-filter: blur(4px);
+    }
+
+    .yoleo-power-confirm-box {
+        position: relative;
+        z-index: 1;
+        width: min(560px, calc(100vw - 36px));
+        overflow: hidden;
+        border: 1px solid rgba(255, 93, 115, .42);
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(18, 26, 36, .98), rgba(11, 17, 25, .98));
+        box-shadow: 0 28px 90px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .04) inset;
+    }
+
+    .yoleo-power-confirm-header {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px 10px 16px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        background: rgba(255, 93, 115, .08);
+    }
+
+    .yoleo-power-confirm-titlebox {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        color: var(--yoleo-text);
+        font-size: 15px;
+        font-weight: 900;
+    }
+
+    .yoleo-power-confirm-icon {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 93, 115, .36);
+        border-radius: 10px;
+        background: rgba(255, 93, 115, .12);
+        flex: 0 0 auto;
+    }
+
+    .yoleo-power-confirm-close {
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, .06);
+        color: var(--yoleo-text);
+        cursor: pointer;
+        font-size: 22px;
+        line-height: 1;
+    }
+
+    .yoleo-power-confirm-close:hover {
+        border-color: var(--yoleo-danger);
+        background: rgba(255, 93, 115, .16);
+    }
+
+    .yoleo-power-confirm-body {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .yoleo-power-confirm-message {
+        margin: 0;
+        color: var(--yoleo-text);
+        font-size: 15px;
+        font-weight: 900;
+    }
+
+    .yoleo-power-confirm-detail {
+        margin: 0;
+        color: var(--yoleo-muted);
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .yoleo-power-confirm-checkline {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 42px;
+        margin-top: 2px;
+        padding: 10px 12px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, .18);
+        color: var(--yoleo-text);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .yoleo-power-confirm-checkline input {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--yoleo-danger);
+        flex: 0 0 auto;
+    }
+
+    .yoleo-power-confirm-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 12px 16px 16px;
+        border-top: 1px solid var(--yoleo-border-soft);
+    }
+
+    .yoleo-power-confirm-btn {
+        min-height: 34px;
+        padding: 7px 13px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, .06);
+        color: var(--yoleo-text);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
+    .yoleo-power-confirm-btn:hover:not(:disabled) {
+        border-color: var(--yoleo-accent-2);
+        background: rgba(26, 235, 255, .10);
+    }
+
+    .yoleo-power-confirm-btn-danger {
+        border-color: rgba(255, 93, 115, .58);
+        background: rgba(255, 93, 115, .16);
+        color: #ffe8ec;
+    }
+
+    .yoleo-power-confirm-btn-danger:hover:not(:disabled) {
+        border-color: var(--yoleo-danger);
+        background: rgba(255, 93, 115, .26);
+    }
+
+    .yoleo-power-confirm-btn:disabled {
+        opacity: .42;
+        cursor: not-allowed;
+        filter: grayscale(.35);
+    }
+
+    body.yoleo-power-modal-open {
+        overflow: hidden;
+    }
+
+    /* ------------------------------------------------------------------
+       Suivi non bloquant d'un redémarrage Flask / serveur
+       ------------------------------------------------------------------ */
+    .yoleo-restart-progress-modal[hidden],
+    .yoleo-restart-progress-modal[aria-hidden="true"] {
+        display: none !important;
+    }
+
+    .yoleo-restart-progress-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 10060;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+    }
+
+    .yoleo-restart-progress-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(4, 10, 18, .82);
+        backdrop-filter: blur(7px);
+    }
+
+    .yoleo-restart-progress-box {
+        position: relative;
+        z-index: 1;
+        width: min(500px, calc(100vw - 36px));
+        overflow: hidden;
+        border: 1px solid rgba(26, 235, 255, .36);
+        border-radius: 20px;
+        background: linear-gradient(160deg, rgba(19, 32, 47, .99), rgba(8, 15, 25, .99));
+        box-shadow: 0 28px 95px rgba(0, 0, 0, .62), 0 0 40px rgba(26, 235, 255, .08) inset;
+    }
+
+    .yoleo-restart-progress-header {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-height: 72px;
+        padding: 15px 18px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        background: rgba(26, 235, 255, .055);
+    }
+
+    .yoleo-restart-progress-header > div {
+        display: grid;
+        gap: 3px;
+    }
+
+    .yoleo-restart-progress-header strong {
+        color: var(--yoleo-text);
+        font-size: 16px;
+        font-weight: 900;
+    }
+
+    .yoleo-restart-progress-subtitle {
+        color: var(--yoleo-muted);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .yoleo-restart-progress-icon {
+        width: 38px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        border: 2px solid rgba(26, 235, 255, .75);
+        border-top-color: transparent;
+        border-radius: 50%;
+        color: var(--yoleo-accent-2);
+        font-size: 22px;
+        font-weight: 900;
+        animation: yoleo-restart-spin 1s linear infinite;
+    }
+
+    .yoleo-restart-progress-body {
+        display: grid;
+        gap: 14px;
+        padding: 20px;
+    }
+
+    .yoleo-restart-progress-timer {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 13px 15px;
+        border: 1px solid rgba(26, 235, 255, .18);
+        border-radius: 13px;
+        background: rgba(0, 0, 0, .2);
+    }
+
+    .yoleo-restart-progress-timer-label {
+        color: var(--yoleo-muted);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+    }
+
+    .yoleo-restart-progress-timer strong {
+        color: var(--yoleo-accent-2);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 27px;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: .04em;
+    }
+
+    .yoleo-restart-progress-status,
+    .yoleo-restart-progress-detail {
+        margin: 0;
+    }
+
+    .yoleo-restart-progress-status {
+        color: var(--yoleo-text);
+        font-size: 15px;
+        font-weight: 900;
+        line-height: 1.4;
+    }
+
+    .yoleo-restart-progress-detail {
+        color: var(--yoleo-muted);
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.5;
+    }
+
+    .yoleo-restart-progress-probe {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-height: 36px;
+        padding: 9px 11px;
+        border: 1px solid rgba(115, 153, 183, .2);
+        border-radius: 11px;
+        background: rgba(255, 255, 255, .035);
+        color: var(--yoleo-muted);
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .yoleo-restart-progress-probe-dot {
+        width: 9px;
+        height: 9px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: var(--yoleo-accent-2);
+        box-shadow: 0 0 0 0 rgba(26, 235, 255, .55);
+        animation: yoleo-restart-pulse 1.6s ease-out infinite;
+    }
+
+    .yoleo-restart-progress-modal.is-restored .yoleo-restart-progress-box {
+        border-color: rgba(46, 219, 128, .56);
+        box-shadow: 0 28px 95px rgba(0, 0, 0, .62), 0 0 42px rgba(46, 219, 128, .1) inset;
+    }
+
+    .yoleo-restart-progress-modal.is-restored .yoleo-restart-progress-icon {
+        border-color: rgba(46, 219, 128, .56);
+        background: rgba(46, 219, 128, .14);
+        color: #6df0aa;
+        animation: none;
+    }
+
+    .yoleo-restart-progress-probe.is-restored {
+        border-color: rgba(46, 219, 128, .35);
+        color: #a2efc4;
+    }
+
+    .yoleo-restart-progress-probe.is-restored .yoleo-restart-progress-probe-dot {
+        background: #37dd86;
+        box-shadow: 0 0 0 5px rgba(55, 221, 134, .1);
+        animation: none;
+    }
+
+    body.yoleo-restart-progress-open {
+        overflow: hidden;
+    }
+
+    @keyframes yoleo-restart-spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @keyframes yoleo-restart-pulse {
+        70% { box-shadow: 0 0 0 8px rgba(26, 235, 255, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(26, 235, 255, 0); }
+    }
+
+    @media (max-width: 560px) {
+        .yoleo-power-confirm-modal {
+            align-items: flex-end;
+            padding: 12px;
+        }
+
+        .yoleo-power-confirm-footer {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+
+        .yoleo-power-confirm-btn {
+            width: 100%;
+        }
+
+        .yoleo-restart-progress-modal {
+            align-items: flex-end;
+            padding: 12px;
+        }
+
+        .yoleo-restart-progress-body {
+            padding: 16px;
+        }
+    }

@@ -1,0 +1,546 @@
+/* Popup ttyd Docker : logs et docker exec en vrai terminal */
+.docker-state-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
+.docker-ttyd-btn {
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+    padding: 0;
+    line-height: 1;
+}
+
+.docker-ttyd-modal[hidden] {
+    display: none !important;
+}
+
+.docker-ttyd-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3vh 3vw;
+}
+
+.docker-ttyd-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(5px);
+}
+
+.docker-ttyd-modal-box {
+    position: relative;
+    width: min(1280px, 94vw);
+    height: min(820px, 88vh);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--panel);
+    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
+}
+
+.docker-ttyd-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 42px;
+    padding: 0.55rem 0.75rem 0.55rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.92);
+}
+
+.docker-ttyd-modal-close {
+    width: 2.15rem;
+    height: 2.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1.25rem;
+}
+
+.docker-ttyd-modal-frame {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 0;
+    background: #000;
+}
+
+body.docker-ttyd-modal-open {
+    overflow: hidden;
+}
+
+@media (max-width: 760px) {
+    .docker-ttyd-modal { padding: 0.75rem; }
+    .docker-ttyd-modal-box { width: 100%; height: 92vh; }
+}
+
+
+
+    /* Docker LAN : compteurs compacts + actions sur la même ligne */
+    .docker-lan-overview {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: stretch;
+        margin-bottom: 10px;
+    }
+
+    .docker-lan-summary-grid {
+        grid-template-columns: repeat(4, minmax(96px, 1fr));
+        gap: 8px;
+        margin-bottom: 0;
+    }
+
+    .docker-lan-summary-grid .summary-card {
+        min-height: 62px;
+        padding: 10px 12px;
+    }
+
+    .docker-lan-top-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: nowrap;
+        align-self: center;
+    }
+
+    .docker-lan-stream-log {
+        display: none;
+        margin: 10px 12px 12px;
+    }
+
+    @media (max-width: 1100px) {
+        .docker-lan-overview { grid-template-columns: 1fr; }
+        .docker-lan-top-actions { justify-content: flex-start; flex-wrap: wrap; }
+    }
+
+    @media (max-width: 760px) {
+        .docker-lan-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+
+
+    /* Docker Compose compact action bar */
+    .docker-compose-panel {
+        display: grid;
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .docker-compose-toolbar {
+        display: flex;
+        align-items: stretch;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .docker-compose-summary {
+        display: grid;
+        grid-template-columns: minmax(80px, 110px) minmax(80px, 110px) minmax(180px, 280px);
+        gap: 8px;
+        min-width: 0;
+        flex: 1 1 auto;
+        max-width: 520px;
+    }
+
+    .docker-compose-mini-card {
+        min-height: 48px;
+        padding: 8px 10px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 10px;
+        background: rgba(14, 25, 38, 0.82);
+    }
+
+    .docker-compose-mini-card .summary-label {
+        font-size: 10px;
+        line-height: 1.1;
+        margin-bottom: 3px;
+    }
+
+    .docker-compose-mini-card .summary-value {
+        font-size: 19px;
+        line-height: 1.15;
+    }
+
+    .docker-compose-path-card .summary-value {
+        font-size: 12px;
+        line-height: 1.08;
+        font-weight: 750;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .docker-compose-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        flex: 0 0 auto;
+        padding-left: 8px;
+    }
+
+    .docker-compose-actions .yoleo-btn {
+        width: auto;
+        min-width: 0;
+        padding-left: 14px;
+        padding-right: 14px;
+        white-space: nowrap;
+    }
+
+    .docker-compose-log-box {
+        margin: 0;
+    }
+
+    @media (max-width: 1100px) {
+        .docker-compose-toolbar {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .docker-compose-summary {
+            width: 100%;
+            max-width: none;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .docker-compose-actions {
+            width: 100%;
+            justify-content: flex-start;
+            padding-left: 0;
+            flex-wrap: wrap;
+        }
+    }
+
+    @media (max-width: 720px) {
+        .docker-compose-summary {
+            grid-template-columns: 1fr;
+        }
+    }
+
+
+    /* Docker conteneurs : résumé compact + actions Compose intégrées */
+    .docker-containers-summary-compact {
+        grid-template-columns: repeat(7, minmax(92px, 1fr));
+        gap: 7px;
+        margin-bottom: 10px;
+    }
+
+    .docker-containers-summary-compact .summary-card {
+        min-height: 54px;
+        padding: 8px 10px;
+    }
+
+    .docker-containers-summary-compact .summary-label {
+        font-size: 10px;
+        line-height: 1.1;
+        margin-bottom: 3px;
+    }
+
+    .docker-containers-summary-compact .summary-value {
+        font-size: 18px;
+        line-height: 1.15;
+    }
+
+    .docker-containers-summary-compact .docker-compose-path-card {
+        min-width: 160px;
+    }
+
+    .docker-containers-actions-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 10px 12px;
+        border-bottom: 1px solid var(--yoleo-border);
+        flex-wrap: nowrap;
+    }
+
+    .docker-compose-inline-zone,
+    .docker-service-inline-zone {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .docker-compose-inline-zone {
+        flex: 1 1 auto;
+        justify-content: flex-start;
+    }
+
+    .docker-service-inline-zone {
+        flex: 0 0 auto;
+        justify-content: flex-end;
+    }
+
+    .docker-compose-inline-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 0 0 auto;
+    }
+
+    .docker-compose-inline-actions .yoleo-btn,
+    .docker-service-inline-zone .yoleo-btn {
+        width: auto;
+        min-width: 0;
+        white-space: nowrap;
+    }
+
+    .docker-compose-progress-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        gap: 4px;
+        min-width: 170px;
+        max-width: 330px;
+        flex: 1 1 240px;
+    }
+
+    .docker-compose-progress-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .docker-compose-status-line {
+        min-height: 14px;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 11px;
+        line-height: 1.1;
+        font-weight: 750;
+        color: var(--yoleo-muted);
+        text-align: left;
+    }
+
+    .docker-compose-status-line.ok {
+        color: #bbf7d0;
+    }
+
+    .docker-compose-status-line.bad {
+        color: #fecaca;
+    }
+
+    .docker-compose-progress-bar {
+        position: relative;
+        overflow: hidden;
+        height: 10px;
+        flex: 1 1 auto;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.96);
+        border: 1px solid rgba(148, 163, 184, 0.24);
+    }
+
+    .docker-compose-progress-bar span {
+        display: block;
+        height: 100%;
+        width: 0%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #0891b2, #22c55e);
+        transition: width .25s ease;
+    }
+
+    .docker-compose-progress-wrap.is-bad .docker-compose-progress-bar span {
+        background: linear-gradient(90deg, #ef4444, #f97316);
+    }
+
+    .docker-compose-progress-text {
+        flex: 0 0 auto;
+        min-width: 42px;
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--yoleo-muted);
+        text-align: right;
+    }
+
+    .docker-compose-log-open.is-bad {
+        border-color: rgba(239, 68, 68, 0.72);
+        color: #fecaca;
+        background: rgba(127, 29, 29, 0.62);
+    }
+
+    .docker-compose-log-open.is-ok {
+        border-color: rgba(34, 197, 94, 0.55);
+        color: #bbf7d0;
+    }
+
+    .docker-compose-inline-log {
+        display: none !important;
+    }
+
+    .docker-page[data-active-tab="docker"] .table-wrap {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow-x: hidden;
+    }
+
+    .docker-page[data-active-tab="docker"] #docker-live-area,
+    .docker-page[data-active-tab="docker"] .docker-section {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0 !important;
+        table-layout: fixed;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table th,
+    .docker-page[data-active-tab="docker"] .docker-table td {
+        min-width: 0;
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table th:nth-child(1),
+    .docker-page[data-active-tab="docker"] .docker-table td:nth-child(1) {
+        width: 17%;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table th:nth-child(2),
+    .docker-page[data-active-tab="docker"] .docker-table td:nth-child(2) {
+        width: 17%;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table th:nth-child(3),
+    .docker-page[data-active-tab="docker"] .docker-table td:nth-child(3) {
+        width: 24%;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table th:nth-child(4),
+    .docker-page[data-active-tab="docker"] .docker-table td:nth-child(4) {
+        width: 15%;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table th:nth-child(5),
+    .docker-page[data-active-tab="docker"] .docker-table td:nth-child(5) {
+        width: 11%;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table th:nth-child(6),
+    .docker-page[data-active-tab="docker"] .docker-table td:nth-child(6) {
+        width: 16%;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table .actions-line {
+        justify-content: flex-start;
+        gap: 5px;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table .yoleo-btn-icon,
+    .docker-page[data-active-tab="docker"] .docker-table .docker-ttyd-btn {
+        width: 30px;
+        min-width: 30px;
+        max-width: 30px;
+        height: 30px;
+        min-height: 30px;
+        padding: 0;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-name-cell {
+        display: table-cell;
+        min-width: 0;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-name-cell span {
+        display: inline-block;
+        max-width: calc(100% - 44px);
+        vertical-align: middle;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-table .mono {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-icon {
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-service-inline-zone {
+        max-width: 100%;
+    }
+
+    .docker-page[data-active-tab="docker"] .docker-service-inline-zone > .yoleo-btn-compact,
+    .docker-page[data-active-tab="docker"] .docker-service-inline-zone .actions-line .yoleo-btn-compact {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    @media (max-width: 1350px) {
+        .docker-containers-summary-compact { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .docker-containers-actions-row { align-items: flex-start; flex-direction: column; }
+        .docker-compose-inline-zone, .docker-service-inline-zone { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
+        .docker-compose-progress-wrap { max-width: none; }
+    }
+
+    @media (max-width: 760px) {
+        .docker-containers-summary-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .docker-compose-inline-zone, .docker-service-inline-zone, .docker-compose-inline-actions { flex-wrap: wrap; }
+    }
+
+
+
+    /* Correctif final Personnalisation > Menu : les boutons des champs restent à côté de l'input.
+       Une ancienne règle globale .field-row du module Build repassait ces lignes en grille,
+       ce qui faisait descendre 📂 / 💾 sous le champ. */
+    .pers-menu-folder-page .pers-menu-field-row,
+    .pers-menu-folder-page .pers-menu-identity-grid .field-row,
+    .pers-menu-folder-page .pers-menu-entry-row .menu-icon-row,
+    .pers-menu-folder-page .pers-menu-folder-edit-grid .menu-icon-row {
+        display:flex !important;
+        flex-direction:row !important;
+        flex-wrap:nowrap !important;
+        align-items:center !important;
+        gap:6px;
+    }
+    .pers-menu-folder-page .pers-menu-field-row .input,
+    .pers-menu-folder-page .pers-menu-entry-row .menu-icon-row .input,
+    .pers-menu-folder-page .pers-menu-folder-edit-grid .menu-icon-row .input {
+        flex:1 1 auto;
+        min-width:0;
+    }
+    .pers-menu-folder-page .pers-menu-field-row .yoleo-btn-icon,
+    .pers-menu-folder-page .pers-menu-entry-row .menu-icon-row .yoleo-btn-icon,
+    .pers-menu-folder-page .pers-menu-folder-edit-grid .menu-icon-row .yoleo-btn-icon {
+        flex:0 0 30px;
+        width:30px;
+        min-width:30px;
+    }
+    .pers-menu-folder-page .pers-menu-identity-grid {
+        grid-template-columns:minmax(185px, 240px) minmax(195px, 260px) minmax(330px, 430px);
+        justify-content:start;
+        align-items:end;
+    }
+    @media (max-width: 900px) {
+        .pers-menu-folder-page .pers-menu-identity-grid {
+            grid-template-columns:1fr;
+        }
+    }

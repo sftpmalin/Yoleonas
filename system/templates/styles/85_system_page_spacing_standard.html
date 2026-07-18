@@ -1,0 +1,78 @@
+/* ------------------------------------------------------------------
+   Standard d'espacement vertical des pages Système.
+   Objectif : une seule hauteur de départ sous le bandeau haut commun,
+   sans empiler le padding du vieux .system-tab-panel avec le padding
+   des pages internes (.mini-page, .svc-page, .mdns-page, etc.).
+   ------------------------------------------------------------------ */
+
+.yoleo-content > .system-tab-panel.active {
+    display: block !important;
+    padding: 0 !important;
+}
+
+.yoleo-content > .system-tab-panel.active > :where(
+    .mini-page,
+    .svc-page,
+    .mdns-page,
+    .lan-page,
+    .system-tools-page
+) {
+    width: 100%;
+    padding: var(--yoleo-page-gap-top) var(--yoleo-page-gap-x) var(--yoleo-page-gap-bottom) !important;
+    margin-top: 0 !important;
+}
+
+.yoleo-content > .system-tab-panel.active > :where(
+    .mini-page,
+    .svc-page,
+    .mdns-page,
+    .lan-page
+) {
+    display: flex;
+    justify-content: center;
+}
+
+.yoleo-content > .system-tab-panel.active > :where(
+    .mini-page,
+    .svc-page,
+    .mdns-page,
+    .lan-page
+) > :where(
+    .mini-panel,
+    .svc-panel,
+    .mdns-panel,
+    .lan-panel
+) {
+    width: 100%;
+    margin-top: 0 !important;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.yoleo-content > .system-tab-panel.active > .system-tools-page {
+    max-width: var(--yoleo-content-wide);
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.yoleo-content > .system-tab-panel.active > .system-tools-page > .system-tool-card {
+    width: 100%;
+    margin-top: 0 !important;
+}
+
+/* Les pages de personnalisation utilisent deja le conteneur standard .pers-page. */
+.yoleo-content > .pers-page {
+    margin-top: var(--yoleo-page-gap-top) !important;
+}
+
+@media (max-width: 900px) {
+    .yoleo-content > .system-tab-panel.active > :where(
+        .mini-page,
+        .svc-page,
+        .mdns-page,
+        .lan-page,
+        .system-tools-page
+    ) {
+        padding: var(--yoleo-page-gap-top) var(--yoleo-page-gap-x) var(--yoleo-page-gap-bottom) !important;
+    }
+}

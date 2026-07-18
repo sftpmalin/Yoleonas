@@ -1,0 +1,69 @@
+/* Maintenance disques : pop-up montage compacte.
+   Périphérique + chemin sur une ligne, filesystem + options sur une ligne. */
+.mount-modal-compact {
+    width: min(720px, 100%);
+    max-height: min(86vh, 560px);
+}
+
+.mount-modal-body {
+    gap: 8px;
+    padding: 12px 14px;
+}
+
+.mount-modal-row {
+    display: grid;
+    align-items: end;
+    column-gap: 12px;
+    row-gap: 8px;
+}
+
+.mount-modal-row-target {
+    grid-template-columns: minmax(170px, 30%) minmax(0, 1fr);
+}
+
+.mount-modal-row-options {
+    grid-template-columns: minmax(130px, 150px) minmax(0, 1fr);
+}
+
+.mount-modal-row .form-row {
+    margin-bottom: 0;
+}
+
+.mount-modal-row input,
+.mount-modal-row select {
+    height: 34px;
+}
+
+.mount-shortcuts {
+    margin: -2px 0 0 calc(30% + 12px);
+    gap: 6px;
+}
+
+.mount-shortcuts .yoleo-btn {
+    min-height: 28px;
+    padding-block: 4px;
+}
+
+.mount-modal-checks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    align-items: center;
+}
+
+.mount-modal-checks .check-row {
+    min-height: 34px;
+    margin: 0;
+}
+
+@media (max-width: 720px) {
+    .mount-modal-row-target,
+    .mount-modal-row-options,
+    .mount-modal-checks {
+        grid-template-columns: 1fr;
+    }
+
+    .mount-shortcuts {
+        margin-left: 0;
+    }
+}

@@ -1,0 +1,320 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<div class="pers-page pers-top-page">
+
+    {% include "partials/system_personnalisation_subnav.html" %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="top-flash-stack yoleo-page-flash">
+        {% for category, message in messages %}
+        <div class="top-flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <form method="post" action="/system/personnalisation/top" class="card pers-top-card" autocomplete="off">
+        <div class="card-body pers-top-body">
+            <div id="topAutoSaveStatus" class="top-autosave-status" aria-live="polite" hidden></div>
+
+            <input type="hidden" id="topOrderInput" name="TOP_ORDER" value="{{ top_items|map(attribute='key')|join(',') }}">
+
+            <div class="top-groups-layout">
+                <section class="top-config-group top-config-group-banner">
+                    <div class="top-config-group-head">
+                        <span class="home-group-icon">🔝</span>
+                        <h3>Bandeau du haut</h3>
+                    </div>
+
+                    <div class="top-choice-list" id="topChoiceList">
+                        {% for item in top_items %}
+                        <div class="top-choice-row" data-top-key="{{ item.key }}">
+                            <label class="top-check-label">
+                                <input type="checkbox" name="{{ item.field }}" value="1" {% if item.enabled %}checked{% endif %}>
+                                <span class="top-choice-icon">{{ item.icon }}</span>
+                                <span class="top-choice-text">
+                                    <strong>{{ item.label }}</strong>
+                                    <small>{{ item.hint }}</small>
+                                </span>
+                            </label>
+                            <div class="top-row-actions">
+                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Monter" onclick="moveTopRow(this, -1)">⬆️</button>
+                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Descendre" onclick="moveTopRow(this, 1)">⬇️</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section class="top-config-group top-config-group-actions">
+                    <div class="top-config-group-head">
+                        <span class="home-group-icon">••</span>
+                        <h3>Menu déroulant système</h3>
+                    </div>
+
+                    <div class="top-actions-list">
+                        {% for action in top_menu_actions %}
+                        <label class="top-action-check">
+                            <input type="checkbox" name="{{ action.field }}" value="1" {% if action.enabled %}checked{% endif %}>
+                            <span>{{ action.label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section class="top-config-group top-config-group-session">
+                    <div class="top-config-group-head">
+                        <span class="home-group-icon">🔐</span>
+                        <h3>Session</h3>
+                    </div>
+
+                    <label class="top-session-field" for="sessionMinutesInput">
+                        <span>Durée de session</span>
+                        <input
+                            id="sessionMinutesInput"
+                            type="number"
+                            name="SESSION_MINUTES"
+                            min="{{ session_config.min_minutes|default(1) }}"
+                            max="{{ session_config.max_minutes|default(10080) }}"
+                            step="1"
+                            value="{{ session_config.minutes|default(20) }}"
+                            inputmode="numeric">
+                        <small>Minutes, appliqué après redémarrage Flask.</small>
+                    </label>
+                </section>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+(function () {
+    const form = document.querySelector('.pers-top-card');
+    const statusBox = document.getElementById('topAutoSaveStatus');
+    let saveTimer = null;
+    let hideTimer = null;
+    let currentController = null;
+
+    function refreshTopOrderInput() {
+        const input = document.getElementById('topOrderInput');
+        if (!input) return;
+        input.value = Array.from(document.querySelectorAll('#topChoiceList .top-choice-row[data-top-key]'))
+            .map(row => row.dataset.topKey || '')
+            .filter(Boolean)
+            .join(',');
+    }
+
+    function showTopSaveStatus(message, type, duration) {
+        if (!statusBox) return;
+        clearTimeout(hideTimer);
+        statusBox.hidden = false;
+        statusBox.textContent = message || '';
+        statusBox.className = 'top-autosave-status is-visible ' + (type || 'success');
+
+        if (duration) {
+            hideTimer = setTimeout(function () {
+                statusBox.classList.remove('is-visible');
+                window.setTimeout(function () {
+                    if (!statusBox.classList.contains('is-visible')) {
+                        statusBox.hidden = true;
+                    }
+                }, 180);
+            }, duration);
+        }
+    }
+
+    function createTopbarDate() {
+        const node = document.createElement('time');
+        node.className = 'yoleo-clock yoleo-clock-date-only';
+        node.id = 'yoleoTopDate';
+        node.setAttribute('data-yoleo-top-item', 'DATE');
+        node.setAttribute('datetime', '');
+        node.innerHTML = '<span class="yoleo-clock-date">--/--/--</span>';
+        return node;
+    }
+
+    function createTopbarTime() {
+        const node = document.createElement('time');
+        node.className = 'yoleo-clock yoleo-clock-time-only';
+        node.id = 'yoleoTopTime';
+        node.setAttribute('data-yoleo-top-item', 'TIME');
+        node.setAttribute('datetime', '');
+        node.innerHTML = '<span class="yoleo-clock-time">--:--:--</span>';
+        return node;
+    }
+
+    function createTopbarMeteo() {
+        const data = document.getElementById('yoleoTopbarMeteoData');
+        if (!data || data.dataset.enabled !== '1') return null;
+        const city = data.dataset.city || '';
+        const icon = data.dataset.icon || '🌤️';
+        const temperature = data.dataset.temperature || '';
+        const node = document.createElement('span');
+        node.className = 'yoleo-top-weather';
+        node.setAttribute('data-yoleo-top-item', 'METEO');
+        node.title = city ? ('Météo ' + city) : 'Météo';
+        node.innerHTML = '<span class="yoleo-top-weather-icon"></span><span class="yoleo-top-weather-temp"></span>';
+        const iconNode = node.querySelector('.yoleo-top-weather-icon');
+        const tempNode = node.querySelector('.yoleo-top-weather-temp');
+        if (iconNode) iconNode.textContent = icon;
+        if (tempNode) tempNode.textContent = temperature;
+        return node;
+    }
+
+    function createTopbarLan() {
+        const node = document.createElement('span');
+        node.className = 'yoleo-top-lan';
+        node.id = 'yoleoTopLan';
+        node.setAttribute('data-yoleo-top-item', 'LAN');
+        node.title = 'Débit réseau LAN';
+        node.innerHTML = '<span class="yoleo-top-lan-down">⬇ <b data-lan-down>--</b></span><span class="yoleo-top-lan-up">⬆ <b data-lan-up>--</b></span>';
+        return node;
+    }
+
+    function createTopbarItem(key) {
+        if (key === 'DATE') return createTopbarDate();
+        if (key === 'TIME') return createTopbarTime();
+        if (key === 'METEO') return createTopbarMeteo();
+        if (key === 'LAN') return createTopbarLan();
+        return null;
+    }
+
+    function applyTopbarPreviewFromForm() {
+        const topActions = document.getElementById('yoleoTopActions') || document.querySelector('.yoleo-top-actions');
+        if (!topActions || !form) return;
+
+        topActions.querySelectorAll('[data-yoleo-top-item]').forEach(function (node) {
+            node.remove();
+        });
+
+        const anchor = topActions.querySelector('.yoleo-page-settings-menu')
+            || topActions.querySelector('#yoleoActionsMenu')
+            || topActions.querySelector('.yoleo-actions-menu')
+            || null;
+
+        document.querySelectorAll('#topChoiceList .top-choice-row[data-top-key]').forEach(function (row) {
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            const key = (row.dataset.topKey || '').toUpperCase();
+            if (!checkbox || !checkbox.checked || !key) return;
+            const node = createTopbarItem(key);
+            if (!node) return;
+            topActions.insertBefore(node, anchor);
+        });
+
+        const actionState = {};
+        form.querySelectorAll('.top-actions-list input[type="checkbox"]').forEach(function (input) {
+            const key = String(input.name || '').replace(/^MENU_/, '').toUpperCase();
+            if (key) actionState[key] = input.checked;
+        });
+
+        const actionsMenu = document.getElementById('yoleoActionsMenu') || document.querySelector('.yoleo-actions-menu');
+        if (actionsMenu) {
+            let hasVisibleAction = false;
+            actionsMenu.querySelectorAll('[data-yoleo-top-action-key]').forEach(function (button) {
+                const key = String(button.dataset.yoleoTopActionKey || '').toUpperCase();
+                const enabled = Boolean(actionState[key]);
+                button.hidden = !enabled;
+                if (enabled) hasVisibleAction = true;
+            });
+            actionsMenu.hidden = !hasVisibleAction;
+            const dropdown = document.getElementById('yoleoActionsDropdown');
+            const toggle = document.getElementById('yoleoActionsToggle');
+            if (!hasVisibleAction && dropdown) dropdown.hidden = true;
+            if (!hasVisibleAction && toggle) toggle.setAttribute('aria-expanded', 'false');
+        }
+
+        if (typeof window.yoleoRefreshTopbarRuntime === 'function') {
+            window.yoleoRefreshTopbarRuntime();
+        }
+    }
+
+    async function saveTopConfigNow() {
+        if (!form) return;
+        refreshTopOrderInput();
+
+        if (currentController) {
+            currentController.abort();
+        }
+        currentController = new AbortController();
+        const controller = currentController;
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                signal: controller.signal
+            });
+
+            const contentType = response.headers.get('content-type') || '';
+            const payload = contentType.includes('application/json') ? await response.json() : { ok: response.ok };
+
+            if (!response.ok || payload.ok === false) {
+                throw new Error(payload.message || payload.error || 'Enregistrement impossible.');
+            }
+
+            applyTopbarPreviewFromForm();
+            showTopSaveStatus('Enregistré', 'success', 650);
+        } catch (error) {
+            if (error && error.name === 'AbortError') return;
+            showTopSaveStatus('Erreur : ' + (error && error.message ? error.message : error), 'error', 0);
+        } finally {
+            if (currentController === controller) {
+                currentController = null;
+            }
+        }
+    }
+
+    function scheduleTopAutosave(delay) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveTopConfigNow, typeof delay === 'number' ? delay : 120);
+    }
+
+    window.moveTopRow = function (button, direction) {
+        const row = button ? button.closest('.top-choice-row') : null;
+        const list = row ? row.parentElement : null;
+        if (!row || !list) return;
+
+        if (direction < 0 && row.previousElementSibling) {
+            list.insertBefore(row, row.previousElementSibling);
+        } else if (direction > 0 && row.nextElementSibling) {
+            list.insertBefore(row.nextElementSibling, row);
+        } else {
+            return;
+        }
+
+        refreshTopOrderInput();
+        scheduleTopAutosave(80);
+    };
+
+    if (form) {
+        form.addEventListener('change', function (event) {
+            if (event.target && event.target.matches('input[type="checkbox"]')) {
+                scheduleTopAutosave(80);
+            }
+            if (event.target && event.target.matches('input[name="SESSION_MINUTES"]')) {
+                scheduleTopAutosave(120);
+            }
+        });
+
+        form.addEventListener('input', function (event) {
+            if (event.target && event.target.matches('input[name="SESSION_MINUTES"]')) {
+                scheduleTopAutosave(450);
+            }
+        });
+
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            saveTopConfigNow();
+        });
+    }
+
+    refreshTopOrderInput();
+})();
+</script>
+{% endblock %}

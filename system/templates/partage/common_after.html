@@ -1,0 +1,1438 @@
+</div>
+    </div>
+
+</div>
+
+<script>
+
+    const URLS = {
+        saveSamba: "{{ url_for('partage_bp.api_samba_save') }}",
+        saveNfs: "{{ url_for('partage_bp.api_nfs_save') }}",
+        state: "{{ url_for('partage_bp.api_state') }}",
+        saveRaw: "{{ url_for('partage_bp.api_raw_save') }}",
+        saveSettings: "{{ url_for('partage_bp.api_settings_save') }}",
+        logs: "{{ url_for('partage_bp.api_logs') }}",
+        browserFolder: "{{ url_for('browser.browser_folder') }}",
+        run: "{{ url_for('partage_bp.run_stream') }}",
+        partageLogs: "{{ url_for('partage_bp.show_logs') }}"
+    };
+
+    const LINUX_USERS = {{ state.linux_users|tojson }};
+    const SAMBA_OWNER_USERS = {{ state.samba_owner_users|tojson }};
+    const SAMBA_BASE = {{ state.samba|tojson }};
+    const PARTAGE_OPERATION_LOG_KEY = 'partage_samba_last_operation_log_v4';
+    let browseTargetInput = null;
+
+    function $(id) { return document.getElementById(id); }
+
+    let messageHideTimer = null;
+
+    function hideFloatingMessage() {
+        const box = $('messageBox');
+        if (!box) return;
+        box.classList.remove('is-visible-v4');
+        window.setTimeout(() => {
+            if (!box.classList.contains('is-visible-v4')) {
+                box.style.display = 'none';
+                box.innerHTML = '';
+            }
+        }, 180);
+    }
+
+    function showMessage(message, ok = true, options = {}) {
+        const box = $('messageBox');
+        if (!box) return;
+        if (messageHideTimer) window.clearTimeout(messageHideTimer);
+
+        box.classList.add('partage-message-float-v4');
+        box.classList.toggle('partage-message-ok-v4', !!ok);
+        box.classList.toggle('partage-message-error-v4', !ok);
+        box.classList.remove('is-visible-v4');
+        box.style.display = 'flex';
+
+        const safeMessage = escapeHtml(message || (ok ? 'Opération terminée.' : 'Erreur.'));
+        if (ok) {
+            const icon = options.hold ? '⏳' : '✅';
+            box.innerHTML = '<span class="partage-message-icon-v4">' + icon + '</span><span>' + safeMessage + '</span>';
+            window.requestAnimationFrame(() => box.classList.add('is-visible-v4'));
+            if (!options.hold) messageHideTimer = window.setTimeout(hideFloatingMessage, 1200);
+        } else {
+            const logLink = options.noLog ? '' : ' <a class="partage-log-link-v4" href="' + URLS.partageLogs + '">Voir Logs partage</a>';
+            box.innerHTML = '<span class="partage-message-icon-v4">⚠️</span><span>' + safeMessage + logLink + '</span>';
+            window.requestAnimationFrame(() => box.classList.add('is-visible-v4'));
+        }
+    }
+
+    function setButtonLoading(button, label = 'En cours…') {
+        if (!button) return;
+        if (!button.dataset.oldHtml) button.dataset.oldHtml = button.innerHTML;
+        button.disabled = true;
+        button.classList.add('is-loading-v4');
+        button.innerHTML = '<span class="yoleo-spinner-v4" aria-hidden="true"></span>' + escapeHtml(label);
+    }
+
+    function clearButtonLoading(button) {
+        if (!button) return;
+        const mustStayDisabled = button.dataset.stateDisabled === '1';
+        button.disabled = mustStayDisabled;
+        button.classList.remove('is-loading-v4');
+        if (button.dataset.oldHtml) {
+            button.innerHTML = button.dataset.oldHtml;
+            delete button.dataset.oldHtml;
+        }
+    }
+
+    function setStateDisabled(button, disabled, title = '') {
+        if (!button) return;
+        const locked = !!disabled;
+        button.dataset.stateDisabled = locked ? '1' : '0';
+        button.disabled = locked;
+        button.setAttribute('aria-disabled', locked ? 'true' : 'false');
+        button.classList.toggle('is-state-disabled-v4', locked);
+        if (title) button.title = title;
+    }
+
+    function looksLikeError(text) {
+        return /(^|\n)\s*(ERREUR|ERROR)\b|échoué|failed|traceback/i.test(String(text || ''));
+    }
+
+    function removeRow(button) {
+        const tr = button.closest('tr');
+        if (tr) tr.remove();
+    }
+
+    let sambaDeleteConfirmButton = null;
+
+    function openSambaDeleteConfirmModal(button) {
+        sambaDeleteConfirmButton = button || null;
+        const modal = $('sambaDeleteConfirmModal');
+        if (modal) modal.classList.add('active');
+    }
+
+    function closeSambaDeleteConfirmModal() {
+        const modal = $('sambaDeleteConfirmModal');
+        if (modal) modal.classList.remove('active');
+        sambaDeleteConfirmButton = null;
+    }
+
+    async function confirmSambaDeleteModal(button) {
+        const target = sambaDeleteConfirmButton;
+        if (!target) {
+            closeSambaDeleteConfirmModal();
+            return false;
+        }
+        setButtonLoading(button, 'Suppression…');
+        try {
+            const ok = await removeSambaShareRow(target);
+            if (ok !== false) closeSambaDeleteConfirmModal();
+            return ok !== false;
+        } finally {
+            clearButtonLoading(button);
+        }
+    }
+
+    async function removeSambaShareRow(button) {
+        const tr = button.closest('tr');
+        if (!tr) return false;
+        const tbody = tr.parentElement;
+        const next = tr.nextSibling;
+        const wasExisting = tr.dataset.existingShare === '1';
+        tr.remove();
+
+        if (!wasExisting) return true;
+
+        const ok = await saveAndApplySambaShares(button, 'Partage supprimé et configuration appliquée.');
+        if (!ok && tbody) {
+            tbody.insertBefore(tr, next);
+        }
+        return ok;
+    }
+
+    function ynOptions(valueYesDefault = true) {
+        return `<option value="yes"${valueYesDefault ? ' selected' : ''}>yes</option><option value="no"${!valueYesDefault ? ' selected' : ''}>no</option>`;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    function linuxUserOptions(selected = '') {
+        if (!LINUX_USERS.length) {
+            return '<option value="">Aucun utilisateur Linux trouvé</option>';
+        }
+        return LINUX_USERS.map(u => {
+            const isSelected = u.name === selected ? ' selected' : '';
+            return `<option value="${escapeHtml(u.name)}" data-uid="${u.uid}" data-gid="${u.gid}" data-shell="${escapeHtml(u.shell || '')}" data-home="${escapeHtml(u.home || '')}"${isSelected}>${escapeHtml(u.display || u.name)}</option>`;
+        }).join('');
+    }
+
+    function sambaOwnerOptions(selected = '') {
+        if (!SAMBA_OWNER_USERS.length) {
+            return '<option value="">Aucun utilisateur Linux</option>';
+        }
+        return SAMBA_OWNER_USERS.map(u => {
+            const isSelected = u.name === selected ? ' selected' : '';
+            return `<option value="${escapeHtml(u.name)}"${isSelected}>${escapeHtml(u.name)}</option>`;
+        }).join('');
+    }
+
+    function syncLinuxUserRow(select) {
+        const tr = select.closest('tr');
+        const opt = select.selectedOptions[0];
+        if (!tr || !opt) return;
+        const set = (key, value) => {
+            const input = tr.querySelector(`[data-user="${key}"]`);
+            if (input) input.value = value || '';
+        };
+        set('uid', opt.dataset.uid);
+        set('gid', opt.dataset.gid);
+        set('shell', opt.dataset.shell || '/usr/sbin/nologin');
+        set('home', opt.dataset.home || '/nonexistent');
+    }
+
+    function addSambaUserRow() {
+        const tbody = document.querySelector('#sambaUsersTable tbody');
+        const first = LINUX_USERS[0] || { name: '', uid: '', gid: '', shell: '/usr/sbin/nologin', home: '/nonexistent' };
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><select class="select-input" data-user="name" onchange="syncLinuxUserRow(this)">${linuxUserOptions(first.name)}</select></td>
+            <td><input class="text-input" data-user="password" autocomplete="new-password" placeholder="mot de passe SMB"></td>
+            <td><input class="text-input" data-user="uid" value="${escapeHtml(first.uid)}" readonly></td>
+            <td><input class="text-input" data-user="gid" value="${escapeHtml(first.gid)}" readonly></td>
+            <td><input class="text-input" data-user="shell" value="${escapeHtml(first.shell || '/usr/sbin/nologin')}" readonly></td>
+            <td><input class="text-input" data-user="home" value="${escapeHtml(first.home || '/nonexistent')}" readonly></td>
+            <td><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red" onclick="removeRow(this)">🗑</button></td>`;
+        tbody.appendChild(tr);
+    }
+
+    function selectHtml(attr, values, selected, title = '') {
+        const titleAttr = title ? ' title="' + escapeHtml(title) + '"' : '';
+        return `<select class="select-input" ${attr}${titleAttr}>` + values.map(v => `<option value="${v}"${v === selected ? ' selected' : ''}>${v}</option>`).join('') + `</select>`;
+    }
+
+
+    function shareRowValues(tr) {
+        const row = {};
+        tr.querySelectorAll('[data-share]').forEach(input => row[input.dataset.share] = input.value.trim());
+        row.access_mode = row.access_mode || 'private';
+        row.browsable = row.browsable || 'yes';
+        row.recycle_bin = row.recycle_bin || 'no';
+        row.read_users = normalizeSambaUserCsv(row.read_users || '');
+        row.write_users = normalizeSambaUserCsv(row.write_users || '');
+        row.type = row.type === 'root' ? 'root' : 'normal';
+        if (!sambaShareAllowsRoot(row)) row.type = 'normal';
+        return row;
+    }
+
+    function normalizeSambaUserList(value) {
+        const raw = Array.isArray(value) ? value : String(value || '').split(/[\s,;]+/);
+        const out = [];
+        raw.forEach(item => {
+            const name = String(item || '').trim();
+            if (name && !out.includes(name)) out.push(name);
+        });
+        return out;
+    }
+
+    function normalizeSambaUserCsv(value) {
+        return normalizeSambaUserList(value).join(',');
+    }
+
+    function sambaAccessLabel(mode) {
+        const value = String(mode || 'private');
+        if (value === 'public') return 'Public';
+        if (value === 'secure') return 'Securise';
+        return 'Prive';
+    }
+
+    function sambaShareAccessSummaryHtml(values) {
+        const mode = String((values && values.access_mode) || 'private');
+        const readUsers = normalizeSambaUserList((values && values.read_users) || '');
+        const writeUsers = normalizeSambaUserList((values && values.write_users) || '');
+        if (mode === 'public') {
+            return '<div class="samba-access-summary-lines"><div><b>Lecture</b> tout le monde</div><div><b>Ecriture</b> personne</div></div>';
+        }
+        const readOnly = readUsers.filter(name => !writeUsers.includes(name));
+        const readText = readOnly.length ? readOnly.map(escapeHtml).join(', ') : (mode === 'secure' ? 'utilisateurs Samba' : 'personne');
+        const writeText = writeUsers.length ? writeUsers.map(escapeHtml).join(', ') : 'personne';
+        const rootText = sambaShareAllowsRoot(values) && values.type === 'root'
+            ? '<div><b>Root</b> actif</div>'
+            : '';
+        return '<div class="samba-access-summary-lines"><div><b>Lecture</b> ' + readText + '</div><div><b>Ecriture</b> ' + writeText + '</div>' + rootText + '</div>';
+    }
+
+    function sambaShareAllowsRoot(values) {
+        const mode = String((values && values.access_mode) || 'private');
+        const writeUsers = normalizeSambaUserList((values && values.write_users) || '');
+        return mode === 'private' && writeUsers.length > 0;
+    }
+
+    function isSambaShareRowEditing(tr) {
+        return !!(tr && tr.classList && tr.classList.contains('share-editing'));
+    }
+
+    function lockSambaShareControl(control, locked, title = '') {
+        if (!control) return;
+        control.disabled = !!locked;
+        if (title) control.title = title;
+        else control.removeAttribute('title');
+    }
+
+    function syncSambaPublicShareControls(tr) {
+        if (!tr) return;
+        const editing = isSambaShareRowEditing(tr);
+        const lockedTitle = 'Clique sur le stylo pour modifier ce partage.';
+        const modeSelect = tr.querySelector('[data-share="access_mode"]');
+        const mode = modeSelect?.value || 'private';
+        const browsable = tr.querySelector('[data-share="browsable"]');
+        const recycle = tr.querySelector('[data-share="recycle_bin"]');
+        const readInput = tr.querySelector('[data-share="read_users"]');
+        const writeInput = tr.querySelector('[data-share="write_users"]');
+        const typeInput = tr.querySelector('[data-share="type"]');
+        const usersButton = tr.querySelector('.samba-access-users-btn');
+
+        if (mode === 'public') {
+            if (readInput) readInput.value = '';
+            if (writeInput) writeInput.value = '';
+        }
+        if (mode === 'secure' && readInput && writeInput) {
+            const writeUsers = normalizeSambaUserList(writeInput.value || '');
+            const readUsers = normalizeSambaUserList(readInput.value || '');
+            const covered = new Set([...readUsers, ...writeUsers]);
+            SAMBA_OWNER_USERS.forEach(user => {
+                const name = String(user.name || '');
+                if (name && !covered.has(name)) {
+                    readUsers.push(name);
+                    covered.add(name);
+                }
+            });
+            readInput.value = normalizeSambaUserCsv(readUsers);
+            writeInput.value = normalizeSambaUserCsv(writeUsers);
+        }
+        if (typeInput && !sambaShareAllowsRoot(shareRowValues(tr))) {
+            typeInput.value = 'normal';
+        }
+
+        lockSambaShareControl(modeSelect, !editing, lockedTitle);
+        lockSambaShareControl(browsable, !editing, lockedTitle);
+
+        if (usersButton) {
+            const isPublic = mode === 'public';
+            const locked = !editing || isPublic;
+            const title = !editing
+                ? 'Clique sur le stylo pour modifier les accès Samba.'
+                : (isPublic ? 'Public : tout le monde lit, personne n ecrit.' : 'Regler les droits Samba');
+            lockSambaShareControl(usersButton, locked, title);
+        }
+
+        if (!recycle) return;
+        if (!editing) {
+            lockSambaShareControl(recycle, true, lockedTitle);
+        } else if (mode === 'public') {
+            recycle.value = 'no';
+            lockSambaShareControl(recycle, true, 'Public est en lecture seule : corbeille inutile.');
+        } else {
+            lockSambaShareControl(recycle, false, '');
+        }
+    }
+
+    function sambaShareEditModeChanged(field) {
+        const tr = field ? field.closest('tr') : null;
+        if (!tr) return;
+        syncSambaPublicShareControls(tr);
+        const summary = tr.querySelector('[data-samba-access-summary]');
+        if (summary) summary.innerHTML = sambaShareAccessSummaryHtml(shareRowValues(tr));
+    }
+
+    function syncAllSambaPublicShareControls() {
+        document.querySelectorAll('#sambaSharesTable tbody tr').forEach(syncSambaPublicShareControls);
+    }
+
+    function refreshAllSambaAccessSummaries() {
+        document.querySelectorAll('#sambaSharesTable tbody tr').forEach(tr => {
+            const summary = tr.querySelector('[data-samba-access-summary]');
+            if (summary) summary.innerHTML = sambaShareAccessSummaryHtml(shareRowValues(tr));
+        });
+    }
+
+    async function sambaShareQuickSave(field) {
+        const tr = field ? field.closest('tr') : null;
+        if (!tr) return false;
+        if (!isSambaShareRowEditing(tr)) {
+            sambaShareEditModeChanged(field);
+            showMessage('Clique d’abord sur le stylo pour modifier ce partage.', false, { noLog: true });
+            return false;
+        }
+        syncSambaPublicShareControls(tr);
+        const summary = tr.querySelector('[data-samba-access-summary]');
+        if (summary) summary.innerHTML = sambaShareAccessSummaryHtml(shareRowValues(tr));
+        return await saveAndApplySambaShares(field, 'Configuration Samba appliquee.');
+    }
+
+    let sambaAccessModalRow = null;
+
+    function sambaAccessRightForUser(values, username) {
+        const readUsers = normalizeSambaUserList(values.read_users || '');
+        const writeUsers = normalizeSambaUserList(values.write_users || '');
+        if (writeUsers.includes(username)) return 'rw';
+        if (readUsers.includes(username)) return 'ro';
+        return 'none';
+    }
+
+    function openSambaAccessModal(button) {
+        const tr = button ? button.closest('tr') : null;
+        if (!tr) return;
+        if (!isSambaShareRowEditing(tr)) {
+            showMessage('Clique d’abord sur le stylo pour modifier les accès Samba.', false, { noLog: true });
+            return;
+        }
+        sambaAccessModalRow = tr;
+        const values = shareRowValues(tr);
+        const modal = $('sambaAccessModal');
+        const body = $('sambaAccessModalBody');
+        const subtitle = $('sambaAccessModalSubtitle');
+        const rootOption = $('sambaRootOption');
+        const rootCheckbox = $('sambaRootEnabled');
+        if (!modal || !body) return;
+        const mode = String(values.access_mode || 'private');
+        if (subtitle) subtitle.textContent = ' - ' + (values.name || 'Partage') + ' - ' + sambaAccessLabel(mode);
+        const disabled = mode === 'public';
+        body.innerHTML = SAMBA_OWNER_USERS.map(user => {
+            const name = String(user.name || '');
+            const right = disabled ? 'ro' : (mode === 'secure' ? (sambaAccessRightForUser(values, name) === 'rw' ? 'rw' : 'ro') : sambaAccessRightForUser(values, name));
+            const noneOption = mode === 'private' ? `<option value="none"${right === 'none' ? ' selected' : ''}>Aucun acces</option>` : '';
+            return `<tr>
+                <td><span class="readonly-cell">${escapeHtml(name)}</span></td>
+                <td>
+                    <select class="select-input" data-samba-access-user="${escapeHtml(name)}"${disabled ? ' disabled' : ''}>
+                        ${noneOption}
+                        <option value="ro"${right === 'ro' ? ' selected' : ''}>Lecture</option>
+                        <option value="rw"${right === 'rw' ? ' selected' : ''}>Lecture + ecriture</option>
+                    </select>
+                </td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="2">Aucun utilisateur Samba disponible.</td></tr>';
+        const syncRootOption = () => {
+            const writeSelected = mode === 'private' && Array.from(body.querySelectorAll('[data-samba-access-user]')).some(select => select.value === 'rw');
+            if (rootOption) rootOption.hidden = !writeSelected;
+            if (rootCheckbox) {
+                rootCheckbox.disabled = !writeSelected;
+                if (!writeSelected) rootCheckbox.checked = false;
+            }
+        };
+        body.querySelectorAll('[data-samba-access-user]').forEach(select => select.addEventListener('change', syncRootOption));
+        if (rootCheckbox) rootCheckbox.checked = values.type === 'root' && sambaShareAllowsRoot(values);
+        syncRootOption();
+        modal.classList.add('active');
+    }
+
+    function closeSambaAccessModal() {
+        const modal = $('sambaAccessModal');
+        if (modal) modal.classList.remove('active');
+        sambaAccessModalRow = null;
+    }
+
+    async function saveSambaAccessModal(button) {
+        const tr = sambaAccessModalRow;
+        if (!tr) return false;
+        const mode = tr.querySelector('[data-share="access_mode"]')?.value || 'private';
+        const rootCheckbox = $('sambaRootEnabled');
+        const readUsers = [];
+        const writeUsers = [];
+        if (mode !== 'public') {
+            document.querySelectorAll('#sambaAccessModalBody [data-samba-access-user]').forEach(select => {
+                const name = select.dataset.sambaAccessUser || '';
+                if (!name) return;
+                if (select.value === 'ro') readUsers.push(name);
+                if (select.value === 'rw') writeUsers.push(name);
+            });
+        }
+        if (mode === 'secure' && !readUsers.length && !writeUsers.length) {
+            SAMBA_OWNER_USERS.forEach(user => {
+                const name = String(user.name || '');
+                if (name) readUsers.push(name);
+            });
+        }
+        const readInput = tr.querySelector('[data-share="read_users"]');
+        const writeInput = tr.querySelector('[data-share="write_users"]');
+        const typeInput = tr.querySelector('[data-share="type"]');
+        if (readInput) readInput.value = normalizeSambaUserCsv(readUsers);
+        if (writeInput) writeInput.value = normalizeSambaUserCsv(writeUsers);
+        if (typeInput) typeInput.value = (mode === 'private' && writeUsers.length && rootCheckbox && rootCheckbox.checked) ? 'root' : 'normal';
+        const summary = tr.querySelector('[data-samba-access-summary]');
+        if (summary) summary.innerHTML = sambaShareAccessSummaryHtml(shareRowValues(tr));
+        const ok = await saveAndApplySambaShares(button, 'Acces Samba enregistres.');
+        if (ok) closeSambaAccessModal();
+        return ok;
+    }
+
+    function statusBadgeForShareRow(tr) {
+        const status = tr.dataset.shareStatus || '';
+        if (status === 'ok') return '<span class="badge badge-ok">dossier OK</span>';
+        if (status === 'missing') return '<span class="badge badge-warn">manquant</span>';
+        return '<span class="badge badge-warn">modifié</span>';
+    }
+
+    function sambaShareAccessHelp(values) {
+        const guest = String((values && values.guest_ok) || 'no');
+        const readOnly = String((values && values.read_only) || 'no');
+        const writable = String((values && values.writable) || 'yes');
+        const owner = String((values && values.owner) || 'utilisateur');
+        if (guest === 'yes') {
+            if (readOnly === 'yes' || writable === 'no') return 'Invité lecture seule : dossiers 755, fichiers 644.';
+            return 'Invité écriture : dossiers 777, fichiers 666.';
+        }
+        if (readOnly === 'yes' && writable === 'yes') {
+            return owner + ' écrit ; son groupe Linux lit : dossiers 750, fichiers 640.';
+        }
+        if (readOnly === 'yes' || writable === 'no') {
+            return 'Privé lecture seule pour ' + owner + ' : dossiers 500, fichiers 400.';
+        }
+        return 'Privé écriture pour ' + owner + ' : dossiers 700, fichiers 600.';
+    }
+
+    function clearSambaShareValidation(tr) {
+        if (!tr) return;
+        tr.querySelectorAll('.is-invalid-v5').forEach(el => el.classList.remove('is-invalid-v5'));
+    }
+
+    function markSambaShareInvalid(tr, key) {
+        const field = tr ? tr.querySelector(`[data-share="${key}"]`) : null;
+        if (field) {
+            field.classList.add('is-invalid-v5');
+            field.focus({ preventScroll: true });
+            try { field.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch (e) {}
+        }
+    }
+
+    function sambaShareRowHasNameOrPath(tr) {
+        if (!tr) return false;
+        const values = shareRowValues(tr);
+        return !!(values.name || values.path);
+    }
+
+    function validateSambaShareRow(tr, options = {}) {
+        if (!tr) return true;
+        clearSambaShareValidation(tr);
+        const values = shareRowValues(tr);
+        const strict = !!options.strict;
+
+        if (!strict && !sambaShareRowHasNameOrPath(tr)) return true;
+
+        if (!values.name && !values.path) {
+            markSambaShareInvalid(tr, 'name');
+            const pathField = tr.querySelector('[data-share="path"]');
+            if (pathField) pathField.classList.add('is-invalid-v5');
+            showMessage('Nom de partage et dossier à partager obligatoires.', false, { noLog: true });
+            return false;
+        }
+        if (!values.name) {
+            markSambaShareInvalid(tr, 'name');
+            showMessage('Nom de partage obligatoire.', false, { noLog: true });
+            return false;
+        }
+        if (/[\/\[\]\x00-\x1f]/.test(values.name) || values.name.length > 80) {
+            markSambaShareInvalid(tr, 'name');
+            showMessage('Nom de partage invalide : évite /, [ ], et limite à 80 caractères.', false, { noLog: true });
+            return false;
+        }
+        if (!values.path) {
+            markSambaShareInvalid(tr, 'path');
+            showMessage('Dossier à partager obligatoire.', false, { noLog: true });
+            return false;
+        }
+        if (!values.path.startsWith('/')) {
+            markSambaShareInvalid(tr, 'path');
+            showMessage('Le dossier à partager doit être un chemin Linux absolu, par exemple /mnt/user/Media.', false, { noLog: true });
+            return false;
+        }
+        return true;
+    }
+
+    function validateSambaSharesBeforeSave() {
+        const table = document.querySelector('#sambaSharesTable');
+        if (!table) return true;
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        for (const tr of rows) {
+            if (!validateSambaShareRow(tr, { strict: false })) return false;
+        }
+        return true;
+    }
+
+    function renderReadonlySambaShareRow(tr, values) {
+        const safe = {
+            name: escapeHtml(values.name || ''),
+            path: escapeHtml(values.path || ''),
+            access_mode: values.access_mode || 'private',
+            browsable: escapeHtml(values.browsable || 'yes'),
+            recycle_bin: escapeHtml(values.recycle_bin || 'no'),
+            type: values.type === 'root' ? 'root' : 'normal',
+            read_users: escapeHtml(normalizeSambaUserCsv(values.read_users || '')),
+            write_users: escapeHtml(normalizeSambaUserCsv(values.write_users || ''))
+        };
+        tr.classList.remove('share-editing');
+        tr.tabIndex = 0;
+        tr.dataset.existingShare = '1';
+        tr.innerHTML = `
+            <td><span class="readonly-cell">${safe.name}</span><input type="hidden" data-share="name" value="${safe.name}"></td>
+            <td><span class="path-pill" title="${safe.path}"><span>${safe.path}</span></span><input type="hidden" data-share="path" value="${safe.path}"></td>
+            <td>${selectHtml('data-share="access_mode" disabled title="Clique sur le stylo pour modifier ce partage."', ['public','secure','private'], safe.access_mode)}</td>
+            <td><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted samba-access-users-btn" onclick="openSambaAccessModal(this)" disabled title="Clique sur le stylo pour modifier les accès Samba.">Acces</button><span class="samba-access-summary" data-samba-access-summary>${sambaShareAccessSummaryHtml(values)}</span><input type="hidden" data-share="type" value="${safe.type}"><input type="hidden" data-share="read_users" value="${safe.read_users}"><input type="hidden" data-share="write_users" value="${safe.write_users}"></td>
+            <td>${selectHtml('data-share="browsable" disabled title="Clique sur le stylo pour modifier ce partage."', ['yes','no'], safe.browsable)}</td>
+            <td>${selectHtml('data-share="recycle_bin" disabled title="Clique sur le stylo pour modifier ce partage."', ['no','yes'], safe.recycle_bin)}</td>
+            <td>${statusBadgeForShareRow(tr)}</td>
+            <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Modifier" onclick="editSambaShareRow(this)">✏️</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="openSambaDeleteConfirmModal(this)">❌</button></div></td>`;
+    }
+
+    function renderEditableSambaShareRow(tr, values) {
+        const safe = {
+            name: escapeHtml(values.name || ''),
+            path: escapeHtml(values.path || ''),
+            access_mode: values.access_mode || 'private',
+            browsable: values.browsable || 'yes',
+            recycle_bin: values.recycle_bin || 'no',
+            type: values.type === 'root' ? 'root' : 'normal',
+            read_users: escapeHtml(normalizeSambaUserCsv(values.read_users || '')),
+            write_users: escapeHtml(normalizeSambaUserCsv(values.write_users || ''))
+        };
+        tr.classList.add('share-editing');
+        tr.tabIndex = 0;
+        tr.innerHTML = `
+            <td><input class="text-input" data-share="name" value="${safe.name}" placeholder="Media"></td>
+            <td><div class="path-edit"><input class="text-input" data-share="path" value="${safe.path}" placeholder="/mnt/user/Media"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" onclick="openBrowseForInput(this.closest('td').querySelector('[data-share=path]'))">📁</button></div></td>
+            <td>${selectHtml('data-share="access_mode" onchange="sambaShareEditModeChanged(this)"', ['public','secure','private'], safe.access_mode)}</td>
+            <td><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted samba-access-users-btn" onclick="openSambaAccessModal(this)" disabled title="Clique sur le stylo pour modifier les accès Samba.">Acces</button><span class="samba-access-summary" data-samba-access-summary>${sambaShareAccessSummaryHtml(values)}</span><input type="hidden" data-share="type" value="${safe.type}"><input type="hidden" data-share="read_users" value="${safe.read_users}"><input type="hidden" data-share="write_users" value="${safe.write_users}"></td>
+            <td>${selectHtml('data-share="browsable"', ['yes','no'], safe.browsable)}</td>
+            <td>${selectHtml('data-share="recycle_bin"', ['no','yes'], safe.recycle_bin)}</td>
+            <td>${statusBadgeForShareRow(tr)}</td>
+            <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-primary yoleo-btn-icon" title="Enregistrer" onclick="saveSambaShareRow(this)">OK</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Annuler" onclick="cancelSambaShareEdit(this)">↩</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="openSambaDeleteConfirmModal(this)">❌</button></div></td>`;
+    }
+
+    function editSambaShareRow(button) {
+        const tr = button.closest('tr');
+        if (!tr) return;
+        tr.dataset.originalShare = JSON.stringify(shareRowValues(tr));
+        renderEditableSambaShareRow(tr, shareRowValues(tr));
+        syncSambaPublicShareControls(tr);
+        const firstField = tr.querySelector('[data-share="name"]');
+        if (firstField) firstField.focus({ preventScroll: true });
+    }
+
+    function cancelSambaShareEdit(button) {
+        const tr = button.closest('tr');
+        if (!tr) return;
+        let values = shareRowValues(tr);
+        try {
+            values = JSON.parse(tr.dataset.originalShare || '{}') || values;
+        } catch (e) {}
+        renderReadonlySambaShareRow(tr, values);
+    }
+
+    async function saveSambaShareRow(button) {
+        const tr = button.closest('tr');
+        if (tr && !validateSambaShareRow(tr, { strict: true })) return false;
+        if (tr) syncSambaPublicShareControls(tr);
+        const values = tr ? shareRowValues(tr) : {};
+        const ok = await saveAndApplySambaShares(button, 'Partage enregistre et configuration Samba appliquee.');
+        if (ok && tr) {
+            tr.dataset.shareStatus = 'ok';
+            renderReadonlySambaShareRow(tr, values);
+        }
+        return ok;
+    }
+
+    function addSambaShareRow() {
+        const tbody = document.querySelector('#sambaSharesTable tbody');
+        const tr = document.createElement('tr');
+        tr.tabIndex = 0;
+        tr.classList.add('share-editing');
+        tr.innerHTML = `
+            <td><input class="text-input" data-share="name" placeholder="Media"></td>
+            <td><div class="path-edit"><input class="text-input" data-share="path" placeholder="/mnt/user/Media"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" onclick="openBrowseForInput(this.closest('td').querySelector('[data-share=path]'))">📁</button></div></td>
+            <td>${selectHtml('data-share="access_mode" onchange="sambaShareEditModeChanged(this)"', ['public','secure','private'], 'private')}</td>
+            <td><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted samba-access-users-btn" onclick="openSambaAccessModal(this)">Acces</button><span class="samba-access-summary" data-samba-access-summary>${sambaShareAccessSummaryHtml({access_mode:'private'})}</span><input type="hidden" data-share="type" value="normal"><input type="hidden" data-share="read_users" value=""><input type="hidden" data-share="write_users" value=""></td>
+            <td>${selectHtml('data-share="browsable"', ['yes','no'], 'yes')}</td>
+            <td>${selectHtml('data-share="recycle_bin"', ['no','yes'], 'no')}</td>
+            <td><span class="badge badge-warn">nouveau</span></td>
+            <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-primary yoleo-btn-icon" title="Enregistrer" onclick="saveSambaShareRow(this)">OK</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="openSambaDeleteConfirmModal(this)">❌</button></div></td>`;
+        tbody.appendChild(tr);
+        syncSambaPublicShareControls(tr);
+        const firstInput = tr.querySelector('[data-share="name"]');
+        if (firstInput) firstInput.focus();
+    }
+
+    function initSambaShareKeyboardSave() {
+        const table = document.querySelector('#sambaSharesTable');
+        if (!table) return;
+        table.querySelectorAll('tbody tr').forEach(tr => {
+            if (!tr.hasAttribute('tabindex')) tr.tabIndex = 0;
+        });
+        if (table.dataset.enterSaveBound === '1') return;
+        table.dataset.enterSaveBound = '1';
+        table.addEventListener('keydown', event => {
+            const target = event.target;
+            if (!target || !target.closest) return;
+            const tr = target.closest('tr');
+            if (!tr || !table.contains(tr)) return;
+
+            if (event.key === 'F2') {
+                if (!tr.classList.contains('share-editing')) {
+                    event.preventDefault();
+                    const editButton = tr.querySelector('button[title="Modifier"]');
+                    if (editButton && !editButton.disabled) editSambaShareRow(editButton);
+                }
+                return;
+            }
+
+            if (event.key !== 'Enter') return;
+            if (!tr.classList.contains('share-editing')) return;
+            event.preventDefault();
+            const saveButton = tr.querySelector('button[title="Enregistrer"]');
+            if (saveButton && !saveButton.disabled) saveSambaShareRow(saveButton);
+        });
+        table.addEventListener('input', event => {
+            const field = event.target && event.target.closest ? event.target.closest('[data-share]') : null;
+            if (field) field.classList.remove('is-invalid-v5');
+        });
+        table.addEventListener('change', event => {
+            const field = event.target && event.target.closest ? event.target.closest('[data-share]') : null;
+            if (field) field.classList.remove('is-invalid-v5');
+        });
+    }
+
+    function nfsRowValues(tr) {
+        const row = {};
+        tr.querySelectorAll('[data-nfs]').forEach(input => row[input.dataset.nfs] = input.value.trim());
+        return row;
+    }
+
+    function nfsStatusHtml(tr) {
+        const existing = tr.dataset.nfsStatusHtml || (tr.querySelector('[data-nfs-status-cell]') ? tr.querySelector('[data-nfs-status-cell]').innerHTML : '');
+        return existing || '<span class="badge badge-warn">modifié</span>';
+    }
+
+    function renderReadonlyNfsRow(tr, values) {
+        const safe = {
+            path: escapeHtml(values.path || ''),
+            client: escapeHtml(values.client || '{{ state.nfs.default_client }}'),
+            access: escapeHtml(values.access || 'rw'),
+            advanced_options: escapeHtml(values.advanced_options || '')
+        };
+        tr.classList.remove('share-editing');
+        tr.tabIndex = 0;
+        tr.dataset.existingNfs = '1';
+        tr.innerHTML = `
+            <td><span class="path-pill" title="${safe.path}"><span>${safe.path}</span></span><input type="hidden" data-nfs="path" value="${safe.path}"></td>
+            <td><span class="readonly-cell">${safe.client}</span><input type="hidden" data-nfs="client" value="${safe.client}"></td>
+            <td><span class="badge badge-info">${safe.access}</span><input type="hidden" data-nfs="access" value="${safe.access}"></td>
+            <td><span class="path-pill" title="${safe.advanced_options}"><span>${safe.advanced_options || '—'}</span></span><input type="hidden" data-nfs="advanced_options" value="${safe.advanced_options}"></td>
+            <td data-nfs-status-cell>${nfsStatusHtml(tr)}</td>
+            <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Modifier" onclick="editNfsRow(this)">✏️</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="removeNfsRow(this)">🗑</button></div></td>`;
+    }
+
+    function renderEditableNfsRow(tr, values) {
+        const safe = {
+            path: escapeHtml(values.path || ''),
+            client: escapeHtml(values.client || '{{ state.nfs.default_client }}'),
+            access: values.access || 'rw',
+            advanced_options: escapeHtml(values.advanced_options || '{{ state.nfs.default_options }}')
+        };
+        tr.classList.add('share-editing');
+        tr.innerHTML = `
+            <td><div class="path-edit"><input class="text-input" data-nfs="path" value="${safe.path}" placeholder="/mnt/user/Media"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" onclick="openBrowseForInput(this.closest('td').querySelector('[data-nfs=path]'))">📁</button></div></td>
+            <td><input class="text-input" data-nfs="client" value="${safe.client}" placeholder="192.168.1.0/24"></td>
+            <td>${selectHtml('data-nfs="access"', ['rw','ro'], safe.access)}</td>
+            <td><input class="text-input" data-nfs="advanced_options" value="${safe.advanced_options}" placeholder="sync,no_subtree_check,no_root_squash"></td>
+            <td data-nfs-status-cell>${nfsStatusHtml(tr)}</td>
+            <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-primary yoleo-btn-icon" title="Enregistrer" onclick="saveNfsRow(this)">💾</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Annuler" onclick="cancelNfsEdit(this)">↩</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="removeNfsRow(this)">🗑</button></div></td>`;
+    }
+
+    function editNfsRow(button) {
+        const tr = button.closest('tr');
+        if (!tr) return;
+        tr.dataset.originalNfs = JSON.stringify(nfsRowValues(tr));
+        if (tr.querySelector('[data-nfs-status-cell]')) {
+            tr.dataset.nfsStatusHtml = tr.querySelector('[data-nfs-status-cell]').innerHTML;
+        }
+        renderEditableNfsRow(tr, nfsRowValues(tr));
+        const firstField = tr.querySelector('[data-nfs="path"]');
+        if (firstField) firstField.focus({ preventScroll: true });
+    }
+
+    function cancelNfsEdit(button) {
+        const tr = button.closest('tr');
+        if (!tr) return;
+        let values = nfsRowValues(tr);
+        try {
+            values = JSON.parse(tr.dataset.originalNfs || '{}') || values;
+        } catch (e) {}
+        renderReadonlyNfsRow(tr, values);
+    }
+
+    function validateNfsRow(tr) {
+        if (!tr) return false;
+        const values = nfsRowValues(tr);
+        const invalid = [];
+        const fields = {
+            path: tr.querySelector('[data-nfs="path"]'),
+            client: tr.querySelector('[data-nfs="client"]')
+        };
+        Object.values(fields).forEach(field => field && field.classList.remove('is-invalid-v5'));
+        if (!values.path) invalid.push(['path', 'chemin local obligatoire']);
+        else if (!values.path.startsWith('/')) invalid.push(['path', 'chemin local absolu obligatoire']);
+        if (!values.client) invalid.push(['client', 'client NFS obligatoire']);
+        else if (/\s/.test(values.client)) invalid.push(['client', 'client NFS invalide : pas d’espace']);
+        if (invalid.length) {
+            invalid.forEach(([key]) => {
+                if (fields[key]) fields[key].classList.add('is-invalid-v5');
+            });
+            showMessage(invalid.map(([, msg]) => msg).join(' · '), false);
+            return false;
+        }
+        return true;
+    }
+
+    async function saveNfsRow(button) {
+        const tr = button.closest('tr');
+        if (tr && !validateNfsRow(tr)) return false;
+        const values = tr ? nfsRowValues(tr) : {};
+        const ok = await saveNfs(button, { refresh: false });
+        if (ok && tr) {
+            tr.dataset.nfsStatusHtml = '<span class="badge badge-warn">modifié</span>';
+            renderReadonlyNfsRow(tr, values);
+            await refreshPartageState({ nfs: true });
+        }
+        return ok;
+    }
+
+    async function removeNfsRow(button) {
+        const tr = button.closest('tr');
+        if (!tr) return;
+        const tbody = tr.parentElement;
+        const next = tr.nextSibling;
+        const wasExisting = tr.dataset.existingNfs === '1';
+        tr.remove();
+        if (!wasExisting) return;
+        const ok = await saveNfs(button, { refresh: false, successMessage: 'Export supprimé.' });
+        if (ok) {
+            await refreshPartageState({ nfs: true });
+        } else if (tbody) {
+            tbody.insertBefore(tr, next);
+        }
+    }
+
+    function addNfsRow() {
+        const tbody = document.querySelector('#nfsTable tbody');
+        if (!tbody) return;
+        tbody.querySelectorAll('tr').forEach(row => {
+            if (!row.querySelector('[data-nfs]')) row.remove();
+        });
+        const tr = document.createElement('tr');
+        tr.tabIndex = 0;
+        tr.classList.add('share-editing');
+        tr.dataset.nfsStatusHtml = '<span class="badge badge-warn">nouveau</span>';
+        tr.innerHTML = `
+            <td><div class="path-edit"><input class="text-input" data-nfs="path" placeholder="/mnt/user/Media"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" onclick="openBrowseForInput(this.closest('td').querySelector('[data-nfs=path]'))">📁</button></div></td>
+            <td><input class="text-input" data-nfs="client" value="{{ state.nfs.default_client }}"></td>
+            <td>${selectHtml('data-nfs="access"', ['rw','ro'], 'rw')}</td>
+            <td><input class="text-input" data-nfs="advanced_options" value="{{ state.nfs.default_options }}" placeholder="sync,no_subtree_check,no_root_squash"></td>
+            <td data-nfs-status-cell><span class="badge badge-warn">nouveau</span></td>
+            <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-primary yoleo-btn-icon" title="Enregistrer" onclick="saveNfsRow(this)">💾</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="removeNfsRow(this)">🗑</button></div></td>`;
+        tbody.appendChild(tr);
+        const firstInput = tr.querySelector('[data-nfs="path"]');
+        if (firstInput) firstInput.focus();
+    }
+
+    function initNfsExportKeyboardSave() {
+        const table = document.querySelector('#nfsTable');
+        if (!table) return;
+        table.querySelectorAll('tbody tr').forEach(tr => {
+            if (tr.querySelector('[data-nfs]') && !tr.hasAttribute('tabindex')) tr.tabIndex = 0;
+        });
+        if (table.dataset.enterSaveBound === '1') return;
+        table.dataset.enterSaveBound = '1';
+        table.addEventListener('keydown', event => {
+            const target = event.target;
+            if (!target || !target.closest) return;
+            const tr = target.closest('tr');
+            if (!tr || !table.contains(tr)) return;
+
+            if (event.key === 'F2') {
+                if (!tr.classList.contains('share-editing')) {
+                    event.preventDefault();
+                    const editButton = tr.querySelector('button[title="Modifier"]');
+                    if (editButton && !editButton.disabled) editNfsRow(editButton);
+                }
+                return;
+            }
+
+            if (event.key !== 'Enter') return;
+            if (!tr.classList.contains('share-editing')) return;
+            event.preventDefault();
+            const saveButton = tr.querySelector('button[title="Enregistrer"]');
+            if (saveButton && !saveButton.disabled) saveNfsRow(saveButton);
+        });
+        table.addEventListener('input', event => {
+            const field = event.target && event.target.closest ? event.target.closest('[data-nfs]') : null;
+            if (field) field.classList.remove('is-invalid-v5');
+        });
+        table.addEventListener('change', event => {
+            const field = event.target && event.target.closest ? event.target.closest('[data-nfs]') : null;
+            if (field) field.classList.remove('is-invalid-v5');
+        });
+    }
+
+    function sambaBasePayload() {
+        const base = JSON.parse(JSON.stringify(SAMBA_BASE || {}));
+        base.global = base.global || {};
+        base.users = (base.users || []).map(user => ({
+            name: String(user.name || ''),
+            password: String(user.password || ''),
+            uid: String(user.uid || ''),
+            gid: String(user.gid || ''),
+            shell: String(user.shell || '/usr/sbin/nologin'),
+            home: String(user.home || '/nonexistent')
+        }));
+        base.shares = (base.shares || []).map(share => ({
+            name: String(share.name || ''),
+            path: String(share.path || ''),
+            owner: String(share.owner || ''),
+            type: String(share.type || 'normal'),
+            guest_ok: String(share.guest_ok || 'no'),
+            read_only: String(share.read_only || 'no'),
+            browsable: String(share.browsable || 'yes'),
+            writable: String(share.writable || 'yes'),
+            recycle_bin: String(share.recycle_bin || 'no'),
+            access_mode: String(share.access_mode || 'private'),
+            read_users: Array.isArray(share.read_users) ? share.read_users.join(',') : String(share.read_users || ''),
+            write_users: Array.isArray(share.write_users) ? share.write_users.join(',') : String(share.write_users || '')
+        }));
+        return base;
+    }
+
+    function collectSamba() {
+        const payload = sambaBasePayload();
+        const globalInputs = Array.from(document.querySelectorAll('[data-global]'));
+        if (globalInputs.length) {
+            payload.global = Object.assign({}, payload.global);
+            const simplifiedGlobalForm = document.querySelector('#sambaGlobalForm[data-samba-simplified="1"]');
+            const mergedNameInput = simplifiedGlobalForm ? simplifiedGlobalForm.querySelector('[data-samba-merged-name]') : null;
+            const mergedName = mergedNameInput ? String(mergedNameInput.value || '').trim() : '';
+            globalInputs.forEach(input => {
+                const key = input.dataset.global;
+                let value = input.value;
+                if (simplifiedGlobalForm && (key === 'netbios_name' || key === 'wsdd_name')) value = mergedName;
+                if (simplifiedGlobalForm && key === 'server_string') value = value || 'Samba Partage';
+                if (simplifiedGlobalForm && key === 'min_protocol') value = 'SMB2';
+                if (simplifiedGlobalForm && (key === 'enable_wsdd' || key === 'create_missing_dirs')) value = 'yes';
+                if (key === 'enable_wsdd' || key === 'create_missing_dirs') value = value === 'yes';
+                payload.global[key] = value;
+            });
+        }
+
+        const usersTable = document.querySelector('#sambaUsersTable');
+        if (usersTable) {
+            payload.users = Array.from(usersTable.querySelectorAll('tbody tr')).map(tr => {
+                const row = {};
+                tr.querySelectorAll('[data-user]').forEach(input => row[input.dataset.user] = input.value.trim());
+                return row;
+            }).filter(row => row.name || row.password);
+        }
+
+        const sharesTable = document.querySelector('#sambaSharesTable');
+        if (sharesTable) {
+            syncAllSambaPublicShareControls();
+            payload.shares = Array.from(sharesTable.querySelectorAll('tbody tr')).map(tr => {
+                const row = {};
+                tr.querySelectorAll('[data-share]').forEach(input => row[input.dataset.share] = input.value.trim());
+                return row;
+            }).filter(row => row.name || row.path);
+        }
+
+        return {
+            conf_path: payload.conf_path,
+            global: payload.global,
+            users: payload.users,
+            shares: payload.shares
+        };
+    }
+
+    function collectNfs() {
+        const entries = Array.from(document.querySelectorAll('#nfsTable tbody tr')).map(tr => {
+            const row = {};
+            tr.querySelectorAll('[data-nfs]').forEach(input => row[input.dataset.nfs] = input.value.trim());
+            return row;
+        }).filter(row => row.path || row.client);
+        return { entries };
+    }
+
+    async function postJson(url, payload) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        let data;
+        try { data = await response.json(); } catch (e) { data = { ok: false, message: await response.text() }; }
+        if (!response.ok || !data.ok) throw new Error(data.message || 'Erreur inconnue');
+        return data;
+    }
+
+    function badgeHtml(text, className) {
+        return '<span class="badge ' + className + '">' + escapeHtml(text || '—') + '</span>';
+    }
+
+    function serviceBadgesHtml(svc) {
+        const active = String((svc && svc.active) || 'unknown');
+        let activeClass = 'badge-warn';
+        if (active === 'active') activeClass = 'badge-ok';
+        else if (active === 'inactive' || active === 'failed') activeClass = 'badge-no';
+        return badgeHtml(active, activeClass) + ' ' + badgeHtml((svc && svc.enabled) || 'unknown', 'badge-info');
+    }
+
+    function nfsEntryStatusHtml(entry) {
+        const activeBadge = entry && entry.active ? badgeHtml('actif', 'badge-ok') : badgeHtml('pas actif', 'badge-warn');
+        const pathBadge = entry && entry.exists ? badgeHtml('dossier OK', 'badge-ok') : badgeHtml('dossier absent', 'badge-no');
+        return activeBadge + ' ' + pathBadge;
+    }
+
+    function nfsReadonlyRowHtml(entry) {
+        const safe = {
+            path: escapeHtml((entry && entry.path) || ''),
+            client: escapeHtml((entry && entry.client) || ''),
+            access: escapeHtml((entry && entry.access) || 'rw'),
+            advanced_options: escapeHtml((entry && entry.advanced_options) || '')
+        };
+        return `<tr data-existing-nfs="1" tabindex="0">
+            <td><span class="path-pill" title="${safe.path}"><span>${safe.path}</span></span><input type="hidden" data-nfs="path" value="${safe.path}"></td>
+            <td><span class="readonly-cell">${safe.client}</span><input type="hidden" data-nfs="client" value="${safe.client}"></td>
+            <td><span class="badge badge-info">${safe.access}</span><input type="hidden" data-nfs="access" value="${safe.access}"></td>
+            <td><span class="path-pill" title="${safe.advanced_options}"><span>${safe.advanced_options || '—'}</span></span><input type="hidden" data-nfs="advanced_options" value="${safe.advanced_options}"></td>
+            <td data-nfs-status-cell>${nfsEntryStatusHtml(entry || {})}</td>
+            <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Modifier" onclick="editNfsRow(this)">✏️</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="removeNfsRow(this)">🗑</button></div></td>
+        </tr>`;
+    }
+
+    function renderNfsEntries(entries) {
+        const tbody = $('nfsEntriesBody');
+        if (!tbody) return;
+        const rows = Array.isArray(entries) ? entries : [];
+        tbody.innerHTML = rows.length ? rows.map(nfsReadonlyRowHtml).join('') : '<tr><td colspan="6">Aucun export permanent configuré.</td></tr>';
+    }
+
+    function renderNfsActiveExports(entries) {
+        const tbody = $('nfsActiveExportsBody');
+        if (!tbody) return;
+        const rows = Array.isArray(entries) ? entries : [];
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="3">Aucun export actif visible ou exportfs indisponible.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map(entry => {
+            const path = escapeHtml(entry.path || '');
+            const client = escapeHtml(entry.client || '');
+            const options = escapeHtml(entry.options || '');
+            return `<tr><td><span class="path-pill" title="${path}"><span>${path}</span></span></td><td>${client}</td><td class="partage-nfs-options-active-cell-v4"><span class="partage-nfs-options-active-v4" title="${options}">${options}</span></td></tr>`;
+        }).join('');
+    }
+
+    function renderNfsServicesSummary(services) {
+        const box = $('nfsServicesSummary');
+        if (!box) return;
+        const rows = (Array.isArray(services) ? services : []).filter(svc => String(svc.name || '').includes('nfs'));
+        box.innerHTML = rows.map(svc => `
+            <div class="summary-card partage-nfs-service-mini-v4">
+                <div class="summary-label">${escapeHtml(svc.name || '')}</div>
+                <div class="summary-value partage-service-badges-compact-v4">${serviceBadgesHtml(svc)}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderNfsState(data) {
+        if (!data || !data.nfs) return;
+        const nfs = data.nfs;
+        if ($('nfsExportsFileValue')) {
+            $('nfsExportsFileValue').textContent = nfs.exports_file || '';
+            $('nfsExportsFileValue').title = nfs.exports_file || '';
+        }
+        if ($('nfsConfiguredCount')) $('nfsConfiguredCount').textContent = String((nfs.entries || []).length);
+        if ($('nfsActiveCount')) $('nfsActiveCount').textContent = String((nfs.active_exports || []).length);
+        if ($('nfsDefaultClientValue')) $('nfsDefaultClientValue').textContent = nfs.default_client || '';
+        renderNfsServicesSummary(data.services || []);
+        renderNfsEntries(nfs.entries || []);
+        renderNfsActiveExports(nfs.active_exports || []);
+        const rawNfs = $('rawNfs');
+        if (rawNfs && document.activeElement !== rawNfs) rawNfs.value = data.raw_nfs || '';
+    }
+
+    function sambaCoreState(services) {
+        const rows = Array.isArray(services) ? services : [];
+        const coreNames = ['smbd.service', 'nmbd.service'];
+        const core = rows.filter(svc => coreNames.includes(String((svc && svc.name) || '')) && svc.exists !== false);
+        const activeCount = core.filter(svc => String((svc && svc.active) || '') === 'active').length;
+        return {
+            total: core.length,
+            active: activeCount,
+            allActive: core.length > 0 && activeCount === core.length,
+            anyActive: activeCount > 0
+        };
+    }
+
+    function syncSambaActionButtons(data) {
+        const status = sambaCoreState((data && data.services) || []);
+        const startButton = document.querySelector('[data-samba-action-button="start"]');
+        const stopButton = document.querySelector('[data-samba-action-button="stop"]');
+        setStateDisabled(
+            startButton,
+            status.allActive,
+            status.allActive ? 'Samba est déjà démarré.' : 'Démarrer les services Samba'
+        );
+        setStateDisabled(
+            stopButton,
+            !status.anyActive,
+            status.anyActive ? 'Arrêter les services Samba' : 'Samba est déjà arrêté.'
+        );
+    }
+
+    function sambaDiscoveryLabel(global, services) {
+        if (!global || !global.enable_wsdd) return 'WSDD non';
+        const rows = Array.isArray(services) ? services : [];
+        const wsddRows = rows.filter(svc => ['wsdd2.service', 'wsdd.service'].includes(String((svc && svc.name) || '')));
+        const refreshActive = rows.some(svc => String((svc && svc.name) || '') === 'samba-wsdd-refresh.timer' && String((svc && svc.active) || '') === 'active');
+        if (wsddRows.some(svc => String((svc && svc.active) || '') === 'active')) return refreshActive ? 'WSDD actif + refresh' : 'WSDD actif';
+        if (wsddRows.some(svc => svc && svc.exists !== false)) return 'WSDD arrêté';
+        return 'WSDD absent';
+    }
+
+    function renderSambaServicesSummary(data) {
+        const box = $('sambaServicesSummary');
+        if (!box || !data) return;
+        const services = Array.isArray(data.services) ? data.services : [];
+        const samba = data.samba || {};
+        const global = samba.global || {};
+        const rows = services.filter(svc => !String((svc && svc.name) || '').includes('nfs'));
+        const cards = rows.map(svc => `
+            <div class="summary-card partage-service-card-compact-v4">
+                <div class="summary-label">${escapeHtml(svc.name || '')}</div>
+                <div class="summary-value partage-service-badges-compact-v4">${serviceBadgesHtml(svc)}</div>
+            </div>
+        `);
+        cards.push(`
+            <div class="summary-card partage-service-card-compact-v4 partage-info-inline-card-v4">
+                <div class="summary-label">Users SMB</div>
+                <div class="summary-value">${Array.isArray(samba.users) ? samba.users.length : 0}</div>
+            </div>
+        `);
+        cards.push(`
+            <div class="summary-card partage-service-card-compact-v4 partage-info-inline-card-v4">
+                <div class="summary-label">Partages</div>
+                <div class="summary-value">${Array.isArray(samba.shares) ? samba.shares.length : 0}</div>
+            </div>
+        `);
+        cards.push(`
+            <div class="summary-card partage-service-card-compact-v4 partage-info-inline-card-v4">
+                <div class="summary-label">Découverte</div>
+                <div class="summary-value">${sambaDiscoveryLabel(global, services)}</div>
+            </div>
+        `);
+        box.innerHTML = cards.join('');
+    }
+
+    function renderSambaState(data) {
+        if (!data || !data.samba) return;
+        renderSambaServicesSummary(data);
+        syncSambaActionButtons(data);
+    }
+
+    async function refreshPartageState(options = {}) {
+        try {
+            const response = await fetch(URLS.state, { cache: 'no-store' });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            if (options.nfs || $('tab-nfs')) renderNfsState(data);
+            if (options.samba || $('tab-samba-main')) renderSambaState(data);
+            return data;
+        } catch (e) {
+            console.warn('Actualisation Partage impossible:', e);
+            return null;
+        }
+    }
+
+    async function saveAndApplySambaShares(button, successMessage = 'Partages enregistres et configuration Samba appliquee.') {
+        showMessage('Enregistrement des partages Samba en cours...', true, { hold: true });
+        return await runAction('samba_apply', button, {
+            loadingLabel: 'Application…',
+            successMessage,
+            errorMessage: 'Erreur pendant l’enregistrement des partages. Le détail est dans Logs partage.'
+        });
+    }
+
+    async function saveSamba(button, successMessage = 'Enregistrement terminé.', options = {}) {
+        if (!validateSambaSharesBeforeSave()) return false;
+        setButtonLoading(button, 'Enregistrement…');
+        try {
+            await postJson(URLS.saveSamba, collectSamba());
+            if (!options.silentSuccess) showMessage(successMessage, true);
+            return true;
+        } catch (e) {
+            showMessage('Erreur : ' + e.message, false);
+            return false;
+        } finally {
+            clearButtonLoading(button);
+        }
+    }
+
+    async function saveNfs(button, options = {}) {
+        setButtonLoading(button, 'Enregistrement…');
+        try {
+            const data = await postJson(URLS.saveNfs, collectNfs());
+            if (options.refresh !== false) await refreshPartageState({ nfs: true });
+            showMessage(options.successMessage || data.message || 'Exports enregistrés.', true);
+            return true;
+        } catch (e) {
+            showMessage('Erreur : ' + e.message, false);
+            return false;
+        } finally {
+            clearButtonLoading(button);
+        }
+    }
+
+    function collectPartageSettings() {
+        const settings = {};
+        document.querySelectorAll('[data-partage-setting]').forEach(input => {
+            settings[input.dataset.partageSetting] = input.value.trim();
+        });
+        return { settings };
+    }
+
+    async function savePartageSettings(button) {
+        setButtonLoading(button, 'Enregistrement…');
+        try {
+            const data = await postJson(URLS.saveSettings, collectPartageSettings());
+            showMessage(data.message || 'Réglages enregistrés.', true);
+            return true;
+        } catch (e) {
+            showMessage('Erreur : ' + e.message, false);
+            return false;
+        } finally {
+            clearButtonLoading(button);
+        }
+    }
+
+    async function saveRaw(kind, button) {
+        setButtonLoading(button, 'Enregistrement…');
+        const content = kind === 'samba' ? $('rawSamba').value : $('rawNfs').value;
+        try {
+            const data = await postJson(URLS.saveRaw, { kind, content });
+            showMessage(data.message || 'Fichier brut enregistré.', true);
+        } catch (e) {
+            showMessage('Erreur : ' + e.message, false);
+        } finally {
+            clearButtonLoading(button);
+        }
+    }
+
+
+    function appendOutput(text) {
+        const term = $('terminal-output');
+        if (term) {
+            term.value += text;
+            term.scrollTop = term.scrollHeight;
+        }
+        try {
+            const previous = window.localStorage.getItem(PARTAGE_OPERATION_LOG_KEY) || '';
+            window.localStorage.setItem(PARTAGE_OPERATION_LOG_KEY, (previous + text).slice(-80000));
+        } catch (e) {}
+    }
+
+    function actionTitle(action) {
+        const map = {
+            samba_install: 'Installation + démarrage Samba',
+            samba_apply: 'Application configuration Samba',
+            samba_passwords: 'Mise à jour mots de passe Samba',
+            samba_start: 'Démarrage services Samba',
+            samba_stop: 'Arrêt services Samba',
+            samba_remove: 'Retrait configuration Samba',
+            nfs_reload: 'Rechargement exports NFS',
+            nfs_start: 'Démarrage service NFS',
+            nfs_stop: 'Arrêt service NFS'
+        };
+        return map[action] || 'Opération Partage';
+    }
+
+
+    let sambaGlobalAutoApplyBusy = false;
+    let sambaGlobalAutoApplyDirty = false;
+
+    function markSambaGlobalDirty() {
+        sambaGlobalAutoApplyDirty = true;
+    }
+
+    async function sambaAutoApplyGlobalForm(button = null, force = false) {
+        const form = $('sambaGlobalForm');
+        if (!form || sambaGlobalAutoApplyBusy) return false;
+        if (!force && !sambaGlobalAutoApplyDirty) return false;
+        sambaGlobalAutoApplyBusy = true;
+        showMessage('Enregistrement en cours…', true, { hold: true });
+        setButtonLoading(button, 'OK…');
+        try {
+            const ok = await runAction('samba_apply', null);
+            if (ok !== false) sambaGlobalAutoApplyDirty = false;
+            return ok !== false;
+        } finally {
+            sambaGlobalAutoApplyBusy = false;
+            clearButtonLoading(button);
+        }
+    }
+
+    async function sambaApplyGlobalFormNow(button = null) {
+        markSambaGlobalDirty();
+        return await sambaAutoApplyGlobalForm(button, true);
+    }
+
+    function initSambaGlobalAutoApply() {
+        const form = $('sambaGlobalForm');
+        if (!form || form.dataset.autoApplyReady === '1') return;
+        form.dataset.autoApplyReady = '1';
+
+        const syncMergedSambaName = () => {
+            const merged = form.querySelector('[data-samba-merged-name]');
+            const wsdd = form.querySelector('[data-global="wsdd_name"]');
+            if (merged && wsdd) wsdd.value = String(merged.value || '').trim();
+        };
+        syncMergedSambaName();
+
+        form.querySelectorAll('input[data-global], select[data-global]').forEach(field => {
+            field.addEventListener('input', () => {
+                syncMergedSambaName();
+                markSambaGlobalDirty();
+            });
+            field.addEventListener('change', async () => {
+                syncMergedSambaName();
+                markSambaGlobalDirty();
+                if (field.tagName === 'SELECT') await sambaAutoApplyGlobalForm();
+            });
+            field.addEventListener('keydown', async event => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                syncMergedSambaName();
+                markSambaGlobalDirty();
+                await sambaAutoApplyGlobalForm();
+                if (typeof field.blur === 'function') field.blur();
+            });
+        });
+    }
+
+    async function runAction(action, button, options = {}) {
+        if (button && button.dataset.stateDisabled === '1') return false;
+        if (action === 'samba_apply' || action === 'samba_install' || action === 'samba_passwords') {
+            const ok = await saveSamba(null, '', { silentSuccess: true });
+            if (!ok) return false;
+        }
+        if (action === 'nfs_reload' || action === 'nfs_start') {
+            const ok = await saveNfs(null);
+            if (!ok) return false;
+        }
+
+        setButtonLoading(button, options.loadingLabel || 'En cours…');
+        try { window.localStorage.setItem(PARTAGE_OPERATION_LOG_KEY, ''); } catch (e) {}
+        appendOutput('\n\n### ' + actionTitle(action) + ' ###\n');
+        let fullOutput = '';
+
+        try {
+            const response = await fetch(URLS.run + '?action=' + encodeURIComponent(action), { cache: 'no-store' });
+            if (!response.ok || !response.body) {
+                throw new Error('Réponse serveur invalide : HTTP ' + response.status);
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                fullOutput += chunk;
+                appendOutput(chunk);
+            }
+            appendOutput('\n');
+            if (action.includes('nfs') || action.includes('samba')) {
+                await refreshPartageState({
+                    nfs: action.includes('nfs'),
+                    samba: action.includes('samba')
+                });
+            }
+            if (looksLikeError(fullOutput)) {
+                showMessage(options.errorMessage || ('Erreur pendant : ' + actionTitle(action) + '. Le détail est dans Logs partage.'), false);
+                return false;
+            }
+            showMessage(options.successMessage || (actionTitle(action) + ' terminé.'), true);
+            return true;
+        } catch (e) {
+            appendOutput('\nERREUR JS : ' + e.message + '\n');
+            showMessage('Erreur : ' + e.message, false);
+            return false;
+        } finally {
+            clearButtonLoading(button);
+        }
+    }
+
+    function openBrowseForInput(input) {
+        browseTargetInput = input;
+        const start = input && input.value ? input.value : '{{ state.browse_start }}';
+        const url = URLS.browserFolder + '?path=' + encodeURIComponent(start || '/') + '&target=';
+        const popup = window.open(
+            url,
+            'yoleo_browser_folder',
+            'width=1100,height=760,resizable=yes,scrollbars=yes'
+        );
+        if (popup) {
+            popup.focus();
+        } else {
+            showMessage('La fenêtre Parcourir a été bloquée par le navigateur.', false);
+        }
+    }
+
+    window.addEventListener('message', event => {
+        const data = event.data || {};
+        if (!data || data.type !== 'yoleo-browser-select') return;
+        if (browseTargetInput) {
+            browseTargetInput.value = data.path || '';
+            browseTargetInput.dispatchEvent(new Event('input', { bubbles: true }));
+            browseTargetInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+
+    async function refreshLogs(button, forcedKind = null) {
+        setButtonLoading(button, 'Lecture…');
+        const kind = forcedKind || ($('logKind') ? $('logKind').value : 'samba');
+        try {
+            const response = await fetch(URLS.logs + '?kind=' + encodeURIComponent(kind) + '&lines=250', { cache: 'no-store' });
+            const out = $('live-log-output');
+            if (out) {
+                out.value = await response.text();
+                out.scrollTop = out.scrollHeight;
+            }
+        } catch (e) {
+            const out = $('live-log-output');
+            if (out) out.value = 'ERREUR lecture logs : ' + e.message;
+        } finally {
+            clearButtonLoading(button);
+        }
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        const term = $('terminal-output');
+        if (term) {
+            try {
+                term.value = window.localStorage.getItem(PARTAGE_OPERATION_LOG_KEY) || '';
+                term.scrollTop = term.scrollHeight;
+            } catch (e) {}
+        }
+        if ('{{ section }}' === 'logs') refreshLogs(null, 'all');
+    });
+
+    document.addEventListener('DOMContentLoaded', initSambaGlobalAutoApply);
+    document.addEventListener('DOMContentLoaded', initSambaShareKeyboardSave);
+    document.addEventListener('DOMContentLoaded', syncAllSambaPublicShareControls);
+    document.addEventListener('DOMContentLoaded', refreshAllSambaAccessSummaries);
+    document.addEventListener('DOMContentLoaded', initNfsExportKeyboardSave);
+
+</script>

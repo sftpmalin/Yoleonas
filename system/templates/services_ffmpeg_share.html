@@ -1,0 +1,243 @@
+{% extends "services_ffmpeg_base.html" %}
+
+{% block ffmpeg_content %}
+<section class="card ffoi-card">
+  <div id="ffoiTestResult" class="ffoi-test-result ffoi-auto-test-banner"></div>
+
+  <div class="card-head ffoi-share-head">
+    <div>
+      <h2 class="card-title">🔁 Partage / rewrite</h2>
+      <div class="hint">Le but : faire rejoindre le chemin vu par le client et le chemin réel local du NAS. Samba est automatique, NFS/manuel demande le chemin client.</div>
+    </div>
+    <button class="yoleo-btn yoleo-btn-green" type="submit" form="ffoiShareForm" name="apply" value="1">💾 Enregistrer + appliquer</button>
+  </div>
+
+  <form method="post" action="{{ url_for('services_bp.ffoi_share_save') }}" class="ffoi-form" id="ffoiShareForm">
+    <div class="ffoi-choice-grid">
+      <label class="ffoi-choice-card {{ 'is-active' if conf.SHARE_MODE == 'samba' else '' }}">
+        <input type="radio" name="SHARE_MODE" value="samba" {% if conf.SHARE_MODE != 'manual' %}checked{% endif %} onchange="ffoiSwitchMode()">
+        <span class="ffoi-choice-title">🪟 Samba automatique</span>
+      </label>
+      <label class="ffoi-choice-card {{ 'is-active' if conf.SHARE_MODE == 'manual' else '' }}">
+        <input type="radio" name="SHARE_MODE" value="manual" {% if conf.SHARE_MODE == 'manual' %}checked{% endif %} onchange="ffoiSwitchMode()">
+        <span class="ffoi-choice-title">🧭 Manuel / NFS</span>
+      </label>
+    </div>
+
+    <div class="ffoi-mode-panel" id="ffoiSambaPanel">
+      <div class="card ffoi-inner-card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Partage Samba détecté</h3>
+          </div>
+        </div>
+        {% if samba_shares %}
+        <div class="grid-3 ffoi-grid">
+          <div>
+            <label>Partage Windows</label>
+            <select name="SAMBA_SHARE" id="ffoiSambaShare" onchange="ffoiFillSambaPaths()">
+              <option value="">— choisir —</option>
+              {% for share in samba_shares %}
+              <option value="{{ share.name }}" data-client="{{ share.client_path }}" data-server="{{ share.server_path }}" {% if conf.SAMBA_SHARE == share.name %}selected{% endif %}>{{ share.name }} — {{ share.client_path }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Chemin Windows généré</label>
+            <div id="ffoiSambaClientPreview" class="ffoi-static-path">{{ conf.CLIENT_PATH or '—' }}</div>
+          </div>
+          <div>
+            <label>Chemin Linux détecté</label>
+            <div id="ffoiSambaServerPreview" class="ffoi-static-path">{{ conf.SERVER_PATH or '—' }}</div>
+          </div>
+        </div>
+        {% else %}
+        <div class="ffoi-alert ffoi-alert-warning">Aucun partage Samba détecté. Configure Samba ou passe en mode manuel.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="ffoi-mode-panel" id="ffoiManualPanel">
+      <div class="card ffoi-inner-card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Mode manuel / NFS</h3>
+          </div>
+        </div>
+        <div class="grid-2 ffoi-grid">
+          <div>
+            <label>Partage NFS monté côté NAS</label>
+            <select name="NFS_MOUNT" id="ffoiNfsMount" onchange="ffoiFillNfsPath()">
+              {% if nfs_mounts %}
+              <option value="">— choisir un montage NFS —</option>
+              {% for mount in nfs_mounts %}
+              <option value="{{ mount.target }}" data-target="{{ mount.target }}" data-source="{{ mount.source }}" {% if conf.NFS_MOUNT == mount.target or conf.SERVER_PATH == mount.target ~ '/' %}selected{% endif %}>{{ mount.label }}</option>
+              {% endfor %}
+              {% else %}
+              <option value="">Aucun dossier NFS monté trouvé</option>
+              {% endif %}
+            </select>
+          </div>
+          <div>
+            <label>Source NFS</label>
+            <div id="ffoiNfsSourcePreview" class="ffoi-static-path ffoi-static-muted">Aucun partage NFS sélectionné</div>
+          </div>
+        </div>
+
+        <div class="grid-2 ffoi-grid">
+          <div>
+            <label>Chemin côté client</label>
+            <input name="CLIENT_PATH" id="ffoiClientPath" value="{{ manual_client_value }}" placeholder="/mnt/media/ ou /home/user/media/">
+          </div>
+          <div>
+            <label>Chemin côté serveur/NAS</label>
+            <div id="ffoiServerPathPreview" class="ffoi-static-path">{{ manual_server_value or '—' }}</div>
+            <input type="hidden" name="SERVER_PATH" id="ffoiServerPath" value="{{ manual_server_value }}">
+          </div>
+        </div>
+
+        {% if not nfs_mounts %}
+        <div class="ffoi-alert ffoi-alert-warning">Aucun dossier NFS monté trouvé côté NAS. Monte d'abord un partage NFS avec le module NFS client, ou utilise Samba automatique / mode manuel complet.</div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <input type="hidden" id="ffoiHiddenClient" name="CLIENT_PATH_HIDDEN_SAFE" value="">
+  </form>
+</section>
+
+
+<script>
+function ffoiSelectedMode(){
+  const r = document.querySelector('input[name="SHARE_MODE"]:checked');
+  return r ? r.value : 'samba';
+}
+function ffoiLooksLikeSambaPath(value){
+  return (value || '').trim().startsWith('\\');
+}
+function ffoiSwitchMode(){
+  const mode = ffoiSelectedMode();
+  document.getElementById('ffoiSambaPanel').style.display = mode === 'samba' ? '' : 'none';
+  document.getElementById('ffoiManualPanel').style.display = mode === 'manual' ? '' : 'none';
+  document.querySelectorAll('.ffoi-choice-card').forEach(card => card.classList.remove('is-active'));
+  const active = document.querySelector('input[name="SHARE_MODE"]:checked');
+  if(active) active.closest('.ffoi-choice-card').classList.add('is-active');
+  if(mode === 'samba') {
+    ffoiFillSambaPaths();
+    ffoiScheduleAutoTest();
+  } else {
+    const client = document.getElementById('ffoiClientPath');
+    // En NFS/manuel, Yoleo ne devine jamais le chemin client.
+    // Si on arrive depuis Samba, on remplace l'ancien UNC par un simple / à compléter.
+    if(client && (!client.value || ffoiLooksLikeSambaPath(client.value))) client.value = '/';
+    ffoiFillNfsPath();
+    ffoiScheduleAutoTest();
+  }
+}
+function ffoiFillSambaPaths(){
+  const sel = document.getElementById('ffoiSambaShare');
+  if(!sel || !sel.selectedOptions.length) return;
+  const opt = sel.selectedOptions[0];
+  const c = opt.dataset.client || '';
+  const s = opt.dataset.server || '';
+  const pc = document.getElementById('ffoiSambaClientPreview');
+  const ps = document.getElementById('ffoiSambaServerPreview');
+  if(pc) pc.textContent = c || '—';
+  if(ps) ps.textContent = s || '—';
+  if(ffoiSelectedMode() === 'samba'){
+    const client = document.getElementById('ffoiClientPath');
+    const server = document.getElementById('ffoiServerPath');
+    if(client) client.value = c;
+    if(server) server.value = s;
+  }
+}
+function ffoiSelectServerPath(path){
+  const input = document.getElementById('ffoiServerPath');
+  if(input) input.value = path.endsWith('/') ? path : path + '/';
+  const preview = document.getElementById('ffoiServerPathPreview');
+  if(preview) preview.textContent = input ? (input.value || '—') : '—';
+}
+function ffoiFillNfsPath(){
+  const sel = document.getElementById('ffoiNfsMount');
+  const server = document.getElementById('ffoiServerPath');
+  const sourceBox = document.getElementById('ffoiNfsSourcePreview');
+  const serverPreview = document.getElementById('ffoiServerPathPreview');
+  if(!sel || !sel.selectedOptions.length) {
+    if(sourceBox) {
+      sourceBox.textContent = 'Aucun partage NFS sélectionné';
+      sourceBox.classList.add('ffoi-static-muted');
+    }
+    if(serverPreview) serverPreview.textContent = '—';
+    if(server) server.value = '';
+    return;
+  }
+  const opt = sel.selectedOptions[0];
+  const target = opt.dataset.target || '';
+  const source = opt.dataset.source || '';
+  if(sourceBox) {
+    sourceBox.textContent = source || 'Aucun partage NFS sélectionné';
+    sourceBox.classList.toggle('ffoi-static-muted', !source);
+  }
+  if(server) {
+    // Si un vrai montage NFS est sélectionné, le chemin serveur vient toujours du montage.
+    // Sinon on laisse le champ serveur vide, sans recopier un ancien chemin Samba.
+    server.value = target ? (target.endsWith('/') ? target : target + '/') : '';
+  }
+  if(serverPreview) serverPreview.textContent = server && server.value ? server.value : '—';
+}
+let ffoiTestTimer = null;
+function ffoiScheduleAutoTest(){
+  window.clearTimeout(ffoiTestTimer);
+  ffoiTestTimer = window.setTimeout(ffoiTestRewrite, 250);
+}
+function ffoiSetTestResult(box, ok, title, detail){
+  box.className = 'ffoi-test-result ffoi-auto-test-banner ' + (ok ? 'ok' : 'bad');
+  box.replaceChildren();
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'ffoi-test-title';
+  titleSpan.textContent = title;
+  const detailSpan = document.createElement('span');
+  detailSpan.className = 'ffoi-test-detail';
+  detailSpan.textContent = detail;
+  box.append(titleSpan, document.createTextNode(' '), detailSpan);
+}
+async function ffoiTestRewrite(){
+  const form = document.getElementById('ffoiShareForm');
+  if(!form) return;
+  if(ffoiSelectedMode() === 'samba') ffoiFillSambaPaths();
+  const data = new FormData(form);
+  data.set('sample', '');
+  const box = document.getElementById('ffoiTestResult');
+  if(!box) return;
+  box.className = 'ffoi-test-result ffoi-auto-test-banner';
+  box.textContent = 'Test automatique de correspondance...';
+  box.style.display = 'block';
+  try{
+    const res = await fetch('{{ url_for('services_bp.ffoi_share_test') }}', {method:'POST', body:data});
+    const json = await res.json();
+    if(json.ok){
+      ffoiSetTestResult(box, true, '✅ Correspondance OK :', `Client : ${json.client_root || '(vide)'} → Serveur : ${json.server_root || '(vide)'}`);
+    }else{
+      ffoiSetTestResult(box, false, '❌ Correspondance incorrecte :', `${json.message || 'Chemin introuvable.'} — Client : ${json.client_root || '(vide)'} → Serveur : ${json.server_root || '(vide)'}`);
+    }
+  }catch(e){
+    box.className = 'ffoi-test-result ffoi-auto-test-banner bad';
+    box.textContent = 'Erreur test automatique : ' + e;
+  }
+}
+function ffoiBindAutoTest(){
+  const form = document.getElementById('ffoiShareForm');
+  if(!form) return;
+  form.querySelectorAll('select,input').forEach(function(el){
+    if(el.type === 'hidden') return;
+    el.addEventListener('change', ffoiScheduleAutoTest);
+    el.addEventListener('input', ffoiScheduleAutoTest);
+  });
+}
+ffoiBindAutoTest();
+ffoiSwitchMode();
+ffoiFillNfsPath();
+ffoiScheduleAutoTest();
+</script>
+{% endblock %}

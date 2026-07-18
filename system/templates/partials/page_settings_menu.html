@@ -1,0 +1,79 @@
+{% set _path = request.path %}
+{% set _section = menu_top_current if menu_top_current is defined else none %}
+{% set _section_items = _section.get('items', []) if _section else [] %}
+{% set _section_enabled = _section and _section.get('enabled') and _section_items %}
+
+{% macro page_settings_icon(icon_value, fallback='⚙️') -%}
+    {% set _icon = ((icon_value if icon_value else fallback)|string).strip() %}
+    {% set _lower = _icon.lower() %}
+    {% set _is_image = _icon.startswith('http://')
+        or _icon.startswith('https://')
+        or _icon.startswith('/static/')
+        or _icon.startswith('/logo/')
+        or _icon.startswith('./')
+        or _icon.startswith('../')
+        or _icon.startswith('static/')
+        or _icon.startswith('logo/')
+        or _lower.endswith('.png')
+        or _lower.endswith('.jpg')
+        or _lower.endswith('.jpeg')
+        or _lower.endswith('.webp')
+        or _lower.endswith('.gif')
+        or _lower.endswith('.svg')
+        or _lower.endswith('.ico')
+        or _lower.endswith('.bmp')
+        or _lower.endswith('.avif') %}
+    {% if _is_image %}
+        {% if _icon.startswith('static/') %}
+            {% set _src = '/' ~ _icon %}
+        {% elif _icon.startswith('logo/') %}
+            {% set _src = '/static/' ~ _icon %}
+        {% else %}
+            {% set _src = _icon %}
+        {% endif %}
+        <img src="{{ _src }}" class="yoleo-menu-img" alt="">
+    {% else %}
+        {{ _icon }}
+    {% endif %}
+{%- endmacro %}
+
+{% macro page_settings_link(item) -%}
+    {% set _href = item.url if item.url else '#' %}
+    {% set _item_path = _href.split('?')[0] %}
+    {#
+       Les entrées qui déclenchent une commande JavaScript pointent souvent vers
+       la page courante uniquement pour éviter un lien vide. Elles ne doivent pas
+       être considérées comme l'onglet actif, sinon tout le menu se transforme en
+       gros boutons bleus/cyan. Seuls les vrais liens de navigation peuvent être
+       marqués actifs.
+    #}
+    {% set _is_action = item.onclick is defined and item.onclick %}
+    {% set _active = (not _is_action) and _href != '#' and (_path == _item_path or (_item_path not in ['', '/'] and _path.startswith(_item_path ~ '/'))) %}
+    <a href="{{ _href }}" class="{{ 'is-active' if _active else '' }}{{ ' is-action' if _is_action else '' }}"{% if item.onclick %} onclick="{{ item.onclick }}"{% endif %}>
+        <span class="page-settings-icon" aria-hidden="true">{{ page_settings_icon(item.icon, '•') }}</span>
+        <span>{{ item.label }}</span>
+    </a>
+{%- endmacro %}
+
+{% if _section_enabled %}
+{% set _active_icon = namespace(value=_section.get('icon')) %}
+{% for item in _section_items %}
+    {% set _href = item.url if item.url else '#' %}
+    {% set _item_path = _href.split('?')[0] %}
+    {% set _is_action = item.onclick is defined and item.onclick %}
+    {% set _active = (not _is_action) and _href != '#' and (_path == _item_path or (_item_path not in ['', '/'] and _path.startswith(_item_path ~ '/'))) %}
+    {% if _active and item.icon %}
+        {% set _active_icon.value = item.icon %}
+    {% endif %}
+{% endfor %}
+<details class="yoleo-page-settings-menu" id="yoleoPageSettingsMenu">
+    <summary class="yoleo-page-settings-toggle" aria-label="{{ _section.get('label') }}" title="{{ _section.get('label') }}">{{ page_settings_icon(_active_icon.value, '⚙️') }}</summary>
+    <nav class="yoleo-page-settings-dropdown" aria-label="{{ _section.get('label') }}">
+        {% for item in _section_items %}
+            {{ page_settings_link(item) }}
+        {% endfor %}
+    </nav>
+</details>
+{% else %}
+<button type="button" class="yoleo-page-settings-toggle is-disabled" id="yoleoPageSettingsDisabled" aria-label="Aucun menu haut actif" title="Aucun menu haut actif" disabled>&#9881;</button>
+{% endif %}

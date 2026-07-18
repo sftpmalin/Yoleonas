@@ -1,0 +1,269 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-virtual-disk" class="disk-section disk-virtual-disk-page">
+    <section class="summary-grid virtualdisk-summary-grid">
+        <div class="summary-card yoleo-card"><div class="summary-label">Virtual Disk</div><div class="summary-value cyan" id="virtualdisk-count">—</div></div>
+        <div class="summary-card yoleo-card"><div class="summary-label">Montés</div><div class="summary-value green" id="virtualdisk-mounted">—</div></div>
+        <div class="summary-card yoleo-card"><div class="summary-label">Lecture seule</div><div class="summary-value" id="virtualdisk-readonly">—</div></div>
+        <div class="summary-card yoleo-card virtualdisk-base-card"><div class="summary-label">Base</div><div class="summary-value virtualdisk-base" id="virtualdisk-base">—</div></div>
+    </section>
+
+    <section class="yoleo-card table-card virtualdisk-card">
+        <div class="table-toolbar virtualdisk-table-toolbar">
+            <div>
+                <h3>Montages actifs</h3>
+                <p class="muted">La croix démonte seulement le disque virtuel. Le fichier image n’est jamais supprimé.</p>
+            </div>
+        </div>
+        <div id="virtualdisk-message" class="virtualdisk-inline-message" hidden></div>
+        <div class="table-wrap disk-table-compact virtualdisk-table-wrap">
+            <table class="yoleo-table virtualdisk-table">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Fichier image</th>
+                        <th>Monté sur</th>
+                        <th>Bloc</th>
+                        <th>Utilisé</th>
+                        <th>Total</th>
+                        <th>Restant</th>
+                        <th>Mode</th>
+                        <th>État</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="virtualdisk-tbody">
+                    <tr><td colspan="10" class="empty-state">Chargement…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="virtualdisk-mobile" class="virtualdisk-mobile-list" hidden></div>
+        <pre id="virtualdisk-output" class="action-output virtualdisk-output" hidden></pre>
+    </section>
+</div>
+
+<div class="modal-backdrop" id="virtualdisk-add-modal">
+    <div class="modal virtualdisk-modal">
+        <div class="modal-head">
+            <div class="modal-title">Ajouter un Virtual Disk</div>
+            <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('virtualdisk-add-modal')">✕</button>
+        </div>
+        <div class="modal-body virtualdisk-modal-body">
+            <div class="maintenance-note virtualdisk-add-note">Choisis un fichier disque virtuel arrêté. Le montage est refusé si le fichier est déjà utilisé par une VM ou un processus.</div>
+
+            <div class="virtualdisk-modal-row virtualdisk-image-row">
+                <label for="virtualdisk-image">Disque virtuel</label>
+                <input id="virtualdisk-image" class="yoleo-input" placeholder="/mnt/user/domains/VM/disk.qcow2">
+                <button type="button" class="yoleo-btn yoleo-btn-small" onclick="openVirtualDiskImageBrowser()">📁 Parcourir</button>
+            </div>
+
+            <div class="virtualdisk-help">Formats acceptés : <span id="virtualdisk-exts">qcow2, raw, img, vdi, vmdk, vhd/vhdx</span>.</div>
+
+            <div class="virtualdisk-modal-row virtualdisk-mount-row">
+                <label for="virtualdisk-mountpoint">Point de montage</label>
+                <input id="virtualdisk-mountpoint" class="yoleo-input" placeholder="/mnt/virtual_disk/nom_du_disque">
+                <button type="button" class="yoleo-btn yoleo-btn-small" onclick="openVirtualDiskFolderBrowser()">📁 Parcourir</button>
+            </div>
+
+            <div class="virtualdisk-options-line">
+                <button type="button" class="yoleo-btn yoleo-btn-small" onclick="virtualDiskSetBase('/mnt/virtual_disk')">/mnt/virtual_disk</button>
+                <button type="button" class="yoleo-btn yoleo-btn-small" onclick="virtualDiskSetBase('/mnt')">/mnt</button>
+                <label class="check-row virtualdisk-inline-check"><input type="checkbox" id="virtualdisk-readonly-check"> Lecture seule</label>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('virtualdisk-add-modal')">Annuler</button>
+            <button class="yoleo-btn yoleo-btn-small yoleo-btn-green" id="virtualdisk-submit-btn" onclick="submitVirtualDiskMount()">Ajouter</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let virtualDiskData = null;
+let virtualDiskBusy = false;
+let virtualDiskTimer = null;
+
+function vdEsc(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'}[c]));
+}
+function virtualDiskMsg(message, ok = true, sticky = false) {
+    const box = $('virtualdisk-message');
+    if (!box) return;
+    box.hidden = false;
+    box.className = 'virtualdisk-inline-message ' + (ok ? 'ok' : 'bad');
+    box.textContent = message || '';
+    window.clearTimeout(box._hideTimer);
+    if (ok && !sticky) box._hideTimer = window.setTimeout(() => { box.hidden = true; box.textContent = ''; }, 850);
+}
+function virtualDiskOutput(text) {
+    const out = $('virtualdisk-output');
+    if (!out) return;
+    out.textContent = text || '';
+    out.hidden = !text;
+}
+function virtualDiskNameSafe(path) {
+    const name = String(path || 'virtual_disk').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+    return name.trim().replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^[._-]+|[._-]+$/g, '') || 'virtual_disk';
+}
+function virtualDiskBase() {
+    return String(virtualDiskData?.base_path || '/mnt/virtual_disk').replace(/\/$/, '');
+}
+function virtualDiskDefaultMountpoint(imagePath) {
+    return virtualDiskBase() + '/' + virtualDiskNameSafe(imagePath || $('virtualdisk-image')?.value || 'disk');
+}
+function virtualDiskSetBase(base) {
+    const image = $('virtualdisk-image')?.value || 'disk';
+    const target = String(base || '/mnt/virtual_disk').replace(/\/$/, '') + '/' + virtualDiskNameSafe(image);
+    if ($('virtualdisk-mountpoint')) $('virtualdisk-mountpoint').value = target;
+}
+function virtualDiskSyncDefaultMountpoint(force = false) {
+    const image = String($('virtualdisk-image')?.value || '').trim();
+    const mp = $('virtualdisk-mountpoint');
+    if (!mp || !image) return;
+    if (force || !String(mp.value || '').trim()) mp.value = virtualDiskDefaultMountpoint(image);
+}
+function openVirtualDiskImageBrowser() {
+    const input = $('virtualdisk-image');
+    const start = input && input.value ? input.value : '/mnt';
+    const url = '/browser/file?target=virtualdisk-image&path=' + encodeURIComponent(start);
+    if (typeof window.yoleoOpenBrowserUrl === 'function') window.yoleoOpenBrowserUrl(url, 'Parcourir un disque virtuel');
+    else window.open(url, 'yoleo_browser_virtualdisk_image', 'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+}
+function openVirtualDiskFolderBrowser() {
+    const input = $('virtualdisk-mountpoint');
+    const start = input && input.value ? input.value : virtualDiskBase();
+    const url = '/browser/folder?target=virtualdisk-mountpoint&path=' + encodeURIComponent(start);
+    if (typeof window.yoleoOpenBrowserUrl === 'function') window.yoleoOpenBrowserUrl(url, 'Parcourir un dossier');
+    else window.open(url, 'yoleo_browser_virtualdisk_mount', 'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+}
+function openVirtualDiskAddModal() {
+    if ($('virtualdisk-image')) $('virtualdisk-image').value = '';
+    if ($('virtualdisk-mountpoint')) $('virtualdisk-mountpoint').value = '';
+    if ($('virtualdisk-readonly-check')) $('virtualdisk-readonly-check').checked = false;
+    virtualDiskOutput('');
+    openModal('virtualdisk-add-modal');
+    setTimeout(() => { if ($('virtualdisk-image')) $('virtualdisk-image').focus(); }, 40);
+}
+function virtualDiskBadge(text, kind) {
+    const cls = kind === 'ok' ? 'badge-temp-ok' : (kind === 'bad' ? 'badge-temp-crit' : 'badge-muted');
+    return `<span class="badge ${cls}">${vdEsc(text || '—')}</span>`;
+}
+function virtualDiskState(row) {
+    if (row.mounted) return virtualDiskBadge('monté', 'ok');
+    if (row.source_mounted) return virtualDiskBadge('source active', 'bad');
+    return virtualDiskBadge('arrêté', 'muted');
+}
+function virtualDiskActionButtons(row) {
+    const id = vdEsc(row.id || '');
+    return `<button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-red yoleo-btn-mini yoleo-btn-icon" title="Démonter" data-id="${id}" onclick="virtualDiskUnmount(this.dataset.id)">×</button>`;
+}
+function virtualDiskSizeCell(value, pct = null) {
+    const label = value || '—';
+    if (pct === null || pct === undefined || pct === '') return vdEsc(label);
+    return `<span title="${vdEsc(String(pct))}% utilisé">${vdEsc(label)}</span>`;
+}
+function renderVirtualDisk(rows) {
+    const tbody = $('virtualdisk-tbody');
+    const mobile = $('virtualdisk-mobile');
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Aucun Virtual Disk monté.</td></tr>';
+        if (mobile) { mobile.hidden = false; mobile.innerHTML = '<div class="empty-state">Aucun Virtual Disk monté.</div>'; }
+        return;
+    }
+    if (tbody) tbody.innerHTML = list.map(row => `<tr data-id="${vdEsc(row.id || '')}">
+        <td><div class="disk-name">${vdEsc(row.name || 'Virtual Disk')}</div></td>
+        <td><span class="mount-path virtualdisk-image-path" title="${vdEsc(row.image_path || '')}">${vdEsc(row.image_path || '—')}</span></td>
+        <td><span class="mount-path" title="${vdEsc(row.mountpoint || '')}">${vdEsc(row.mountpoint || '—')}</span></td>
+        <td>${vdEsc(row.source || row.nbd || '—')}</td>
+        <td>${virtualDiskSizeCell(row.used_human, row.use_percent)}</td>
+        <td>${virtualDiskSizeCell(row.total_human)}</td>
+        <td>${virtualDiskSizeCell(row.free_human)}</td>
+        <td>${row.read_only ? virtualDiskBadge('RO', 'muted') : virtualDiskBadge('RW', 'ok')}</td>
+        <td>${virtualDiskState(row)}</td>
+        <td class="actions-col">${virtualDiskActionButtons(row)}</td>
+    </tr>`).join('');
+    if (mobile) {
+        mobile.hidden = false;
+        mobile.innerHTML = list.map(row => `<article class="virtualdisk-mobile-card ${row.mounted ? 'is-mounted' : 'is-stopped'}">
+            <div class="virtualdisk-mobile-top"><strong>${vdEsc(row.name || 'Virtual Disk')}</strong>${virtualDiskState(row)}</div>
+            <div class="virtualdisk-mobile-line"><span>Image</span><b>${vdEsc(row.image_path || '—')}</b></div>
+            <div class="virtualdisk-mobile-line"><span>Montage</span><b>${vdEsc(row.mountpoint || '—')}</b></div>
+            <div class="virtualdisk-mobile-line"><span>Bloc</span><b>${vdEsc(row.source || row.nbd || '—')}</b></div>
+            <div class="virtualdisk-mobile-line"><span>Utilisé</span><b>${vdEsc(row.used_human || '—')}</b></div>
+            <div class="virtualdisk-mobile-line"><span>Total</span><b>${vdEsc(row.total_human || '—')}</b></div>
+            <div class="virtualdisk-mobile-line"><span>Restant</span><b>${vdEsc(row.free_human || '—')}</b></div>
+            <div class="virtualdisk-mobile-actions">${virtualDiskActionButtons(row)}</div>
+        </article>`).join('');
+    }
+}
+async function loadVirtualDisk(showMessage = false) {
+    try {
+        const response = await fetch('/disk/api/virtual_disk', {cache: 'no-store'});
+        const data = await response.json();
+        if (!response.ok || data.ok === false) throw new Error(data.message || ('HTTP ' + response.status));
+        virtualDiskData = data || {};
+        const s = data.summary || {};
+        if ($('virtualdisk-count')) $('virtualdisk-count').textContent = s.profiles ?? '0';
+        if ($('virtualdisk-mounted')) $('virtualdisk-mounted').textContent = s.mounted ?? '0';
+        if ($('virtualdisk-readonly')) $('virtualdisk-readonly').textContent = s.readonly ?? '0';
+        if ($('virtualdisk-base')) $('virtualdisk-base').textContent = data.base_path || '—';
+        if ($('virtualdisk-exts')) $('virtualdisk-exts').textContent = (data.allowed_extensions || []).join(', ');
+        renderVirtualDisk(data.rows || []);
+        if (showMessage) virtualDiskMsg('Virtual Disk actualisé.', true, false);
+    } catch (err) {
+        virtualDiskMsg('Erreur Virtual Disk : ' + err.message, false, true);
+    }
+}
+async function virtualDiskPost(url, payload, busyText) {
+    if (virtualDiskBusy) return;
+    virtualDiskBusy = true;
+    document.querySelectorAll('.virtualdisk-card button, #virtualdisk-add-modal button').forEach(btn => btn.disabled = true);
+    virtualDiskMsg(busyText || 'Action Virtual Disk en cours...', true, true);
+    try {
+        const response = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload || {})});
+        const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+        virtualDiskMsg(data.message || (data.ok ? 'Action terminée.' : 'Erreur Virtual Disk.'), !!data.ok, !data.ok);
+        virtualDiskOutput(data.output || '');
+        await loadVirtualDisk(false);
+    } catch (err) {
+        virtualDiskMsg('Erreur Ajax : ' + err.message, false, true);
+    } finally {
+        virtualDiskBusy = false;
+        document.querySelectorAll('.virtualdisk-card button, #virtualdisk-add-modal button').forEach(btn => btn.disabled = false);
+    }
+}
+async function submitVirtualDiskMount() {
+    const image = String($('virtualdisk-image')?.value || '').trim();
+    const mountpointField = $('virtualdisk-mountpoint');
+    if (image && mountpointField && !String(mountpointField.value || '').trim()) mountpointField.value = virtualDiskDefaultMountpoint(image);
+    const payload = {
+        image_path: image,
+        mountpoint: mountpointField?.value || '',
+        read_only: !!$('virtualdisk-readonly-check')?.checked,
+    };
+    if (!String(payload.image_path || '').startsWith('/')) { virtualDiskMsg('Chemin image absolu obligatoire.', false, true); return; }
+    if (!String(payload.mountpoint || '').startsWith('/')) { virtualDiskMsg('Point de montage absolu obligatoire.', false, true); return; }
+    closeModal('virtualdisk-add-modal');
+    await virtualDiskPost('/disk/api/action/virtual_disk/mount', payload, 'Montage Virtual Disk en cours...');
+}
+async function virtualDiskUnmount(id) {
+    const row = (virtualDiskData?.rows || []).find(item => String(item.id || '') === String(id || '')) || {};
+    const label = row.mountpoint || row.image_path || id || 'ce montage';
+    const ok = await showConfirm('Démonter le Virtual Disk', 'Démonter ' + label + ' ? Le fichier image ne sera pas supprimé. Le dossier de montage sera supprimé seulement s’il est vide.', 'Démonter', true);
+    if (!ok) return;
+    await virtualDiskPost('/disk/api/action/virtual_disk/unmount', {id}, 'Démontage Virtual Disk en cours...');
+}
+document.addEventListener('DOMContentLoaded', function () {
+    const imageInput = $('virtualdisk-image');
+    if (imageInput) {
+        imageInput.addEventListener('input', () => virtualDiskSyncDefaultMountpoint(false));
+        imageInput.addEventListener('change', () => virtualDiskSyncDefaultMountpoint(false));
+    }
+    loadVirtualDisk(false);
+    window.clearInterval(virtualDiskTimer);
+    virtualDiskTimer = window.setInterval(() => { if (!virtualDiskBusy) loadVirtualDisk(false); }, 3500);
+});
+</script>
+{% endblock %}

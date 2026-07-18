@@ -1,0 +1,303 @@
+{% extends "services_base.html" %}
+
+{% macro mini_status_badge(value) -%}
+    {%- set raw = (value|string)|trim -%}
+    {%- set norm = raw|lower -%}
+    {%- set ok_values = ['active', 'enabled', 'enable', 'oui', 'yes', 'true', 'running', 'ok', 'source ok', 'prêt', 'pret'] -%}
+    {%- set ko_values = ['inactive', 'disabled', 'disable', 'non', 'no', 'false', 'failed', 'dead', 'not-found', 'not found', 'missing', 'absent', 'error', 'erreur'] -%}
+    <span class="mini-status-pill {{ 'mini-status-ok' if norm in ok_values else ('mini-status-ko' if norm in ko_values else 'mini-status-neutral') }}">{{ raw }}</span>
+{%- endmacro %}
+
+{% block route_content %}
+<div class="mini-page">
+              <div class="mini-panel">
+                  {% with messages = get_flashed_messages(with_categories=true) %}
+                      {% if messages %}
+                          <div class="flash-stack yoleo-page-flash">
+                              {% for category, message in messages %}
+                                  <div class="flash mini-flash {{ 'success' if category == 'success' else 'error' }}" data-mini-flash="{{ category }}">{{ message }}</div>
+                              {% endfor %}
+                          </div>
+                      {% endif %}
+                  {% endwith %}
+
+                  <div class="service-section-shell">
+                      <div id="tab-main" class="tab-panel {{ 'active' if active_tab == 'main' else '' }}">
+                          <form method="post" action="{{ url_for('services_bp.mini_minidnla_save') }}" id="miniForm">
+                              <section class="card">
+                                  <div class="summary-grid mini-summary-grid-compact">
+                                      <div class="summary-card"><div class="summary-label">Service</div><div class="summary-value small">{{ mini_status_badge(conf.SERVICE_NAME) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">État</div><div class="summary-value">{{ mini_status_badge(status.active) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">Boot</div><div class="summary-value">{{ mini_status_badge(status.enabled) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">Binaire</div><div class="summary-value">{{ mini_status_badge(status.binary_exists) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">Unit</div><div class="summary-value">{{ mini_status_badge(status.unit_exists) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">Conf</div><div class="summary-value">{{ mini_status_badge(status.conf_exists) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">Partages</div><div class="summary-value">{{ mini_status_badge(shares|length) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">Vidéos</div><div class="summary-value">{{ mini_status_badge(counts.video) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">Audio</div><div class="summary-value">{{ mini_status_badge(counts.audio) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">Photos</div><div class="summary-value">{{ mini_status_badge(counts.photo) }}</div></div>
+                                      <div class="summary-card"><div class="summary-label">Total</div><div class="summary-value">{{ mini_status_badge(counts.mixed) }}</div></div>
+                                  </div>
+                              </section>
+
+                              <section class="card">
+                                  <div class="card-head">
+                                      <div>
+                                          <h2 class="card-title">🎛️ Réglages MiniDLNA</h2>
+                                          <div class="hint">Réglages simples : nom visible sur le réseau DLNA et port HTTP. Les options avancées restent gérées automatiquement derrière.</div>
+                                      </div>
+                                      <div class="toolbar">
+                                          <button class="yoleo-btn yoleo-btn-green mini-action-btn" type="submit" name="restart_after_save" value="1">💾 Sauver + appliquer</button>
+                                      </div>
+                                  </div>
+                                  <div class="grid-4 mini-settings-simple-grid">
+                                      <div><label>Nom visible DLNA</label><input name="FRIENDLY_NAME" value="{{ conf.FRIENDLY_NAME }}" placeholder="Minidnla"></div>
+                                      <div><label>Port HTTP DLNA</label><input name="PORT" value="{{ conf.PORT }}" placeholder="8200"></div>
+                                  </div>
+                              </section>
+
+                              <section class="card">
+                                  <div class="card-head">
+                                      <div>
+                                          <h2 class="card-title">📁 Dossiers médias</h2>
+                                          <div class="hint">Choisis simplement les dossiers à partager avec MiniDLNA, puis utilise Sauver + appliquer dans les réglages.</div>
+                                      </div>
+                                      <div class="toolbar"><button class="yoleo-btn yoleo-btn-green" type="button" onclick="miniAddShareRow()">➕ Ajouter un dossier</button></div>
+                                  </div>
+                                  <div class="table-wrap">
+                                      <table class="mini-table" id="sharesTable">
+                                          <thead>
+                                              <tr>
+                                                  <th style="width:18%;">Nom</th>
+                                                  <th>Dossier média</th>
+                                                  <th style="width:140px;">Type</th>
+                                                  <th style="width:28%;">Ligne générée</th>
+                                                  <th class="col-actions">Action</th>
+                                              </tr>
+                                          </thead>
+                                          <tbody>
+                                              {% for share in shares %}
+                                              <tr>
+                                                  <td><input name="share_name[]" value="{{ share.name }}" oninput="updateRow(this)"></td>
+                                                  <td><div class="inline"><input name="share_path[]" class="share-path" value="{{ share.host_path }}" oninput="updateRow(this)"><button class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" type="button" onclick="openMiniDNLABrowse(this)">📂</button></div></td>
+                                                  <td>
+                                                      <select name="share_type[]" onchange="updateRow(this)">
+                                                          <option value="mixed" {% if share.media_type == 'mixed' %}selected{% endif %}>Tout</option>
+                                                          <option value="video" {% if share.media_type == 'video' %}selected{% endif %}>Vidéos</option>
+                                                          <option value="audio" {% if share.media_type == 'audio' %}selected{% endif %}>Musique</option>
+                                                          <option value="photo" {% if share.media_type == 'photo' %}selected{% endif %}>Photos</option>
+                                                      </select>
+                                                  </td>
+                                                  <td><input class="mono generated-line" value="{{ share.media_dir_line }}" readonly></td>
+                                                  <td class="col-actions"><button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="removeRow(this)">🗑️</button></td>
+                                              </tr>
+                                              {% endfor %}
+                                          </tbody>
+                                      </table>
+                                  </div>
+                                  <div class="hint">Le bouton 📂 ouvre les dossiers autorisés par la configuration interne. Un dossier doit exister pour être sauvegardé.</div>
+                              </section>
+                          </form>
+                      </div>
+
+                      <div id="tab-info" class="tab-panel {{ 'active' if active_tab == 'info' else '' }}">
+                          <section class="card">
+                              <div class="card-head">
+                                  <div>
+                                      <h2 class="card-title">ℹ️ Informations MiniDLNA</h2>
+                                      <div class="hint">Chemins techniques, binaire, unité systemd et configuration générée.</div>
+                                  </div>
+                              </div>
+                              <div class="path-grid">
+                                  <div class="path-pill"><b>module</b><span>{{ config_file }}</span></div>
+                                  <div class="path-pill"><b>daemon</b><span>{{ status.conf_path }}</span></div>
+                                  <div class="path-pill"><b>systemd</b><span>{{ status.unit_path }}</span></div>
+                                  <div class="path-pill"><b>db</b><span>{{ status.db_dir }}</span></div>
+                                  <div class="path-pill"><b>logs</b><span>{{ status.log_dir }}</span></div>
+                              </div>
+                              <div class="card" style="margin-bottom:0;">
+                                  <h2 class="card-title">Informations service</h2>
+                                  <div class="status-line"><div class="status-k">Service</div><div class="status-v mono">{{ status.service }}</div></div>
+                                  <div class="status-line"><div class="status-k">Binaire</div><div class="status-v mono">{{ status.binary }}</div></div>
+                                  <div class="status-line"><div class="status-k">Unit</div><div class="status-v mono">{{ status.unit_path }}</div></div>
+                                  <div class="status-line"><div class="status-k">Conf</div><div class="status-v mono">{{ status.conf_path }}</div></div>
+                                  <div class="status-line"><div class="status-k">DB</div><div class="status-v mono">{{ status.db_dir }}</div></div>
+                                  <div class="status-line"><div class="status-k">Logs</div><div class="status-v mono">{{ status.log_dir }}</div></div>
+                              </div>
+                          </section>
+                      </div>
+
+                      <div id="tab-logs" class="tab-panel {{ 'active' if active_tab == 'logs' else '' }}">
+                          <section class="card">
+                              <div class="card-head">
+                                  <div>
+                                      <h2 class="card-title">📜 Log MiniDLNA</h2>
+                                      <div class="hint">Journaux, état systemd brut et aperçus techniques. Ce qui était dans Système/Aperçu est regroupé ici.</div>
+                                  </div>
+                              </div>
+                              <div class="grid-2">
+                                  <div class="card" style="margin-bottom:0;">
+                                      <h2 class="card-title">systemctl show</h2>
+                                      <pre class="code-box">{{ status.show }}</pre>
+                                  </div>
+                                  <div class="card" style="margin-bottom:0;">
+                                      <h2 class="card-title">📜 Journal systemd</h2>
+                                      <pre class="code-box">{{ status.journal }}</pre>
+                                  </div>
+                              </div>
+                          </section>
+                          <section class="card">
+                              <div class="card-head">
+                                  <div><h2 class="card-title">📄 Fichier MiniDLNA généré</h2><div class="hint">Aperçu du fichier écrit dans <span class="mono">{{ status.conf_path }}</span>.</div></div>
+                              </div>
+                              <textarea readonly>{{ generated_config }}</textarea>
+                          </section>
+                          <section class="card">
+                              <div class="card-head">
+                                  <div><h2 class="card-title">🧩 Service systemd généré</h2><div class="hint">Aperçu du fichier écrit dans <span class="mono">{{ status.unit_path }}</span>.</div></div>
+                              </div>
+                              <textarea readonly>{{ unit_preview }}</textarea>
+                          </section>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <script>
+          function miniSetButtonLoading(btn) {
+              if (!btn || btn.dataset.miniLoading === '1') return;
+              btn.dataset.miniLoading = '1';
+              btn.dataset.miniOriginalHtml = btn.innerHTML;
+              const spinner = '<span class="mini-action-spinner" aria-hidden="true"></span>';
+              if (btn.classList.contains('mini-icon-action')) {
+                  btn.innerHTML = spinner;
+              } else {
+                  btn.innerHTML = spinner + '<span class="mini-action-label">' + btn.innerHTML + '</span>';
+              }
+              btn.classList.add('mini-action-loading');
+              btn.setAttribute('aria-busy', 'true');
+              btn.disabled = true;
+          }
+
+          function miniLockToolbar(exceptBtn) {
+              document.querySelectorAll('.mini-main-toolbar button').forEach(function(btn) {
+                  if (btn !== exceptBtn) btn.disabled = true;
+              });
+          }
+
+          function miniPostAction(actionUrl, actionName, btn) {
+              miniSetButtonLoading(btn);
+              miniLockToolbar(btn);
+              const form = document.createElement('form');
+              form.method = 'post';
+              form.action = actionUrl;
+              form.style.display = 'none';
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = 'action';
+              input.value = actionName;
+              form.appendChild(input);
+              document.body.appendChild(form);
+              form.submit();
+          }
+
+          function switchTab(name) {
+              const root = document.querySelector('.mini-panel') || document;
+              root.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+              root.querySelectorAll('.yoleo-subnav-link').forEach(b => b.classList.remove('is-active'));
+              const panel = root.querySelector('#tab-' + name);
+              const btn = root.querySelector('.yoleo-subnav-link[href*="/' + name + '"]');
+              if (panel) panel.classList.add('active');
+              if (btn) btn.classList.add('is-active');
+              const url = new URL(window.location.href);
+              url.searchParams.set('tab', 'minidnla');
+              url.searchParams.set('subtab', name);
+              history.replaceState(null, '', url.toString());
+          }
+
+          function mediaPrefix(type) {
+              if (type === 'video') return 'V,';
+              if (type === 'audio') return 'A,';
+              if (type === 'photo') return 'P,';
+              return '';
+          }
+
+          function updateRow(el) {
+              const tr = el.closest('tr');
+              if (!tr) return;
+              const path = tr.querySelector('input[name="share_path[]"]')?.value || '';
+              const type = tr.querySelector('select[name="share_type[]"]')?.value || 'mixed';
+              const gen = tr.querySelector('.generated-line');
+              if (gen) gen.value = 'media_dir=' + mediaPrefix(type) + path;
+          }
+
+          function miniAddShareRow() {
+              const tbody = document.querySelector('#sharesTable tbody');
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                  <td><input name="share_name[]" value="" placeholder="Films" oninput="updateRow(this)"></td>
+                  <td><div class="inline"><input name="share_path[]" class="share-path" value="" placeholder="/mnt/user/Films" oninput="updateRow(this)"><button class="yoleo-btn yoleo-btn-muted yoleo-btn-mini" type="button" onclick="openMiniDNLABrowse(this)">📂</button></div></td>
+                  <td><select name="share_type[]" onchange="updateRow(this)"><option value="mixed">Tout</option><option value="video">Vidéos</option><option value="audio">Musique</option><option value="photo">Photos</option></select></td>
+                  <td><input class="mono generated-line" value="media_dir=" readonly></td>
+                  <td class="col-actions"><button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="removeRow(this)">🗑️</button></td>`;
+              tbody.appendChild(tr);
+          }
+
+          function removeRow(btn) {
+              const tr = btn.closest('tr');
+              if (tr) tr.remove();
+          }
+
+          let miniDNLABrowseInput = null;
+
+          function openMiniDNLABrowse(btn) {
+              const tr = btn.closest('tr');
+              miniDNLABrowseInput = tr ? tr.querySelector('input[name="share_path[]"]') : null;
+              const start = miniDNLABrowseInput && miniDNLABrowseInput.value ? miniDNLABrowseInput.value : '/';
+              const params = new URLSearchParams({path: start || '/', target: ''});
+              window.open('/browser/folder?' + params.toString(), 'yoleo_services_minidlna_browser', 'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+          }
+
+          window.addEventListener('message', function(event) {
+              const data = event.data || {};
+              if (data.type !== 'yoleo-browser-select' || data.mode !== 'folder') return;
+              if (!miniDNLABrowseInput) return;
+              miniDNLABrowseInput.value = data.path || '';
+              updateRow(miniDNLABrowseInput);
+              miniDNLABrowseInput.dispatchEvent(new Event('input', {bubbles: true}));
+              miniDNLABrowseInput.dispatchEvent(new Event('change', {bubbles: true}));
+          });
+
+
+          document.addEventListener('DOMContentLoaded', function() {
+              const miniForm = document.getElementById('miniForm');
+              if (miniForm) {
+                  miniForm.addEventListener('submit', function(event) {
+                      const submitter = event.submitter || document.activeElement;
+                      if (submitter && submitter.matches('button[type="submit"]')) {
+                          // Quand on désactive le bouton pour afficher le spinner, le navigateur
+                          // n'envoie plus son name/value. On copie donc sa valeur avant le lock.
+                          if (submitter.name) {
+                              const hidden = document.createElement('input');
+                              hidden.type = 'hidden';
+                              hidden.name = submitter.name;
+                              hidden.value = submitter.value || '1';
+                              miniForm.appendChild(hidden);
+                          }
+                          miniSetButtonLoading(submitter);
+                          miniLockToolbar(submitter);
+                      }
+                  });
+              }
+
+              document.querySelectorAll('.mini-flash.success').forEach(function(el) {
+                  window.setTimeout(function() {
+                      el.classList.add('is-hiding');
+                      window.setTimeout(function() { el.remove(); }, 320);
+                  }, 5000);
+              });
+          });
+
+          document.querySelectorAll('#sharesTable tbody tr').forEach(tr => updateRow(tr));
+          </script>
+{% endblock %}

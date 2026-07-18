@@ -1,0 +1,98 @@
+/* ------------------------------------------------------------------
+   Mobile disque : mosaïque visuelle des volumes.
+   - icône disque dur CSS
+   - contour vert si volume monté
+   - contour rouge si volume non monté / démonté
+   - point vert si disque actif
+   - point rouge si disque en veille
+   ------------------------------------------------------------------ */
+
+@media (max-width: 900px) {
+    .yoleo-mobile-table-tile.is-disk-tile {
+        position: relative;
+        overflow: visible;
+        border-color: rgba(130, 148, 170, .38);
+    }
+
+    .yoleo-mobile-table-tile.is-disk-mounted {
+        border-color: rgba(53, 215, 129, .72) !important;
+        box-shadow: inset 0 0 0 1px rgba(53, 215, 129, .24), 0 10px 24px rgba(0, 0, 0, .18) !important;
+    }
+
+    .yoleo-mobile-table-tile.is-disk-unmounted {
+        border-color: rgba(255, 82, 101, .72) !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 82, 101, .24), 0 10px 24px rgba(0, 0, 0, .18) !important;
+    }
+
+    .yoleo-mobile-table-tile.is-disk-tile::after {
+        content: "";
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, .9);
+        box-shadow: 0 0 0 2px rgba(5, 8, 13, .9), 0 0 8px rgba(148, 163, 184, .4);
+    }
+
+    .yoleo-mobile-table-tile.is-disk-awake::after {
+        background: #35d781;
+        box-shadow: 0 0 0 2px rgba(5, 8, 13, .9), 0 0 9px rgba(53, 215, 129, .65);
+    }
+
+    .yoleo-mobile-table-tile.is-disk-sleeping::after {
+        background: #ff5265;
+        box-shadow: 0 0 0 2px rgba(5, 8, 13, .9), 0 0 9px rgba(255, 82, 101, .60);
+    }
+
+    .yoleo-mobile-table-tile.is-disk-tile .yoleo-mobile-tile-icon {
+        border-color: rgba(125, 211, 252, .30);
+        background: radial-gradient(circle at 50% 40%, rgba(125, 211, 252, .14), rgba(5, 8, 13, .88));
+    }
+
+    .yoleo-mobile-disk-icon {
+        position: relative;
+        width: 29px;
+        height: 34px;
+        display: inline-block;
+        border: 2px solid rgba(226, 232, 240, .88);
+        border-radius: 6px 6px 9px 9px;
+        background: linear-gradient(180deg, rgba(226, 232, 240, .32), rgba(15, 23, 42, .08) 38%, rgba(15, 23, 42, .74)), rgba(15, 23, 42, .88);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 5px 12px rgba(0,0,0,.30);
+    }
+
+    .yoleo-mobile-disk-icon::before {
+        content: "";
+        position: absolute;
+        left: 6px;
+        right: 6px;
+        bottom: 5px;
+        height: 4px;
+        border-radius: 99px;
+        background: rgba(226, 232, 240, .75);
+    }
+
+    .yoleo-mobile-disk-icon::after {
+        content: "";
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(125, 211, 252, .95);
+        box-shadow: 0 0 7px rgba(125, 211, 252, .65);
+    }
+
+    .yoleo-mobile-table-tile.is-mergerfs-tile.is-running {
+        border-color: rgba(53, 215, 129, .72) !important;
+        box-shadow: inset 0 0 0 1px rgba(53, 215, 129, .24), 0 10px 24px rgba(0, 0, 0, .18) !important;
+    }
+
+    .yoleo-mobile-table-tile.is-mergerfs-tile.is-stopped {
+        border-color: rgba(255, 82, 101, .72) !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 82, 101, .24), 0 10px 24px rgba(0, 0, 0, .18) !important;
+    }
+
+}

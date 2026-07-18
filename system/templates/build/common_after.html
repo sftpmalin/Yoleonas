@@ -1,0 +1,2383 @@
+<div class="modal-overlay" id="progressModal">
+        <div class="modal-box">
+            <h3 class="modal-title" id="modalTitle">Import registre</h3>
+            <div class="status-box" id="modalStatus">Préparation…</div>
+            <div class="progress-box">
+                <div class="progress-head"><div class="progress-title" id="modalProgressTitle">Progression</div><div class="progress-value" id="modalProgressValue">0%</div></div>
+                <div class="progress-track"><div class="progress-fill" id="modalProgressFill"></div></div>
+            </div>
+            <div class="modal-log" id="modalLog"></div>
+            <div class="modal-actions"><button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeProgressModal()">Fermer</button></div>
+        </div>
+    </div>
+
+    <script>
+        function $(id) { return document.getElementById(id); }
+
+        function fallbackIcon(img) {
+            const defaultIcon = img.dataset.defaultIcon || '/static/logo.png';
+            if (img.src.endsWith(defaultIcon)) return;
+            img.src = defaultIcon;
+        }
+
+        function switchTab(target) {
+            target = String(target || 'build').replace(/^tab-/, '');
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tabTarget === target));
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.toggle('active', panel.id === 'tab-' + target));
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', target);
+                history.replaceState(null, '', url.toString());
+            } catch (e) {}
+            if (typeof setupDbScroll === 'function') setupDbScroll();
+            if ((target === 'build' || target === 'registry') && typeof resumeBackgroundJob === 'function') {
+                // La page lit maintenant build.jdom : pas de scan complet automatique à chaque navigation.
+                // Les scans ciblés restent déclenchés après les actions UI.
+                resumeBackgroundJob();
+            }
+            if (target === 'registry-system' && typeof refreshRegistryServiceStatus === 'function') {
+                refreshRegistryServiceStatus();
+            }
+            if (target === 'registry-browser' && typeof startRegistryBrowserAutoRefresh === 'function') {
+                startRegistryBrowserAutoRefresh();
+            }
+            if (target === 'logs' && typeof resumeBackgroundJob === 'function') {
+                resumeBackgroundJob();
+            }
+            window.setTimeout(() => { bindKeyboardRows(); ensureKeyboardSelection(); }, 0);
+        }
+
+        function setStatus(message) { const el = $('statusBox'); if (el) el.textContent = message; }
+        function setProgress(value) {
+            const safe = Math.max(0, Math.min(100, Number(value) || 0));
+            const fill = $('progressFill');
+            const val = $('progressValue');
+            if (fill) fill.style.width = safe + '%';
+            if (val) val.textContent = safe + '%';
+        }
+        function setModalProgress(value) {
+            const safe = Math.max(0, Math.min(100, Number(value) || 0));
+            $('modalProgressFill').style.width = safe + '%';
+            $('modalProgressValue').textContent = safe + '%';
+        }
+        function clearLog() { const out = $('terminal-output'); if (out) out.value = ''; setProgress(0); setStatus('Prêt.'); }
+        function appendLog(text) {
+            const box = $('terminal-output');
+            if (!box) return;
+            box.value += text;
+            box.scrollTop = box.scrollHeight;
+        }
+        function appendModalLog(text) {
+            const box = $('modalLog');
+            box.textContent += text;
+            box.scrollTop = box.scrollHeight;
+        }
+        function openProgressModal(title, progressTitle) {
+            $('modalTitle').textContent = title || 'Opération en cours';
+            $('modalProgressTitle').textContent = progressTitle || 'Progression';
+            $('modalStatus').textContent = 'Démarrage…';
+            $('modalLog').textContent = '';
+            setModalProgress(0);
+            $('progressModal').style.display = 'flex';
+        }
+        function closeProgressModal() { $('progressModal').style.display = 'none'; }
+        function shouldAutoCloseProgressModal(action) {
+            const value = String(action || '');
+            return value === 'cache_refresh' || value.startsWith('build_') || value === 'registry_all' || value === 'registry_one';
+        }
+
+        const runStreamUrl = {{ url_for('builds_bp.run_stream')|tojson }};
+        const runStartUrl = {{ url_for('builds_bp.run_start')|tojson }};
+        const runStatusUrl = {{ url_for('builds_bp.run_status')|tojson }};
+        const databaseJsonUrl = {{ url_for('builds_bp.database_json')|tojson }};
+        const databaseAutofillUrl = {{ url_for('builds_bp.database_autofill_json')|tojson }};
+        const statusJsonUrl = {{ url_for('builds_bp.status_json')|tojson }};
+        const registryServiceStatusUrl = {{ url_for('builds_bp.registry_service_status_json')|tojson }};
+        const buildLogLevelUrl = {{ url_for('builds_bp.build_log_level_route')|tojson }};
+        const systemLogFile = {{ conf.SYSTEM_LOG_FILE|tojson }};
+        const buildMainTtydUrl = {{ url_for('builds_bp.build_main_ttyd_route')|tojson }};
+        const autoBuildCacheOnLoad = {{ ((not build_setup.required) and (not build_cache.exists) and (active_build_section in ['main', 'tarbuild']))|tojson }};
+        const autoBuildCachePath = {{ (build_cache.path or '')|tojson }};
+
+        function buildMainTtydElements() {
+            return {
+                modal: $('buildMainTtydModal'),
+                frame: $('buildMainTtydFrame'),
+                title: $('buildMainTtydModalTitle')
+            };
+        }
+
+        function closeBuildMainTtyd() {
+            const parts = buildMainTtydElements();
+            if (!parts.modal) return;
+            parts.modal.hidden = true;
+            parts.modal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('docker-ttyd-modal-open');
+            if (parts.frame) parts.frame.src = 'about:blank';
+        }
+
+        async function openBuildMainTtyd(button) {
+            setButtonRunning(button);
+            try {
+                const response = await fetch(buildMainTtydUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+                const data = await response.json().catch(() => ({ok: false, message: 'Réponse serveur illisible.'}));
+                if (!response.ok || !data.ok || !data.url) throw new Error(data.message || 'Impossible d’ouvrir le log Build Main dans ttyd.');
+                const parts = buildMainTtydElements();
+                if (!parts.modal || !parts.frame) {
+                    window.open(data.url, 'yoleo_build_main_ttyd', 'width=1200,height=760,resizable=yes,scrollbars=yes');
+                    setButtonFinished(button, true);
+                    return;
+                }
+                if (parts.title) parts.title.textContent = data.title || 'Log Build Main';
+                parts.frame.src = data.url;
+                parts.modal.hidden = false;
+                parts.modal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('docker-ttyd-modal-open');
+                setButtonFinished(button, true);
+            } catch (error) {
+                setStatus(error.message || String(error));
+                setButtonFinished(button, false);
+            }
+        }
+
+        window.openBuildMainTtyd = openBuildMainTtyd;
+        window.closeBuildMainTtyd = closeBuildMainTtyd;
+
+        function saveBuildLogLevel(level) {
+            const value = String(level || '').trim();
+            if (!value) return;
+            setStatus('Enregistrement du niveau de log…');
+            fetch(buildLogLevelUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({log_level: value})
+            })
+            .then(r => r.json().then(data => ({ok: r.ok && data.ok, data})))
+            .then(result => {
+                setStatus(result.ok ? (result.data.message || 'Niveau de log enregistré.') : (result.data.error || 'Erreur niveau de log.'));
+            })
+            .catch(err => setStatus('Erreur niveau de log : ' + err));
+        }
+
+        function refreshBuildOptionsPreview() {
+            const host = ($('registryHostInput')?.value || '').trim();
+            const port = ($('registryPortInput')?.value || '').trim();
+            const target = host && port ? `${host}:${port}` : '';
+            if ($('registryUrlPreview')) $('registryUrlPreview').textContent = target ? `http://${target}` : '—';
+            if ($('httpRegistryPreview')) $('httpRegistryPreview').textContent = target || '—';
+            const loginHost = $('loginHostInput');
+            if (loginHost && target && (!loginHost.value || loginHost.dataset.autofilled === '1')) {
+                loginHost.value = target;
+                loginHost.dataset.autofilled = '1';
+            }
+        }
+
+        function fillBuildOptionsAutoIp() {
+            const input = $('registryHostInput');
+            if (!input) return;
+            input.value = input.dataset.autoIp || input.value;
+            refreshBuildOptionsPreview();
+        }
+
+        function cleanDockerName(name) {
+            return String(name || '').trim().replace(/\.tar$/i, '');
+        }
+
+        const STATUS_SCAN_PARALLEL = 4;
+        const statusCache = { build: new Map(), registry: new Map() };
+        const statusScanRunning = { build: false, registry: false };
+        const statusScanQueued = { build: false, registry: false };
+
+        function statusButtons(kind) {
+            return Array.from(document.querySelectorAll(`button.smart-action-button[data-status-kind="${kind}"]`));
+        }
+
+        function statusName(button) {
+            return cleanDockerName(button?.dataset?.statusName || '');
+        }
+
+        function statusBadge(button) {
+            const cell = button?.closest('.actions-cell');
+            if (!cell) return null;
+            const kind = button.dataset.statusKind || '';
+            const name = statusName(button);
+            return Array.from(cell.querySelectorAll('.smart-status')).find(item => {
+                return item.dataset.statusKind === kind && cleanDockerName(item.dataset.statusName || '') === name;
+            }) || null;
+        }
+
+
+        function isBuildMainPage() {
+            return Boolean(document.querySelector('#buildTable tr[data-build-name]') && window.location.pathname.includes('/build/main'));
+        }
+
+        function pageHasStatusButtons(kind) {
+            return statusButtons(kind).length > 0;
+        }
+
+        const mainBuildRowMemory = {
+            lastFailed: 0,
+            stateByName: new Map(),
+            registryByName: new Map(),
+            overall: {
+                active: false,
+                action: '',
+                total: 0,
+                completed: new Set(),
+                failed: new Set(),
+                lastPercent: 0
+            }
+        };
+
+        function mainBuildRow(name) {
+            const cleanName = cleanDockerName(name);
+            if (!cleanName) return null;
+            return document.querySelector(`#buildTable tr[data-build-name="${CSS.escape(cleanName)}"]`);
+        }
+
+        function mainBuildButton(name) {
+            const row = mainBuildRow(name);
+            if (!row) return null;
+            return row.querySelector('button.smart-action-button[data-status-kind="build"]');
+        }
+
+        function mainRegistryBadge(name) {
+            const row = mainBuildRow(name);
+            if (!row) return null;
+            return row.querySelector('[data-main-registry-status]');
+        }
+
+        function mainRegistryBadgeClass(state) {
+            if (state === 'ok') return 'badge-ok';
+            if (state === 'error') return 'badge-no';
+            if (state === 'running') return 'badge-warn';
+            if (state === 'skipped') return 'badge-muted';
+            return 'badge-warn';
+        }
+
+        function mainRegistryBadgeMarkup(name) {
+            if (!isBuildMainPage()) return '';
+            const cleanName = cleanDockerName(name);
+            const saved = mainBuildRowMemory.registryByName.get(cleanName) || { state: 'unknown', label: 'Registre attente', title: 'Statut registre non recalculé.' };
+            const cls = mainRegistryBadgeClass(saved.state);
+            const label = escapeHtml(saved.label || 'Registre OK');
+            const title = escapeHtml(saved.title || saved.label || '');
+            const spinner = saved.state === 'running' ? '<span class="mini-spinner"></span>' : '';
+            return `<span class="badge ${cls} build-main-registry-status" data-main-registry-status data-main-registry-name="${escapeHtml(cleanName)}" title="${title}">${spinner}${label}</span>`;
+        }
+
+        function setMainRegistryState(name, state, label, title = '') {
+            if (!isBuildMainPage()) return;
+            const cleanName = cleanDockerName(name);
+            if (!cleanName) return;
+            const saved = {
+                state: state || 'unknown',
+                label: String(label || '').trim() || 'Registre OK',
+                title: title || label || '',
+                at: Date.now()
+            };
+            mainBuildRowMemory.registryByName.set(cleanName, saved);
+            const badge = mainRegistryBadge(cleanName);
+            if (!badge) return;
+            badge.className = `badge ${mainRegistryBadgeClass(saved.state)} build-main-registry-status`;
+            badge.title = saved.title;
+            badge.innerHTML = `${saved.state === 'running' ? '<span class="mini-spinner"></span>' : ''}${escapeHtml(saved.label)}`;
+        }
+
+        function mainRegistryUiFromPayload(payload) {
+            const state = String(payload && payload.state || 'unknown');
+            const label = String(payload && payload.label || '').trim();
+            const message = String(payload && payload.message || '').trim();
+            const needsAction = Boolean(payload && payload.needs_action);
+            const canRun = Boolean(payload && payload.can_run);
+            if (state === 'current' && !needsAction) {
+                return {state: 'ok', label: 'Registre OK', title: message || 'Le registre contient déjà le TAR attendu.'};
+            }
+            if (state === 'needed' && canRun && needsAction) {
+                return {state: 'unknown', label: 'À envoyer', title: message || 'Le registre doit recevoir ce TAR.'};
+            }
+            if (state === 'disabled') {
+                return {state: 'skipped', label: label || 'Registre attente', title: message || 'Envoi registre indisponible pour le moment.'};
+            }
+            if (state === 'error') {
+                return {state: 'error', label: 'Registre erreur', title: message || 'Erreur pendant la vérification du registre.'};
+            }
+            return {state: 'unknown', label: label || 'Registre attente', title: message || 'Statut registre à confirmer.'};
+        }
+
+        function payloadNeedsAction(payload) {
+            return Boolean(payload && payload.can_run && payload.needs_action);
+        }
+
+        function payloadIsUsableCurrent(payload) {
+            return Boolean(payload && payload.state === 'current' && !payload.needs_action);
+        }
+
+        function reconcileMainBuildButton(name) {
+            if (!isBuildMainPage()) return;
+            const cleanName = cleanDockerName(name);
+            const row = mainBuildRow(cleanName);
+            const button = mainBuildButton(cleanName);
+            if (!row || !button) return;
+            if (row.dataset.mainError === '1' || button.dataset.jobRunning === '1' || button.classList.contains('is-running')) return;
+
+            const buildPayload = statusCache.build ? statusCache.build.get(cleanName) : null;
+            const registryPayload = statusCache.registry ? statusCache.registry.get(cleanName) : null;
+            const buildNeeds = payloadNeedsAction(buildPayload);
+            const registryNeeds = payloadNeedsAction(registryPayload);
+            const buildCurrent = payloadIsUsableCurrent(buildPayload);
+            const registryCurrent = payloadIsUsableCurrent(registryPayload);
+
+            button.classList.remove('smart-current', 'smart-needed', 'smart-checking', 'is-fail');
+            button.style.display = '';
+
+            if (buildPayload && !buildPayload.can_run && !registryNeeds) {
+                button.disabled = true;
+                button.innerHTML = buildPayload.label || 'Indispo';
+                setStatusBadge(button, buildPayload.label || 'indispo', buildPayload.state || 'disabled', buildPayload.message || '', true);
+                return;
+            }
+
+            if (buildNeeds) {
+                button.disabled = false;
+                button.classList.add('smart-needed');
+                button.innerHTML = button.dataset.actionLabel || 'Build';
+                setStatusBadge(button, buildPayload.label || 'Build', buildPayload.state || 'needed', buildPayload.message || 'Build nécessaire.', true);
+                return;
+            }
+
+            if (buildCurrent && registryNeeds) {
+                button.disabled = false;
+                button.classList.add('smart-needed');
+                button.innerHTML = 'Envoyer';
+                setStatusBadge(button, 'À jour', 'current', 'Build TAR déjà à jour ; l’action enverra seulement le TAR au registre.', true);
+                return;
+            }
+
+            if (buildCurrent && registryCurrent) {
+                button.disabled = true;
+                button.classList.add('smart-current');
+                button.innerHTML = button.dataset.currentLabel || 'À jour';
+                setStatusBadge(button, button.dataset.currentLabel || 'À jour', 'current', 'Build et registre sont à jour.', true);
+                return;
+            }
+
+            if (buildCurrent) {
+                button.disabled = registryNeeds ? false : true;
+                button.classList.add(registryNeeds ? 'smart-needed' : 'smart-current');
+                button.innerHTML = registryNeeds ? 'Envoyer' : (button.dataset.currentLabel || 'À jour');
+                setStatusBadge(button, button.dataset.currentLabel || 'À jour', 'current', 'Build TAR à jour.', true);
+            }
+        }
+
+        function applyMainRegistryPayload(name, payload) {
+            if (!isBuildMainPage()) return;
+            const cleanName = cleanDockerName(name || (payload && payload.name) || '');
+            if (!cleanName || !payload) return;
+            const ui = mainRegistryUiFromPayload(payload);
+            setMainRegistryState(cleanName, ui.state, ui.label, ui.title);
+            reconcileMainBuildButton(cleanName);
+        }
+
+        function mainRegistryNames() {
+            return Array.from(document.querySelectorAll('#buildTable tr[data-build-name]'))
+                .map(row => cleanDockerName(row.dataset.buildName || ''))
+                .filter(name => name);
+        }
+
+        function isMainBuildWorkflowAction(action) {
+            return action === 'build_registry_all' || action === 'build_registry_one';
+        }
+
+        function setMainOverallProgress(percent, label = '', detail = '', state = 'running') {
+            if (!isBuildMainPage()) return;
+            const box = document.getElementById('buildMainOverallProgress');
+            if (!box) return;
+            const safe = Math.max(0, Math.min(100, Number(percent) || 0));
+            const fill = document.getElementById('buildMainOverallFill');
+            const value = document.getElementById('buildMainOverallValue');
+            const labelEl = document.getElementById('buildMainOverallLabel');
+            const detailEl = document.getElementById('buildMainOverallDetail');
+            box.classList.remove('is-running', 'is-ok', 'is-error');
+            if (state) box.classList.add(`is-${state}`);
+            if (fill) fill.style.width = safe.toFixed(1) + '%';
+            if (value) value.textContent = Math.round(safe) + '%';
+            if (labelEl) labelEl.textContent = label || 'Progression globale';
+            if (detailEl) detailEl.textContent = detail || 'Progression globale Build → Registre';
+        }
+
+        function resetMainOverallProgress(action = '', name = '', total = 0) {
+            if (!isBuildMainPage() || !isMainBuildWorkflowAction(String(action || ''))) return;
+            const names = name ? [cleanDockerName(name)] : mainRegistryNames();
+            const count = Number(total || names.length || 0);
+            mainBuildRowMemory.overall = {
+                active: true,
+                action: String(action || ''),
+                total: Math.max(count, 1),
+                completed: new Set(),
+                failed: new Set(),
+                lastPercent: 0
+            };
+            setMainOverallProgress(0, 'Progression globale', count ? `0/${count} Docker traité` : 'Préparation du lot Build → Registre', 'running');
+        }
+
+        function updateMainOverallProgressFromPayload(payload, failedIncreased = false) {
+            if (!isBuildMainPage() || !payload || typeof payload !== 'object') return;
+            const action = String(payload.action || '');
+            if (action !== 'build' && action !== 'registry') return;
+            const name = cleanDockerName(payload.name || '');
+            if (!name) return;
+            const phase = String(payload.phase || '');
+            const total = Math.max(Number(payload.total || mainBuildRowMemory.overall.total || mainRegistryNames().length || 1), 1);
+            if (!mainBuildRowMemory.overall.active || mainBuildRowMemory.overall.total !== total) {
+                mainBuildRowMemory.overall.active = true;
+                mainBuildRowMemory.overall.total = total;
+                if (!mainBuildRowMemory.overall.completed) mainBuildRowMemory.overall.completed = new Set();
+                if (!mainBuildRowMemory.overall.failed) mainBuildRowMemory.overall.failed = new Set();
+            }
+
+            const overall = mainBuildRowMemory.overall;
+            const isRegistryTerminal = action === 'registry' && (phase === 'registry_done' || phase === 'registry_error');
+            const isBuildTerminalError = action === 'build' && (phase === 'build_error' || (phase === 'build_done' && failedIncreased));
+            if (isRegistryTerminal || isBuildTerminalError) {
+                overall.completed.add(name);
+                if (phase === 'registry_error' || isBuildTerminalError) overall.failed.add(name);
+            }
+
+            const completed = overall.completed.size;
+            const percent = Math.max(overall.lastPercent || 0, Math.min(100, (completed / total) * 100));
+            overall.lastPercent = percent;
+
+            let label = 'Progression globale';
+            let detail = `${completed}/${total} Docker traité${completed > 1 ? 's' : ''}`;
+            let state = overall.failed.size ? 'error' : 'running';
+            if (action === 'build' && phase === 'build') detail = `${completed}/${total} traité · Build en cours : ${name}`;
+            else if (action === 'build' && phase === 'build_done' && !failedIncreased) detail = `${completed}/${total} traité · Build terminé : ${name}, envoi registre à suivre`;
+            else if (action === 'registry' && phase === 'registry') detail = `${completed}/${total} traité · Envoi registre : ${name}`;
+            else if (action === 'registry' && phase === 'registry_done') detail = `${completed}/${total} traité · Registre OK : ${name}`;
+            else if (action === 'registry' && phase === 'registry_error') detail = `${completed}/${total} traité · Erreur registre : ${name}`;
+            else if (isBuildTerminalError) detail = `${completed}/${total} traité · Erreur build : ${name}`;
+
+            if (completed >= total) {
+                state = overall.failed.size ? 'error' : 'ok';
+                label = overall.failed.size ? 'Terminé avec erreur' : 'Terminé';
+                detail = `${completed}/${total} Docker traité${completed > 1 ? 's' : ''}` + (overall.failed.size ? ` · ${overall.failed.size} erreur(s)` : ' · Registre OK');
+            }
+            setMainOverallProgress(percent, label, detail, state);
+        }
+
+        function finishMainOverallProgress(job, ok, progress) {
+            if (!isBuildMainPage() || !job || !isMainBuildWorkflowAction(String(job.action || ''))) return;
+            const total = Math.max(Number((progress && progress.total) || mainBuildRowMemory.overall.total || mainRegistryNames().length || 1), 1);
+            const completed = Math.max(mainBuildRowMemory.overall.completed ? mainBuildRowMemory.overall.completed.size : 0, Math.min(total, Number((progress && progress.current) || 0)));
+            const percent = ok ? 100 : Math.max(mainBuildRowMemory.overall.lastPercent || 0, (completed / total) * 100);
+            setMainOverallProgress(percent, ok ? 'Terminé' : 'Terminé avec erreur', `${completed}/${total} Docker traité${completed > 1 ? 's' : ''}`, ok ? 'ok' : 'error');
+        }
+
+        async function refreshMainRegistryForName(name) {
+            if (!isBuildMainPage()) return;
+            const cleanName = cleanDockerName(name);
+            if (!cleanName) return;
+            try {
+                setMainRegistryState(cleanName, 'running', 'Vérif registre…', 'Vérification réelle du registre en cours.');
+                const payload = await fetchStatusPayload('registry', cleanName);
+                statusCache.registry.set(cleanName, payload);
+                applyMainRegistryPayload(cleanName, payload);
+            } catch (err) {
+                const payload = {
+                    ok: false,
+                    kind: 'registry',
+                    name: cleanName,
+                    state: 'error',
+                    label: 'Erreur',
+                    message: String(err && (err.message || err) || 'Erreur statut registre'),
+                    can_run: true,
+                    needs_action: true
+                };
+                statusCache.registry.set(cleanName, payload);
+                applyMainRegistryPayload(cleanName, payload);
+            }
+        }
+
+        async function startMainRegistryStatusScan(force = false) {
+            if (!isBuildMainPage()) return;
+            const names = mainRegistryNames();
+            let nextIndex = 0;
+            async function worker() {
+                while (nextIndex < names.length) {
+                    const name = names[nextIndex++];
+                    if (!force && statusCache.registry.has(name)) {
+                        applyMainRegistryPayload(name, statusCache.registry.get(name));
+                        continue;
+                    }
+                    await refreshMainRegistryForName(name);
+                }
+            }
+            const workerCount = Math.min(STATUS_SCAN_PARALLEL, names.length);
+            await Promise.all(Array.from({ length: workerCount }, worker));
+        }
+
+        function setMainBuildRowState(name, state, label, title = '') {
+            if (!isBuildMainPage()) return;
+            const cleanName = cleanDockerName(name);
+            const row = mainBuildRow(cleanName);
+            if (!row) return;
+            const button = mainBuildButton(cleanName);
+            const text = String(label || '').trim();
+            row.classList.remove('build-main-row-running', 'build-main-row-registry', 'build-main-row-registry-error', 'build-main-row-error', 'build-main-row-ok');
+            row.dataset.mainState = state || '';
+            if (state === 'build') row.classList.add('build-main-row-running');
+            if (state === 'registry') row.classList.add('build-main-row-registry');
+            if (state === 'error') row.classList.add('build-main-row-error');
+            if (state === 'ok') row.classList.add('build-main-row-ok');
+            if (state === 'error') row.dataset.mainError = '1';
+            if (state === 'build' || state === 'registry') delete row.dataset.mainError;
+            if (button) {
+                rememberButtonLabel(button);
+                if (state === 'build' || state === 'registry') {
+                    button.dataset.jobRunning = '1';
+                    button.classList.add('is-running');
+                    button.classList.remove('is-fail', 'is-ok');
+                    button.disabled = true;
+                    button.innerHTML = `<span class="btn-spinner"></span><span>${escapeHtml(text || 'En cours…')}</span>`;
+                } else if (state === 'error') {
+                    delete button.dataset.jobRunning;
+                    button.classList.remove('is-running', 'smart-current', 'smart-needed', 'smart-checking');
+                    button.classList.add('is-fail');
+                    button.disabled = false;
+                    button.style.display = '';
+                    button.innerHTML = '<span class="btn-result">❌</span><span>Relancer</span>';
+                } else if (state === 'ok') {
+                    delete button.dataset.jobRunning;
+                    button.classList.remove('is-running', 'is-fail');
+                    button.classList.add('is-ok');
+                    button.disabled = false;
+                    button.style.display = '';
+                    button.innerHTML = `<span class="btn-result">✅</span><span>${escapeHtml(text || 'Terminé')}</span>`;
+                    window.setTimeout(() => {
+                        if (row.dataset.mainState !== 'ok') return;
+                        row.classList.remove('build-main-row-ok');
+                        button.classList.remove('is-ok');
+                        button.innerHTML = button.dataset.originalHtml || button.dataset.actionLabel || 'Build';
+                        const cached = statusCache.build ? statusCache.build.get(cleanName) : null;
+                        if (cached) applyStatusPayload(button, cached);
+                    }, 2200);
+                }
+            }
+            const badgeState = state === 'error' ? 'error' : (state === 'ok' ? 'current' : 'unknown');
+            if (button) setStatusBadge(button, text || label || state, badgeState, title || text, true);
+            mainBuildRowMemory.stateByName.set(cleanName, { state, label: text, title: title || text, at: Date.now() });
+        }
+
+        function clearMainBuildRowsForRun(action, name = '') {
+            if (!isBuildMainPage() || String(action || '').indexOf('build_registry_') !== 0) return;
+            mainBuildRowMemory.lastFailed = 0;
+            mainBuildRowMemory.stateByName.clear();
+            mainBuildRowMemory.registryByName.clear();
+            resetMainOverallProgress(action, name);
+            const names = name ? [cleanDockerName(name)] : Array.from(document.querySelectorAll('#buildTable tr[data-build-name]')).map(row => cleanDockerName(row.dataset.buildName || ''));
+            names.forEach(item => {
+                const row = mainBuildRow(item);
+                if (!row) return;
+                row.classList.remove('build-main-row-running', 'build-main-row-registry', 'build-main-row-registry-error', 'build-main-row-error', 'build-main-row-ok');
+                delete row.dataset.mainError;
+                delete row.dataset.mainState;
+                setMainRegistryState(item, 'skipped', 'Registre attente', 'Le workflow principal va vérifier ou envoyer le TAR au registre.');
+            });
+        }
+
+        function mainBuildRowHasStickyError(button) {
+            if (!isBuildMainPage() || !button) return false;
+            const row = mainBuildRow(statusName(button));
+            return Boolean(row && row.dataset.mainError === '1');
+        }
+
+        function markMainBuildFailuresFromLog(logText) {
+            if (!isBuildMainPage() || !logText) return;
+            const buildPatterns = [
+                /❌\s*BUILDX\s+ÉCHEC\s*:\s*([^\r\n]+)/gi,
+                /⛔\s*Envoi\s+registre\s+ignoré\s+pour\s+([^:\r\n]+)\s*:/gi
+            ];
+            const registryPatterns = [
+                /❌\s*(?:REGISTRE|ENVOI\s+REGISTRE|IMPORT)\s*(?:ÉCHEC|ERREUR)?\s*:\s*([^\s:\r\n]+)/gi,
+                /❌\s*Envoi\s+registre\s+impossible\s+pour\s+([^:\r\n]+)\s*:/gi,
+                /❌\s*Registre\s+cible\s+manquant\s+pour\s+([^\.\r\n]+)/gi
+            ];
+            buildPatterns.forEach(rx => {
+                let m;
+                while ((m = rx.exec(logText)) !== null) {
+                    const name = cleanDockerName((m[1] || '').trim());
+                    if (name) {
+                        setMainBuildRowState(name, 'error', 'Erreur build', 'Erreur détectée dans le log Build principal.');
+                        setMainRegistryState(name, 'skipped', 'Registre ignoré', 'Envoi registre ignoré parce que le build est en erreur.');
+                    }
+                }
+            });
+            registryPatterns.forEach(rx => {
+                let m;
+                while ((m = rx.exec(logText)) !== null) {
+                    const name = cleanDockerName((m[1] || '').trim());
+                    if (name) setMainRegistryState(name, 'error', 'Registre erreur', 'Erreur détectée dans le log pendant la phase registre.');
+                }
+            });
+        }
+
+        function updateMainBuildRowFromProgressPayload(payload) {
+            if (!isBuildMainPage() || !payload || typeof payload !== 'object') return;
+            const action = String(payload.action || '');
+            if (action !== 'build' && action !== 'registry') return;
+            const name = cleanDockerName(payload.name || '');
+            if (!name) return;
+            const phase = String(payload.phase || '');
+            const label = String(payload.running_text || payload.phase_label || '').trim();
+            const failed = Number(payload.failed || 0);
+            const failedIncreased = failed > mainBuildRowMemory.lastFailed;
+            updateMainOverallProgressFromPayload(payload, failedIncreased);
+            mainBuildRowMemory.lastFailed = Math.max(mainBuildRowMemory.lastFailed, failed);
+
+            if (action === 'build') {
+                if (failedIncreased || phase === 'build_error') {
+                    setMainBuildRowState(name, 'error', 'Erreur build', 'Le build TAR a échoué. Le registre est ignoré pour cette ligne.');
+                    setMainRegistryState(name, 'skipped', 'Registre ignoré', 'Envoi registre non lancé parce que le build est en erreur.');
+                    return;
+                }
+                if (phase === 'build_done') {
+                    setMainBuildRowState(name, 'build', label || 'Build terminé…', 'Build terminé, préparation de l’envoi registre.');
+                    setMainRegistryState(name, 'skipped', 'Registre attente', 'Le TAR est prêt, attente de la phase registre.');
+                    return;
+                }
+                setMainBuildRowState(name, 'build', label || 'Build en cours…', 'Build TAR en cours.');
+                setMainRegistryState(name, 'skipped', 'Registre attente', 'Le build TAR doit finir avant l’envoi registre.');
+                return;
+            }
+
+            if (action === 'registry') {
+                const row = mainBuildRow(name);
+                if (row) {
+                    row.classList.remove('build-main-row-running', 'build-main-row-registry', 'build-main-row-registry-error', 'build-main-row-error', 'build-main-row-ok');
+                    row.classList.add((failedIncreased || phase === 'registry_error') ? 'build-main-row-registry-error' : 'build-main-row-registry');
+                    row.dataset.mainState = (failedIncreased || phase === 'registry_error') ? 'registry-error' : 'registry';
+                }
+                if (failedIncreased || phase === 'registry_error') {
+                    setMainRegistryState(name, 'error', 'Registre erreur', 'Erreur pendant l’envoi vers le registre.');
+                    if (statusCache.registry) {
+                        statusCache.registry.set(name, {kind: 'registry', name, state: 'error', label: 'Erreur', message: 'Erreur pendant l’envoi vers le registre.', can_run: true, needs_action: true});
+                    }
+                    const button = mainBuildButton(name);
+                    if (button) setStatusBadge(button, 'Build OK', 'current', 'Le build TAR est terminé, mais l’envoi registre a échoué.', true);
+                    return;
+                }
+                if (phase === 'registry_done') {
+                    setMainRegistryState(name, 'ok', label || 'Registre à jour', 'TAR présent dans le registre.');
+                    if (statusCache.registry) {
+                        statusCache.registry.set(name, {kind: 'registry', name, state: 'current', label: 'À jour', message: 'TAR présent dans le registre.', can_run: true, needs_action: false});
+                    }
+                    setMainBuildRowState(name, 'ok', 'À jour', 'Build et registre terminés pour cette ligne.');
+                    return;
+                }
+                setMainRegistryState(name, 'running', 'Envoi en cours', 'Envoi du TAR vers le registre.');
+                const button = mainBuildButton(name);
+                if (button) setStatusBadge(button, 'Build OK', 'current', 'Le build TAR est terminé, envoi registre en cours.', true);
+            }
+        }
+
+        function badgeClassForState(state) {
+            if (state === 'current') return 'badge-ok';
+            if (state === 'needed') return 'badge-info';
+            if (state === 'disabled') return 'badge-muted';
+            if (state === 'error') return 'badge-no';
+            return 'badge-warn';
+        }
+
+        function setStatusBadge(button, text, state, title, visible = true) {
+            const badge = statusBadge(button);
+            if (!badge) return;
+            badge.className = `badge smart-status ${badgeClassForState(state)}${visible ? '' : ' is-hidden'}`;
+            badge.textContent = text || '';
+            badge.title = title || '';
+        }
+
+        function buildModeAllowsManualOverride() {
+            return ['force', 'nocache', 'check'].includes(buildMode());
+        }
+
+        function resetSmartButton(button) {
+            if (!button) return;
+            if (button.dataset.jobRunning === '1' && activeJobAffectsButton(button)) return;
+            button.classList.remove('smart-checking', 'smart-current', 'smart-needed');
+            button.style.display = '';
+            button.disabled = button.dataset.baseDisabled === '1';
+            button.innerHTML = button.dataset.originalHtml || button.dataset.actionLabel || button.textContent || 'Action';
+            setStatusBadge(button, '', 'disabled', '', false);
+        }
+
+        function markStatusChecking(button) {
+            if (!button || button.classList.contains('is-running') || (button.dataset.jobRunning === '1' && activeJobAffectsButton(button))) return;
+            if (mainBuildRowHasStickyError(button)) {
+                setMainBuildRowState(statusName(button), 'error', 'Erreur build', 'Dernier build principal en erreur. Relance la ligne pour réessayer.');
+                return;
+            }
+            rememberButtonLabel(button);
+            button.classList.remove('smart-current', 'smart-needed');
+            button.classList.add('smart-checking');
+            button.style.display = '';
+            button.disabled = true;
+            button.innerHTML = '<span class="btn-spinner"></span><span>Vérif…</span>';
+            setStatusBadge(button, 'calcul', 'unknown', 'Calcul en arrière-plan…', true);
+        }
+
+        function payloadIsCurrent(payload) {
+            return Boolean(payload && payload.state === 'current' && !payload.needs_action);
+        }
+
+        function completeBackgroundRowFromPayload(button, payload) {
+            if (!button || !payload || !payloadIsCurrent(payload)) return false;
+            const kind = button.dataset.statusKind || payload.kind || '';
+            const name = cleanDockerName(payload.name || statusName(button));
+            if (kind && name && activeBackgroundCompleted[kind]) activeBackgroundCompleted[kind].add(name);
+            delete button.dataset.jobRunning;
+            button.classList.remove('is-running');
+            return true;
+        }
+
+        function applyStatusPayload(button, payload) {
+            if (!button || !payload) return;
+            rememberButtonLabel(button);
+            if (mainBuildRowHasStickyError(button) && button.dataset.jobRunning !== '1') {
+                setMainBuildRowState(statusName(button), 'error', 'Erreur build', 'Dernier build principal en erreur. Relance la ligne pour réessayer.');
+                return;
+            }
+            const kind = button.dataset.statusKind || payload.kind || '';
+            const state = payload.state || 'unknown';
+            const message = payload.message || '';
+            const actionLabel = button.dataset.actionLabel || 'Action';
+            const currentLabel = button.dataset.currentLabel || 'À jour';
+            const cleanNameForMain = cleanDockerName(payload.name || statusName(button));
+
+            if (payload.tar) {
+                updateTarCells(payload.name || statusName(button), payload.tar);
+            }
+            if (isBuildMainPage() && kind === 'registry') {
+                applyMainRegistryPayload(cleanNameForMain, payload);
+            }
+
+            // Important : pendant un build_all / registry_all, une ligne peut finir avant
+            // la tâche globale. Avant, on gardait le spinner jusqu'à la fin de tout le job.
+            // Maintenant, si le statut réel de la ligne dit « current », on libère seulement
+            // cette ligne et elle repasse à « À jour » pendant que les autres continuent.
+            if (button.dataset.jobRunning === '1' && activeJobAffectsButton(button)) {
+                if (!completeBackgroundRowFromPayload(button, payload)) return;
+            }
+
+            button.classList.remove('smart-checking', 'smart-current', 'smart-needed');
+            button.style.display = '';
+
+            // Le statut API est la source de vérité. Un bouton peut être né disabled
+            // parce que le TAR était absent au chargement, puis devenir disponible
+            // après un build sans F5.
+            if (!payload.can_run) {
+                button.disabled = true;
+                button.innerHTML = payload.label || actionLabel;
+                setStatusBadge(button, payload.label || 'indispo', state, message, true);
+                if (isBuildMainPage() && kind === 'build') reconcileMainBuildButton(cleanNameForMain);
+                return;
+            }
+
+            if (state === 'current' && !payload.needs_action) {
+                button.classList.add('smart-current');
+                if (kind === 'registry') {
+                    button.disabled = true;
+                    button.innerHTML = currentLabel;
+                    button.style.display = 'none';
+                    setStatusBadge(button, currentLabel, state, message || 'Registre identique au TAR.', true);
+                    return;
+                }
+                if (buildModeAllowsManualOverride()) {
+                    button.disabled = false;
+                    button.innerHTML = actionLabel;
+                    setStatusBadge(button, currentLabel, state, `${message} Mode ${buildMode()} : action manuelle autorisée.`, true);
+                    if (isBuildMainPage() && kind === 'build') reconcileMainBuildButton(cleanNameForMain);
+                    return;
+                }
+                button.disabled = true;
+                button.innerHTML = currentLabel;
+                setStatusBadge(button, currentLabel, state, message || 'Rien à refaire.', true);
+                if (isBuildMainPage() && kind === 'build') reconcileMainBuildButton(cleanNameForMain);
+                return;
+            }
+
+            button.classList.add('smart-needed');
+            button.disabled = false;
+            button.innerHTML = actionLabel;
+            setStatusBadge(button, payload.label || 'à faire', state, message, true);
+            if (isBuildMainPage() && kind === 'build') reconcileMainBuildButton(cleanNameForMain);
+        }
+
+        async function fetchStatusPayload(kind, name) {
+            const params = new URLSearchParams({ kind, name });
+            const response = await fetch(`${statusJsonUrl}?${params.toString()}`, { credentials: 'same-origin', cache: 'no-store' });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+            return payload;
+        }
+
+        async function refreshStatusForName(kind, name) {
+            name = cleanDockerName(name);
+            if (!['build', 'registry'].includes(kind) || !name) return;
+            const buttons = statusButtons(kind).filter(button => statusName(button) === name);
+            if (!buttons.length) return;
+            buttons.forEach(markStatusChecking);
+            try {
+                const payload = await fetchStatusPayload(kind, name);
+                statusCache[kind].set(name, payload);
+                buttons.forEach(button => {
+                    button.dataset.statusChecked = '1';
+                    applyStatusPayload(button, payload);
+                });
+            } catch (err) {
+                const payload = {
+                    ok: false,
+                    kind,
+                    name,
+                    state: 'error',
+                    label: 'Erreur',
+                    message: String(err && (err.message || err) || 'Erreur statut'),
+                    can_run: true,
+                    needs_action: true
+                };
+                statusCache[kind].set(name, payload);
+                buttons.forEach(button => {
+                    button.dataset.statusChecked = '1';
+                    applyStatusPayload(button, payload);
+                });
+            }
+        }
+
+        async function runStatusPool(kind, buttons) {
+            let nextIndex = 0;
+            async function worker() {
+                while (nextIndex < buttons.length) {
+                    const button = buttons[nextIndex++];
+                    const name = statusName(button);
+                    if (!name) continue;
+                    try {
+                        const payload = await fetchStatusPayload(kind, name);
+                        statusCache[kind].set(name, payload);
+                        button.dataset.statusChecked = '1';
+                        applyStatusPayload(button, payload);
+                    } catch (err) {
+                        const payload = {
+                            ok: false,
+                            kind,
+                            name,
+                            state: 'error',
+                            label: 'Erreur',
+                            message: String(err && (err.message || err) || 'Erreur statut'),
+                            can_run: button.dataset.baseDisabled !== '1',
+                            needs_action: true
+                        };
+                        statusCache[kind].set(name, payload);
+                        button.dataset.statusChecked = '1';
+                        applyStatusPayload(button, payload);
+                    }
+                }
+            }
+            const workerCount = Math.min(STATUS_SCAN_PARALLEL, buttons.length);
+            await Promise.all(Array.from({ length: workerCount }, worker));
+        }
+
+        async function startStatusScan(kind, force = false) {
+            if (!['build', 'registry'].includes(kind)) return;
+            if (statusScanRunning[kind]) {
+                statusScanQueued[kind] = true;
+                return;
+            }
+
+            const buttons = statusButtons(kind).filter(button => force || button.dataset.statusChecked !== '1');
+            if (!buttons.length) {
+                if (kind === 'build') {
+                    statusButtons('build').forEach(button => {
+                        const cached = statusCache.build.get(statusName(button));
+                        if (cached) applyStatusPayload(button, cached);
+                    });
+                }
+                return;
+            }
+
+            statusScanRunning[kind] = true;
+            buttons.forEach(markStatusChecking);
+            setStatus(`Vérification ${kind === 'build' ? 'Build → TAR' : 'TAR → Registre'} : ${buttons.length} entrée(s), ${Math.min(STATUS_SCAN_PARALLEL, buttons.length)} en parallèle…`);
+
+            try {
+                await runStatusPool(kind, buttons);
+            } finally {
+                statusScanRunning[kind] = false;
+                setStatus('Vérification terminée.');
+                if (statusScanQueued[kind]) {
+                    statusScanQueued[kind] = false;
+                    startStatusScan(kind, true);
+                }
+            }
+        }
+
+        function invalidateStatus(kind, name = '') {
+            const targets = statusButtons(kind).filter(button => !name || statusName(button) === cleanDockerName(name));
+            targets.forEach(button => {
+                button.dataset.statusChecked = '0';
+                statusCache[kind].delete(statusName(button));
+                resetSmartButton(button);
+            });
+        }
+
+        function notifyBuildsParentRefresh(actionName = '', name = '') {
+            const payload = {
+                type: String(actionName || '').includes('registry') ? 'builds:registry-finished' : 'builds:task-finished',
+                action: actionName || '',
+                name: cleanDockerName(name || ''),
+                stamp: Date.now()
+            };
+            try {
+                if (window.top && window.top !== window && window.top.postMessage) {
+                    window.top.postMessage(payload, window.location.origin);
+                }
+            } catch (e) {}
+            try {
+                localStorage.setItem('builds_refresh_stamp', String(payload.stamp));
+            } catch (e) {}
+        }
+
+        function refreshStatusAfterTask(action, name = '') {
+            const actionName = String(action || '');
+            // Informe la page parente que les iframes dépendantes doivent être rechargées
+            // (TAR -> Registre, Base de données et surtout Registre) sans F5 manuel.
+            notifyBuildsParentRefresh(actionName, name);
+            const refreshOne = (kind, delay) => {
+                invalidateStatus(kind, name);
+                window.setTimeout(() => startStatusScan(kind, true), delay);
+            };
+
+            if (actionName === 'cache_refresh') {
+                setStatus('Cache Build mis à jour. Rechargement de la page…');
+                window.setTimeout(() => window.location.reload(), 900);
+                return;
+            }
+
+            if (actionName.startsWith('build_')) {
+                refreshOne('build', 700);
+                // Après un build, l'onglet TAR → Registre doit se mettre à jour
+                // sans F5 : un TAR absent au chargement peut maintenant exister.
+                refreshOne('registry', 1200);
+                if (isBuildMainPage()) window.setTimeout(() => startMainRegistryStatusScan(true), 1400);
+                return;
+            }
+
+            if (actionName === 'registry_service_delete_all_tags' || actionName === 'registry_service_clean_storage') {
+                window.setTimeout(() => refreshRegistryServiceStatus(), 700);
+                window.setTimeout(() => refreshRegistryBrowser(false).catch(() => {}), 1200);
+                // Les tags/le stockage du registre ont change : on force aussi
+                // l'onglet TAR -> Registre a recalculer les boutons Envoyer.
+                refreshOne('registry', 1500);
+                if (isBuildMainPage()) window.setTimeout(() => startMainRegistryStatusScan(true), 1700);
+                return;
+            }
+
+            if (actionName.startsWith('registry_service_')) {
+                window.setTimeout(() => refreshRegistryServiceStatus(), 700);
+                return;
+            }
+
+            if (actionName.includes('registry')) {
+                refreshOne('registry', 700);
+            }
+        }
+
+
+        function setRegistryServiceText(id, value) {
+            const el = $(id);
+            if (el) el.textContent = value || '—';
+        }
+
+        function setRegistryServiceBadge(id, text, okClass) {
+            const el = $(id);
+            if (!el) return;
+            el.textContent = text || '—';
+            el.className = 'badge ' + (okClass || 'badge-muted');
+        }
+
+        function renderRegistryServiceStatus(data) {
+            if (!data) return;
+            setRegistryServiceBadge('rsvc-running', data.running ? 'Actif' : 'Arrêté', data.running ? 'badge-ok' : 'badge-no');
+            setRegistryServiceText('rsvc-pid', data.pid || '—');
+            setRegistryServiceBadge('rsvc-systemd', data.service_active || 'unknown', data.service_active === 'active' ? 'badge-ok' : 'badge-muted');
+            setRegistryServiceText('rsvc-installed', data.service_installed ? 'oui' : 'non');
+            setRegistryServiceBadge('rsvc-enabled', data.service_enabled || 'unknown', data.service_enabled === 'enabled' ? 'badge-ok' : 'badge-muted');
+            setRegistryServiceText('rsvc-port', data.port || '—');
+            setRegistryServiceText('rsvc-bind', data.bind_addr || '—');
+            setRegistryServiceBadge('rsvc-storage', data.storage_ready ? 'Prêt' : 'Non prêt', data.storage_ready ? 'badge-ok' : 'badge-no');
+            setRegistryServiceText('rsvc-data', data.data_dir || '—');
+            setRegistryServiceBadge('rsvc-conf', data.conf_error ? 'Erreur' : 'OK', data.conf_error ? 'badge-no' : 'badge-ok');
+            setRegistryServiceText('rsvc-conf-error', data.conf_error || '../conf/registry.conf');
+            setRegistryServiceBadge('rsvc-bin', data.source_bin_ok ? 'Source OK' : 'Source absente', data.source_bin_ok ? 'badge-ok' : 'badge-no');
+            setRegistryServiceText('rsvc-runtime', data.runtime_bin_ok ? 'oui' : 'non');
+            const paths = data.paths || {};
+            setRegistryServiceText('rsvc-path-conf', paths.human_conf || '—');
+            setRegistryServiceText('rsvc-path-yaml', paths.yaml_conf || '—');
+            setRegistryServiceText('rsvc-path-pid', paths.pid_file || '—');
+            setRegistryServiceText('rsvc-path-log', paths.log_file || '—');
+            setRegistryServiceText('rsvc-path-bin', paths.bin_dir || '—');
+            setRegistryServiceText('rsvc-path-runtime', paths.runtime_bin || '—');
+            setRegistryServiceText('rsvc-detail', data.detail || '—');
+            setRegistryServiceText('rsvc-port-listen', data.port_listen || 'Port non vu par ss.');
+        }
+
+        async function refreshRegistryServiceStatus(button = null) {
+            setButtonRunning(button);
+            try {
+                const response = await fetch(registryServiceStatusUrl, {cache: 'no-store'});
+                const data = await response.json();
+                renderRegistryServiceStatus(data);
+                setButtonFinished(button, true);
+                return data;
+            } catch (err) {
+                setButtonFinished(button, false);
+                setRegistryServiceBadge('rsvc-conf', 'Erreur', 'badge-no');
+                setRegistryServiceText('rsvc-conf-error', String(err && (err.message || err) || 'Erreur statut'));
+                return null;
+            }
+        }
+
+        function runRegistryService(action, button) {
+            const actionName = String(action || '');
+            const registryInlineActions = new Set([
+                'registry_service_install',
+                'registry_service_enable',
+                'registry_service_disable',
+                'registry_service_remove',
+                'registry_service_start',
+                'registry_service_restart',
+                'registry_service_stop',
+                'registry_service_generate_yaml',
+                'registry_service_status'
+            ]);
+            const isRegistryBrowserMaintenance = Boolean(
+                button &&
+                button.closest &&
+                button.closest('#tab-registry-browser') &&
+                (actionName === 'registry_service_delete_all_tags' || actionName === 'registry_service_clean_storage')
+            );
+            const runInline = registryInlineActions.has(actionName) || isRegistryBrowserMaintenance;
+
+            // Actions registre : plus de modale. On garde le spinner du bouton,
+            // le statut Ajax et le message flottant de fin.
+            runTask(actionName, '', 'normal', !runInline, button, runInline).then(() => {
+                window.setTimeout(() => refreshRegistryServiceStatus(), 700);
+                if (actionName === 'registry_service_delete_all_tags' || actionName === 'registry_service_clean_storage') {
+                    window.setTimeout(() => {
+                        if (typeof refreshRegistryBrowser === 'function') refreshRegistryBrowser(false).catch(() => {});
+                    }, 1200);
+                    invalidateStatus('registry');
+                    window.setTimeout(() => startStatusScan('registry', true), 1500);
+                    if (isBuildMainPage()) window.setTimeout(() => startMainRegistryStatusScan(true), 1700);
+                }
+            });
+        }
+
+
+        function buildMode() { return $('buildMode') ? $('buildMode').value : 'normal'; }
+        function runCacheRefresh(button) { runTask('cache_refresh', '', 'normal', false, button, true); }
+
+        function maybeAutoInitializeBuildCache() {
+            if (!autoBuildCacheOnLoad) return;
+            const lockKey = 'yoleo_auto_build_cache_' + (autoBuildCachePath || 'default');
+            const now = Date.now();
+            try {
+                const previous = Number(sessionStorage.getItem(lockKey) || '0');
+                if (previous && (now - previous) < 30000) return;
+                sessionStorage.setItem(lockKey, String(now));
+            } catch (e) {}
+            setStatus('Cache Build absent : initialisation automatique…');
+            window.setTimeout(() => runTask('cache_refresh', '', 'normal', false, null, true), 500);
+        }
+
+        function runBuildAll(button) { runTask('build_all', '', buildMode(), false, button, true); }
+        function runBuildOne(name, button) { runTask('build_one', cleanDockerName(name), buildMode(), false, button, true); }
+        function runMainBuildAll(button) { runTask('build_registry_all', '', buildMode(), false, button, true); }
+        function runMainBuildOne(name, button) { runTask('build_registry_one', cleanDockerName(name), buildMode(), false, button, true); }
+        function runRegistryAll(button) { runTask('registry_all', '', 'normal', false, button, true); }
+        function runRegistryOne(name, button) { runTask('registry_one', cleanDockerName(name), 'normal', false, button, true); }
+
+        function rememberButtonLabel(button) {
+            if (!button || button.dataset.originalHtml) return;
+            button.dataset.originalHtml = button.innerHTML;
+        }
+        function setButtonRunning(button) {
+            if (!button) return;
+            rememberButtonLabel(button);
+            button.style.display = '';
+            button.disabled = true;
+            button.classList.remove('is-ok', 'is-fail');
+            button.classList.add('is-running');
+            button.innerHTML = `<span class="btn-spinner"></span><span>${button.dataset.runningText || 'En cours…'}</span>`;
+        }
+        function setButtonFinished(button, ok) {
+            if (!button) return;
+            if (!ok && mainBuildRowHasStickyError(button)) {
+                button.classList.remove('is-running');
+                button.classList.add('is-fail');
+                button.disabled = false;
+                button.innerHTML = '<span class="btn-result">❌</span><span>Relancer</span>';
+                return;
+            }
+            button.classList.remove('is-running');
+            button.classList.add(ok ? 'is-ok' : 'is-fail');
+            button.innerHTML = `<span class="btn-result">${ok ? '✅' : '❌'}</span><span>${ok ? 'Terminé' : 'Erreur'}</span>`;
+            window.setTimeout(() => {
+                button.classList.remove('is-ok', 'is-fail');
+                button.disabled = false;
+                button.innerHTML = button.dataset.originalHtml || button.innerHTML;
+                const kind = button.dataset.statusKind || '';
+                const cache = kind && statusCache[kind] ? statusCache[kind].get(statusName(button)) : null;
+                if (cache) applyStatusPayload(button, cache);
+            }, 1800);
+        }
+
+        function updateRunningButtonTextFromProgressPayload(payload) {
+            if (!payload || typeof payload !== 'object') return;
+            const text = String(payload.running_text || payload.phase_label || '').trim();
+            if (!text) return;
+            const name = cleanDockerName(payload.name || '');
+            const action = String(payload.action || '');
+            allSmartActionButtons().forEach(button => {
+                if (button.dataset.jobRunning !== '1') return;
+                if (name && statusName(button) !== name) return;
+                button.innerHTML = `<span class="btn-spinner"></span><span>${escapeHtml(text)}</span>`;
+                // Sur /build/main, la phase registre a son propre badge dans la colonne TAR actuel.
+                // On ne remplace donc pas le badge Build par "Envoi registre", sinon les deux états se mélangent.
+                if (!(isBuildMainPage() && action === 'registry' && button.dataset.statusKind === 'build')) {
+                    setStatusBadge(button, text, 'unknown', text, true);
+                }
+            });
+        }
+
+        function maybeRefreshRowFromProgressPayload(payload) {
+            if (!payload || typeof payload !== 'object') return;
+            const name = cleanDockerName(payload.name || '');
+            const action = String(payload.action || '');
+            const kind = action === 'build' ? 'build' : (action === 'registry' ? 'registry' : '');
+            const phase = String(payload.phase || '');
+            if (!kind || !name) return;
+
+            // Ne pas recalculer le statut pendant une phase en cours : ça écrasait
+            // les badges vivants de /build/main ("Envoi en cours") par l'ancien
+            // état réel du registre, puis tout semblait se mettre à jour d'un coup
+            // à la fin. On ne recalcule que sur une phase terminée ou en erreur.
+            const terminalPhase = (
+                (kind === 'build' && (phase === 'build_done' || phase === 'build_error')) ||
+                (kind === 'registry' && (phase === 'registry_done' || phase === 'registry_error'))
+            );
+            if (!terminalPhase) return;
+
+            const key = [activeBackgroundCompletedJobId || 'job', kind, phase, name, payload.current || 0, payload.done || 0, payload.failed || 0].join(':');
+            if (progressRefreshSeen.has(key)) return;
+            progressRefreshSeen.add(key);
+
+            if (activeBackgroundJob && activeBackgroundJob.running && jobIsBulk(activeBackgroundJob.action)) {
+                ensureActiveJobTracking(activeBackgroundJob);
+                if (activeBackgroundCompleted[kind]) activeBackgroundCompleted[kind].add(name);
+            }
+
+            // Une ligne terminée dans un bulk peut quitter le spinner et recalculer son vrai état
+            // pendant que les autres lignes continuent de tourner.
+            if (kind === 'build') {
+                window.setTimeout(() => refreshStatusForName('build', name), 450);
+                // Le TAR vient peut-être d'être créé ou mis à jour : on vérifie le registre
+                // juste après, mais sans écraser une phase registry déjà en cours.
+                window.setTimeout(() => {
+                    if (isBuildMainPage()) {
+                        const row = mainBuildRow(name);
+                        if (row && row.dataset.mainState === 'registry') return;
+                        refreshMainRegistryForName(name);
+                    } else {
+                        refreshStatusForName('registry', name);
+                    }
+                }, 900);
+                return;
+            }
+
+            if (kind === 'registry') {
+                // Après un envoi, laisse quelques centaines de ms au registre local
+                // avant de relire le manifest. Le badge reste vivant entre-temps.
+                window.setTimeout(() => {
+                    if (isBuildMainPage()) refreshMainRegistryForName(name);
+                    else refreshStatusForName('registry', name);
+                }, phase === 'registry_done' ? 900 : 300);
+            }
+        }
+
+        function handleProgressPayload(payload, useModal) {
+            if (!payload || typeof payload !== 'object') return;
+            const percent = payload.percent || 0;
+            setProgress(percent);
+            lastRunFailedCount = Number(payload.failed || 0);
+            const phase = payload.phase_label ? String(payload.phase_label) + ' · ' : '';
+            const label = `${phase}${payload.current || 0}/${payload.total || 0} - OK ${payload.done || 0} - erreurs ${payload.failed || 0}${payload.name ? ' - ' + payload.name : ''}`;
+            setStatus(label);
+            updateMainBuildRowFromProgressPayload(payload);
+            updateRunningButtonTextFromProgressPayload(payload);
+            if (useModal) {
+                setModalProgress(percent);
+                $('modalStatus').textContent = label;
+            }
+            maybeRefreshRowFromProgressPayload(payload);
+        }
+
+        function consumeLines(text, useModal) {
+            const lines = text.split(/(\r?\n)/);
+            let rebuilt = '';
+            for (let i = 0; i < lines.length; i++) {
+                const part = lines[i];
+                if (part === '') continue;
+                if (part.startsWith('@@PROGRESS ')) {
+                    try { handleProgressPayload(JSON.parse(part.substring('@@PROGRESS '.length)), useModal); } catch (e) {}
+                    continue;
+                }
+                rebuilt += part;
+            }
+            if (rebuilt) {
+                if (rebuilt.includes('❌')) runHadError = true;
+                appendLog(rebuilt);
+                if (useModal) appendModalLog(rebuilt);
+            }
+        }
+
+        let lastRunFailedCount = 0;
+        let runHadError = false;
+        let activeRunPollTimer = null;
+        let activeBackgroundJob = null;
+        let activeBackgroundCompletedJobId = '';
+        const activeBackgroundCompleted = { build: new Set(), registry: new Set() };
+        const progressRefreshSeen = new Set();
+        const backgroundProgressLastSeq = new Map();
+
+        function jobStatusKind(action) {
+            const value = String(action || '');
+            if (value === 'build_registry_one' || value === 'build_registry_all') return 'build';
+            if (value.startsWith('build_')) return 'build';
+            if ((value.startsWith('registry_') || value.startsWith('dry_registry_')) && !value.startsWith('registry_service_')) return 'registry';
+            return '';
+        }
+
+        function jobIsBulk(action) {
+            const value = String(action || '');
+            return value.endsWith('_all');
+        }
+
+        function ensureActiveJobTracking(job) {
+            const jobId = String(job && job.id || '');
+            if (jobId && jobId !== activeBackgroundCompletedJobId) {
+                activeBackgroundCompletedJobId = jobId;
+                activeBackgroundCompleted.build.clear();
+                activeBackgroundCompleted.registry.clear();
+                progressRefreshSeen.clear();
+            }
+        }
+
+        function isBulkJobNameCompleted(kind, name) {
+            return Boolean(kind && name && activeBackgroundCompleted[kind] && activeBackgroundCompleted[kind].has(cleanDockerName(name)));
+        }
+
+        function jobAffectsSmartButton(job, button) {
+            if (!job || !button) return false;
+            if (mainBuildRowHasStickyError(button)) return false;
+            const kind = jobStatusKind(job.action);
+            if (!kind || button.dataset.statusKind !== kind) return false;
+            const buttonName = statusName(button);
+            if (jobIsBulk(job.action)) {
+                if (isBulkJobNameCompleted(kind, buttonName)) return false;
+                const cached = statusCache[kind] ? statusCache[kind].get(buttonName) : null;
+                if (payloadIsCurrent(cached)) {
+                    if (activeBackgroundCompleted[kind]) activeBackgroundCompleted[kind].add(buttonName);
+                    return false;
+                }
+                return true;
+            }
+            return buttonName === cleanDockerName(job.name || '');
+        }
+
+        function activeJobAffectsButton(button) {
+            return Boolean(activeBackgroundJob && activeBackgroundJob.running && jobAffectsSmartButton(activeBackgroundJob, button));
+        }
+
+        function allSmartActionButtons() {
+            return statusButtons('build').concat(statusButtons('registry'));
+        }
+
+        let runningBulkStatusRefresh = false;
+        let runningBulkStatusRefreshAt = 0;
+
+        async function refreshRunningBulkJobRows(job) {
+            if (!job || !job.running || !jobIsBulk(job.action)) return;
+            const now = Date.now();
+            if (runningBulkStatusRefresh || (now - runningBulkStatusRefreshAt) < 900) return;
+            const kind = jobStatusKind(job.action);
+            if (!kind) return;
+            const buttons = statusButtons(kind).filter(button => button.dataset.jobRunning === '1' || jobAffectsSmartButton(job, button));
+            if (!buttons.length) return;
+            runningBulkStatusRefresh = true;
+            runningBulkStatusRefreshAt = now;
+            try {
+                await runStatusPool(kind, buttons);
+            } catch (e) {
+                // Le polling background ne doit jamais casser l'UI : au prochain tick on réessaie.
+            } finally {
+                runningBulkStatusRefresh = false;
+            }
+        }
+
+        function markButtonsForBackgroundJob(job) {
+            if (!job || !job.running) return;
+            ensureActiveJobTracking(job);
+            activeBackgroundJob = job;
+            allSmartActionButtons().forEach(button => {
+                if (jobAffectsSmartButton(job, button)) {
+                    button.dataset.jobRunning = '1';
+                    setButtonRunning(button);
+                    setStatusBadge(button, 'en cours', 'unknown', 'Tâche en arrière-plan en cours.', true);
+                } else if (button.dataset.jobRunning === '1') {
+                    delete button.dataset.jobRunning;
+                    resetSmartButton(button);
+                    const kind = button.dataset.statusKind || '';
+                    const cached = kind && statusCache[kind] ? statusCache[kind].get(statusName(button)) : null;
+                    if (cached) applyStatusPayload(button, cached);
+                }
+            });
+        }
+
+        function finishButtonsForBackgroundJob(job, ok, fallbackButton = null) {
+            const buttons = allSmartActionButtons().filter(button => button.dataset.jobRunning === '1' || jobAffectsSmartButton(job, button));
+            if (!buttons.length && fallbackButton) buttons.push(fallbackButton);
+            buttons.forEach(button => {
+                delete button.dataset.jobRunning;
+                setButtonFinished(button, ok);
+            });
+            if (activeBackgroundJob && job && activeBackgroundJob.id === job.id) {
+                activeBackgroundJob = Object.assign({}, job, { running: false });
+            }
+        }
+
+        function taskModalTitle(action, name) {
+            if (action === 'cache_refresh') return 'Mise à jour du cache Build';
+            if (action === 'build_registry_all') return 'Build principal de tous les Dockers vers registre';
+            if (action === 'build_registry_one') return `Build principal de ${name} vers registre`;
+            if (action === 'build_all') return 'Build de tous les Dockers vers TAR';
+            if (action === 'build_one') return `Build de ${name} vers TAR`;
+            if (action === 'registry_all') return 'Envoi de tous les TAR vers le registre';
+            if (action === 'registry_one') return `Envoi de ${name}.tar vers le registre`;
+            if (action === 'registry_service_status') return 'Statut complet du registre host';
+            if (action === 'registry_service_generate_yaml') return 'Génération du registry.yml';
+            if (action === 'registry_service_install') return 'Installation du service registry host';
+            if (action === 'registry_service_start') return 'Démarrage du registry host';
+            if (action === 'registry_service_stop') return 'Arrêt du registry host';
+            if (action === 'registry_service_restart') return 'Redémarrage du registry host';
+            if (action === 'registry_service_enable') return 'Activation boot du registry host';
+            if (action === 'registry_service_disable') return 'Désactivation boot du registry host';
+            if (action === 'registry_service_remove') return 'Suppression du service registry host';
+            if (action === 'registry_service_delete_all_tags') return 'Suppression de tous les tags du registre';
+            if (action === 'registry_service_clean_storage') return 'Nettoyage complet du stockage registre';
+            if (action === 'system_stacks_update') return 'stacks-host --update';
+            if (action === 'system_stacks_start') return 'stacks-host --start';
+            if (action === 'system_stacks_list') return 'stacks-host --list';
+            if (action === 'system_stacks_ollama') return 'stacks-host --ollama';
+            if (action === 'system_stacks_remove_ollama') return 'stacks-host --remove-ollama';
+            if (action === 'system_stacks_all') return 'stacks-host --update';
+            if (action === 'system_stacks_create') return 'stacks-host --update';
+            if (action === 'system_compose_create') return 'stacks-host --update';
+            if (action === 'system_docker_up') return 'stacks-host --update';
+            return 'Opération en cours';
+        }
+
+        function backgroundProgressKey(job) {
+            if (!job || typeof job !== 'object') return 'unknown';
+            return String(job.id || job.started_at || job.action || 'unknown');
+        }
+
+        function replayBackgroundProgressEvents(job, useModal = false) {
+            if (!job || typeof job !== 'object') return false;
+            const events = Array.isArray(job.progress_events) ? job.progress_events : [];
+            if (!events.length) return false;
+
+            const key = backgroundProgressKey(job);
+            let lastSeq = Number(backgroundProgressLastSeq.get(key) || 0);
+            const freshEvents = events
+                .filter(event => Number(event && event.seq || 0) > lastSeq && event && typeof event.payload === 'object')
+                .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0));
+
+            freshEvents.forEach(event => {
+                const seq = Number(event.seq || 0);
+                if (seq > lastSeq) lastSeq = seq;
+                handleProgressPayload(event.payload, useModal);
+            });
+
+            if (lastSeq > 0) backgroundProgressLastSeq.set(key, lastSeq);
+
+            // Nettoyage léger : un seul job actif suffit au navigateur.
+            if (backgroundProgressLastSeq.size > 4) {
+                Array.from(backgroundProgressLastSeq.keys()).forEach(item => {
+                    if (item !== key) backgroundProgressLastSeq.delete(item);
+                });
+            }
+            return true;
+        }
+
+        function taskProgressTitle(action) {
+            const actionValue = String(action || '');
+            if (actionValue === 'cache_refresh') return 'Progression cache';
+            if (actionValue === 'build_registry_one' || actionValue === 'build_registry_all') return 'Progression build + registre';
+            if (actionValue.startsWith('build_')) return 'Progression build';
+            if (String(action || '').startsWith('registry_service_')) return 'Progression service registre';
+            if (String(action || '').includes('registry')) return 'Progression registre';
+            if (String(action || '').startsWith('system_')) return 'Progression système';
+            return 'Progression';
+        }
+
+        function renderBackgroundJob(job, useModal = false) {
+            if (!job || !job.id) return;
+            const progress = job.progress_payload || {
+                percent: job.progress || 0,
+                current: job.running ? 0 : 1,
+                total: job.running ? 0 : 1,
+                done: job.success ? 1 : 0,
+                failed: job.failed || 0,
+                name: job.name || ''
+            };
+            const modalVisible = useModal && $('progressModal').style.display === 'flex';
+            const replayedProgress = replayBackgroundProgressEvents(job, modalVisible);
+            if (!replayedProgress) handleProgressPayload(progress, modalVisible);
+
+            const logText = job.log_tail || '';
+            markMainBuildFailuresFromLog(logText);
+            const output = $('terminal-output');
+            if (output && output.value !== logText) {
+                output.value = logText;
+                output.scrollTop = output.scrollHeight;
+            }
+            if (useModal && $('progressModal').style.display === 'flex') {
+                const modal = $('modalLog');
+                if (modal && modal.textContent !== logText) {
+                    modal.textContent = logText;
+                    modal.scrollTop = modal.scrollHeight;
+                }
+            }
+
+            lastRunFailedCount = Number(job.failed || progress.failed || 0);
+            runHadError = Boolean(job.had_error);
+            if (job.running) {
+                markButtonsForBackgroundJob(job);
+                refreshRunningBulkJobRows(job);
+                setStatus('En cours : ' + [job.action, job.name, job.mode !== 'normal' ? job.mode : ''].filter(Boolean).join(' / '));
+                if (useModal && $('progressModal').style.display === 'flex') $('modalStatus').textContent = 'En cours...';
+                return;
+            }
+            const ok = job.success === true && lastRunFailedCount === 0 && !runHadError;
+            finishMainOverallProgress(job, ok, progress);
+            setStatus(job.status || (ok ? 'Termine.' : 'Termine avec erreur.'));
+            if (useModal && $('progressModal').style.display === 'flex') {
+                $('modalStatus').textContent = job.status || (ok ? 'Termine.' : 'Erreur.');
+                setModalProgress(job.progress || (ok ? 100 : progress.percent || 0));
+            }
+        }
+
+        async function fetchBackgroundJob() {
+            const response = await fetch(runStatusUrl, { credentials: 'same-origin', cache: 'no-store' });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+            return payload.job || {};
+        }
+
+        function stopBackgroundPolling() {
+            if (activeRunPollTimer) {
+                window.clearTimeout(activeRunPollTimer);
+                activeRunPollTimer = null;
+            }
+        }
+
+        function scheduleBackgroundPolling(action, name, useModal, button) {
+            stopBackgroundPolling();
+            const tick = async () => {
+                try {
+                    const job = await fetchBackgroundJob();
+                    renderBackgroundJob(job, useModal);
+                    if (job && job.running) {
+                        const pollDelay = String((job && job.action) || action || '').startsWith('build_registry_') ? 600 : 1200;
+                        activeRunPollTimer = window.setTimeout(tick, pollDelay);
+                        return;
+                    }
+                    const ok = Boolean(job && job.success === true && !job.had_error && Number(job.failed || 0) === 0);
+                    finishButtonsForBackgroundJob(job, ok, button);
+                    if (job && job.action) refreshStatusAfterTask(job.action, job.name || name);
+                    document.dispatchEvent(new CustomEvent('build:task-finished', {
+                        detail: {
+                            action: (job && job.action) || action,
+                            name: (job && job.name) || name || '',
+                            ok,
+                            job: job || null,
+                            message: (job && job.status) || ''
+                        }
+                    }));
+                    if (useModal && ok && shouldAutoCloseProgressModal((job && job.action) || action)) {
+                        window.setTimeout(() => closeProgressModal(), 900);
+                    }
+                } catch (err) {
+                    consumeLines(`\nErreur statut background : ${String(err && (err.message || err) || err)}\n`, useModal);
+                    setStatus('Erreur statut background.');
+                    finishButtonsForBackgroundJob(activeBackgroundJob || { action, name }, false, button);
+                    document.dispatchEvent(new CustomEvent('build:task-finished', {
+                        detail: {
+                            action,
+                            name: name || '',
+                            ok: false,
+                            job: activeBackgroundJob || null,
+                            message: String(err && (err.message || err) || 'Erreur statut background.')
+                        }
+                    }));
+                }
+            };
+            activeRunPollTimer = window.setTimeout(tick, 500);
+        }
+
+        async function resumeBackgroundJob() {
+            try {
+                const job = await fetchBackgroundJob();
+                if (!job || !job.id) return;
+                renderBackgroundJob(job, false);
+                if (job.running) scheduleBackgroundPolling(job.action || '', job.name || '', false, null);
+            } catch (e) {}
+        }
+
+        /*
+        async function runTaskLegacyUnused(action, name = '', mode = 'normal', useModal = false, button = null) {
+            if (useModal) openProgressModal(taskModalTitle(action, name), taskProgressTitle(action));
+            else switchTab('logs');
+
+            lastRunFailedCount = 0;
+            runHadError = false;
+            stopBackgroundPolling();
+            clearMainBuildRowsForRun(action, name);
+            setButtonRunning(button);
+            clearLog();
+            setStatus('Démarrage : ' + [action, name, mode !== 'normal' ? mode : ''].filter(Boolean).join(' / '));
+            setProgress(0);
+
+            try {
+                const response = await fetch(runStartUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, name, mode })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const text = payload.message || 'Erreur lancement';
+                    runHadError = true;
+                    consumeLines(`❌ HTTP ${response.status}
+    ${text}
+    `, useModal);
+                    setStatus('Erreur HTTP ' + response.status);
+                    setButtonFinished(button, false);
+                    return;
+                }
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const parts = buffer.split('\n');
+                    buffer = parts.pop() || '';
+                    for (const line of parts) consumeLines(line + '\n', useModal);
+                }
+                if (buffer) consumeLines(buffer, useModal);
+                const ok = lastRunFailedCount === 0 && !runHadError;
+                setStatus(ok ? 'Terminé.' : `Terminé avec ${lastRunFailedCount || 1} erreur(s).`);
+                setButtonFinished(button, ok);
+                refreshStatusAfterTask(action, name);
+            } catch (err) {
+                runHadError = true;
+                const errText = String((err && (err.message || err)) || 'Erreur inconnue');
+                const streamCut = String(action || '').startsWith('system_stacks_') && /input stream|network|fetch|terminated|aborted/i.test(errText);
+                if (streamCut) {
+                    consumeLines(`
+    ⚠️ Flux navigateur coupé pendant Docker up.
+    Ce n'est pas forcément une erreur Docker : la stack base peut recréer NginxProxyManager/Registry, et si tu passes par NPM, le proxy coupe la page pendant son redémarrage.
+    Recharge la page dans quelques secondes puis vérifie le log système : ${systemLogFile}
+    `, useModal);
+                    setStatus('Flux coupé : probablement redémarrage du proxy NPM. Recharge la page puis vérifie le log système.');
+                } else {
+                    consumeLines(`
+    ❌ Exception navigateur : ${errText}
+    `, useModal);
+                    setStatus('Erreur navigateur.');
+                }
+                setButtonFinished(button, false);
+                refreshStatusAfterTask(action, name);
+            }
+        }
+
+        */
+
+        async function runTask(action, name = '', mode = 'normal', useModal = false, button = null, quiet = false) {
+            if (useModal) openProgressModal(taskModalTitle(action, name), taskProgressTitle(action));
+            else if (!quiet) switchTab('logs');
+
+            lastRunFailedCount = 0;
+            runHadError = false;
+            stopBackgroundPolling();
+            clearMainBuildRowsForRun(action, name);
+            setButtonRunning(button);
+            clearLog();
+            setStatus('Demarrage : ' + [action, name, mode !== 'normal' ? mode : ''].filter(Boolean).join(' / '));
+            setProgress(0);
+
+            try {
+                const response = await fetch(runStartUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, name, mode })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.ok) {
+                    runHadError = true;
+                    consumeLines(`HTTP ${response.status} : ${payload.message || 'Erreur lancement'}\n`, useModal);
+                    setStatus('Erreur HTTP ' + response.status);
+                    setButtonFinished(button, false);
+                    document.dispatchEvent(new CustomEvent('build:task-finished', {
+                        detail: {action, name: name || '', ok: false, job: null, message: payload.message || 'Erreur lancement'}
+                    }));
+                    return;
+                }
+                const job = payload.job || {};
+                if (job.already_running) {
+                    setStatus('Une tache Build/Registre est deja en cours, reprise du suivi.');
+                }
+                renderBackgroundJob(job, useModal);
+                scheduleBackgroundPolling(action, name, useModal, button);
+            } catch (err) {
+                runHadError = true;
+                consumeLines(`\nException navigateur : ${String((err && (err.message || err)) || 'Erreur inconnue')}\n`, useModal);
+                setStatus('Erreur navigateur.');
+                setButtonFinished(button, false);
+                document.dispatchEvent(new CustomEvent('build:task-finished', {
+                    detail: {
+                        action,
+                        name: name || '',
+                        ok: false,
+                        job: null,
+                        message: String((err && (err.message || err)) || 'Erreur navigateur.')
+                    }
+                }));
+                refreshStatusAfterTask(action, name);
+            }
+        }
+
+        function filterTable(tableId, query) {
+            query = String(query || '').toLowerCase().trim();
+            document.querySelectorAll(`#${tableId} tbody tr`).forEach(row => {
+                const haystack = row.dataset.filter || row.textContent.toLowerCase();
+                row.style.display = (!query || haystack.includes(query)) ? '' : 'none';
+            });
+            bindKeyboardRows();
+            ensureKeyboardSelection($(tableId));
+        }
+
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+        }
+
+        function updateTarCells(name, tar) {
+            const cleanName = cleanDockerName(name);
+            if (!cleanName || !tar) return;
+
+            document.querySelectorAll('[data-tar-cell][data-tar-name]').forEach(cell => {
+                if (cleanDockerName(cell.dataset.tarName || '') !== cleanName) return;
+                const kind = cell.dataset.tarCell || '';
+                const exists = Boolean(tar.exists);
+                const size = escapeHtml(tar.size_h || '—');
+                const mtime = escapeHtml(tar.mtime || '');
+                const shaText = tar.sha ? 'oui' : 'non';
+                const arches = Array.isArray(tar.arches) && tar.arches.length ? ` · ${escapeHtml(tar.arches.join(', '))}` : '';
+
+                if (!exists) {
+                    if (kind === 'registry') {
+                        cell.innerHTML = '<span class="badge badge-no">manquant</span>';
+                    } else if (isBuildMainPage()) {
+                        cell.innerHTML = `<div class="build-main-tar-line"><span class="badge badge-no">pas de TAR</span>${mainRegistryBadgeMarkup(cleanName)}</div>`;
+                    } else {
+                        cell.innerHTML = '<span class="badge badge-no">pas de TAR</span>';
+                    }
+                    return;
+                }
+
+                if (kind === 'registry') {
+                    cell.innerHTML = `<span class="badge badge-ok">${size}</span><div class="name-sub">sha256 : ${shaText}${arches}</div>`;
+                } else if (isBuildMainPage()) {
+                    cell.innerHTML = `<div class="build-main-tar-line"><span class="badge badge-ok">${size}</span>${mainRegistryBadgeMarkup(cleanName)}</div><div class="name-sub">${mtime}</div><div class="name-sub">sha256 : ${shaText}${arches}</div>`;
+                } else {
+                    cell.innerHTML = `<span class="badge badge-ok">${size}</span><div class="name-sub">${mtime}</div><div class="name-sub">sha256 : ${shaText}${arches}</div>`;
+                }
+            });
+        }
+
+        function fillDbRow(button) {
+            const row = button.closest('tr');
+            row.querySelectorAll('input[data-suggest], select[data-suggest]').forEach(field => {
+                if (!String(field.value || '').trim()) field.value = field.dataset.suggest || '';
+            });
+        }
+        function clearDbRow(button) {
+            const row = button.closest('tr');
+            if (!row) return;
+            row.querySelectorAll('input[data-suggest]').forEach(input => input.value = '');
+            row.querySelectorAll('select[name="db_platforms"]').forEach(select => {
+                select.value = '';
+            });
+            row.querySelectorAll('select[name="db_mode"]').forEach(select => {
+                select.value = '';
+            });
+        }
+
+        function dbRowPayload(row) {
+            return {
+                name: row.querySelector('input[name="db_name"]')?.value || '',
+                registry: row.querySelector('input[name="db_registry"]')?.value || '',
+                platforms: row.querySelector('select[name="db_platforms"]')?.value || '',
+                mode: row.querySelector('select[name="db_mode"]')?.value || ''
+            };
+        }
+
+        function setDbRowState(row, ok, message) {
+            if (!row) return;
+            row.dataset.unsaved = '0';
+            const hint = row.querySelector('td:first-child .hint');
+            if (hint) {
+                hint.innerHTML = `<span class="badge ${ok ? 'badge-ok' : 'badge-no'}">${ok ? 'enregistré' : 'erreur'}</span>`;
+                if (message) hint.title = message;
+            }
+            const data = dbRowPayload(row);
+            const modeLabel = String(data.mode) === '1' ? 'https' : 'http';
+            row.dataset.dbFilter = `${String(data.name).toLowerCase()} ${String(data.registry).toLowerCase()} ${String(data.platforms).toLowerCase()} ${modeLabel}`;
+        }
+
+        async function postDbRows(rows, button) {
+            setButtonRunning(button);
+            try {
+                const response = await fetch(databaseJsonUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({rows})
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.ok) throw new Error(payload.message || `Erreur HTTP ${response.status}`);
+                setButtonFinished(button, true);
+                return payload;
+            } catch (error) {
+                setButtonFinished(button, false);
+                throw error;
+            }
+        }
+
+        function refreshStatusesAfterDatabaseRows(rows, delay = 180) {
+            // Quand la base change en AJAX, les boutons Build/TAR et TAR/Registre
+            // ne doivent pas attendre un F5 : on invalide le cache navigateur puis
+            // on relance les routes /builds/status_json pour les lignes touchees.
+            const names = Array.from(new Set((rows || [])
+                .map(row => cleanDockerName(row && row.name))
+                .filter(name => name)));
+
+            const invalidateOne = (kind, name) => {
+                if (name) invalidateStatus(kind, name);
+                else invalidateStatus(kind);
+            };
+
+            if (!names.length) {
+                invalidateOne('build', '');
+                invalidateOne('registry', '');
+            } else {
+                names.forEach(name => {
+                    invalidateOne('build', name);
+                    invalidateOne('registry', name);
+                });
+            }
+
+            // /build/main n'a pas de vrais boutons registry dans la colonne TAR :
+            // son badge "Registre" est vivant à part. Après un changement de
+            // plateforme/registre, on le met immédiatement en vérification puis on
+            // force le recalcul réel du registre, sans F5 ni bouton cache manuel.
+            if (isBuildMainPage()) {
+                const targetNames = names.length ? names : mainRegistryNames();
+                targetNames.forEach(name => {
+                    statusCache.registry.delete(name);
+                    setMainRegistryState(name, 'running', 'Vérif registre…', 'Recalcul réel du registre après modification de la base.');
+                });
+            }
+
+            window.setTimeout(() => startStatusScan('build', true), delay);
+            window.setTimeout(() => startStatusScan('registry', true), delay + 350);
+            if (isBuildMainPage()) window.setTimeout(() => startMainRegistryStatusScan(true), delay + 650);
+            setStatus('Base de données enregistrée : recalcul AJAX des boutons Build/TAR et TAR → Registre…');
+        }
+
+        async function saveDbRow(button) {
+            const row = button.closest('tr');
+            if (!row) return;
+            const rowData = dbRowPayload(row);
+            try {
+                const payload = await postDbRows([rowData], button);
+                setDbRowState(row, true, payload.message || 'Enregistré');
+                refreshStatusesAfterDatabaseRows([rowData]);
+            } catch (error) {
+                setDbRowState(row, false, error.message || 'Erreur');
+            }
+        }
+
+        async function saveDbForm() {
+            // Compatibilité vieux HTML/cache : sauvegarde dynamique de toutes les lignes, sans submit navigateur.
+            const rows = Array.from(document.querySelectorAll('#dbTable tbody tr')).map(dbRowPayload);
+            try {
+                await postDbRows(rows, null);
+                document.querySelectorAll('#dbTable tbody tr').forEach(row => setDbRowState(row, true, 'Enregistré'));
+                refreshStatusesAfterDatabaseRows(rows, 250);
+            } catch (error) {
+                console.error(error.message || 'Erreur pendant l’enregistrement.');
+            }
+        }
+
+        async function deleteDbRow(button) {
+            const row = button.closest('tr');
+            if (!row) return;
+            if (row.dataset.unsaved === '1') {
+                row.remove();
+                setupDbScroll();
+                bindKeyboardRows();
+                ensureKeyboardSelection();
+                return;
+            }
+            const current = dbRowPayload(row);
+            try {
+                await postDbRows([{name: current.name, registry: '', platforms: '', mode: ''}], button);
+                refreshStatusesAfterDatabaseRows([current]);
+                row.remove();
+                setupDbScroll();
+                bindKeyboardRows();
+                ensureKeyboardSelection();
+            } catch (error) {
+                setDbRowState(row, false, error.message || 'Erreur suppression');
+            }
+        }
+
+        function removeDbRow(button) { deleteDbRow(button); }
+        function fillDbAll() { document.querySelectorAll('#dbTable tbody tr').forEach(row => fillDbRow(row.querySelector('button'))); }
+
+        async function fillDbAllAndSave(button) {
+            const rowsEls = Array.from(document.querySelectorAll('#dbTable tbody tr'));
+            if (!rowsEls.length) return;
+
+            rowsEls.forEach(row => fillDbRow(row.querySelector('button')));
+            const rows = rowsEls.map(dbRowPayload);
+
+            try {
+                const payload = await postDbRows(rows, button);
+                rowsEls.forEach(row => setDbRowState(row, true, payload.message || 'Enregistré'));
+
+                // Le bouton magique lance aussi le remplissage côté serveur pour les
+                // dossiers build détectés qui ne seraient pas encore visibles dans le tableau.
+                try {
+                    const autoResponse = await fetch(databaseAutofillUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({})
+                    });
+                    const autoPayload = await autoResponse.json().catch(() => ({}));
+                    if (autoResponse.ok && autoPayload.ok && Number(autoPayload.count || 0) > 0) {
+                        setStatus(autoPayload.message || 'Base complétée automatiquement.');
+                        window.setTimeout(() => window.location.reload(), 650);
+                        return;
+                    }
+                } catch (autoError) {
+                    console.warn(autoError);
+                }
+
+                refreshStatusesAfterDatabaseRows(rows, 250);
+                setStatus('Remplissage auto all enregistré.');
+            } catch (error) {
+                rowsEls.forEach(row => setDbRowState(row, false, error.message || 'Erreur'));
+                setStatus('Erreur Remplir auto all : ' + (error.message || error));
+            }
+        }
+
+        function buildDbOptionPlatformValue(value) {
+            const raw = String(value || '').trim();
+            if (raw === 'linux/amd64,linux/arm64' || raw === 'linux/arm64,linux/amd64') return 'linux/amd64,linux/arm64';
+            if (raw.includes('linux/arm64') && raw.includes('linux/amd64')) return 'linux/amd64,linux/arm64';
+            if (raw.includes('linux/arm64')) return 'linux/arm64';
+            return 'linux/amd64';
+        }
+
+        function buildDbOptionModeValue(value) {
+            return String(value || '').trim() === '1' ? '1' : '0';
+        }
+
+        function openBuildDbOptionModalFromButton(button) {
+            if (!button) return;
+            openBuildDbOptionModal({
+                name: button.dataset.name || '',
+                registry: button.dataset.registry || '',
+                registry_suggested: button.dataset.registrySuggested || '',
+                platforms: button.dataset.platforms || '',
+                platform_suggested: button.dataset.platformSuggested || '',
+                mode: button.dataset.mode || '0'
+            }, button);
+        }
+
+        function ensureBuildDbOptionModal() {
+            let overlay = $('buildDbOptionOverlay');
+            if (overlay) return overlay;
+
+            const wrap = document.createElement('div');
+            wrap.innerHTML = `
+                <div id="buildDbOptionOverlay" class="build-db-option-overlay" style="display:none;">
+                    <div class="build-db-option-box" role="dialog" aria-modal="true" aria-labelledby="buildDbOptionTitle">
+                        <div class="build-db-option-head">
+                            <div>
+                                <div class="build-db-option-title" id="buildDbOptionTitle">Options Build</div>
+                                <div class="build-db-option-sub" id="buildDbOptionName">Docker</div>
+                            </div>
+                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon build-db-option-close" onclick="closeBuildDbOptionModal()">×</button>
+                        </div>
+                        <div class="build-db-option-body">
+                            <label class="build-db-option-field">
+                                <span>Image / registre</span>
+                                <input class="text-input" id="buildDbOptionRegistry" type="text" autocomplete="off">
+                            </label>
+                            <div class="build-db-option-grid">
+                                <label class="build-db-option-field">
+                                    <span>Plateforme</span>
+                                    <select class="select-input" id="buildDbOptionPlatform">
+                                        <option value="linux/amd64">linux/amd64</option>
+                                        <option value="linux/amd64,linux/arm64">linux/amd64 + linux/arm64</option>
+                                        <option value="linux/arm64">linux/arm64</option>
+                                    </select>
+                                </label>
+                                <label class="build-db-option-field">
+                                    <span>Mode</span>
+                                    <select class="select-input" id="buildDbOptionMode">
+                                        <option value="0">HTTP</option>
+                                        <option value="1">HTTPS</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="build-db-option-help">Réglage rapide de la base interne. Par défaut : linux/amd64 + HTTP. La page Base de données reste disponible pour les modifications en masse.</div>
+                            <div class="build-db-option-status" id="buildDbOptionStatus"></div>
+                        </div>
+                        <div class="build-db-option-actions">
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeBuildDbOptionModal()">Annuler</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-green" id="buildDbOptionSaveBtn" onclick="saveBuildDbOptionModal(this)">OK</button>
+                        </div>
+                    </div>
+                </div>`;
+            overlay = wrap.firstElementChild;
+            document.body.appendChild(overlay);
+            overlay.addEventListener('click', event => {
+                if (event.target === overlay) closeBuildDbOptionModal();
+            });
+            return overlay;
+        }
+
+        function openBuildDbOptionModal(data, sourceButton = null) {
+            const overlay = ensureBuildDbOptionModal();
+            const name = cleanDockerName(data && data.name || '');
+            if (!name) return;
+
+            const registry = String((data && data.registry) || (data && data.registry_suggested) || '').trim();
+            const suggested = String((data && data.registry_suggested) || registry || '').trim();
+            const platform = buildDbOptionPlatformValue((data && data.platforms) || (data && data.platform_suggested) || 'linux/amd64');
+            const mode = buildDbOptionModeValue(data && data.mode);
+
+            overlay.dataset.name = name;
+            overlay.dataset.sourceButtonId = '';
+            if (sourceButton) {
+                if (!sourceButton.id) sourceButton.id = 'buildDbOptionBtn_' + name.replace(/[^a-zA-Z0-9_-]+/g, '_') + '_' + Date.now();
+                overlay.dataset.sourceButtonId = sourceButton.id;
+            }
+
+            const title = $('buildDbOptionTitle');
+            const nameBox = $('buildDbOptionName');
+            const registryInput = $('buildDbOptionRegistry');
+            const platformSelect = $('buildDbOptionPlatform');
+            const modeSelect = $('buildDbOptionMode');
+            const status = $('buildDbOptionStatus');
+
+            if (title) title.textContent = 'Options Build';
+            if (nameBox) nameBox.textContent = 'Docker : ' + name;
+            if (registryInput) {
+                registryInput.value = registry;
+                registryInput.placeholder = suggested;
+            }
+            if (platformSelect) platformSelect.value = platform;
+            if (modeSelect) modeSelect.value = mode;
+            if (status) {
+                status.textContent = '';
+                status.classList.remove('is-error', 'is-ok');
+            }
+
+            overlay.style.display = 'flex';
+            window.setTimeout(() => registryInput && registryInput.focus(), 30);
+        }
+
+        function closeBuildDbOptionModal() {
+            const overlay = $('buildDbOptionOverlay');
+            if (overlay) overlay.style.display = 'none';
+        }
+
+        function findBuildTableRow(name) {
+            const clean = cleanDockerName(name);
+            if (!clean) return null;
+            return Array.from(document.querySelectorAll('#buildTable tbody tr[data-build-name]')).find(row => cleanDockerName(row.dataset.buildName || '') === clean) || null;
+        }
+
+        function buildDbOptionPlatformBadges(platforms) {
+            const value = String(platforms || 'linux/amd64');
+            const amd = value.includes('linux/amd64');
+            const arm = value.includes('linux/arm64');
+            return `
+                <span class="badge ${amd ? 'badge-info' : 'badge-muted'}">amd64</span>
+                <span class="badge ${arm ? 'badge-info' : 'badge-muted'}">arm64</span>`;
+        }
+
+        function applyBuildDbOptionToRow(rowData) {
+            const row = findBuildTableRow(rowData.name);
+            if (!row) return;
+            const name = cleanDockerName(rowData.name);
+            const registry = String(rowData.registry || '').trim();
+            const platforms = buildDbOptionPlatformValue(rowData.platforms || 'linux/amd64');
+            const mode = buildDbOptionModeValue(rowData.mode);
+
+            const platformCell = row.querySelector('[data-build-platform-cell]');
+            if (platformCell) {
+                const tag = platformCell.querySelector('.tag-val');
+                const arch = platformCell.querySelector('.arch-row');
+                if (tag) tag.textContent = platforms;
+                if (arch) arch.innerHTML = buildDbOptionPlatformBadges(platforms);
+            }
+
+            const registryCell = row.querySelector('[data-build-registry-cell]');
+            if (registryCell) {
+                registryCell.innerHTML = registry
+                    ? `<span class="badge badge-ok">OK</span><div class="name-sub">${escapeHtml(registry)}</div>`
+                    : '<span class="badge badge-warn">à compléter</span>';
+            }
+
+            const metaHint = row.querySelector('[data-build-meta-hint]');
+            if (metaHint) {
+                metaHint.innerHTML = registry && platforms
+                    ? '<span class="badge badge-ok">base OK</span>'
+                    : '<span class="badge badge-warn">base incomplète</span>';
+            }
+
+            const optionButton = row.querySelector('.build-db-option-btn');
+            if (optionButton) {
+                optionButton.dataset.registry = registry;
+                optionButton.dataset.platforms = platforms;
+                optionButton.dataset.mode = mode;
+            }
+
+            row.dataset.filter = `${name} ${registry.toLowerCase()} ${platforms.toLowerCase()} ${registry ? 'registre' : 'a completer'} dockerfile tar`;
+        }
+
+        async function saveBuildDbOptionModal(button) {
+            const overlay = $('buildDbOptionOverlay');
+            if (!overlay) return;
+            const name = cleanDockerName(overlay.dataset.name || '');
+            if (!name) return;
+
+            const registryInput = $('buildDbOptionRegistry');
+            const platformSelect = $('buildDbOptionPlatform');
+            const modeSelect = $('buildDbOptionMode');
+            const status = $('buildDbOptionStatus');
+            const rowData = {
+                name,
+                registry: String(registryInput?.value || registryInput?.placeholder || '').trim(),
+                platforms: buildDbOptionPlatformValue(platformSelect?.value || 'linux/amd64'),
+                mode: buildDbOptionModeValue(modeSelect?.value || '0')
+            };
+
+            if (status) {
+                status.textContent = 'Enregistrement…';
+                status.classList.remove('is-error', 'is-ok');
+            }
+
+            try {
+                const payload = await postDbRows([rowData], button);
+                applyBuildDbOptionToRow(rowData);
+                refreshStatusesAfterDatabaseRows([rowData], 180);
+                if (status) {
+                    status.textContent = payload.message || 'Options enregistrées.';
+                    status.classList.add('is-ok');
+                }
+                window.setTimeout(() => closeBuildDbOptionModal(), 450);
+            } catch (error) {
+                if (status) {
+                    status.textContent = error.message || 'Erreur pendant l’enregistrement.';
+                    status.classList.add('is-error');
+                }
+            }
+        }
+
+        function filterDbRows() {
+            const query = String($('dbSearch')?.value || '').toLowerCase().trim();
+            document.querySelectorAll('#dbTable tbody tr').forEach(row => {
+                const haystack = row.dataset.dbFilter || row.textContent.toLowerCase();
+                row.style.display = (!query || haystack.includes(query)) ? '' : 'none';
+            });
+            bindKeyboardRows();
+            ensureKeyboardSelection($('dbTable'));
+        }
+
+        function setupDbScroll() {
+            const top = $('dbScrollTop');
+            const inner = $('dbScrollTopInner');
+            const wrap = $('dbTableWrap');
+            const table = $('dbTable');
+            if (!top || !inner || !wrap || !table) return;
+            inner.style.width = table.scrollWidth + 'px';
+            let syncing = false;
+            top.onscroll = () => { if (syncing) return; syncing = true; wrap.scrollLeft = top.scrollLeft; syncing = false; };
+            wrap.onscroll = () => { if (syncing) return; syncing = true; top.scrollLeft = wrap.scrollLeft; syncing = false; };
+        }
+
+        // --- NAVIGATION CLAVIER TABLEAUX ---
+        const keyboardNav = { tableId: '', rowKey: '', actionIndex: 0 };
+
+        function isTypingTarget(el) {
+            if (!el) return false;
+            const tag = String(el.tagName || '').toLowerCase();
+            return ['input', 'textarea', 'select'].includes(tag) || el.isContentEditable;
+        }
+
+        function isAnyBuildModalOpen() {
+            return Array.from(document.querySelectorAll('.modal-overlay, .build-db-option-overlay, .client-import-top-overlay, .build-delete-overlay, .tar-delete-overlay')).some(modal => {
+                const style = window.getComputedStyle(modal);
+                return style.display !== 'none' && style.visibility !== 'hidden';
+            });
+        }
+
+        function activeTabPanel() {
+            return document.querySelector('.tab-panel.active');
+        }
+
+        function visibleTableRows(table) {
+            if (!table) return [];
+            return Array.from(table.querySelectorAll('tbody tr')).filter(row => {
+                const style = window.getComputedStyle(row);
+                if (style.display === 'none' || style.visibility === 'hidden') return false;
+                if (row.offsetParent === null) return false;
+                if (row.querySelector('.empty-state')) return false;
+                return row.querySelectorAll('td').length > 0;
+            });
+        }
+
+        function activeKeyboardTable() {
+            const panel = activeTabPanel();
+            if (!panel) return null;
+            const tables = Array.from(panel.querySelectorAll('table.build-table'));
+            return tables.find(table => visibleTableRows(table).length > 0) || null;
+        }
+
+        function keyboardRowKey(row) {
+            if (!row) return '';
+            const dbName = row.querySelector('input[name="db_name"]');
+            if (dbName && dbName.value) return 'db:' + dbName.value;
+            const main = row.querySelector('.name-main');
+            if (main && main.textContent.trim()) return 'name:' + main.textContent.trim();
+            return row.dataset.filter || row.dataset.dbFilter || String(row.rowIndex || 0);
+        }
+
+        function rowActionButtons(row) {
+            if (!row) return [];
+            return Array.from(row.querySelectorAll('.actions-cell button, .db-actions-cell button')).filter(button => {
+                const style = window.getComputedStyle(button);
+                return style.display !== 'none' && style.visibility !== 'hidden' && !button.disabled;
+            });
+        }
+
+        function clearKeyboardPaint() {
+            document.querySelectorAll('.keyboard-selected-row').forEach(row => row.classList.remove('keyboard-selected-row'));
+            document.querySelectorAll('.keyboard-action-focus').forEach(button => button.classList.remove('keyboard-action-focus'));
+        }
+
+        function paintKeyboardRow(row, actionIndex = keyboardNav.actionIndex, focusButton = false, scrollRow = false) {
+            if (!row) return;
+            clearKeyboardPaint();
+            row.classList.add('keyboard-selected-row');
+            const table = row.closest('table');
+            keyboardNav.tableId = table ? table.id : '';
+            keyboardNav.rowKey = keyboardRowKey(row);
+
+            const buttons = rowActionButtons(row);
+            if (buttons.length) {
+                keyboardNav.actionIndex = Math.max(0, Math.min(actionIndex, buttons.length - 1));
+                const activeButton = buttons[keyboardNav.actionIndex];
+                activeButton.classList.add('keyboard-action-focus');
+                if (focusButton && typeof activeButton.focus === 'function') {
+                    activeButton.focus({preventScroll: true});
+                }
+            } else {
+                keyboardNav.actionIndex = 0;
+            }
+
+            // Important : ne pas scroller automatiquement quand la page s'ouvre
+            // ou quand on change d'onglet. Sinon l'onglet Build remonte/descend
+            // tout seul et le menu du haut disparaît de l'écran.
+            // On scroll uniquement pendant une vraie navigation clavier.
+            if (scrollRow) {
+                row.scrollIntoView({block: 'nearest', inline: 'nearest'});
+            }
+        }
+
+        function ensureKeyboardSelection(table = activeKeyboardTable()) {
+            if (!table) {
+                clearKeyboardPaint();
+                return null;
+            }
+            const rows = visibleTableRows(table);
+            if (!rows.length) {
+                clearKeyboardPaint();
+                return null;
+            }
+            let row = null;
+            if (keyboardNav.tableId === table.id && keyboardNav.rowKey) {
+                row = rows.find(item => keyboardRowKey(item) === keyboardNav.rowKey) || null;
+            }
+            if (!row) row = rows[0];
+            paintKeyboardRow(row, keyboardNav.actionIndex, false);
+            return row;
+        }
+
+        function moveKeyboardRow(delta) {
+            const table = activeKeyboardTable();
+            const rows = visibleTableRows(table);
+            if (!rows.length) return;
+            const current = ensureKeyboardSelection(table);
+            const currentIndex = Math.max(0, rows.indexOf(current));
+            const nextIndex = Math.max(0, Math.min(rows.length - 1, currentIndex + delta));
+            paintKeyboardRow(rows[nextIndex], 0, true, true);
+        }
+
+        function moveKeyboardAction(delta) {
+            const row = ensureKeyboardSelection();
+            const buttons = rowActionButtons(row);
+            if (!buttons.length) return;
+            const nextIndex = Math.max(0, Math.min(buttons.length - 1, keyboardNav.actionIndex + delta));
+            paintKeyboardRow(row, nextIndex, true, true);
+        }
+
+        function jumpKeyboardRow(position) {
+            const table = activeKeyboardTable();
+            const rows = visibleTableRows(table);
+            if (!rows.length) return;
+            const index = position === 'end' ? rows.length - 1 : 0;
+            paintKeyboardRow(rows[index], 0, true, true);
+        }
+
+        function activateKeyboardAction() {
+            const row = ensureKeyboardSelection();
+            if (!row) return;
+            const buttons = rowActionButtons(row);
+            if (buttons.length) {
+                buttons[Math.max(0, Math.min(keyboardNav.actionIndex, buttons.length - 1))].click();
+            }
+        }
+
+        function bindKeyboardRows() {
+            document.querySelectorAll('table.build-table tbody tr').forEach(row => {
+                if (row.dataset.keyboardBound === '1') return;
+                row.dataset.keyboardBound = '1';
+                row.addEventListener('click', event => {
+                    if (isTypingTarget(event.target)) return;
+                    const buttons = rowActionButtons(row);
+                    const clickedButtonIndex = buttons.indexOf(event.target.closest('button'));
+                    paintKeyboardRow(row, clickedButtonIndex >= 0 ? clickedButtonIndex : keyboardNav.actionIndex, false);
+                });
+            });
+        }
+
+        document.addEventListener('keydown', event => {
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '].includes(event.key)) return;
+            if (isAnyBuildModalOpen()) return;
+            if (isTypingTarget(event.target)) return;
+            if (!activeKeyboardTable()) return;
+
+            event.preventDefault();
+            if (event.key === 'ArrowUp') moveKeyboardRow(-1);
+            else if (event.key === 'ArrowDown') moveKeyboardRow(1);
+            else if (event.key === 'ArrowLeft') moveKeyboardAction(-1);
+            else if (event.key === 'ArrowRight') moveKeyboardAction(1);
+            else if (event.key === 'Home') jumpKeyboardRow('home');
+            else if (event.key === 'End') jumpKeyboardRow('end');
+            else if (event.key === 'Enter' || event.key === ' ') activateKeyboardAction();
+        });
+
+
+        window.addEventListener('load', () => {
+            const wanted = new URLSearchParams(window.location.search).get('tab');
+            if (wanted && $('tab-' + wanted)) switchTab(wanted);
+            setupDbScroll();
+            bindKeyboardRows();
+            ensureKeyboardSelection();
+        });
+        window.addEventListener('resize', setupDbScroll);
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.tab-btn[data-tab-target]').forEach(btn => {
+                btn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    switchTab(btn.dataset.tabTarget || 'build');
+                });
+            });
+            const buildModeSelect = $('buildMode');
+            if (buildModeSelect) {
+                buildModeSelect.addEventListener('change', () => {
+                    statusButtons('build').forEach(button => {
+                        const cached = statusCache.build.get(statusName(button));
+                        if (cached) applyStatusPayload(button, cached);
+                    });
+                });
+            }
+            ['registryHostInput', 'registryPortInput'].forEach(id => {
+                const input = $(id);
+                if (input) input.addEventListener('input', refreshBuildOptionsPreview);
+            });
+            refreshBuildOptionsPreview();
+            resumeBackgroundJob();
+            maybeAutoInitializeBuildCache();
+            if (pageHasStatusButtons('build')) {
+                window.setTimeout(() => startStatusScan('build'), 300);
+            }
+            if (pageHasStatusButtons('registry')) {
+                window.setTimeout(() => startStatusScan('registry'), 650);
+            }
+            if (isBuildMainPage()) {
+                window.setTimeout(() => startMainRegistryStatusScan(true), 750);
+            }
+            if (document.querySelector('[data-active-build-section="system"]')) {
+                window.setTimeout(() => refreshRegistryServiceStatus(), 800);
+            }
+            bindKeyboardRows();
+            ensureKeyboardSelection();        });
+    </script>
+  </div>
+</main>

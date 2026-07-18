@@ -1,0 +1,1413 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<div class="pers-page">
+
+    {% include "partials/system_personnalisation_subnav.html" %}
+
+    {% if pers_subtab == 'menu' %}
+                <div class="pers-menu-page pers-menu-folder-page">
+                    <div class="pers-menu-top-grid">
+                        <div class="card pers-menu-card pers-menu-identity-card">
+                            <div class="card-body pers-menu-card-body">
+                                <div class="pers-menu-section-title">Identité</div>
+                                <div class="pers-menu-identity-grid">
+                                    <label class="field-box pers-menu-field">
+                                        <div class="field-label">Onglet</div>
+                                        <div class="field-row pers-menu-field-row">
+                                            <input class="input" id="cfg_titre_tab" value="{{ config.titre_tab }}">
+                                            <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-icon yoleo-btn-small" title="Sauvegarder" aria-label="Sauvegarder le titre de l’onglet" onclick="saveConfig('titre_tab','cfg_titre_tab')">💾</button>
+                                        </div>
+                                    </label>
+                                    <label class="field-box pers-menu-field">
+                                        <div class="field-label">Titre sidebar</div>
+                                        <div class="field-row pers-menu-field-row">
+                                            <input class="input" id="cfg_titre_logo" value="{{ config.titre_logo }}">
+                                            <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-icon yoleo-btn-small" title="Sauvegarder" aria-label="Sauvegarder le titre de la sidebar" onclick="saveConfig('titre_logo','cfg_titre_logo')">💾</button>
+                                        </div>
+                                    </label>
+                                    <label class="field-box pers-menu-field">
+                                        <div class="field-label">Logo / favoris</div>
+                                        <div class="field-row pers-menu-field-row">
+                                            <input class="input" id="cfg_nav_icons" value="{{ config.nav_icons }}">
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" aria-label="Choisir une icône" onclick="openStaticBrowser('cfg_nav_icons')">📂</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-icon yoleo-btn-small" title="Sauvegarder" aria-label="Sauvegarder l’icône" onclick="saveConfig('nav_icons','cfg_nav_icons')">💾</button>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div id="configStatus" class="status-line"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card pers-menu-card pers-menu-list-card">
+                        <div class="card-body pers-menu-card-body">
+                            <div class="pers-menu-list-titlebar">
+                                <div>
+                                    <div class="pers-menu-section-title">Menu personnalisé</div>
+                                </div>
+                                <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="openMenuEntryModal('', '', 'Catégorie')">➕ Groupe</button>
+                            </div>
+
+                            <div class="pers-menu-folder-list">
+                                {% for item in menu_items %}
+                                <section class="pers-menu-folder" data-menu-folder="{{ item.safe_id }}">
+                                    <button type="button" class="pers-menu-folder-head" onclick="toggleMenuFolder('{{ item.safe_id }}')">
+                                        <span class="pers-menu-folder-icon">{% if item.icon and (item.icon.startswith('/static') or item.icon.startswith('static/')) %}<img src="{{ item.icon if item.icon.startswith('/') else '/' ~ item.icon }}" alt="">{% else %}{{ item.icon or '📁' }}{% endif %}</span>
+                                        <span class="pers-menu-folder-name">{{ item.label }}</span>
+                                        <span class="pers-menu-folder-count">{{ item.children|length }} entrée{{ 's' if item.children|length > 1 else '' }}</span>
+                                        <span class="pers-menu-folder-actions" onclick="event.stopPropagation()">
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Monter le groupe" onclick="moveMenuItem('', '{{ item.id }}', -1, '{{ item.safe_id }}')">▲</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Descendre le groupe" onclick="moveMenuItem('', '{{ item.id }}', 1, '{{ item.safe_id }}')">▼</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-icon yoleo-btn-small" title="Ajouter dans {{ item.label|e }}" onclick="openMenuEntryModal('{{ item.id }}', '', 'Sous-menu')">➕</button>
+                                        </span>
+                                    </button>
+
+                                    <div class="pers-menu-folder-edit" id="folder_edit_{{ item.safe_id }}">
+                                        <div class="pers-menu-folder-edit-grid">
+                                            <label>
+                                                <div class="menu-field-label">Titre du groupe</div>
+                                                <input class="input" id="m_{{ item.safe_id }}_label" value="{{ item.label }}">
+                                            </label>
+                                            <label>
+                                                <div class="menu-field-label">Lien direct</div>
+                                                <input class="input" id="m_{{ item.safe_id }}_url" value="{{ item.url }}">
+                                            </label>
+                                            <label>
+                                                <div class="menu-field-label">Icône</div>
+                                                <div class="menu-icon-row">
+                                                    <span class="menu-icon-preview-box" id="m_{{ item.safe_id }}_preview">{% if item.icon and (item.icon.startswith('/static') or item.icon.startswith('static/')) %}<img src="{{ item.icon if item.icon.startswith('/') else '/' ~ item.icon }}" alt="">{% else %}{{ item.icon or '📁' }}{% endif %}</span>
+                                                    <input class="input" id="m_{{ item.safe_id }}_icon" value="{{ item.icon }}" oninput="refreshIconPreview('m_{{ item.safe_id }}_icon','m_{{ item.safe_id }}_preview')">
+                                                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" aria-label="Choisir l’icône" onclick="openStaticBrowser('m_{{ item.safe_id }}_icon')">📂</button>
+                                                </div>
+                                            </label>
+                                            <div class="pers-menu-folder-edit-actions">
+                                                <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-small" onclick="saveMenuItem('', '{{ item.id }}', '{{ item.safe_id }}')">💾 Sauvegarder</button>
+                                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Monter le groupe" onclick="moveMenuItem('', '{{ item.id }}', -1, '{{ item.safe_id }}')">▲</button>
+                                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Descendre le groupe" onclick="moveMenuItem('', '{{ item.id }}', 1, '{{ item.safe_id }}')">▼</button>
+                                                <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-small" onclick="deleteMenuItem('', '{{ item.id }}', '{{ item.label|e }}')">🗑️ Supprimer</button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="pers-menu-folder-children">
+                                        {% for child in item.children %}
+                                        <article class="pers-menu-entry-row" data-menu-entry="{{ child.safe_id }}">
+                                            <span class="pers-menu-entry-icon" id="m_{{ child.safe_id }}_preview">{% if child.icon and (child.icon.startswith('/static') or child.icon.startswith('static/')) %}<img src="{{ child.icon if child.icon.startswith('/') else '/' ~ child.icon }}" alt="">{% else %}{{ child.icon or '↳' }}{% endif %}</span>
+                                            <input class="input" id="m_{{ child.safe_id }}_label" value="{{ child.label }}" title="Nom">
+                                            <input class="input" id="m_{{ child.safe_id }}_url" value="{{ child.url }}" title="URL">
+                                            <div class="menu-icon-row pers-menu-entry-icon-field">
+                                                <input class="input" id="m_{{ child.safe_id }}_icon" value="{{ child.icon }}" title="Icône" oninput="refreshIconPreview('m_{{ child.safe_id }}_icon','m_{{ child.safe_id }}_preview')">
+                                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" onclick="openStaticBrowser('m_{{ child.safe_id }}_icon')">📂</button>
+                                            </div>
+                                            <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-icon yoleo-btn-small" title="Sauvegarder" onclick="saveMenuItem('{{ item.id }}', '{{ child.id }}', '{{ child.safe_id }}')">💾</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Monter" onclick="moveMenuItem('{{ item.id }}', '{{ child.id }}', -1, '{{ child.safe_id }}')">▲</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Descendre" onclick="moveMenuItem('{{ item.id }}', '{{ child.id }}', 1, '{{ child.safe_id }}')">▼</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-icon yoleo-btn-small" title="Supprimer" onclick="deleteMenuItem('{{ item.id }}', '{{ child.id }}', '{{ child.label|e }}')">🗑️</button>
+                                        </article>
+                                        {% else %}
+                                        <div class="menu-child-empty">Aucune entrée dans ce groupe.</div>
+                                        {% endfor %}
+                                    </div>
+                                </section>
+                                {% else %}
+                                <div class="menu-empty">Aucune entrée de menu.</div>
+                                {% endfor %}
+                            </div>
+                            <div id="menuStatus" class="status-line"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="menuEntryModal" class="modal-overlay pers-menu-entry-modal">
+                    <div class="modal-box pers-menu-entry-modal-box">
+                        <h2 class="modal-title" id="menuEntryModalTitle">Ajouter une entrée</h2>
+                        <input type="hidden" id="modal_menu_parent_id">
+                        <input type="hidden" id="modal_menu_item_id">
+                        <div class="pers-menu-modal-grid">
+                            <label>
+                                <div class="field-label">Nom</div>
+                                <input class="input" id="modal_menu_label" placeholder="Nom affiché">
+                            </label>
+                            <label>
+                                <div class="field-label">URL</div>
+                                <input class="input" id="modal_menu_url" placeholder="/system/info">
+                            </label>
+                            <label>
+                                <div class="field-label">Icône</div>
+                                <div class="menu-icon-row">
+                                    <span class="menu-icon-preview-box" id="modal_menu_icon_preview">🌐</span>
+                                    <input class="input" id="modal_menu_icon" placeholder="🌐 ou /static/logo.png" oninput="refreshIconPreview('modal_menu_icon','modal_menu_icon_preview')">
+                                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" onclick="openStaticBrowser('modal_menu_icon')">📂</button>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeModal('menuEntryModal')">Annuler</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-green" onclick="submitMenuEntryModal()">➕ Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+    {% elif pers_subtab == 'home' %}
+
+                {% set ssh_gpu_ready = home_ssh_config.get('SSH_GPU_HOST','') and home_ssh_config.get('SSH_GPU_PORT','') and home_ssh_config.get('SSH_GPU_USER','') and home_ssh_config.get('SSH_GPU_KEY_PATH','') %}
+                {% macro home_toggle(key, label, desc='', emoji='🔘') -%}
+                <label class="home-toggle{% if key == 'SHOW_NVIDIA_SSH' %} home-toggle-ssh-gpu{% endif %}">
+                    <span class="home-toggle-icon">{{ emoji }}</span>
+                    <input type="checkbox" class="home-check" name="{{ key }}" {% if home_config.get(key|lower, '1')|int and not (key == 'SHOW_NVIDIA_SSH' and not ssh_gpu_ready) %}checked{% endif %}{% if key == 'SHOW_NVIDIA_SSH' %} data-ssh-gpu-toggle="1" aria-describedby="sshDisabledNote" {% if not ssh_gpu_ready %}disabled{% endif %} onchange="handleNvidiaSshToggleChange(this)"{% else %} onchange="toggleNvidiaSshSettings(); autoSaveHomeConfig()"{% endif %}>
+                    <span>
+                        <span class="home-toggle-title">{{ label }}</span>
+                        {% if desc %}<span class="home-toggle-desc">{{ desc }}</span>{% endif %}
+                    </span>
+                </label>
+                {%- endmacro %}
+
+                <div id="homeTopStatus" class="status-line pers-home-top-status" hidden></div>
+
+                <div class="card pers-home-editor-card">
+                    <div class="card-body">
+                        <div class="home-config-groups">
+
+                            <section id="identityCard" class="home-config-group pers-home-identity-card" tabindex="0" aria-label="Identité de l’interface">
+                                <div class="home-group-head pers-home-identity-head">
+                                    <span class="home-group-icon">🏷️</span>
+                                    <div class="home-group-title"><h3>Identité <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small pers-identity-edit-btn" title="Modifier" aria-label="Modifier l’identité" onclick="beginIdentityEdit()">✏️</button></h3><p>Nom affiché dans l’onglet, la sidebar et logo de l’interface.</p></div>
+                                </div>
+
+                                <div id="identityView" class="pers-identity-view">
+                                    <div class="pers-identity-logo" id="identityLogoView">
+                                        {% if config.nav_icons and (config.nav_icons.startswith('/static') or config.nav_icons.startswith('static/')) %}
+                                        <img src="{{ config.nav_icons if config.nav_icons.startswith('/') else '/' ~ config.nav_icons }}" alt="Logo">
+                                        {% else %}
+                                        <span>{{ config.nav_icons or '🏷️' }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="pers-identity-values">
+                                        <div class="pers-identity-value pers-inline-edit-box">
+                                            <span class="pers-identity-label">Nom du NAS</span>
+                                            <strong id="identitySidebarView">{{ config.titre_logo }}</strong>
+                                            <input class="input pers-autosize-input pers-inline-edit-input" id="cfg_titre_logo" value="{{ config.titre_logo }}" data-original="{{ config.titre_logo }}" autocomplete="off">
+                                        </div>
+                                        <div class="pers-identity-value pers-inline-edit-box">
+                                            <span class="pers-identity-label">Nom de la machine / Hostname</span>
+                                            <strong id="identityHostnameView">{{ config.hostname }}</strong>
+                                            <input class="input pers-autosize-input pers-inline-edit-input" id="cfg_hostname" value="{{ config.hostname }}" data-original="{{ config.hostname }}" autocomplete="off" autocapitalize="none" spellcheck="false" pattern="[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?" title="1 à 63 caractères minuscules, chiffres ou tirets">
+                                        </div>
+                                        <div class="pers-identity-value pers-inline-edit-box">
+                                            <span class="pers-identity-label">Titre navigateur</span>
+                                            <strong id="identityTabView">{{ config.titre_tab }}</strong>
+                                            <input class="input pers-autosize-input pers-inline-edit-input" id="cfg_titre_tab" value="{{ config.titre_tab }}" data-original="{{ config.titre_tab }}" autocomplete="off">
+                                        </div>
+                                        <div class="pers-identity-value pers-identity-logo-text pers-inline-edit-box">
+                                            <span class="pers-identity-label">Logo / favoris</span>
+                                            <strong id="identityLogoTextView">{{ config.nav_icons }}</strong>
+                                            <div class="pers-inline-icon-edit">
+                                                <span class="menu-icon-preview-box pers-identity-mini-preview" id="cfg_nav_icons_preview">
+                                                    {% if config.nav_icons and (config.nav_icons.startswith('/static') or config.nav_icons.startswith('static/')) %}
+                                                    <img src="{{ config.nav_icons if config.nav_icons.startswith('/') else '/' ~ config.nav_icons }}" alt="Logo">
+                                                    {% else %}
+                                                    {{ config.nav_icons or '🏷️' }}
+                                                    {% endif %}
+                                                </span>
+                                                <input class="input pers-autosize-input pers-inline-edit-input" id="cfg_nav_icons" value="{{ config.nav_icons }}" data-original="{{ config.nav_icons }}" autocomplete="off" oninput="refreshIconPreview('cfg_nav_icons','cfg_nav_icons_preview'); autosizeOneInput(this)">
+                                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" aria-label="Choisir une image" onclick="openStaticBrowser('cfg_nav_icons')">📂</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="home-config-group pers-home-gpu-card">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">🎮</span>
+                                    <div class="home-group-title"><h3>Carte graphique</h3><p>NVIDIA locale et Intel iGPU.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_NVIDIA_LOCAL', 'NVIDIA GPU local', 'Carte NVIDIA présente sur l’hôte Flask.', '🟢') }}
+                                    {{ home_toggle('SHOW_INTEL_GPU', 'Intel GPU', 'Jauge Intel iGPU locale.', '🔵') }}
+                                </div>
+                            </section>
+
+                            <section class="home-config-group pers-home-system-card">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">⚙️</span>
+                                    <div class="home-group-title"><h3>Système</h3><p>Identité du NAS, heure, uptime et services.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_TIME', 'Heure', 'Horloge et date dans le panneau principal.', '🕒') }}
+                                    {{ home_toggle('SHOW_HOST', 'Hôte', 'Hostname, système et démarrage.', '🏠') }}
+                                    {{ home_toggle('SHOW_UPTIME', 'Uptime', 'Durée de fonctionnement et kernel.', '⏱️') }}
+                                    {{ home_toggle('SHOW_SERVICES', 'Services', 'Résumé des services systemd.', '🧰') }}
+                                </div>
+                            </section>
+
+                            <section class="home-config-group pers-home-docker-card">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">🐳</span>
+                                    <div class="home-group-title"><h3>Docker / VM</h3><p>Compteurs des conteneurs et des machines virtuelles.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_DOCKER_TOTAL', 'Docker', 'Tuile avec total, en exécution et arrêtés.', '🐳') }}
+                                    {{ home_toggle('SHOW_DOCKER_RUNNING', 'VM', 'Tuile avec total VM, en exécution et arrêtées.', '🖥️') }}
+                                    {{ home_toggle('SHOW_BUILD', 'Build', 'Resume du cache Build, des TAR et du registre.', 'Build') }}
+                                </div>
+                            </section>
+
+                            <section class="home-config-group pers-home-resources-card">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">📊</span>
+                                    <div class="home-group-title"><h3>Ressources</h3><p>CPU, RAM, stockage et réseau.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_CPU', 'Processeur', 'Jauge CPU et load average.', '🧠') }}
+                                    {{ home_toggle('SHOW_RAM', 'Mémoire RAM', 'Jauge RAM et total utilisé.', '📊') }}
+                                    {{ home_toggle('SHOW_STORAGE', 'Stockage', 'Tuile stockage rapide.', '💾') }}
+                                    {{ home_toggle('SHOW_DISK_MOUNTS', 'Vérifier montages disque', 'Affiche le contrôle des points de montage configurés dans disk_top.conf.', '💿') }}
+                                    {{ home_toggle('SHOW_FANS', 'Ventilateurs', 'Panneau RPM des ventilateurs détectés par Linux via hwmon.', '🌀') }}
+                                    {{ home_toggle('SHOW_NETWORK', 'Réseau local', 'IP, passerelle, débit et IP publique.', '🌐') }}
+                                    {{ home_toggle('SHOW_LOCAL_RESOLUTION', 'Résolution locale', 'Bloc réseau/résolution locale, façon OMV.', '🧭') }}
+                                </div>
+                            </section>
+
+                            <section id="sshSettingsCard" class="home-config-group pers-home-ssh-group pers-home-ssh-card" tabindex="0" aria-label="Réglages GPU SSH">
+                                <div class="home-group-head pers-home-ssh-head">
+                                    <span class="home-group-icon">🖥️</span>
+                                    <div class="home-group-title">
+                                        <h3>GPU SSH <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small pers-ssh-edit-btn" title="Modifier" aria-label="Modifier les réglages GPU SSH" onclick="beginSshEdit()">✏️</button></h3>
+                                        <p>Carte NVIDIA d’une machine distante ou d’une VM.</p>
+                                    </div>
+                                </div>
+
+                                <div class="pers-home-ssh-toggle-row">
+                                    {{ home_toggle('SHOW_NVIDIA_SSH', 'GPU SSH', 'Disponible après renseignement complet des réglages SSH.', '🖥️') }}
+                                </div>
+
+                                <div id="sshDisabledNote" class="pers-home-ssh-note" hidden>Renseigne d’abord Machine, Port, Utilisateur et Clé SSH, puis active GPU SSH.</div>
+
+                                <div id="sshView" class="pers-ssh-view">
+                                    <div class="pers-ssh-value pers-inline-edit-box">
+                                        <span>Machine</span>
+                                        <strong id="sshHostView">{{ home_ssh_config.get('SSH_GPU_HOST','') or 'Non définie' }}</strong>
+                                        <input id="sshGpuHost" class="input pers-autosize-input pers-inline-edit-input" data-home-ssh="SSH_GPU_HOST" value="{{ home_ssh_config.get('SSH_GPU_HOST','') }}" placeholder="192.168.1.4" autocomplete="off">
+                                    </div>
+                                    <div class="pers-ssh-value pers-inline-edit-box">
+                                        <span>Port</span>
+                                        <strong id="sshPortView">{{ home_ssh_config.get('SSH_GPU_PORT','22') or '22' }}</strong>
+                                        <input id="sshGpuPort" class="input pers-autosize-input pers-inline-edit-input" data-home-ssh="SSH_GPU_PORT" value="{{ home_ssh_config.get('SSH_GPU_PORT','22') or '22' }}" placeholder="22" autocomplete="off">
+                                    </div>
+                                    <div class="pers-ssh-value pers-inline-edit-box">
+                                        <span>Utilisateur</span>
+                                        <strong id="sshUserView">{{ home_ssh_config.get('SSH_GPU_USER','') or 'Non défini' }}</strong>
+                                        <input id="sshGpuUser" class="input pers-autosize-input pers-inline-edit-input" data-home-ssh="SSH_GPU_USER" value="{{ home_ssh_config.get('SSH_GPU_USER','') }}" placeholder="yoan" autocomplete="off">
+                                    </div>
+                                    <div class="pers-ssh-value pers-ssh-key-value pers-inline-edit-box">
+                                        <span>Clé SSH</span>
+                                        <strong id="sshKeyView">{{ home_ssh_config.get('SSH_GPU_KEY_PATH','') or 'Non définie' }}</strong>
+                                        <div class="pers-inline-key-edit">
+                                            <input id="sshGpuKeyPath" class="input pers-autosize-input pers-inline-edit-input" data-home-ssh="SSH_GPU_KEY_PATH" value="{{ home_ssh_config.get('SSH_GPU_KEY_PATH','') }}" placeholder="/home/key/yoan" autocomplete="off">
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" aria-label="Choisir la clé SSH" onclick="openKeyBrowser('sshGpuKeyPath')">📁</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <input type="hidden" data-home-ssh="REMOTE_NVIDIA_SMI" value="{{ home_ssh_config.get('REMOTE_NVIDIA_SMI','/usr/bin/nvidia-smi') or '/usr/bin/nvidia-smi' }}">
+                                <input type="hidden" data-home-ssh="SSH_GPU_CONNECT_TIMEOUT" value="{{ home_ssh_config.get('SSH_GPU_CONNECT_TIMEOUT','5') or '5' }}">
+                                <input type="hidden" data-home-ssh="SSH_GPU_COMMAND_TIMEOUT" value="{{ home_ssh_config.get('SSH_GPU_COMMAND_TIMEOUT','8') or '8' }}">
+                                <input type="hidden" data-home-ssh="SSH_GPU_CACHE_SECONDS" value="{{ home_ssh_config.get('SSH_GPU_CACHE_SECONDS','2') or '2' }}">
+                            </section>
+                        </div>
+
+                        <section class="home-config-group pers-home-order-section">
+                            <div class="home-group-head">
+                                <span class="home-group-icon">↕️</span>
+                                <div class="home-group-title"><h3>Ordre des étiquettes</h3></div>
+                            </div>
+                            <input type="hidden" id="indexTopOrderInput" name="INDEX_TOP_ORDER" value="{{ index_top_items|map(attribute='key')|join(',') }}">
+                            <div class="pers-home-order-list" id="indexTopOrderTable" role="list">
+                                {% for item in index_top_items %}
+                                <article class="pers-home-order-item" data-index-top-key="{{ item.key }}" role="listitem" draggable="true">
+                                    <span class="pers-home-order-rank">{{ loop.index }}</span>
+                                    <span class="pers-home-order-text">
+                                        <strong>{{ item.label }}</strong>
+                                        <code>{{ item.key }}</code>
+                                    </span>
+                                    <span class="pers-home-order-actions">
+                                        <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Monter" aria-label="Monter" data-order-move="-1" onclick="moveIndexTopRow(this, -1)">&uarr;</button>
+                                        <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Descendre" aria-label="Descendre" data-order-move="1" onclick="moveIndexTopRow(this, 1)">&darr;</button>
+                                    </span>
+                                </article>
+                                {% endfor %}
+                            </div>
+                        </section>
+
+                        <div id="homeConfigStatus" class="status-line" hidden></div>
+                    </div>
+                </div>
+
+
+    {% elif pers_subtab == 'disk' %}
+
+                <div class="card disk-top-card">
+                    <div class="card-body">
+                        <div class="disk-top-head">
+                            <div>
+                                <h2 class="disk-top-title">💿 Montages affichés sur l’accueil</h2>
+                                <p class="disk-top-subtitle">Coche les chemins à vérifier. Yoleo contrôle seulement que chaque chemin est un vrai point de montage : cette page ne monte rien et ne modifie pas fstab.</p>
+                            </div>
+                            <div class="disk-top-conf">Conf : <code>{{ disk_top_config.path }}</code></div>
+                        </div>
+
+                        <form method="post" action="/system/personnalisation/disque">
+                            <div class="yoleo-table-wrap disk-top-table-wrap">
+                                <table class="yoleo-table disk-top-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Afficher</th>
+                                            <th>Point de montage</th>
+                                            <th>État réel</th>
+                                            <th>Source</th>
+                                            <th>FS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in disk_top_candidates.rows %}
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" name="mount_path" value="{{ row.path }}" {% if row.selected %}checked{% endif %}>
+                                            </td>
+                                            <td><code>{{ row.path }}</code></td>
+                                            <td>
+                                                <span class="disk-top-badge disk-top-badge-{{ row.status }}">{{ row.status_label }}</span>
+                                            </td>
+                                            <td>{{ row.source }}</td>
+                                            <td>{{ row.fstype }}</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="5" class="muted">Aucun montage détecté. Ajoute un chemin manuel ci-dessous.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="disk-top-custom-row">
+                                <label class="field-box">
+                                    <div class="field-label">Ajouter un chemin manuel</div>
+                                    <input class="input" name="custom_mount" placeholder="/mnt/cache">
+                                </label>
+                                <button type="submit" class="yoleo-btn yoleo-btn-green">💾 Enregistrer</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+
+    {% elif pers_subtab == 'info' %}
+
+                <div class="card pers-info-card pers-info-details-card">
+                    <div class="card-body pers-info-body pers-info-details-body">
+                        <div class="pers-info-header">
+                            <div class="pers-info-icon">ℹ️</div>
+                            <div>
+                                <h2>Info</h2>
+                                <p>Notes déplacées depuis les pages Accueil, Menu et l’ancienne page SSH GPU.</p>
+                            </div>
+                        </div>
+                        <div class="pers-info-grid">
+                            <section class="pers-info-note-card">
+                                <h3>Menu démarré</h3>
+                                <p>Source : <code>../conf/menu/menu.conf</code> + dossiers de catégories.</p>
+                            </section>
+                            <section class="pers-info-note-card">
+                                <h3>GPU SSH</h3>
+                                <p><b>Usage</b> : lecture de <code>nvidia-smi</code> sur une machine distante ou une VM.</p>
+                                <p><b>Affichage</b> : le bloc n’apparaît sur l’accueil que si la carte <b>GPU SSH</b> est activée.</p>
+                                <p><b>Conf</b> : les valeurs sont sauvegardées dans <code>system.conf</code>.</p>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+    {% endif %}
+</div>
+
+
+
+<style>
+.pers-home-top-status {
+    display: none;
+    margin: 0 0 8px 0;
+    max-width: 760px;
+    min-height: 0;
+}
+.pers-home-top-status.is-visible {
+    display: block;
+}
+.pers-home-identity-card {
+    border-color: rgba(0, 210, 255, .26);
+    box-shadow: 0 0 0 1px rgba(0, 210, 255, .04) inset;
+}
+.pers-home-identity-head {
+    align-items: center;
+}
+.pers-identity-edit-btn,
+.pers-ssh-edit-btn {
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.pers-home-identity-head .home-group-title,
+.pers-home-ssh-head .home-group-title {
+    justify-self: start;
+}
+.pers-identity-view {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding-top: 4px;
+}
+.pers-identity-logo {
+    width: 74px;
+    height: 74px;
+    border-radius: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 210, 255, .10);
+    border: 1px solid rgba(0, 210, 255, .28);
+    box-shadow: 0 0 18px rgba(0, 210, 255, .06) inset;
+    font-size: 34px;
+    flex: 0 0 auto;
+}
+.pers-identity-logo img {
+    max-width: 58px;
+    max-height: 58px;
+    object-fit: contain;
+}
+.pers-identity-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: stretch;
+}
+.pers-identity-value {
+    min-width: 180px;
+    padding: 10px 12px;
+    border: 1px solid rgba(120, 170, 220, .18);
+    border-radius: 14px;
+    background: rgba(5, 12, 24, .34);
+}
+.pers-identity-label {
+    display: block;
+    color: #9dc6df;
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.pers-identity-value strong {
+    display: block;
+    color: #fff;
+    font-size: 14px;
+    line-height: 1.25;
+    word-break: break-word;
+}
+.pers-identity-logo-text strong {
+    color: #7de9ff;
+    font-size: 12px;
+}
+.pers-identity-edit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding-top: 8px;
+}
+.pers-identity-edit[hidden] {
+    display: none !important;
+}
+.pers-identity-edit-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(120, 170, 220, .20);
+    background: rgba(5, 12, 24, .38);
+}
+.pers-identity-edit-field > span:first-child {
+    color: #9dc6df;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.pers-identity-edit-field input {
+    min-width: 8ch;
+    max-width: min(58vw, 44ch);
+    width: auto;
+}
+.pers-identity-edit-logo-field input {
+    max-width: min(58vw, 52ch);
+}
+.pers-identity-mini-preview {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+}
+.pers-identity-mini-preview img {
+    max-width: 26px;
+    max-height: 26px;
+}
+
+.pers-home-ssh-card {
+    border-color: rgba(0, 210, 255, .22);
+    box-shadow: 0 0 0 1px rgba(0, 210, 255, .03) inset;
+}
+.pers-home-ssh-card .pers-home-ssh-toggle-row {
+    max-width: 360px;
+}
+.pers-ssh-view {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: stretch;
+}
+.pers-ssh-value {
+    min-width: 130px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(120, 170, 220, .18);
+    background: rgba(5, 12, 24, .34);
+}
+.pers-ssh-key-value {
+    min-width: min(100%, 280px);
+}
+.pers-ssh-value span {
+    display: block;
+    color: #9dc6df;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.pers-ssh-value strong {
+    display: block;
+    color: #fff;
+    font-size: 13px;
+    line-height: 1.25;
+    word-break: break-word;
+}
+.pers-ssh-key-value strong {
+    color: #7de9ff;
+    font-size: 12px;
+}
+.pers-ssh-edit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.pers-ssh-edit[hidden] {
+    display: none !important;
+}
+.pers-ssh-edit-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(120, 170, 220, .20);
+    background: rgba(5, 12, 24, .38);
+}
+.pers-ssh-edit-field > span:first-child {
+    color: #9dc6df;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.pers-ssh-edit-field input {
+    min-width: 6ch;
+    max-width: min(58vw, 48ch);
+    width: auto;
+}
+.pers-ssh-edit-key-field input {
+    max-width: min(62vw, 62ch);
+}
+@media (max-width: 760px) {
+    .pers-identity-view {
+        align-items: flex-start;
+    }
+    .pers-identity-values, .pers-identity-value, .pers-identity-edit-field {
+        width: 100%;
+    }
+    .pers-identity-edit-field input,
+    .pers-ssh-edit-field input {
+        max-width: 100%;
+    }
+    .pers-ssh-value, .pers-ssh-edit-field {
+        width: 100%;
+    }
+}
+/* Ajustements finaux : statuts sans trace + édition directement à la place des valeurs */
+.pers-home-top-status {
+    position: fixed;
+    top: 126px;
+    left: min(24vw, 360px);
+    z-index: 5000;
+    display: none !important;
+    margin: 0;
+    max-width: min(720px, calc(100vw - 48px));
+    min-height: 0;
+    pointer-events: none;
+}
+.pers-home-top-status.is-visible {
+    display: block !important;
+}
+.pers-inline-edit-input,
+.pers-inline-icon-edit,
+.pers-inline-key-edit {
+    display: none;
+}
+#identityCard.is-editing .pers-inline-edit-box > strong,
+#sshSettingsCard.is-editing .pers-inline-edit-box > strong {
+    display: none;
+}
+#identityCard.is-editing .pers-inline-edit-box > .pers-inline-edit-input,
+#sshSettingsCard.is-editing .pers-inline-edit-box > .pers-inline-edit-input {
+    display: inline-block;
+}
+#identityCard.is-editing .pers-inline-icon-edit,
+#sshSettingsCard.is-editing .pers-inline-key-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+}
+#identityCard.is-editing .pers-inline-icon-edit .pers-inline-edit-input,
+#sshSettingsCard.is-editing .pers-inline-key-edit .pers-inline-edit-input {
+    display: inline-block;
+}
+.pers-inline-edit-box .input {
+    min-width: 7ch;
+    max-width: min(58vw, 54ch);
+    width: auto;
+}
+.pers-identity-value, .pers-ssh-value {
+    transition: border-color .15s ease, background .15s ease;
+}
+#identityCard.is-editing .pers-identity-value,
+#sshSettingsCard.is-editing .pers-ssh-value {
+    border-color: rgba(0, 210, 255, .34);
+    background: rgba(0, 30, 48, .28);
+}
+@media (max-width: 900px) {
+    .pers-home-top-status {
+        left: 12px;
+        right: 12px;
+        max-width: none;
+        top: 112px;
+    }
+}
+
+</style>
+
+<div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+        <h2 class="modal-title" id="confirmTitle">Confirmation</h2>
+        <div id="confirmBody" class="pers-subtitle"></div>
+        <div class="modal-actions">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" id="confirmCancel">Annuler</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red" id="confirmOk">Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentBrowseTarget = '';
+let confirmResolver = null;
+
+const statusTimers = {};
+function setStatus(id, msg, ok=true) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!el.dataset.baseClass) el.dataset.baseClass = el.className || 'status-line';
+    if (statusTimers[id]) {
+        clearTimeout(statusTimers[id]);
+        delete statusTimers[id];
+    }
+    el.textContent = msg || '';
+    el.className = el.dataset.baseClass;
+    el.classList.remove('ok', 'bad', 'is-visible');
+    if (!msg) {
+        el.hidden = true;
+        return;
+    }
+    el.hidden = false;
+    el.classList.add(ok ? 'ok' : 'bad', 'is-visible');
+    if (ok) {
+        statusTimers[id] = setTimeout(() => {
+            el.textContent = '';
+            el.className = el.dataset.baseClass;
+            el.classList.remove('ok', 'bad', 'is-visible');
+            el.hidden = true;
+            delete statusTimers[id];
+        }, 1000);
+    }
+}
+function homeStatusId() {
+    return document.getElementById('homeTopStatus') ? 'homeTopStatus' : 'homeConfigStatus';
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+}
+
+function showConfirm(title, body, okLabel='Valider') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('confirmTitle').textContent = title || 'Confirmation';
+        document.getElementById('confirmBody').textContent = body || '';
+        document.getElementById('confirmOk').textContent = okLabel || 'Valider';
+        confirmResolver = resolve;
+        modal.style.display = 'flex';
+    });
+}
+
+function settleConfirm(value) {
+    closeModal('confirmModal');
+    if (confirmResolver) confirmResolver(value === true);
+    confirmResolver = null;
+}
+
+document.getElementById('confirmCancel')?.addEventListener('click', () => settleConfirm(false));
+document.getElementById('confirmOk')?.addEventListener('click', () => settleConfirm(true));
+
+function toggleMenuFolder(safeId) {
+    const box = document.getElementById('folder_edit_' + safeId);
+    if (!box) return;
+    box.classList.toggle('is-open');
+}
+
+function openMenuEntryModal(parentId='', itemId='', title='Entrée') {
+    document.getElementById('modal_menu_parent_id').value = parentId || '';
+    document.getElementById('modal_menu_item_id').value = itemId || '';
+    document.getElementById('modal_menu_label').value = '';
+    document.getElementById('modal_menu_url').value = parentId ? '' : '#';
+    document.getElementById('modal_menu_icon').value = parentId ? '↳' : '🌐';
+    refreshIconPreview('modal_menu_icon', 'modal_menu_icon_preview');
+    document.getElementById('menuEntryModalTitle').textContent = parentId ? 'Ajouter une entrée' : 'Ajouter un groupe';
+    const modal = document.getElementById('menuEntryModal');
+    if (modal) modal.style.display = 'flex';
+    setTimeout(() => document.getElementById('modal_menu_label')?.focus(), 50);
+}
+
+async function submitMenuEntryModal() {
+    const fd = new FormData();
+    fd.append('action', 'menu_upsert');
+    fd.append('parent_id', document.getElementById('modal_menu_parent_id')?.value || '');
+    fd.append('item_id', document.getElementById('modal_menu_item_id')?.value || '');
+    fd.append('nom', document.getElementById('modal_menu_label')?.value || '');
+    fd.append('url', document.getElementById('modal_menu_url')?.value || '#');
+    fd.append('icone', document.getElementById('modal_menu_icon')?.value || '🌐');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur ajout.', false); return; }
+        closeModal('menuEntryModal');
+        setStatus('menuStatus', 'Menu sauvegardé. Rechargement…', true);
+        location.reload();
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+async function updateConfigValue(key, value) {
+    const fd = new FormData();
+    fd.append('action', 'update_config');
+    fd.append('cle', key);
+    fd.append('valeur', value || '');
+    const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+    const txt = await res.text();
+    if (!res.ok) throw new Error(txt || 'Erreur sauvegarde.');
+    return txt;
+}
+
+async function saveConfig(key, inputId) {
+    const value = document.getElementById(inputId)?.value || '';
+    try {
+        await updateConfigValue(key, value);
+        setStatus(document.getElementById('configStatus') ? 'configStatus' : homeStatusId(), 'Sauvegardé.', true);
+    } catch (e) {
+        setStatus(document.getElementById('configStatus') ? 'configStatus' : homeStatusId(), String(e), false);
+    }
+}
+
+async function saveMenuItem(parentId, itemId, safeId) {
+    const fd = new FormData();
+    fd.append('action', 'menu_upsert');
+    fd.append('parent_id', parentId || '');
+    fd.append('item_id', itemId || '');
+    fd.append('nom', document.getElementById(`m_${safeId}_label`)?.value || '');
+    fd.append('url', document.getElementById(`m_${safeId}_url`)?.value || '');
+    fd.append('icone', document.getElementById(`m_${safeId}_icon`)?.value || '');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur sauvegarde.', false); return; }
+        setStatus('menuStatus', 'Menu sauvegardé. Rechargement…', true);
+        location.reload();
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+async function deleteMenuItem(parentId, itemId, label) {
+    const ok = await showConfirm('Supprimer cette entrée ?', `Entrée : ${label || itemId}. Cette action modifiera ../conf/menu.`, 'Supprimer');
+    if (!ok) return;
+    const fd = new FormData();
+    fd.append('action', 'menu_delete');
+    fd.append('parent_id', parentId || '');
+    fd.append('item_id', itemId || '');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur suppression.', false); return; }
+        setStatus('menuStatus', 'Entrée supprimée. Rechargement…', true);
+        location.reload();
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+async function moveMenuItem(parentId, itemId, direction, safeId) {
+    const fd = new FormData();
+    fd.append('action', 'menu_move');
+    fd.append('parent_id', parentId || '');
+    fd.append('item_id', itemId || '');
+    fd.append('direction', String(direction || 1));
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur déplacement.', false); return; }
+
+        if (parentId) {
+            const row = document.querySelector(`[data-menu-entry="${CSS.escape(safeId || '')}"]`);
+            const list = row?.parentElement;
+            if (row && list) {
+                if (Number(direction) < 0 && row.previousElementSibling) {
+                    list.insertBefore(row, row.previousElementSibling);
+                } else if (Number(direction) > 0 && row.nextElementSibling) {
+                    list.insertBefore(row.nextElementSibling, row);
+                }
+            }
+        } else {
+            const section = document.querySelector(`[data-menu-folder="${CSS.escape(safeId || '')}"]`);
+            const list = section?.parentElement;
+            if (section && list) {
+                if (Number(direction) < 0 && section.previousElementSibling) {
+                    list.insertBefore(section, section.previousElementSibling);
+                } else if (Number(direction) > 0 && section.nextElementSibling) {
+                    list.insertBefore(section.nextElementSibling, section);
+                }
+            }
+        }
+        setStatus('menuStatus', txt || 'Ordre mis à jour.', true);
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+function normalizeBrowserStartPath(value, fallbackPath) {
+    const fallback = fallbackPath || '/';
+    const raw = String(value || '').trim();
+    if (!raw) return fallback;
+
+    // Emoji / texte libre : on ouvre le browser au dossier utile au lieu de tenter un faux chemin.
+    if (!raw.startsWith('/')) {
+        if (raw.startsWith('static/')) return '/' + raw;
+        return fallback;
+    }
+    return raw;
+}
+
+function openYoleoSystemBrowser(mode, targetId, title, fallbackPath) {
+    currentBrowseTarget = targetId || '';
+    const browserMode = mode || 'file';
+    const input = document.getElementById(currentBrowseTarget);
+    const startPath = normalizeBrowserStartPath(input ? input.value : '', fallbackPath || '/');
+    const params = new URLSearchParams({target: currentBrowseTarget, path: startPath});
+    const url = '/browser/' + browserMode + '?' + params.toString();
+    const safeTarget = String(currentBrowseTarget || 'target').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    const popup = window.open(
+        url,
+        'yoleo_system_browser_' + browserMode + '_' + safeTarget,
+        'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+    );
+    if (popup) popup.focus();
+}
+
+function openStaticBrowser(targetId) {
+    openYoleoSystemBrowser('image', targetId, 'Parcourir une image', '/static');
+}
+
+window.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type !== 'yoleo-browser-select') return;
+    if (!['image', 'file', 'folder'].includes(data.mode)) return;
+    const targetId = data.target || currentBrowseTarget;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    input.value = data.path || '';
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    input.dispatchEvent(new Event('change', {bubbles: true}));
+    const preview = document.getElementById(targetId.replace(/_icon$/, '_preview'));
+    if (preview) refreshIconPreview(targetId, preview.id);
+    if (targetId === 'cfg_nav_icons') {
+        autosizeOneInput(input);
+        updateIdentityViewFromInputs();
+    }
+    if (targetId === 'sshGpuKeyPath') {
+        autosizeOneInput(input);
+        updateSshViewFromInputs();
+    }
+});
+
+function openKeyBrowser(targetId) {
+    currentBrowseTarget = targetId || '';
+    const input = document.getElementById(currentBrowseTarget);
+    const startPath = normalizeBrowserStartPath(input ? input.value : '', '/');
+    const params = new URLSearchParams({target: currentBrowseTarget, path: startPath});
+    const url = '/browser/file?' + params.toString();
+
+    // Spécifique au champ clé SSH : ouverture en vraie fenêtre popup,
+    // sans passer par la boîte commune du layout.
+    const popup = window.open(
+        url,
+        'yoleo_ssh_key_browser',
+        'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+    );
+    if (popup) popup.focus();
+}
+
+function refreshIconPreview(inputId, previewId) {
+    const value = document.getElementById(inputId)?.value || '';
+    const box = document.getElementById(previewId);
+    if (!box) return;
+    if (value.startsWith('/static') || value.startsWith('static/')) {
+        const src = value.startsWith('/') ? value : '/' + value;
+        box.innerHTML = `<img src="${escapeHtml(src)}" alt="">`;
+    } else {
+        box.textContent = value || '📁';
+    }
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeJs(value) {
+    return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
+}
+
+
+function refreshIndexTopOrderInput() {
+    const input = document.getElementById('indexTopOrderInput');
+    if (!input) return;
+    const rows = Array.from(document.querySelectorAll('#indexTopOrderTable [data-index-top-key]'));
+    input.value = rows
+        .map(row => row.dataset.indexTopKey || '')
+        .filter(Boolean)
+        .join(',');
+    rows.forEach((row, index) => {
+        const rank = row.querySelector('.pers-home-order-rank');
+        if (rank) rank.textContent = String(index + 1);
+    });
+}
+
+function moveIndexTopRow(button, direction) {
+    const row = button ? button.closest('[data-index-top-key]') : null;
+    const tbody = row ? row.parentElement : null;
+    if (!row || !tbody) return;
+    if (direction < 0 && row.previousElementSibling) {
+        tbody.insertBefore(row, row.previousElementSibling);
+    } else if (direction > 0 && row.nextElementSibling) {
+        tbody.insertBefore(row.nextElementSibling, row);
+    }
+    refreshIndexTopOrderInput();
+    autoSaveHomeConfig();
+}
+
+function initIndexTopDragSort() {
+    const list = document.getElementById('indexTopOrderTable');
+    if (!list) return;
+    let dragged = null;
+
+    function clearDropState() {
+        list.querySelectorAll('.pers-home-order-item').forEach(item => {
+            item.classList.remove('is-drop-before', 'is-drop-after');
+        });
+    }
+
+    function itemAfterPointer(container, x, y) {
+        const items = [...container.querySelectorAll('.pers-home-order-item:not(.is-dragging)')];
+        return items.reduce((closest, item) => {
+            const box = item.getBoundingClientRect();
+            const horizontal = Math.abs(x - (box.left + box.width / 2)) / Math.max(box.width, 1);
+            const vertical = (y - box.top - box.height / 2) / Math.max(box.height, 1);
+            const offset = vertical + horizontal * .16;
+            if (offset < 0 && offset > closest.offset) return {offset, element: item};
+            return closest;
+        }, {offset: Number.NEGATIVE_INFINITY, element: null}).element;
+    }
+
+    list.addEventListener('dragstart', (event) => {
+        const item = event.target.closest('.pers-home-order-item');
+        if (!item || event.target.closest('button')) return;
+        dragged = item;
+        item.classList.add('is-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', item.dataset.indexTopKey || '');
+    });
+
+    list.addEventListener('dragover', (event) => {
+        if (!dragged) return;
+        event.preventDefault();
+        const before = itemAfterPointer(list, event.clientX, event.clientY);
+        clearDropState();
+        if (before) {
+            before.classList.add('is-drop-before');
+            list.insertBefore(dragged, before);
+        } else {
+            const last = list.querySelector('.pers-home-order-item:not(.is-dragging):last-child');
+            if (last) last.classList.add('is-drop-after');
+            list.appendChild(dragged);
+        }
+        refreshIndexTopOrderInput();
+    });
+
+    list.addEventListener('dragend', () => {
+        if (dragged) dragged.classList.remove('is-dragging');
+        dragged = null;
+        clearDropState();
+        refreshIndexTopOrderInput();
+        autoSaveHomeConfig();
+    });
+}
+
+async function saveHomeConfig({silent=false} = {}) {
+    refreshIndexTopOrderInput();
+    const fd = new FormData();
+    fd.append('action', 'update_home_config');
+    const indexTopOrder = document.getElementById('indexTopOrderInput');
+    if (indexTopOrder) fd.append('INDEX_TOP_ORDER', indexTopOrder.value || '');
+    for (const input of document.querySelectorAll('.home-check')) {
+        fd.append(input.name, input.checked ? '1' : '0');
+    }
+    // Les réglages GPU SSH sont dans system.conf et sont sauvegardés par saveSshConfig().
+    // On ne les renvoie pas à chaque coche accueil pour éviter les modifications accidentelles.
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        setStatus(homeStatusId(), res.ok ? (silent ? '' : 'Accueil sauvegardé.') : txt, res.ok);
+        toggleNvidiaSshSettings();
+    } catch (e) {
+        setStatus(homeStatusId(), String(e), false);
+    }
+}
+
+let homeAutoSaveTimer = null;
+function autoSaveHomeConfig() {
+    clearTimeout(homeAutoSaveTimer);
+    homeAutoSaveTimer = setTimeout(() => saveHomeConfig(), 300);
+}
+
+
+function identityInputs() {
+    return ['cfg_titre_logo', 'cfg_hostname', 'cfg_titre_tab', 'cfg_nav_icons']
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+}
+function autosizeOneInput(input) {
+    if (!input) return;
+    const len = Math.max(8, Math.min(56, String(input.value || input.placeholder || '').length + 3));
+    input.style.width = len + 'ch';
+}
+function autosizeIdentityInputs() {
+    for (const input of identityInputs()) autosizeOneInput(input);
+}
+function beginIdentityEdit() {
+    const card = document.getElementById('identityCard');
+    if (!card) return;
+    for (const input of identityInputs()) input.dataset.original = input.value || '';
+    card.classList.add('is-editing');
+    autosizeIdentityInputs();
+    setTimeout(() => document.getElementById('cfg_titre_logo')?.focus(), 30);
+}
+function updateIdentityViewFromInputs() {
+    const logo = document.getElementById('cfg_nav_icons')?.value || '';
+    const nas = document.getElementById('cfg_titre_logo')?.value || '';
+    const hostname = document.getElementById('cfg_hostname')?.value || '';
+    const tab = document.getElementById('cfg_titre_tab')?.value || '';
+    const logoView = document.getElementById('identityLogoView');
+    const logoText = document.getElementById('identityLogoTextView');
+    const sidebarView = document.getElementById('identitySidebarView');
+    const hostnameView = document.getElementById('identityHostnameView');
+    const tabView = document.getElementById('identityTabView');
+    if (sidebarView) sidebarView.textContent = nas;
+    if (hostnameView) hostnameView.textContent = hostname;
+    if (tabView) tabView.textContent = tab;
+    if (logoText) logoText.textContent = logo;
+    if (logoView) {
+        if (logo.startsWith('/static') || logo.startsWith('static/')) {
+            const src = logo.startsWith('/') ? logo : '/' + logo;
+            logoView.innerHTML = `<img src="${escapeHtml(src)}" alt="Logo">`;
+        } else {
+            logoView.innerHTML = `<span>${escapeHtml(logo || '🏷️')}</span>`;
+        }
+    }
+}
+async function updateHostnameValue(value) {
+    const fd = new FormData();
+    fd.append('action', 'update_hostname');
+    fd.append('valeur', value || '');
+    const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+    const text = await res.text();
+    if (!res.ok) throw new Error(text || 'Erreur lors de la modification du hostname.');
+    try {
+        const data = JSON.parse(text);
+        return data.hostname || value;
+    } catch (_) {
+        return value;
+    }
+}
+async function saveIdentityConfig({close=true} = {}) {
+    try {
+        const hostnameInput = document.getElementById('cfg_hostname');
+        if (hostnameInput && hostnameInput.value !== hostnameInput.dataset.original) {
+            hostnameInput.value = await updateHostnameValue(hostnameInput.value);
+            hostnameInput.dataset.original = hostnameInput.value;
+        }
+        await updateConfigValue('titre_logo', document.getElementById('cfg_titre_logo')?.value || '');
+        await updateConfigValue('titre_tab', document.getElementById('cfg_titre_tab')?.value || '');
+        await updateConfigValue('nav_icons', document.getElementById('cfg_nav_icons')?.value || '');
+        updateIdentityViewFromInputs();
+        if (close) endIdentityEdit(false);
+        setStatus(homeStatusId(), 'Identité sauvegardée.', true);
+    } catch (e) {
+        setStatus(homeStatusId(), String(e), false);
+    }
+}
+function endIdentityEdit(cancel=false) {
+    const card = document.getElementById('identityCard');
+    if (!card || !card.classList.contains('is-editing')) return;
+    if (cancel) {
+        for (const input of identityInputs()) input.value = input.dataset.original || '';
+        refreshIconPreview('cfg_nav_icons', 'cfg_nav_icons_preview');
+        updateIdentityViewFromInputs();
+    }
+    card.classList.remove('is-editing');
+}
+function cancelIdentityEdit() {
+    endIdentityEdit(true);
+}
+
+function sshInputs() {
+    return ['sshGpuHost', 'sshGpuPort', 'sshGpuUser', 'sshGpuKeyPath']
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+}
+function autosizeSshInputs() {
+    for (const input of sshInputs()) autosizeOneInput(input);
+}
+function beginSshEdit() {
+    const card = document.getElementById('sshSettingsCard');
+    if (!card) return;
+    for (const input of sshInputs()) input.dataset.original = input.value || '';
+    card.classList.add('is-editing');
+    autosizeSshInputs();
+    setTimeout(() => document.getElementById('sshGpuHost')?.focus(), 30);
+}
+function updateSshViewFromInputs() {
+    const host = document.getElementById('sshGpuHost')?.value || '';
+    const port = document.getElementById('sshGpuPort')?.value || '22';
+    const user = document.getElementById('sshGpuUser')?.value || '';
+    const key = document.getElementById('sshGpuKeyPath')?.value || '';
+    const hostView = document.getElementById('sshHostView');
+    const portView = document.getElementById('sshPortView');
+    const userView = document.getElementById('sshUserView');
+    const keyView = document.getElementById('sshKeyView');
+    if (hostView) hostView.textContent = host || 'Non définie';
+    if (portView) portView.textContent = port || '22';
+    if (userView) userView.textContent = user || 'Non défini';
+    if (keyView) keyView.textContent = key || 'Non définie';
+}
+async function saveSshConfig({close=true, silent=false} = {}) {
+    const fd = new FormData();
+    fd.append('action', 'update_home_ssh_config');
+    for (const input of document.querySelectorAll('[data-home-ssh]')) {
+        fd.append(input.dataset.homeSsh, input.value || '');
+    }
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) throw new Error(txt || 'Erreur sauvegarde SSH.');
+        updateSshViewFromInputs();
+        if (close) endSshEdit(false);
+        updateSshGpuCheckboxAvailability({saveIfUnchecked:true});
+        if (!silent) setStatus(homeStatusId(), 'Réglages SSH sauvegardés.', true);
+        return true;
+    } catch (e) {
+        setStatus(homeStatusId(), String(e), false);
+        return false;
+    }
+}
+function endSshEdit(cancel=false) {
+    const card = document.getElementById('sshSettingsCard');
+    if (!card || !card.classList.contains('is-editing')) return;
+    if (cancel) {
+        for (const input of sshInputs()) input.value = input.dataset.original || '';
+        updateSshViewFromInputs();
+    }
+    card.classList.remove('is-editing');
+}
+function cancelSshEdit() {
+    endSshEdit(true);
+}
+
+function isSshGpuConfigReady() {
+    const host = (document.getElementById('sshGpuHost')?.value || '').trim();
+    const port = (document.getElementById('sshGpuPort')?.value || '').trim();
+    const user = (document.getElementById('sshGpuUser')?.value || '').trim();
+    const key = (document.getElementById('sshGpuKeyPath')?.value || '').trim();
+    return !!(host && port && user && key);
+}
+
+function updateSshGpuCheckboxAvailability({saveIfUnchecked=false} = {}) {
+    const checkbox = document.querySelector('.home-check[name="SHOW_NVIDIA_SSH"]');
+    const ready = isSshGpuConfigReady();
+    const label = checkbox ? checkbox.closest('.home-toggle') : null;
+    const note = document.getElementById('sshDisabledNote');
+    if (!checkbox) return ready;
+
+    if (!ready && checkbox.checked) {
+        checkbox.checked = false;
+        if (saveIfUnchecked) autoSaveHomeConfig();
+    }
+
+    checkbox.disabled = !ready;
+    checkbox.title = ready ? '' : 'Renseigne d’abord Machine, Port, Utilisateur et Clé SSH.';
+    if (label) {
+        label.classList.toggle('is-disabled', !ready);
+        label.title = checkbox.title;
+    }
+    if (note) {
+        note.hidden = ready;
+        note.textContent = 'Renseigne d’abord Machine, Port, Utilisateur et Clé SSH, puis active GPU SSH.';
+    }
+    return ready;
+}
+
+async function handleNvidiaSshToggleChange(checkbox) {
+    if (!checkbox) return;
+    if (!updateSshGpuCheckboxAvailability()) {
+        checkbox.checked = false;
+        toggleNvidiaSshSettings();
+        return;
+    }
+    if (checkbox.checked) {
+        const saved = await saveSshConfig({close:true, silent:true});
+        if (!saved) {
+            checkbox.checked = false;
+            toggleNvidiaSshSettings();
+            return;
+        }
+    }
+    toggleNvidiaSshSettings();
+    autoSaveHomeConfig();
+}
+
+function toggleNvidiaSshSettings() {
+    updateSshGpuCheckboxAvailability();
+    const checkbox = document.querySelector('.home-check[name="SHOW_NVIDIA_SSH"]');
+    const enabled = !!(checkbox && !checkbox.disabled && checkbox.checked);
+    const card = document.getElementById('sshSettingsCard');
+    if (card) card.classList.toggle('pers-home-ssh-enabled', enabled);
+}
+
+(function initPersonalizationPage() {
+    toggleNvidiaSshSettings();
+    refreshIndexTopOrderInput();
+    initIndexTopDragSort();
+    autosizeIdentityInputs();
+    autosizeSshInputs();
+
+    for (const input of identityInputs()) {
+        input.addEventListener('input', () => {
+            autosizeOneInput(input);
+            if (input.id === 'cfg_nav_icons') refreshIconPreview('cfg_nav_icons', 'cfg_nav_icons_preview');
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveIdentityConfig({close:true});
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelIdentityEdit();
+            }
+        });
+    }
+
+    document.getElementById('identityCard')?.addEventListener('keydown', (e) => {
+        if (e.key === 'F2') {
+            e.preventDefault();
+            beginIdentityEdit();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        const card = document.getElementById('identityCard');
+        if (card && card.classList.contains('is-editing') && !card.contains(e.target)) {
+            saveIdentityConfig({close:true});
+        }
+        const sshCard = document.getElementById('sshSettingsCard');
+        if (sshCard && sshCard.classList.contains('is-editing') && !sshCard.contains(e.target)) {
+            saveSshConfig({close:true});
+        }
+    });
+
+    for (const input of sshInputs()) {
+        input.addEventListener('input', () => {
+            autosizeOneInput(input);
+            updateSshGpuCheckboxAvailability();
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveSshConfig({close:true});
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelSshEdit();
+            }
+        });
+    }
+
+    document.getElementById('sshSettingsCard')?.addEventListener('keydown', (e) => {
+        if (e.key === 'F2') {
+            e.preventDefault();
+            beginSshEdit();
+        }
+    });
+})();
+
+document.addEventListener('click', function(e) {
+    for (const modal of document.querySelectorAll('.modal-overlay')) {
+        if (e.target === modal) {
+            if (modal.id === 'confirmModal') settleConfirm(false);
+            else modal.style.display = 'none';
+        }
+    }
+});
+</script>
+{% endblock %}

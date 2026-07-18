@@ -1,0 +1,114 @@
+@media (max-width: 900px) {
+    html, body { overflow-x: hidden !important; }
+    .yoleo-topbar { position: sticky; top: 0; z-index: 1500; min-height: 50px; gap: 8px; padding: 7px 9px; }
+    .yoleo-page-title h1 { font-size: 15px; }
+    .yoleo-page-title p { display: none; }
+    .yoleo-clock { min-width: 0; padding: 6px 8px; font-size: 13px; }
+    .yoleo-clock-date, .yoleo-clock-sep { display: none !important; }
+    .yoleo-actions-toggle, .yoleo-mobile-toggle { width: 34px; height: 34px; min-width: 34px; }
+    :where(.docker-page,.disk-page,.builds-page,.partage-page,.services-page,.users-page,.system-home,.system-tools-page,.terminal-page,.vm-page,.meteo-page,.browser-page) {
+        width: 100% !important; max-width: 100% !important; margin-left: 0 !important; margin-right: 0 !important; padding-left: 8px !important; padding-right: 8px !important;
+    }
+    :where(.summary-grid,.nas-summary-grid,.docker-containers-summary-compact,.docker-stack-summary-compact,.docker-lan-summary-grid,.nft-fw-summary-grid,.mini-summary-grid-compact) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 7px !important;
+    }
+    .summary-value { white-space: normal !important; overflow-wrap: anywhere; font-size: 16px; }
+    body.yoleo-mobile-mosaic-ready :where(.mobile-list,.mobile-cards) { display: none !important; }
+    .yoleo-mobile-source-wrap { display: none !important; }
+    .yoleo-mobile-table-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; width: 100%; padding: 10px; }
+    .yoleo-mobile-table-grid:empty { display: none; }
+    .yoleo-mobile-table-tile {
+        min-width: 0; min-height: 94px; display: grid; grid-template-rows: 42px auto auto; justify-items: center; align-items: center; gap: 5px;
+        padding: 10px 7px 9px; border: 1px solid var(--yoleo-border); border-radius: 11px; background: rgba(18,26,36,.92); color: var(--yoleo-text);
+        font: inherit; text-align: center; box-shadow: 0 10px 24px rgba(0,0,0,.18); forced-color-adjust: none;
+    }
+    .yoleo-mobile-table-tile:active, .yoleo-mobile-table-tile:focus-visible { outline: 2px solid var(--yoleo-accent-2); outline-offset: 2px; border-color: var(--yoleo-accent-2); }
+    .yoleo-mobile-table-tile.is-running {
+        border-color: rgba(72, 213, 151, .58) !important;
+        background: linear-gradient(180deg, rgba(72, 213, 151, .10), rgba(18, 26, 36, .94)) !important;
+        box-shadow: inset 0 0 0 1px rgba(72, 213, 151, .18), 0 10px 24px rgba(0,0,0,.18) !important;
+    }
+    .yoleo-mobile-table-tile.is-stopped {
+        border-color: rgba(255, 93, 115, .58) !important;
+        background: linear-gradient(180deg, rgba(255, 93, 115, .10), rgba(18, 26, 36, .94)) !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 93, 115, .18), 0 10px 24px rgba(0,0,0,.18) !important;
+    }
+    .yoleo-mobile-tile-icon {
+        width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.08);
+        border-radius: 11px; background: rgba(5,8,13,.82); color: var(--yoleo-accent-2); font-size: 21px; font-weight: 900; line-height: 1; overflow: hidden; forced-color-adjust: none;
+    }
+    .yoleo-mobile-table-tile.is-running .yoleo-mobile-tile-icon { border-color: rgba(72, 213, 151, .45) !important; }
+    .yoleo-mobile-table-tile.is-stopped .yoleo-mobile-tile-icon { border-color: rgba(255, 93, 115, .45) !important; }
+    .yoleo-mobile-tile-icon img { width: 28px; height: 28px; object-fit: contain; }
+    .yoleo-mobile-tile-title, .yoleo-mobile-tile-sub { max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .yoleo-mobile-tile-title { color: #fff; font-size: 12px; font-weight: 900; }
+    .yoleo-mobile-tile-sub { color: var(--yoleo-muted); font-size: 10px; line-height: 1.2; }
+    .yoleo-mobile-row-modal { position: fixed; inset: 0; z-index: 12000; display: none; align-items: flex-end; justify-content: center; padding: 12px; }
+    .yoleo-mobile-row-modal.is-open { display: flex; }
+    .yoleo-mobile-row-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.68); backdrop-filter: blur(4px); }
+    .yoleo-mobile-row-sheet {
+        position: relative; width: min(100%, 520px); max-height: 86dvh; display: flex; flex-direction: column; overflow: hidden;
+        border: 1px solid var(--yoleo-border); border-radius: 16px; background: rgba(14,20,29,.98); box-shadow: 0 24px 70px rgba(0,0,0,.58);
+    }
+    .yoleo-mobile-row-head {
+        min-height: 58px; display: grid; grid-template-columns: 42px minmax(0,1fr) 34px; align-items: center; gap: 10px; padding: 10px 12px;
+        border-bottom: 1px solid var(--yoleo-border-soft); background: rgba(10,15,22,.82);
+    }
+    .yoleo-mobile-row-title { min-width: 0; color: #fff; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .yoleo-mobile-row-subtitle { margin-top: 2px; min-width: 0; color: var(--yoleo-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .yoleo-mobile-row-close { width: 34px; height: 34px; border: 1px solid var(--yoleo-border); border-radius: 10px; background: rgba(18,26,36,.82); color: var(--yoleo-text); cursor: pointer; font-size: 18px; font-weight: 900; }
+    .yoleo-mobile-row-body { display: grid; gap: 12px; overflow: auto; padding: 12px; }
+    .yoleo-mobile-row-details { display: grid; gap: 7px; }
+    .yoleo-mobile-row-kv { display: grid; grid-template-columns: minmax(82px,.38fr) minmax(0,1fr); gap: 8px; align-items: start; padding: 8px; border: 1px solid var(--yoleo-border-soft); border-radius: 10px; background: rgba(5,8,13,.55); }
+    .yoleo-mobile-row-k { color: #8fb4d6; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+    .yoleo-mobile-row-v { min-width: 0; color: #eef6ff; font-size: 12px; overflow-wrap: anywhere; }
+    .yoleo-mobile-row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .yoleo-mobile-row-actions:empty { display: none; }
+    .yoleo-mobile-action-btn { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 10px; border: 1px solid var(--yoleo-border); border-radius: 10px; background: #263242; color: #fff; cursor: pointer; font: inherit; font-size: 12px; font-weight: 900; text-decoration: none; }
+    .yoleo-mobile-action-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .yoleo-mobile-action-btn.is-danger { border-color: rgba(255,93,115,.55); background: rgba(255,93,115,.15); color: #ffd9df; }
+    .yoleo-mobile-action-btn.is-primary { border-color: var(--yoleo-accent-2); background: rgba(26,235,255,.16); color: #dffcff; }
+    .docker-stack-table-wrap,
+    .docker-env-wrap { display: block !important; max-width: 100%; overflow-x: hidden !important; }
+    .docker-stack-table-wrap + .yoleo-mobile-table-grid,
+    .docker-env-wrap + .yoleo-mobile-table-grid { display: none !important; }
+    .docker-stack-table,
+    .docker-env-table { width: 100% !important; min-width: 0 !important; table-layout: fixed !important; font-size: 11px; }
+    .docker-stack-table th,
+    .docker-stack-table td,
+    .docker-env-table th,
+    .docker-env-table td { padding: 5px 4px !important; }
+    .docker-stack-num { width: 28px !important; }
+    .docker-stack-action-col { width: 72px !important; }
+    .docker-stack-yml-input { width: 100% !important; height: 30px; padding: 5px 7px; font-size: 11px; }
+    .docker-stack-actions,
+    .docker-stack-action-col.actions-line { gap: 4px !important; flex-wrap: nowrap !important; }
+    .docker-stack-actions .yoleo-btn-icon,
+    .docker-stack-action-col .yoleo-btn-icon { width: 28px !important; min-width: 28px !important; height: 28px !important; padding: 0 !important; font-size: 12px !important; }
+    .docker-env-table th:last-child,
+    .docker-env-table td:last-child { width: 82px !important; min-width: 82px !important; }
+    .docker-env-pair { width: 100% !important; grid-template-columns: minmax(82px, 1fr) 10px minmax(92px, 1fr) !important; gap: 4px !important; }
+    .docker-env-input,
+    .docker-env-comment-input { height: 30px !important; padding: 5px 6px !important; font-size: 10.5px !important; }
+    .docker-env-comment-line { width: 100% !important; }
+    .docker-env-action-cell .yoleo-btn-mini,
+    .docker-env-comment-actions .yoleo-btn-mini { min-width: 26px !important; height: 26px !important; padding: 3px 6px !important; font-size: 11px !important; }
+    .docker-env-table tbody tr.docker-env-kv-row .docker-env-action-cell .yoleo-btn,
+    .docker-env-table tbody tr.docker-env-comment-row .docker-env-comment-actions { position: static !important; transform: none !important; }
+    .system-info-page .system-table-wrap,
+    .pers-page :where(.table-wrap,.system-table-wrap,.desktop-table-wrap,.yoleo-table-wrap,.yoleo-table-wrap,.disk-top-table-wrap) { display: block !important; overflow-x: hidden !important; }
+    .system-info-page :where(.system-info-table,.yoleo-table),
+    .pers-page :where(table,.yoleo-table) { width: 100% !important; min-width: 0 !important; table-layout: fixed !important; }
+    .pers-page :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select, .input, .search-input) { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+    .pers-page :where(.field-row,.menu-icon-row,.ssh-key-row,.disk-top-custom-row,.source-value) { width: 100%; min-width: 0; }
+    .pers-page :where(.pers-menu-entry-row,.pers-menu-folder-edit-grid,.pers-menu-identity-grid,.home-toggle-grid,.pers-menu-modal-grid) { grid-template-columns: 1fr !important; }
+    .pers-page :where(.home-toggle,.pers-info-note-card,.pers-menu-folder,.card) { width: 100%; max-width: 100%; }
+    .pers-page :where(.pers-menu-folder-children,.pers-menu-folder-list,.pers-menu-page) { width: 100% !important; min-width: 0 !important; grid-template-columns: minmax(0, 1fr) !important; overflow-x: hidden !important; }
+    .pers-page :where(.pers-menu-entry-row,.pers-menu-folder-edit-grid,.pers-menu-entry-icon-field) { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
+    body.yoleo-mobile-row-open { overflow: hidden !important; }
+}
+@media (max-width: 460px) {
+    .yoleo-mobile-table-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 8px; }
+    .yoleo-mobile-table-tile { min-height: 88px; padding-left: 5px; padding-right: 5px; }
+    .yoleo-mobile-row-actions { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,440 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<section id="tab-mdns" class="system-tab-panel active no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+<div class="mdns-page" id="system-mdns-root">
+    <div class="mdns-panel">
+        {% if mdns_errors %}
+            <div class="alert">{% for e in mdns_errors %}{{ e }}{% if not loop.last %}\n{% endif %}{% endfor %}</div>
+        {% endif %}
+
+        <nav class="yoleo-subnav" aria-label="Navigation mDNS">
+            <a href="/system/mdns" class="yoleo-subnav-link {{ 'is-active' if current_mdns_subtab == 'dashboard' else '' }}">📡 mDNS</a>
+            <a href="/system/mdns/names" class="yoleo-subnav-link {{ 'is-active' if current_mdns_subtab == 'config' else '' }}">🗂️ Noms .local</a>
+            <a href="/system/mdns/logs" class="yoleo-subnav-link {{ 'is-active' if current_mdns_subtab == 'logs' else '' }}">📜 Logs</a>
+        </nav>
+
+        <div class="status-box mdns-ajax-banner" id="mainStatus" hidden></div>
+
+        {% if current_mdns_subtab == 'dashboard' %}
+                <section class="card">
+                    <div class="summary-grid" id="summaryGrid">
+                        <div class="summary-card"><div class="summary-label">Service</div><div class="summary-value" id="sumActive">{{ 'Actif' if mdns_summary.service_active else 'Arrêté' }}</div><div class="summary-sub" id="sumMode">{{ mdns_summary.mode }}</div></div>
+                        <div class="summary-card"><div class="summary-label">Entrées</div><div class="summary-value" id="sumEntries">{{ mdns_summary.entries_count|default(0) }}</div><div class="summary-sub">noms .local</div></div>
+                        <div class="summary-card"><div class="summary-label">Avahi</div><div class="summary-value" id="sumAvahi">{{ mdns_summary.avahi_count }}</div><div class="summary-sub">daemon</div></div>
+                        <div class="summary-card"><div class="summary-label">Avahi hosts</div><div class="summary-value" id="sumStaticHosts">{{ mdns_summary.static_hosts_matched_count|default(0) }}</div><div class="summary-sub">/etc/avahi/hosts</div></div>
+                        <div class="summary-card"><div class="summary-label">Systemd</div><div class="summary-value" id="sumSystemd">{{ mdns_summary.systemd.active|default('unknown') }}</div><div class="summary-sub" id="sumSystemdSub">{{ mdns_summary.systemd.enabled|default('unknown') }}</div></div>
+                        <div class="summary-card"><div class="summary-label">UDP 5353</div><div class="summary-value" id="sumUdp">{{ mdns_summary.udp_5353_count }}</div><div class="summary-sub">listeners</div></div>
+                        <div class="summary-card">
+                            <div class="summary-label">Actions</div>
+                            <div class="toolbar" id="actionToolbar">
+                                {# Boutons compacts : play si arrêté, restart/stop si actif, état toujours visible. #}
+                                <button type="button" id="btnStart" data-mdns-action="start" class="yoleo-btn yoleo-btn-green yoleo-btn-mini yoleo-btn-icon{% if mdns_summary.service_active %} mdns-force-hidden{% endif %}" title="Démarrer" aria-label="Démarrer mDNS" onclick="mdnsRunAction('start', this)">▶</button>
+                                <button type="button" id="btnRestart" data-mdns-action="restart" class="yoleo-btn yoleo-btn-orange yoleo-btn-mini yoleo-btn-icon{% if not mdns_summary.service_active %} mdns-force-hidden{% endif %}" title="Redémarrer" aria-label="Redémarrer mDNS" onclick="mdnsRunAction('restart', this)">🔄</button>
+                                <button type="button" id="btnStop" data-mdns-action="stop" class="yoleo-btn yoleo-btn-red yoleo-btn-mini yoleo-btn-icon{% if not mdns_summary.service_active %} mdns-force-hidden{% endif %}" title="Stopper" aria-label="Stopper mDNS" onclick="mdnsRunAction('stop', this)">⏹</button>
+                                <button type="button" id="btnStatus" data-mdns-action="status" class="yoleo-btn yoleo-btn-muted yoleo-btn-mini yoleo-btn-icon" title="État" aria-label="État mDNS" onclick="mdnsRunAction('status', this)">ℹ</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="path-grid">
+                        <div class="path-pill"><b>module conf</b><span>{{ mdns_config_path }}</span></div>
+                        <div class="path-pill"><b>SERVICE_CONF</b><span>{{ mdns_conf.SERVICE_CONF }}</span></div>
+                        <div class="path-pill"><b>SERVICE_LOG</b><span>{{ mdns_conf.SERVICE_LOG }}</span></div>
+                        <div class="path-pill"><b>RUNTIME_HOSTS</b><span>{{ mdns_conf.RUNTIME_HOSTS }}</span></div>
+                        <div class="path-pill"><b>PID_FILE</b><span>{{ mdns_conf.PID_FILE }}</span></div>
+                    </div>
+                    <div class="details-grid">
+                        <div class="code-box" id="processBox">Avahi daemon:\n{% for line in mdns_summary.avahi_lines %}{{ line }}\n{% else %}—\n{% endfor %}\nAvahi static hosts:\n{% for line in mdns_summary.static_host_lines %}{{ line }}\n{% else %}—\n{% endfor %}\nPublishers legacy:\n{% for line in mdns_summary.publisher_lines %}{{ line }}\n{% else %}—\n{% endfor %}\nUDP 5353:\n{% for line in mdns_summary.udp_5353_lines %}{{ line }}\n{% else %}—\n{% endfor %}</div>
+                    </div>
+                </section>
+        {% elif current_mdns_subtab == 'config' %}
+
+                <section class="card mdns-names-card no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                    <div class="topbar mdns-names-topbar">
+                        <div class="mdns-inline-busy" aria-live="polite">
+                            <span id="mdnsAjaxSpinner" class="mdns-ajax-spinner" aria-hidden="true"></span>
+                            <span id="mdnsAjaxBusyText" class="mdns-ajax-busy-text"></span>
+                        </div>
+                        <div class="toolbar">
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="mdnsAddRow()">➕ Ajouter</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-green" onclick="mdnsSaveEntries(this, true)">💾 + 🔄 Enregistrer et redémarrer</button>
+                        </div>
+                    </div>
+
+                    <div class="table-tools">
+                        <input class="search-input" id="entrySearch" type="text" placeholder="Filtrer : nom, IP…" oninput="mdnsFilterRows(this.value)">
+                        <span class="hint">Validation : IPv4 + nom en <b>.local</b>, sans doublon de nom.</span>
+                    </div>
+                    <div class="table-wrap mdns-names-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+                        <table class="mdns-table mdns-names-table no-mobile-mosaic mobile-no-mosaic" id="mdns_entriesTable" data-mobile-mosaic="off">
+                            <colgroup>
+                                <col class="mdns-col-ip">
+                                <col class="mdns-col-name">
+                                <col class="mdns-col-actions">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th class="sys-inline-054">IP</th>
+                                    <th class="sys-inline-055">Nom local</th>
+                                    <th class="sys-inline-056">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in mdns_entries %}
+                                <tr data-filter="{{ entry.ip|lower }} {{ entry.name|lower }}">
+                                    <td><input class="text-input entry-ip" value="{{ entry.ip }}" placeholder="192.168.1.2"></td>
+                                    <td><input class="text-input entry-name" value="{{ entry.name }}" placeholder="pihole.local"></td>
+                                    <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Tester" onclick="mdnsTestRow(this)">📶</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="mdnsDeleteRow(this)">🗑</button></div></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="hint">Le bouton 📶 lance un ping depuis l’hôte Flask. Pour Windows, pense encore à <b>ipconfig /flushdns</b> si le cache garde une vieille adresse.</div>
+                </section>
+        {% elif current_mdns_subtab == 'logs' %}
+
+                <section class="card">
+                    <div class="topbar">
+                        <div></div>
+                        <div class="toolbar">
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="mdnsRefreshLog(this)">🔄 Rafraîchir</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-orange" onclick="mdnsRunAction('status', this)">ℹ Ajouter état au log</button>
+                        </div>
+                    </div>
+                    <div class="code-box" id="logBox">{{ mdns_log_tail }}</div>
+                </section>
+        {% endif %}
+    </div>
+</div>
+
+
+<script>
+(function () {
+    const mdnsRoot = document.getElementById('system-mdns-root');
+    if (!mdnsRoot) return;
+
+    const defaultIp = {{ mdns_conf.DEFAULT_IP|tojson }};
+    const saveUrl = {{ url_for('system_bp.mdns_save_entries')|tojson }};
+    const actionUrl = {{ url_for('system_bp.mdns_action')|tojson }};
+    const statusUrl = {{ url_for('system_bp.mdns_status_json')|tojson }};
+    const logUrl = {{ url_for('system_bp.mdns_log_json')|tojson }};
+    const testUrl = {{ url_for('system_bp.mdns_test_name')|tojson }};
+    const initialSummary = {{ mdns_summary|tojson }};
+
+    let mdnsActionRunning = false;
+    let mdnsBannerTimer = null;
+
+    const actionLabels = {
+        start: 'démarrage',
+        stop: 'arrêt',
+        restart: 'redémarrage',
+        status: 'lecture de l’état'
+    };
+
+    function mdnsEl(id) { return document.getElementById(id); }
+
+    function mdnsSetText(id, value) {
+        const el = mdnsEl(id);
+        if (el) el.textContent = (value === undefined || value === null || value === '') ? '—' : value;
+    }
+
+    function mdnsClearBannerClasses(box) {
+        box.classList.remove('is-success', 'is-error', 'is-running', 'is-info');
+    }
+
+    function mdnsSetBanner(message, type, timeoutMs) {
+        const box = mdnsEl('mainStatus');
+        if (!box) return;
+        if (mdnsBannerTimer) window.clearTimeout(mdnsBannerTimer);
+        mdnsBannerTimer = null;
+        mdnsClearBannerClasses(box);
+        const text = String(message || '').trim();
+        if (!text) {
+            box.hidden = true;
+            box.textContent = '';
+            return;
+        }
+        box.hidden = false;
+        box.classList.add(type ? `is-${type}` : 'is-info');
+        box.textContent = text;
+        if (timeoutMs) {
+            mdnsBannerTimer = window.setTimeout(() => {
+                mdnsClearBannerClasses(box);
+                box.hidden = true;
+                box.textContent = '';
+            }, timeoutMs);
+        }
+    }
+
+    function mdnsSetBusyLabel(message) {
+        const text = mdnsEl('mdnsAjaxBusyText');
+        if (text) text.textContent = message || '';
+    }
+
+    function mdnsSetPageBusy(locked, message) {
+        mdnsActionRunning = !!locked;
+        mdnsRoot.classList.toggle('mdns-ajax-running', !!locked);
+        mdnsSetBusyLabel(locked ? (message || 'Action en cours…') : '');
+        mdnsRoot.querySelectorAll('button').forEach(btn => {
+            btn.disabled = !!locked;
+        });
+    }
+
+    function mdnsSetButtonState(button, running, ok) {
+        if (!button) return;
+        button.classList.remove('is-running', 'is-ok', 'is-fail');
+        button.disabled = !!running;
+        if (running) button.classList.add('is-running');
+        if (ok === true) button.classList.add('is-ok');
+        if (ok === false) button.classList.add('is-fail');
+        if (ok !== undefined && ok !== null) window.setTimeout(() => button.classList.remove('is-ok', 'is-fail'), 1600);
+    }
+
+    function mdnsSetActionButtonVisible(action, visible) {
+        const btn = mdnsRoot.querySelector(`[data-mdns-action="${action}"]`);
+        if (!btn) return;
+        const show = !!visible;
+        btn.classList.toggle('is-hidden', !show);
+        btn.classList.toggle('mdns-force-hidden', !show);
+        btn.hidden = !show;
+        btn.setAttribute('aria-hidden', show ? 'false' : 'true');
+    }
+
+    function mdnsUpdateActionButtons(summary, force = false) {
+        if (!summary) return;
+        if (mdnsActionRunning && !force) return;
+
+        const active = !!summary.service_active;
+        mdnsSetActionButtonVisible('start', !active);
+        mdnsSetActionButtonVisible('restart', active);
+        mdnsSetActionButtonVisible('stop', active);
+        mdnsSetActionButtonVisible('status', true);
+    }
+
+    function mdnsUpdateSummary(summary) {
+        if (!summary) return;
+        mdnsUpdateActionButtons(summary);
+        mdnsSetText('sumActive', summary.service_active ? 'Actif' : 'Arrêté');
+        mdnsSetText('sumMode', summary.mode || '—');
+        mdnsSetText('sumEntries', summary.entries_count ?? '0');
+        mdnsSetText('sumAvahi', summary.avahi_count ?? '0');
+        mdnsSetText('sumStaticHosts', summary.static_hosts_matched_count ?? summary.static_hosts_count ?? '0');
+        mdnsSetText('sumSystemd', summary.systemd?.active || 'unknown');
+        mdnsSetText('sumSystemdSub', summary.systemd?.enabled || 'unknown');
+        mdnsSetText('sumUdp', summary.udp_5353_count ?? '0');
+
+        const processBox = mdnsEl('processBox');
+        if (processBox) {
+            const lines = [];
+            lines.push('Avahi daemon:');
+            (summary.avahi_lines || []).forEach(line => lines.push(line));
+            if (!(summary.avahi_lines || []).length) lines.push('—');
+            lines.push('', 'Avahi static hosts:');
+            (summary.static_host_lines || []).forEach(line => lines.push(line));
+            if (!(summary.static_host_lines || []).length) lines.push('—');
+            if ((summary.static_hosts_missing || []).length) {
+                lines.push('', 'Entrées manquantes dans /etc/avahi/hosts:');
+                (summary.static_hosts_missing || []).forEach(line => lines.push(line));
+            }
+            lines.push('', 'Publishers legacy:');
+            (summary.publisher_lines || []).forEach(line => lines.push(line));
+            if (!(summary.publisher_lines || []).length) lines.push('—');
+            lines.push('', 'UDP 5353:');
+            (summary.udp_5353_lines || []).forEach(line => lines.push(line));
+            if (!(summary.udp_5353_lines || []).length) lines.push('—');
+            processBox.textContent = lines.join('\n');
+        }
+    }
+
+    function mdnsEscapeHtml(value) {
+        return String(value || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
+
+    function mdnsRowTemplate(ip, name) {
+        const tr = document.createElement('tr');
+        tr.dataset.filter = `${String(ip || '').toLowerCase()} ${String(name || '').toLowerCase()}`;
+        tr.innerHTML = `
+            <td><input class="text-input entry-ip" value="${mdnsEscapeHtml(ip || '')}" placeholder="192.168.1.2"></td>
+            <td><input class="text-input entry-name" value="${mdnsEscapeHtml(name || '')}" placeholder="pihole.local"></td>
+            <td><div class="actions-cell"><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon" title="Tester" onclick="mdnsTestRow(this)">📶</button><button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-red yoleo-btn-icon" title="Supprimer" onclick="mdnsDeleteRow(this)">🗑</button></div></td>`;
+        return tr;
+    }
+
+    function mdnsAddRow() {
+        if (mdnsActionRunning) return;
+        const tbody = document.querySelector('#mdns_entriesTable tbody');
+        if (!tbody) return;
+        tbody.appendChild(mdnsRowTemplate(defaultIp || '192.168.1.2', ''));
+        const input = tbody.querySelector('tr:last-child .entry-name');
+        if (input) input.focus();
+    }
+
+    function mdnsDeleteRow(button) {
+        if (mdnsActionRunning) return;
+        const tr = button.closest('tr');
+        if (tr) tr.remove();
+    }
+
+    function mdnsCollectRows() {
+        return Array.from(document.querySelectorAll('#mdns_entriesTable tbody tr')).map(row => ({
+            ip: row.querySelector('.entry-ip')?.value.trim() || '',
+            name: row.querySelector('.entry-name')?.value.trim() || ''
+        })).filter(row => row.ip || row.name);
+    }
+
+    function mdnsFilterRows(query) {
+        query = String(query || '').toLowerCase().trim();
+        document.querySelectorAll('#mdns_entriesTable tbody tr').forEach(row => {
+            const ip = row.querySelector('.entry-ip')?.value || '';
+            const name = row.querySelector('.entry-name')?.value || '';
+            const haystack = `${ip} ${name}`.toLowerCase();
+            row.style.display = (!query || haystack.includes(query)) ? '' : 'none';
+        });
+    }
+
+    async function mdnsPostJson(url, payload) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            cache: 'no-store',
+            body: JSON.stringify(payload || {})
+        });
+        const raw = await res.text();
+        let data = {};
+        try {
+            data = raw ? JSON.parse(raw) : {};
+        } catch (parseError) {
+            throw new Error(raw || parseError.message || 'Réponse serveur illisible.');
+        }
+        if (!res.ok || data.ok === false) {
+            throw new Error(data.message || data.output || `Erreur HTTP ${res.status}`);
+        }
+        return data;
+    }
+
+    async function mdnsSaveEntries(button, restartAfter) {
+        if (mdnsActionRunning) return;
+        mdnsSetPageBusy(true, 'Enregistrement…');
+        mdnsSetButtonState(button, true);
+        mdnsSetBanner('Enregistrement du fichier mDNS…', 'running');
+
+        try {
+            const data = await mdnsPostJson(saveUrl, {rows: mdnsCollectRows()});
+            mdnsUpdateSummary(data.summary);
+
+            if (restartAfter) {
+                mdnsSetBanner('Fichier enregistré. Redémarrage du service mDNS…', 'running');
+                mdnsSetBusyLabel('Redémarrage…');
+                const actionData = await mdnsRunAction('restart', button, {inline: true});
+                if (!actionData || actionData.ok === false) return;
+                mdnsSetBanner('C’est bon : noms .local enregistrés et service redémarré.', 'success', 3000);
+            } else {
+                mdnsSetBanner(data.message || 'C’est bon : fichier mDNS enregistré.', 'success', 3000);
+            }
+            mdnsSetButtonState(button, false, true);
+        } catch (err) {
+            mdnsSetBanner(`Erreur : ${String(err.message || err)}. Consulte les logs mDNS.`, 'error');
+            mdnsSetButtonState(button, false, false);
+        } finally {
+            mdnsSetPageBusy(false);
+            await mdnsRefreshStatus();
+        }
+    }
+
+    async function mdnsRunAction(action, button, options) {
+        const inline = !!(options && options.inline);
+        const label = actionLabels[action] || action;
+
+        if (!inline) {
+            if (mdnsActionRunning) return null;
+            mdnsSetPageBusy(true, `mDNS : ${label}…`);
+            mdnsSetButtonState(button, true);
+            mdnsSetBanner(`mDNS : ${label} en cours…`, 'running');
+        }
+
+        try {
+            const data = await mdnsPostJson(actionUrl, {action});
+            if (data.mdns_log_tail !== undefined && mdnsEl('logBox')) mdnsEl('logBox').textContent = data.mdns_log_tail || '';
+            mdnsUpdateSummary(data.summary);
+            if (!inline) {
+                mdnsSetBanner(`C’est bon : ${label} terminé.`, 'success', 3000);
+                mdnsSetButtonState(button, false, true);
+            }
+            return data;
+        } catch (err) {
+            mdnsSetBanner(`Erreur pendant ${label} : ${String(err.message || err)}. Consulte les logs mDNS.`, 'error');
+            mdnsSetButtonState(button, false, false);
+            return {ok: false, message: String(err.message || err)};
+        } finally {
+            if (!inline) {
+                mdnsSetPageBusy(false);
+                await mdnsRefreshStatus();
+            }
+        }
+    }
+
+    async function mdnsRefreshLog(button) {
+        mdnsSetButtonState(button, true);
+        try {
+            const res = await fetch(logUrl, {cache: 'no-store'});
+            const data = await res.json();
+            if (mdnsEl('logBox')) mdnsEl('logBox').textContent = data.mdns_log_tail || '';
+            mdnsSetButtonState(button, false, true);
+        } catch (err) {
+            mdnsSetButtonState(button, false, false);
+            mdnsSetBanner(`Erreur lecture log : ${String(err.message || err)}`, 'error');
+        }
+    }
+
+    async function mdnsRefreshStatus() {
+        try {
+            const res = await fetch(statusUrl, {cache: 'no-store'});
+            const data = await res.json();
+            mdnsUpdateSummary(data.summary);
+            if (data.mdns_log_tail !== undefined && mdnsEl('logBox')) mdnsEl('logBox').textContent = data.mdns_log_tail || '';
+        } catch (err) {}
+    }
+
+    async function mdnsTestRow(button) {
+        if (mdnsActionRunning) return;
+        const tr = button.closest('tr');
+        const name = tr?.querySelector('.entry-name')?.value.trim() || '';
+        if (!name) {
+            mdnsSetBanner('Erreur : aucun nom .local à tester.', 'error');
+            return;
+        }
+
+        mdnsSetPageBusy(true, 'Test ping…');
+        mdnsSetButtonState(button, true);
+        mdnsSetBanner(`Test de ${name} depuis l’hôte Flask…`, 'running');
+        try {
+            const data = await mdnsPostJson(testUrl, {name});
+            mdnsSetBanner(data.message || `C’est bon : ${name} répond au ping.`, 'success', 3000);
+            mdnsSetButtonState(button, false, true);
+        } catch (err) {
+            mdnsSetBanner(`Erreur test ${name} : ${String(err.message || err)}. Consulte les logs mDNS si besoin.`, 'error');
+            mdnsSetButtonState(button, false, false);
+        } finally {
+            mdnsSetPageBusy(false);
+        }
+    }
+
+    window.mdnsRunAction = mdnsRunAction;
+    window.mdnsAddRow = mdnsAddRow;
+    window.mdnsSaveEntries = mdnsSaveEntries;
+    window.mdnsRefreshLog = mdnsRefreshLog;
+    window.mdnsTestRow = mdnsTestRow;
+    window.mdnsDeleteRow = mdnsDeleteRow;
+    window.mdnsFilterRows = mdnsFilterRows;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        mdnsUpdateActionButtons(initialSummary, true);
+        window.setInterval(mdnsRefreshStatus, 15000);
+    });
+
+})();
+</script>
+            </section>
+{% endblock %}

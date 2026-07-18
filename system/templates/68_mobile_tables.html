@@ -1,0 +1,364 @@
+/* ------------------------------------------------------------------
+   Mobile global : les tableaux deviennent une mosaique tactile.
+   Le script global de menu.html genere .yoleo-mobile-table-grid.
+   ------------------------------------------------------------------ */
+
+.yoleo-mobile-table-grid,
+.yoleo-mobile-row-modal {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    html,
+    body {
+        overflow-x: hidden !important;
+    }
+
+    .yoleo-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 1500;
+        min-height: 50px;
+        gap: 8px;
+        padding: 7px 9px;
+    }
+
+    .yoleo-page-title h1 {
+        font-size: 15px;
+    }
+
+    .yoleo-page-title p {
+        display: none;
+    }
+
+    .yoleo-clock {
+        min-width: 0;
+        padding: 6px 8px;
+        font-size: 13px;
+    }
+
+    .yoleo-top-weather {
+        min-height: 30px;
+        padding: 5px 8px;
+        font-size: 12px;
+    }
+
+    .yoleo-actions-toggle,
+    .yoleo-mobile-toggle {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+    }
+
+    :where(
+        .docker-page,
+        .disk-page,
+        .builds-page,
+        .partage-page,
+        .services-page,
+        .users-page,
+        .system-home,
+        .system-tools-page,
+        .terminal-page,
+        .vm-page,
+        .meteo-page,
+        .browser-page
+    ) {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    .summary-grid,
+    .nas-summary-grid,
+    .docker-containers-summary-compact,
+    .docker-stack-summary-compact,
+    .docker-lan-summary-grid,
+    .nft-fw-summary-grid,
+    .mini-summary-grid-compact {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 7px !important;
+    }
+
+    .summary-card,
+    .yoleo-card {
+        border-radius: 10px;
+    }
+
+    .summary-value {
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        font-size: 16px;
+    }
+
+    body.yoleo-mobile-mosaic-ready .mobile-list,
+    body.yoleo-mobile-mosaic-ready .mobile-cards {
+        display: none !important;
+    }
+
+    .yoleo-mobile-source-wrap {
+        display: none !important;
+    }
+
+    .yoleo-mobile-table-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+        gap: 10px;
+        width: 100%;
+        padding: 10px;
+    }
+
+    .yoleo-mobile-table-grid:empty {
+        display: none;
+    }
+
+    .yoleo-mobile-table-tile {
+        min-width: 0;
+        min-height: 94px;
+        display: grid;
+        grid-template-rows: 42px auto auto;
+        justify-items: center;
+        align-items: center;
+        gap: 5px;
+        padding: 10px 7px 9px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 11px;
+        background: rgba(18, 26, 36, .92);
+        color: var(--yoleo-text);
+        font: inherit;
+        text-align: center;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
+    }
+
+    .yoleo-mobile-table-tile:active,
+    .yoleo-mobile-table-tile:focus-visible {
+        outline: 2px solid var(--yoleo-accent-2);
+        outline-offset: 2px;
+        border-color: var(--yoleo-accent-2);
+    }
+
+    .yoleo-mobile-tile-icon {
+        width: 40px;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, .08);
+        border-radius: 11px;
+        background: rgba(5, 8, 13, .82);
+        color: var(--yoleo-accent-2);
+        font-size: 21px;
+        font-weight: 900;
+        line-height: 1;
+        overflow: hidden;
+    }
+
+    .yoleo-mobile-tile-icon img {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+    }
+
+    .yoleo-mobile-tile-title,
+    .yoleo-mobile-tile-sub {
+        max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .yoleo-mobile-tile-title {
+        color: #fff;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
+    .yoleo-mobile-tile-sub {
+        color: var(--yoleo-muted);
+        font-size: 10px;
+        line-height: 1.2;
+    }
+
+    .yoleo-mobile-row-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 12000;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 12px;
+    }
+
+    .yoleo-mobile-row-modal.is-open {
+        display: flex;
+    }
+
+    .yoleo-mobile-row-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, .68);
+        backdrop-filter: blur(4px);
+    }
+
+    .yoleo-mobile-row-sheet {
+        position: relative;
+        width: min(100%, 520px);
+        max-height: 86dvh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 16px;
+        background: rgba(14, 20, 29, .98);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, .58);
+    }
+
+    .yoleo-mobile-row-head {
+        min-height: 58px;
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) 34px;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--yoleo-border-soft);
+        background: rgba(10, 15, 22, .82);
+    }
+
+    .yoleo-mobile-row-title {
+        min-width: 0;
+        color: #fff;
+        font-weight: 900;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .yoleo-mobile-row-subtitle {
+        margin-top: 2px;
+        min-width: 0;
+        color: var(--yoleo-muted);
+        font-size: 11px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .yoleo-mobile-row-close {
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 10px;
+        background: rgba(18, 26, 36, .82);
+        color: var(--yoleo-text);
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: 900;
+    }
+
+    .yoleo-mobile-row-body {
+        display: grid;
+        gap: 12px;
+        overflow: auto;
+        padding: 12px;
+    }
+
+    .yoleo-mobile-row-details {
+        display: grid;
+        gap: 7px;
+    }
+
+    .yoleo-mobile-row-kv {
+        display: grid;
+        grid-template-columns: minmax(82px, .38fr) minmax(0, 1fr);
+        gap: 8px;
+        align-items: start;
+        padding: 8px;
+        border: 1px solid var(--yoleo-border-soft);
+        border-radius: 10px;
+        background: rgba(5, 8, 13, .55);
+    }
+
+    .yoleo-mobile-row-k {
+        color: #8fb4d6;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .yoleo-mobile-row-v {
+        min-width: 0;
+        color: #eef6ff;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
+    .yoleo-mobile-row-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .yoleo-mobile-row-actions:empty {
+        display: none;
+    }
+
+    .yoleo-mobile-action-btn {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 9px 10px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 10px;
+        background: #263242;
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 900;
+        text-decoration: none;
+    }
+
+    .yoleo-mobile-action-btn:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+    }
+
+    .yoleo-mobile-action-btn.is-danger {
+        border-color: rgba(255, 93, 115, .55);
+        background: rgba(255, 93, 115, .15);
+        color: #ffd9df;
+    }
+
+    .yoleo-mobile-action-btn.is-primary {
+        border-color: var(--yoleo-accent-2);
+        background: rgba(26, 235, 255, .16);
+        color: #dffcff;
+    }
+
+    body.yoleo-mobile-row-open {
+        overflow: hidden !important;
+    }
+}
+
+@media (max-width: 460px) {
+    .yoleo-mobile-table-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .yoleo-mobile-table-tile {
+        min-height: 88px;
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+
+    .yoleo-mobile-row-actions {
+        grid-template-columns: 1fr;
+    }
+}

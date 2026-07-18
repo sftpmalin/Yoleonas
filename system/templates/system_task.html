@@ -1,0 +1,2457 @@
+{% extends "menu.html" %}
+{% block title %}Gestionnaire de tâches - Yoleo{% endblock %}
+{% block page_title %}Gestionnaire de tâches{% endblock %}
+{% block page_subtitle %}Tâches planifiées, exécutions manuelles et logs.{% endblock %}
+{% block head_extra %}
+<link rel="manifest" href="{{ url_for('task_bp.manifest') }}">
+<meta name="theme-color" content="#090c10">
+{% endblock %}
+{% block content %}
+<style>
+    *, *:before, *:after { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #090c10; }
+    body { overflow-x: hidden; }
+
+    :root {
+        --bg-main: #090c10;
+        --bg-card: #151b23;
+        --bg-soft: #0f141b;
+        --bg-soft-2: #0c1118;
+        --text-main: #c9d1d9;
+        --text-muted: #8b949e;
+        --accent: #00E5FF;
+        --accent-hover: #00bcd4;
+        --border: #30363d;
+        --success: #2ea043;
+        --warning: #d29922;
+        --danger: #f85149;
+        --info: #58a6ff;
+        --shadow: 0 14px 38px rgba(0,0,0,0.38);
+    }
+
+    .task-wrapper {
+        padding: 18px clamp(12px, 2.6vw, 30px) 28px;
+        background: linear-gradient(180deg, #070a0e 0%, #090c10 100%);
+        color: var(--text-main);
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        min-height: 100vh;
+    }
+
+    .max-w { max-width: 1500px; margin: 0 auto; }
+
+    .page-header {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 18px;
+    }
+
+    .page-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: clamp(22px, 2.2vw, 30px);
+        color: var(--accent);
+        font-weight: 800;
+        letter-spacing: 0.4px;
+        line-height: 1.15;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    .page-subtitle code {
+        color: var(--accent);
+        background: rgba(0,229,255,.08);
+        border: 1px solid rgba(0,229,255,.18);
+        border-radius: 6px;
+        padding: 2px 5px;
+    }
+
+    .tabs-shell {
+        background: #151c27;
+        border: 1px solid #333;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+    }
+
+    .tabs-bar {
+        display: flex;
+        border-bottom: 1px solid #2a3443;
+        background: #111822;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .tabs-bar::-webkit-scrollbar { display: none; }
+
+    .tab-btn {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: #c7d4e2;
+        padding: 16px 20px;
+        cursor: pointer;
+        font-weight: 800;
+        font-size: 14px;
+        white-space: nowrap;
+        border-bottom: 3px solid transparent;
+        transition: .18s ease;
+        min-height: 52px;
+    }
+    .tab-btn:hover { background: rgba(255,255,255,.04); color: #fff; }
+    .tab-btn.active {
+        color: #1AEBFF;
+        border-bottom-color: #1AEBFF;
+        background: rgba(26,235,255,.06);
+    }
+
+    .tab-panel {
+        display: none;
+        padding: 18px;
+        animation: panelFade .18s ease;
+    }
+    .tab-panel.active { display: block; }
+    @keyframes panelFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card {
+        background: linear-gradient(180deg, rgba(21,27,35,0.96) 0%, rgba(17,22,29,0.96) 100%);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: var(--shadow);
+        margin-bottom: 18px;
+    }
+    .card-accent { border-top: 3px solid var(--accent); }
+    .card-success { border-top: 3px solid var(--success); }
+    .card-warning { border-top: 3px solid var(--warning); }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 14px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        font-weight: 800;
+        margin-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 10px;
+        letter-spacing: 0.6px;
+    }
+
+    .title-meta { font-size: 11px; color: var(--text-muted); text-transform: none; font-weight: 500; }
+
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+    .mini-stat {
+        background: linear-gradient(180deg, var(--bg-soft) 0%, var(--bg-soft-2) 100%);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+    }
+    .mini-stat .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        letter-spacing: .45px;
+    }
+    .mini-stat .value {
+        font-size: clamp(22px, 2.2vw, 28px);
+        font-weight: 900;
+        color: var(--text-main);
+        line-height: 1;
+    }
+
+    .desktop-table-wrap {
+        overflow-x: auto;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.04);
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        min-width: 1120px;
+    }
+    th {
+        text-align: left;
+        padding: 12px;
+        color: var(--text-muted);
+        font-weight: 800;
+        text-transform: uppercase;
+        font-size: 11px;
+        border-bottom: 2px solid var(--border);
+        white-space: nowrap;
+        background: rgba(255,255,255,0.02);
+    }
+    td {
+        padding: 13px 12px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .task-title { font-weight: 800; color: var(--text-main); margin-bottom: 5px; line-height: 1.35; }
+    .task-desc, .tiny, .code-text { color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+    .code-text { font-family: Consolas, Monaco, monospace; word-break: break-word; }
+    .message-cell { max-width: 320px; font-family: Consolas, Monaco, monospace; color: #b1bac4; line-height: 1.5; word-break: break-word; }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-weight: 800;
+        font-size: 11px;
+        letter-spacing: .3px;
+        border: 1px solid transparent;
+        white-space: nowrap;
+        margin: 2px 0;
+    }
+    .badge-green { background: rgba(46,160,67,.15); color: #3fb950; border-color: rgba(46,160,67,.4); }
+    .badge-yellow { background: rgba(210,153,34,.15); color: #e3b341; border-color: rgba(210,153,34,.4); }
+    .badge-red { background: rgba(248,81,73,.15); color: #ff7b72; border-color: rgba(248,81,73,.4); }
+    .badge-blue { background: rgba(88,166,255,.12); color: #79c0ff; border-color: rgba(88,166,255,.35); }
+    .badge-gray { background: rgba(139,148,158,.1); color: var(--text-muted); border-color: var(--border); }
+    .badge-cyan { background: rgba(0,229,255,.1); color: var(--accent); border-color: rgba(0,229,255,.35); }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 14px;
+        font-size: 12px;
+        font-weight: 900;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        transition: .18s ease;
+        text-transform: uppercase;
+        min-height: 40px;
+        text-decoration: none;
+        box-sizing: border-box;
+        white-space: nowrap;
+    }
+    .btn-glow { background: var(--accent); color: #000; box-shadow: 0 0 10px rgba(0,229,255,.2); }
+    .btn-glow:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
+    .btn-outline:hover { background: var(--border); }
+    .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+    .btn-danger:hover { background: var(--danger); color: #fff; }
+    .btn-warning { background: rgba(210,153,34,.14); border: 1px solid rgba(210,153,34,.45); color: #e3b341; }
+    .btn-warning:hover { background: rgba(210,153,34,.25); }
+    .btn-success { background: rgba(46,160,67,.15); border: 1px solid rgba(46,160,67,.45); color: #3fb950; }
+    .btn-success:hover { background: rgba(46,160,67,.25); }
+    .icon-btn { width: 38px; height: 38px; padding: 0; border-radius: 10px; font-size: 15px; }
+    .action-row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap; }
+
+    .task-toolbar {
+        display: grid;
+        grid-template-columns: minmax(240px, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 14px;
+    }
+    .filter-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    .filter-chip {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,.03);
+        color: var(--text-main);
+        border-radius: 999px;
+        padding: 9px 11px;
+        font-size: 11px;
+        font-weight: 900;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: .18s ease;
+    }
+    .filter-chip:hover { background: rgba(255,255,255,.07); }
+    .filter-chip.active { color: #000; background: var(--accent); border-color: var(--accent); }
+    .filter-count { margin: 0 0 12px; color: var(--text-muted); font-size: 11px; }
+    .task-hidden { display: none !important; }
+    .no-match { display: none; margin-top: 12px; }
+
+    .cmd-wrap { margin-top: 7px; min-width: 220px; }
+    .cmd-list {
+        font-family: Consolas, Monaco, monospace;
+        word-break: break-word;
+        overflow: hidden;
+        transition: max-height .18s ease;
+    }
+    .cmd-list.compact { max-height: 58px; }
+    .cmd-list.expanded { max-height: 900px; }
+    .cmd-toggle {
+        appearance: none;
+        border: 1px solid rgba(0,229,255,.28);
+        background: rgba(0,229,255,.08);
+        color: var(--accent);
+        border-radius: 999px;
+        padding: 5px 9px;
+        margin-top: 6px;
+        font-size: 11px;
+        font-weight: 900;
+        cursor: pointer;
+    }
+    .cmd-toggle:hover { background: rgba(0,229,255,.14); }
+
+    .msg-wrap { margin-top: 7px; max-width: 340px; }
+    .msg-list {
+        overflow: hidden;
+        transition: max-height .18s ease;
+    }
+    .msg-list.compact { max-height: 64px; }
+    .msg-list.expanded { max-height: 900px; }
+    .msg-toggle { display: none; }
+    .msg-toggle.visible { display: inline-flex; }
+
+    .grid-form {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 15px;
+    }
+    .col-2 { grid-column: span 2; }
+    .col-4 { grid-column: span 4; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-weight: 800;
+        letter-spacing: .4px;
+    }
+    .form-control {
+        background: #010409;
+        border: 1px solid var(--border);
+        color: var(--text-main);
+        padding: 12px 13px;
+        border-radius: 10px;
+        font-family: Consolas, Monaco, monospace;
+        font-size: 13px;
+        transition: border .2s, box-shadow .2s;
+        min-height: 44px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    textarea.form-control { min-height: 85px; resize: vertical; }
+    .form-control:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,255,.12); }
+    .inline-time { display: flex; gap: 8px; }
+    .cron-custom-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(92px, 1fr));
+        gap: 10px;
+        align-items: end;
+    }
+    .cron-mini label {
+        display: block;
+        margin-bottom: 6px;
+        text-align: center;
+    }
+    .cron-mini .form-control {
+        text-align: center;
+        font-weight: 800;
+        font-size: 15px;
+    }
+    .cron-preview {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border: 1px solid rgba(0,229,255,.22);
+        border-radius: 12px;
+        background: rgba(0,229,255,.06);
+        color: var(--accent);
+        font-family: Consolas, Monaco, monospace;
+        font-size: 12px;
+        word-break: break-word;
+    }
+
+    .checkbox-line, .days-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .checkbox-line input, .days-row input {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent);
+    }
+    .days-row label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 999px;
+        padding: 8px 10px;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--text-main);
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .form-help {
+        color: var(--text-muted);
+        font-size: 11px;
+        line-height: 1.45;
+        margin-top: 5px;
+    }
+
+    .command-grid { display: grid; grid-template-columns: 42px 1fr; gap: 8px; align-items: center; }
+    .command-num {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: rgba(0,229,255,.08);
+        border: 1px solid rgba(0,229,255,.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent);
+        font-weight: 900;
+    }
+
+    .split-two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .log-box {
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        background: #05080c;
+        color: #bfe8ff;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        font-family: Consolas, Monaco, monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        min-height: 360px;
+        max-height: 520px;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .task-log-only .log-box {
+        min-height: 520px;
+        max-height: calc(100vh - 330px);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 28px !important;
+        color: var(--text-muted);
+        background: rgba(255,255,255,.015);
+        border-radius: 14px;
+    }
+
+    .mobile-cards { display: none; gap: 12px; }
+    .mobile-card {
+        background: linear-gradient(180deg, var(--bg-soft) 0%, var(--bg-soft-2) 100%);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px;
+        display: grid;
+        gap: 12px;
+    }
+    .mobile-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .mobile-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    .mobile-meta { background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.05); border-radius: 12px; padding: 10px; }
+    .mobile-meta .meta-label { color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .mobile-meta .meta-value { color: var(--text-main); font-size: 12px; line-height: 1.45; word-break: break-word; }
+
+    .notification-card {
+        display: none;
+        border-top: 3px solid var(--info);
+        margin-bottom: 18px;
+    }
+    .notification-card.show { display: block; }
+    .notification-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+    }
+    .notification-title {
+        font-size: 14px;
+        font-weight: 900;
+        color: #fff;
+        margin-bottom: 6px;
+    }
+    .notification-text {
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.55;
+    }
+    .notification-status {
+        margin-top: 8px;
+        color: var(--accent);
+        font-family: Consolas, Monaco, monospace;
+        font-size: 11px;
+        line-height: 1.45;
+    }
+    .notification-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(1, 4, 9, 0.76);
+        backdrop-filter: blur(10px);
+    }
+    .modal-backdrop.show { display: flex; animation: modalFade .16s ease; }
+    @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+    .confirm-modal {
+        width: min(520px, 100%);
+        background: linear-gradient(180deg, #182231 0%, #0f151e 100%);
+        border: 1px solid rgba(248,81,73,.38);
+        border-radius: 22px;
+        box-shadow: 0 24px 80px rgba(0,0,0,.58), 0 0 0 1px rgba(255,255,255,.03) inset;
+        padding: 22px;
+        color: var(--text-main);
+        transform: translateY(0);
+        animation: modalPop .18s ease;
+    }
+    @keyframes modalPop { from { transform: translateY(8px) scale(.98); opacity: .5; } to { transform: translateY(0) scale(1); opacity: 1; } }
+    .confirm-modal-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+    .confirm-modal-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(248,81,73,.14);
+        border: 1px solid rgba(248,81,73,.35);
+        font-size: 22px;
+        flex: 0 0 auto;
+    }
+    .confirm-modal-title { font-size: 18px; font-weight: 900; line-height: 1.25; margin: 0 0 6px; color: #fff; }
+    .confirm-modal-message { color: var(--text-main); font-size: 14px; line-height: 1.5; margin: 0; }
+    .confirm-modal-details {
+        background: rgba(255,255,255,.035);
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 14px;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.55;
+        padding: 12px;
+        margin: 14px 0 0;
+    }
+    .confirm-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+    .confirm-modal-actions .btn { min-width: 132px; }
+
+    @media (max-width: 1200px) {
+        .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .split-two { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 860px) {
+        .task-wrapper { padding: 14px 12px 22px; }
+        .task-page { padding:14px 12px 28px; }
+        .card { padding: 14px; border-radius: 16px; }
+        .grid-form { grid-template-columns: 1fr; }
+        .col-2, .col-4 { grid-column: span 1; }
+        .cron-custom-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .desktop-table-wrap { display: none; }
+        .mobile-cards { display: grid; }
+        .section-title { align-items: flex-start; flex-direction: column; }
+        .task-toolbar { grid-template-columns: 1fr; }
+        .filter-row { justify-content: flex-start; }
+    }
+    @media (max-width: 560px) {
+        .stat-grid, .mobile-meta-grid, .cron-custom-grid { grid-template-columns: 1fr; }
+        .tab-btn { flex: 1 0 auto; padding: 14px; font-size: 12px; min-height: 48px; }
+        .tab-panel { padding: 14px; }
+        .btn { width: 100%; }
+        .action-row { justify-content: stretch; flex-wrap: wrap; }
+        .icon-btn { width: calc(50% - 4px); }
+    }
+
+    .task-page {
+        --bg-main:#0e1218;
+        --bg-card:#131d2b;
+        --bg-soft:#0e1723;
+        --bg-soft-2:#101722;
+        --text-main:#e9eef5;
+        --text-muted:#99acc2;
+        --accent:#1AEBFF;
+        --accent-hover:#8cf5ff;
+        --border:#26364b;
+        --shadow:0 14px 30px rgba(0,0,0,.18);
+        padding:18px 18px 34px;
+        display:flex;
+        justify-content:center;
+        width:100%;
+    }
+    .task-page .task-wrapper {
+        width:100%;
+        min-height:auto;
+        background:transparent;
+        padding:0;
+        color:var(--text-main);
+    }
+    .task-page .max-w { width:100%; max-width:1420px; margin:0 auto; }
+    .task-page .tabs-shell { background:transparent; border:0; border-radius:0; box-shadow:none; overflow:visible; }
+    .task-page .task-subnav { margin-bottom:14px; align-items:center; }
+    .task-page .tab-panel { padding:16px; }
+    .task-page .card,
+    .task-page .mobile-card,
+    .task-page .mini-stat {
+        background:linear-gradient(180deg,#131d2b 0%,#101722 100%);
+        border:1px solid #26364b;
+        border-radius:16px;
+        box-shadow:0 14px 30px rgba(0,0,0,.18);
+    }
+    .task-page .card { padding:14px; margin-bottom:14px; }
+    .task-page .card-accent,
+    .task-page .card-success,
+    .task-page .card-warning { border-top:1px solid #26364b; }
+    .task-page .section-title { color:#1AEBFF; border-bottom:1px solid #273447; margin-bottom:12px; letter-spacing:0; }
+    .task-page .form-control { background:#07101b; border-color:#2b3d55; color:#eaf2ff; }
+    .task-page .desktop-table-wrap { border-color:#26364b; background:#0c131e; }
+    .task-page th { background:#1a2636; color:#a8eaff; border-bottom-color:#30435b; letter-spacing:0; }
+    .task-page td { border-bottom-color:#1d2c3f; }
+
+    /* Ajustement route /system/task : le panneau Tâches reprend toute la largeur du bandeau haut.
+       Le tableau principal reste sur la page sans ascenseur horizontal inutile. */
+    .task-page #tab-tasks.tab-panel { padding-left:0; padding-right:0; }
+    .task-page #tab-tasks .task-toolbar {
+        min-width:0;
+        grid-template-columns:minmax(240px, 430px) minmax(0, 1fr);
+        align-items:end;
+    }
+    .task-page #tab-tasks .filter-row {
+        min-width:0;
+        max-width:100%;
+        justify-content:flex-end;
+    }
+    .task-page #tab-tasks .filter-chip {
+        min-width:0;
+        flex:0 1 auto;
+    }
+    .task-page #tab-tasks table {
+        min-width:0;
+        width:100%;
+        table-layout:fixed;
+    }
+    .task-page #tab-tasks .desktop-table-wrap {
+        overflow-x:visible;
+        width:100%;
+    }
+    .task-page #tab-tasks th,
+    .task-page #tab-tasks td {
+        padding-left:8px;
+        padding-right:8px;
+    }
+    .task-page #tab-tasks th:nth-child(1) { width:13%; }
+    .task-page #tab-tasks th:nth-child(2) { width:15%; }
+    .task-page #tab-tasks th:nth-child(3) { width:11%; }
+    .task-page #tab-tasks th:nth-child(4) { width:15%; }
+    .task-page #tab-tasks th:nth-child(5) { width:12%; }
+    .task-page #tab-tasks th:nth-child(6) { width:18%; }
+    .task-page #tab-tasks th:nth-child(7) { width:16%; }
+    .task-page #tab-tasks th:nth-child(3),
+    .task-page #tab-tasks td:nth-child(3) {
+        padding-left:16px;
+    }
+    .task-page #tab-tasks th:nth-child(4),
+    .task-page #tab-tasks td:nth-child(4) {
+        padding-left:18px;
+    }
+    .task-page #tab-tasks th:nth-child(5),
+    .task-page #tab-tasks td:nth-child(5) {
+        padding-left:22px;
+    }
+    .task-page #tab-tasks th:nth-child(6),
+    .task-page #tab-tasks td:nth-child(6) {
+        padding-left:18px;
+    }
+    .task-page #tab-tasks td:nth-child(3) .badge,
+    .task-page #tab-tasks .activation-badges .badge,
+    .task-page #tab-tasks td:nth-child(5) .badge {
+        max-width:100%;
+        overflow:hidden;
+        text-overflow:ellipsis;
+    }
+    .task-page #tab-tasks td:nth-child(2) {
+        min-width:0;
+        overflow:visible;
+    }
+    .task-page #tab-tasks .task-schedule-badge {
+        display:inline-block;
+        width:100%;
+        max-width:170px;
+        min-width:0;
+        box-sizing:border-box;
+        white-space:normal;
+        overflow:visible;
+        text-overflow:clip;
+        overflow-wrap:anywhere;
+        word-break:normal;
+        line-height:1.24;
+        text-align:center;
+        vertical-align:top;
+    }
+    .task-page #tab-tasks .activation-badges {
+        display:flex;
+        align-items:center;
+        gap:6px;
+        flex-wrap:nowrap;
+        min-width:0;
+    }
+    .task-page #tab-tasks .task-chain-mode { margin-top:0; display:inline-flex; }
+    .task-page #tab-tasks .cmd-wrap { min-width:0; }
+    .task-page #tab-tasks .message-cell { max-width:none; }
+    .task-page #tab-tasks td:nth-child(7) {
+        overflow:visible;
+    }
+    .task-page #tab-tasks .action-row {
+        gap:4px;
+        width:100%;
+        min-width:0;
+        max-width:100%;
+        justify-content:flex-end;
+        flex-wrap:wrap;
+        overflow:visible;
+    }
+    .task-page #tab-tasks .action-row .icon-btn {
+        width:28px;
+        min-width:28px;
+        max-width:28px;
+        height:28px;
+        min-height:28px;
+        max-height:28px;
+        flex:0 0 28px;
+        aspect-ratio:1 / 1;
+        padding:0;
+        border-radius:8px;
+        font-size:12px;
+        line-height:1;
+        overflow:hidden;
+    }
+    .task-page .mini-stat .label,
+    .task-page .form-group label,
+    .task-page .option-group-title { letter-spacing:0; }
+
+    /* Formulaire creation/modification de tâche : dense, lisible et responsive. */
+    .task-page .task-create-card {
+        width:min(100%, 1080px);
+        margin:0 auto 14px;
+        padding:12px;
+        border-radius:12px;
+    }
+    .task-page .task-create-card .section-title {
+        margin-bottom:10px;
+        padding-bottom:8px;
+        font-size:15px;
+        line-height:1.2;
+    }
+    .task-page .task-create-card .title-meta { font-size:10px; }
+    .task-page .task-create-form {
+        display:grid;
+        gap:10px;
+    }
+    .task-page .task-form-section {
+        border:1px solid rgba(255,255,255,.07);
+        border-radius:10px;
+        background:rgba(255,255,255,.02);
+        padding:10px;
+    }
+    .task-page .task-form-section-head {
+        display:flex;
+        justify-content:space-between;
+        gap:10px;
+        align-items:flex-start;
+        margin-bottom:9px;
+        padding-bottom:7px;
+        border-bottom:1px solid rgba(255,255,255,.07);
+    }
+    .task-page .task-form-section-head span:first-child {
+        color:#1AEBFF;
+        font-weight:900;
+        font-size:12px;
+        line-height:1.15;
+        text-transform:uppercase;
+    }
+    .task-page .task-form-section-head span:last-child {
+        color:#99acc2;
+        font-size:10px;
+        line-height:1.35;
+        text-align:right;
+    }
+    .task-page .task-identity-grid,
+    .task-page .task-schedule-grid {
+        display:grid;
+        grid-template-columns:repeat(12, minmax(0, 1fr));
+        gap:9px 10px;
+        align-items:start;
+    }
+    .task-page .task-title-field { grid-column:span 7; }
+    .task-page .task-switch-grid {
+        grid-column:span 5;
+        display:grid;
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        gap:8px;
+    }
+    .task-page .task-description-field { grid-column:span 7; }
+    .task-page .task-chain-field { grid-column:span 5; }
+    .task-page .task-schedule-main { grid-column:span 5; }
+    .task-page .task-schedule-grid .schedule-field { grid-column:span 3; }
+    .task-page .task-schedule-grid .task-schedule-wide { grid-column:span 12; }
+    .task-page .task-create-card .form-group { gap:4px; }
+    .task-page .task-create-card .form-group label {
+        font-size:10px;
+        line-height:1.15;
+    }
+    .task-page .task-create-card .form-control {
+        min-height:36px;
+        padding:8px 10px;
+        border-radius:8px;
+        font-size:12px;
+        line-height:1.25;
+    }
+    .task-page .task-create-card textarea.form-control {
+        min-height:64px;
+    }
+    .task-page .task-create-card .form-help {
+        margin-top:3px;
+        font-size:10px;
+        line-height:1.35;
+    }
+    .task-page .task-switch-card {
+        position:relative;
+        display:flex;
+        align-items:flex-start;
+        gap:8px;
+        min-height:62px;
+        padding:9px;
+        border:1px solid #2b3d55;
+        border-radius:10px;
+        background:#0b1420;
+        cursor:pointer;
+    }
+    .task-page .task-switch-card input {
+        position:absolute;
+        opacity:0;
+        pointer-events:none;
+    }
+    .task-page .task-switch-card .switch-ui {
+        position:relative;
+        flex:0 0 30px;
+        width:30px;
+        height:17px;
+        margin-top:1px;
+        border:1px solid #40536c;
+        border-radius:999px;
+        background:#07101b;
+        transition:background .16s ease, border-color .16s ease;
+    }
+    .task-page .task-switch-card .switch-ui::after {
+        content:"";
+        position:absolute;
+        top:2px;
+        left:2px;
+        width:11px;
+        height:11px;
+        border-radius:999px;
+        background:#99acc2;
+        transition:transform .16s ease, background .16s ease;
+    }
+    .task-page .task-switch-card input:checked + .switch-ui {
+        border-color:rgba(26,235,255,.82);
+        background:rgba(26,235,255,.22);
+    }
+    .task-page .task-switch-card input:checked + .switch-ui::after {
+        transform:translateX(13px);
+        background:#1AEBFF;
+    }
+    .task-page .task-switch-text {
+        display:grid;
+        gap:3px;
+        min-width:0;
+    }
+    .task-page .task-switch-title {
+        color:#eaf2ff;
+        font-size:12px;
+        font-weight:900;
+        line-height:1.15;
+    }
+    .task-page .task-switch-help,
+    .task-page .task-choice-help {
+        color:#99acc2;
+        font-size:10px;
+        line-height:1.28;
+    }
+    .task-page .task-choice-grid {
+        display:grid;
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        gap:8px;
+    }
+    .task-page .task-choice-card {
+        position:relative;
+        display:grid;
+        gap:4px;
+        min-height:75px;
+        padding:9px;
+        border:1px solid #2b3d55;
+        border-radius:10px;
+        background:#0b1420;
+        cursor:pointer;
+        transition:border-color .16s ease, background .16s ease, box-shadow .16s ease;
+    }
+    .task-page .task-choice-card:hover,
+    .task-page .task-switch-card:hover {
+        border-color:rgba(26,235,255,.52);
+        background:#0d1927;
+    }
+    .task-page .task-choice-card.is-active {
+        border-color:rgba(26,235,255,.72);
+        background:rgba(26,235,255,.08);
+        box-shadow:0 0 0 1px rgba(26,235,255,.12) inset;
+    }
+    .task-page .task-choice-card input {
+        position:absolute;
+        opacity:0;
+        pointer-events:none;
+    }
+    .task-page .task-choice-title {
+        color:#eaf2ff;
+        font-size:12px;
+        font-weight:900;
+        line-height:1.15;
+    }
+    .task-page .task-choice-flag {
+        justify-self:start;
+        padding:3px 6px;
+        border:1px solid rgba(26,235,255,.32);
+        border-radius:999px;
+        color:#1AEBFF;
+        background:rgba(26,235,255,.08);
+        font-family:Consolas, Monaco, monospace;
+        font-size:10px;
+        font-weight:900;
+        line-height:1;
+    }
+    .task-page .task-choice-card:focus-within,
+    .task-page .task-switch-card:focus-within {
+        outline:2px solid rgba(26,235,255,.58);
+        outline-offset:2px;
+    }
+    .task-page .task-create-card .inline-time {
+        gap:6px;
+    }
+    .task-page .task-create-card .days-row {
+        gap:7px;
+    }
+    .task-page .task-create-card .days-row label {
+        min-height:30px;
+        padding:6px 9px;
+        border-radius:8px;
+        font-size:11px;
+    }
+    .task-page .task-create-card .days-row input {
+        width:15px;
+        height:15px;
+    }
+    .task-page .task-create-card .cron-custom-grid {
+        grid-template-columns:repeat(5, minmax(0, 1fr));
+        gap:7px;
+    }
+    .task-page .task-create-card .cron-mini label {
+        margin-bottom:4px;
+        font-size:9px;
+    }
+    .task-page .task-create-card .cron-preview {
+        margin-top:7px;
+        padding:7px 9px;
+        border-radius:8px;
+        font-size:11px;
+    }
+    .task-page .task-command-list {
+        display:grid;
+        gap:7px;
+    }
+    .task-page .task-create-card .command-grid {
+        grid-template-columns:34px minmax(0, 1fr);
+        gap:7px;
+    }
+    .task-page .task-create-card .command-num {
+        width:32px;
+        height:32px;
+        border-radius:8px;
+        font-size:12px;
+    }
+    .task-page .task-create-actions .action-row {
+        gap:7px;
+    }
+    .task-page .task-create-actions .btn {
+        min-height:36px;
+        padding:8px 11px;
+        border-radius:8px;
+        font-size:11px;
+    }
+    @media (max-width:1180px) {
+        .task-page .task-create-card { width:100%; }
+        .task-page .task-title-field,
+        .task-page .task-switch-grid,
+        .task-page .task-description-field,
+        .task-page .task-chain-field,
+        .task-page .task-schedule-main,
+        .task-page .task-schedule-grid .schedule-field {
+            grid-column:span 6;
+        }
+        .task-page .task-switch-grid,
+        .task-page .task-choice-grid {
+            grid-template-columns:1fr;
+        }
+        .task-page .task-choice-card { min-height:auto; }
+    }
+    @media (max-width:760px) {
+        .task-page .task-create-card {
+            padding:10px;
+            border-radius:10px;
+        }
+        .task-page .task-identity-grid,
+        .task-page .task-schedule-grid,
+        .task-page .task-switch-grid,
+        .task-page .task-choice-grid,
+        .task-page .task-create-card .cron-custom-grid {
+            grid-template-columns:1fr;
+        }
+        .task-page .task-title-field,
+        .task-page .task-switch-grid,
+        .task-page .task-description-field,
+        .task-page .task-chain-field,
+        .task-page .task-schedule-main,
+        .task-page .task-schedule-grid .schedule-field,
+        .task-page .task-schedule-grid .task-schedule-wide {
+            grid-column:1;
+        }
+        .task-page .task-form-section-head {
+            display:grid;
+        }
+        .task-page .task-form-section-head span:last-child {
+            text-align:left;
+        }
+        .task-page .task-switch-card,
+        .task-page .task-choice-card {
+            min-height:auto;
+        }
+    }
+    @media (max-width:560px) {
+        .task-page .task-create-card .task-switch-card {
+            min-height:40px;
+        }
+        .task-page .task-create-card .task-switch-card .switch-ui {
+            flex-basis:32px;
+            width:32px;
+            height:18px;
+        }
+        .task-page .task-create-card .task-switch-card .switch-ui::after {
+            width:12px;
+            height:12px;
+        }
+        .task-page .task-create-card .task-switch-card input:checked + .switch-ui::after {
+            transform:translateX(14px);
+        }
+        .task-page .task-create-actions .action-row {
+            align-items:stretch;
+        }
+        .task-page .task-create-actions .btn {
+            width:100%;
+        }
+    }
+    @media (max-width:1280px) {
+        .task-page #tab-tasks .task-toolbar { grid-template-columns:1fr; }
+        .task-page #tab-tasks .filter-row { justify-content:flex-start; }
+    }
+    @media (max-width:900px) {
+        .task-page #tab-tasks .desktop-table-wrap { display:none !important; }
+        .task-page #tab-tasks .desktop-table-wrap + .yoleo-mobile-table-grid { display:none !important; }
+        body.yoleo-mobile-mosaic-ready .task-page #tab-tasks .mobile-cards,
+        .task-page #tab-tasks .mobile-cards { display:grid !important; }
+    }
+    @media (max-width:700px) {
+        .task-page { padding:10px; }
+    }
+</style>
+
+<div class="task-page">
+<div class="task-wrapper">
+    <div class="max-w">
+        <div class="tabs-shell">
+            <nav class="yoleo-subnav service-inner-subnav task-subnav" aria-label="Navigation tâches">
+                <a class="yoleo-subnav-link {{ 'is-active' if active_tab == 'tasks' else '' }}" href="{{ url_for('task_bp.task_home') }}">📋 Tâches</a>
+                <a class="yoleo-subnav-link {{ 'is-active' if active_tab == 'create' else '' }}" href="{{ url_for('task_bp.task_new') }}">➕ Créer</a>
+                <a class="yoleo-subnav-link {{ 'is-active' if active_tab == 'progress' else '' }}" href="{{ url_for('task_bp.task_progress', log_task=selected_log_task) }}">🧾 Logs</a>
+                <a class="yoleo-subnav-link {{ 'is-active' if active_tab == 'info' else '' }}" href="{{ url_for('task_bp.task_info') }}">ℹ️ Info</a>
+            </nav>
+
+            <!-- ====================================================== -->
+            <!-- ONGLET INFO -->
+            <!-- ====================================================== -->
+            <section id="tab-info" class="tab-panel {{ 'active' if active_tab == 'info' else '' }}">
+                <div class="card card-accent">
+                    <div class="section-title">
+                        <span>ℹ️ Infos Task Manager</span>
+                    </div>
+                    <div class="page-subtitle">
+                        Moteur universel : une tâche = une planification + jusqu’à 5 commandes/scripts.<br>
+                        Stockage SQLite dans <code>{{ conf.TASK_DB }}</code>, cron généré dans <code>{{ conf.CRON_FILE }}</code>.
+                    </div>
+                </div>
+
+        <div class="card notification-card" id="push-card">
+            <div class="notification-grid">
+                <div>
+                    <div class="notification-title">🔔 Notifications Task Manager</div>
+                    <div class="notification-text">
+                        Abonne ce navigateur/téléphone une seule fois. Ensuite, chaque tâche envoie une notification uniquement si sa case “recevoir une notification” est cochée et que l’exécution finit en succès.
+                    </div>
+                    <div class="notification-status" id="push-status">Vérification des notifications...</div>
+                </div>
+                <div class="notification-actions">
+                    <button type="button" class="btn btn-glow" id="push-subscribe-btn" onclick="enablePushNotifications()">🔔 Activer</button>
+                    <button type="button" class="btn btn-outline" id="push-test-btn" onclick="sendPushTest()">🧪 Test</button>
+                    <button type="button" class="btn btn-outline" id="push-cleanup-btn" onclick="cleanupPushSubscriptions()">🧹 Nettoyer</button>
+                    <button type="button" class="btn btn-outline" id="push-unsubscribe-btn" onclick="disablePushNotifications()">🔕 Désabonner</button>
+                </div>
+            </div>
+        </div>
+
+            </section>
+
+            <!-- ====================================================== -->
+            <!-- ONGLET TÂCHES -->
+            <!-- ====================================================== -->
+            <section id="tab-tasks" class="tab-panel {{ 'active' if active_tab == 'tasks' else '' }}">
+                <div class="stat-grid">
+                    <div class="mini-stat"><div class="label">Total</div><div class="value" id="stat-total">{{ stats.total }}</div></div>
+                    <div class="mini-stat"><div class="label">Activées</div><div class="value" id="stat-enabled">{{ stats.enabled }}</div></div>
+                    <div class="mini-stat"><div class="label">Désactivées</div><div class="value" id="stat-disabled">{{ stats.disabled }}</div></div>
+                    <div class="mini-stat"><div class="label">En cours</div><div class="value" id="stat-running">{{ stats.running }}</div></div>
+                </div>
+
+                <div class="card card-accent">
+                    <div class="section-title">
+                        <span>📋 Tableau des tâches</span>
+                        <span class="title-meta">Activation corrigée : case cochée = activé, case décochée = désactivé</span>
+                    </div>
+
+                    <div class="task-toolbar">
+                        <div class="form-group" style="gap:6px;">
+                            <label for="task-search">Recherche</label>
+                            <input type="search" class="form-control" id="task-search" placeholder="Tape un mot, un script, une heure, un statut..." oninput="filterTasks()">
+                        </div>
+                        <div class="filter-row" aria-label="Filtres de tâches">
+                            <button type="button" class="filter-chip active" data-filter="all" onclick="setTaskFilter('all', this)">Toutes</button>
+                            <button type="button" class="filter-chip" data-filter="multi_day" onclick="setTaskFilter('multi_day', this)">Plusieurs / jour</button>
+                            <button type="button" class="filter-chip" data-filter="daily" onclick="setTaskFilter('daily', this)">Tous les jours</button>
+                            <button type="button" class="filter-chip" data-filter="weekly" onclick="setTaskFilter('weekly', this)">Semaine</button>
+                            <button type="button" class="filter-chip" data-filter="monthly" onclick="setTaskFilter('monthly', this)">Mois</button>
+                            <button type="button" class="filter-chip" data-filter="yearly" onclick="setTaskFilter('yearly', this)">Année</button>
+                            <button type="button" class="filter-chip" data-filter="custom" onclick="setTaskFilter('custom', this)">Personnalisé</button>
+                            <button type="button" class="filter-chip" data-filter="manual" onclick="setTaskFilter('manual', this)">Manuel</button>
+                        </div>
+                    </div>
+                    <div class="filter-count" id="filter-visible-count">—</div>
+
+                    {% if not tasks %}
+                        <div class="empty-state" data-yoleo-context-zone="task-empty">Aucune tâche pour le moment. Va dans l’onglet “Créer / Modifier”.</div>
+                    {% else %}
+                        <div class="desktop-table-wrap" data-yoleo-context-zone="task-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Tâche</th>
+                                        <th>Planification</th>
+                                        <th>Commandes</th>
+                                        <th>Activation</th>
+                                        <th>Dernier état</th>
+                                        <th>Dernière exécution</th>
+                                        <th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for task in tasks %}
+                                    {% set st = task.status %}
+                                    <tr id="task-row-{{ task.id }}" data-task-row="1" data-task-id="{{ task.id }}" data-schedule-category="{{ task.schedule_category }}" data-search="{{ (task.title ~ ' ' ~ (task.description or '') ~ ' ' ~ task.schedule_label ~ ' ' ~ (task.commands|join(' ')) ~ ' ' ~ st.status ~ ' ' ~ (st.last_message or ''))|upper }}">
+                                        <td>
+                                            <div class="task-title">{{ task.title }}</div>
+                                            <div class="tiny">ID interne : {{ task.id }}</div>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-cyan task-schedule-badge">{{ task.schedule_label }}</span>
+                                        </td>
+                                        <td>
+                                            {% if task.commands_count > 0 %}
+                                                <span class="badge badge-blue">{{ task.commands_count }} commande(s)</span>
+                                            {% else %}
+                                                <span class="badge badge-gray">Aucune commande</span>
+                                            {% endif %}
+                                        </td>
+                                        <td id="task-enabled-cell-{{ task.id }}">
+                                            <div class="activation-badges">
+                                                {% if task.enabled %}
+                                                    <span id="task-enabled-badge-{{ task.id }}" class="badge badge-green">Activé</span>
+                                                {% else %}
+                                                    <span id="task-enabled-badge-{{ task.id }}" class="badge badge-gray">Désactivé</span>
+                                                {% endif %}
+                                                <span class="task-chain-mode">
+                                                    {% if task.chain_mode == 'continue' %}
+                                                        <span class="badge badge-yellow">Continue</span>
+                                                    {% else %}
+                                                        <span class="badge badge-yellow">Stop</span>
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+                                            {% if task.notify_success %}
+                                                <div style="margin-top:6px;"><span class="badge badge-blue">🔔 Notification succès</span></div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if st.running %}
+                                                <span id="task-status-badge-{{ task.id }}" class="badge badge-yellow">{{ st.status }}</span>
+                                            {% elif st.result == 'Erreur' %}
+                                                <span id="task-status-badge-{{ task.id }}" class="badge badge-red">{{ st.status }}</span>
+                                            {% elif st.result == 'Arrêté' %}
+                                                <span id="task-status-badge-{{ task.id }}" class="badge badge-yellow">{{ st.status }}</span>
+                                            {% elif st.result == 'Succès' %}
+                                                <span id="task-status-badge-{{ task.id }}" class="badge badge-green">{{ st.status }}</span>
+                                            {% else %}
+                                                <span id="task-status-badge-{{ task.id }}" class="badge badge-gray">{{ st.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="tiny" id="task-last-run-{{ task.id }}">Début : {{ st.last_run or '—' }}</div>
+                                            <div class="tiny" id="task-last-end-{{ task.id }}">Fin : {{ st.last_end or '—' }}</div>
+                                            <div class="tiny" id="task-source-{{ task.id }}">Source : {{ st.source or '—' }}</div>
+                                        </td>
+                                        <td>
+                                            <div class="action-row">
+                                                <a href="{{ url_for('task_bp.task_edit', task_id=task.id) }}" class="btn btn-outline icon-btn" title="Réouvrir dans le formulaire">✏️</a>
+                                                <a href="{{ url_for('task_bp.task_run', task_id=task.id) }}" class="btn btn-glow icon-btn" title="Lancer maintenant" onclick="return launchTask({{ task.id }}, event)">▶</a>
+                                                <button type="button" class="btn btn-danger icon-btn" title="Forcer l'arrêt de la tâche" onclick="return stopTask({{ task.id }}, event)">⛔</button>
+                                                <button type="button" class="btn btn-outline icon-btn" title="Voir les logs" onclick="openLogs({{ task.id }})">🧾</button>
+                                                <button type="button" id="task-toggle-btn-{{ task.id }}" data-enabled="{{ 1 if task.enabled else 0 }}" class="btn {{ 'btn-warning' if task.enabled else 'btn-success' }} icon-btn" title="{{ 'Désactiver' if task.enabled else 'Activer' }}" onclick="return toggleTask({{ task.id }}, event)">{{ '⏸' if task.enabled else '✅' }}</button>
+                                                <button type="button" class="btn btn-danger icon-btn" title="Supprimer" onclick="return confirmDeleteTask({{ task.id }}, event)">🗑️</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mobile-cards">
+                        {% for task in tasks %}
+                            {% set st = task.status %}
+                            <div class="mobile-card" data-task-card="1" data-task-id="{{ task.id }}" data-schedule-category="{{ task.schedule_category }}" data-search="{{ (task.title ~ ' ' ~ (task.description or '') ~ ' ' ~ task.schedule_label ~ ' ' ~ (task.commands|join(' ')) ~ ' ' ~ st.status ~ ' ' ~ (st.last_message or ''))|upper }}">
+                                <div class="mobile-card-head">
+                                    <div>
+                                        <div class="task-title">{{ task.title }}</div>
+                                        <div class="task-desc">{{ task.description or '—' }}</div>
+                                    </div>
+                                    <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+                                        {% if task.enabled %}<span id="mobile-task-enabled-badge-{{ task.id }}" class="badge badge-green">Activé</span>{% else %}<span id="mobile-task-enabled-badge-{{ task.id }}" class="badge badge-gray">Désactivé</span>{% endif %}
+                                        {% if task.notify_success %}<span class="badge badge-blue">🔔 Notif.</span>{% endif %}
+                                    </div>
+                                </div>
+                                <div class="mobile-meta-grid">
+                                    <div class="mobile-meta"><div class="meta-label">Planification</div><div class="meta-value">{{ task.schedule_label }}</div></div>
+                                    <div class="mobile-meta"><div class="meta-label">État</div><div class="meta-value" id="mobile-task-status-{{ task.id }}">{{ st.status }}</div></div>
+                                    <div class="mobile-meta"><div class="meta-label">Commandes</div><div class="meta-value">{{ task.commands_count }}</div></div>
+                                    <div class="mobile-meta"><div class="meta-label">Dernier run</div><div class="meta-value" id="mobile-task-last-run-{{ task.id }}">{{ st.last_run }}</div></div>
+                                </div>
+                                {% if task.commands_count > 0 %}
+                                    <div class="cmd-wrap">
+                                        <div class="cmd-list compact" id="mobile-cmd-list-{{ task.id }}">
+                                            {% for cmd in task.commands if cmd.strip() %}
+                                                <div class="code-text">{{ loop.index }}. {{ cmd }}</div>
+                                            {% endfor %}
+                                        </div>
+                                        {% if task.commands_count > 2 or (task.commands|join(' ')|length > 140) %}
+                                            <button type="button" class="cmd-toggle" id="mobile-cmd-toggle-{{ task.id }}" onclick="toggleCommands({{ task.id }})">⌄ Voir tout</button>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                                <div class="msg-wrap">
+                                    <div class="message-cell msg-list compact" id="mobile-task-message-{{ task.id }}">{{ st.last_message or '—' }}</div>
+                                    <button type="button" class="cmd-toggle msg-toggle" id="mobile-msg-toggle-{{ task.id }}" onclick="toggleMessage({{ task.id }})">⌄ Voir tout</button>
+                                </div>
+                                <div class="action-row">
+                                    <a href="{{ url_for('task_bp.task_edit', task_id=task.id) }}" class="btn btn-outline">✏️ Modifier</a>
+                                    <a href="{{ url_for('task_bp.task_run', task_id=task.id) }}" class="btn btn-glow" onclick="return launchTask({{ task.id }}, event)">▶ Lancer</a>
+                                    <button type="button" class="btn btn-danger" onclick="return stopTask({{ task.id }}, event)">⛔ Stop forcé</button>
+                                    <button type="button" class="btn btn-outline" onclick="openLogs({{ task.id }})">🧾 Logs</button>
+                                    <button type="button" id="mobile-task-toggle-btn-{{ task.id }}" data-enabled="{{ 1 if task.enabled else 0 }}" class="btn {{ 'btn-warning' if task.enabled else 'btn-success' }}" onclick="return toggleTask({{ task.id }}, event)">{{ '⏸ Désactiver' if task.enabled else '✅ Activer' }}</button>
+                                    <button type="button" class="btn btn-danger" onclick="return confirmDeleteTask({{ task.id }}, event)">🗑️ Supprimer</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                        <div class="empty-state no-match" id="task-no-match">Aucune tâche ne correspond à cette recherche.</div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- ====================================================== -->
+            <!-- ONGLET FORMULAIRE -->
+            <!-- ====================================================== -->
+            <section id="tab-create" class="tab-panel {{ 'active' if active_tab == 'create' else '' }}">
+                <div class="card card-success task-create-card">
+                    <div class="section-title">
+                        <span>{{ '✏️ Modifier la tâche' if is_edit else '➕ Créer une nouvelle tâche' }}</span>
+                        <span class="title-meta">L’ID est automatique et invisible dans le formulaire normal.</span>
+                    </div>
+
+                    <form method="post" action="{{ url_for('task_bp.task_save') }}">
+                        <input type="hidden" name="task_id" value="{{ edit_task.id if is_edit else '' }}">
+
+                        <div class="task-create-form">
+                            <div class="task-form-section task-section-main">
+                                <div class="task-form-section-head">
+                                    <span>Identité</span>
+                                    <span>Titre lisible, état cron et comportement des commandes.</span>
+                                </div>
+                                <div class="task-identity-grid">
+                                    <div class="form-group task-title-field">
+                                        <label>Titre</label>
+                                        <input type="text" class="form-control" name="title" value="{{ edit_task.title }}" placeholder="ex: MB Plus belle la vie" required>
+                                    </div>
+
+                                    <div class="task-switch-grid">
+                                        <label class="task-switch-card" for="enabled">
+                                            <input type="checkbox" name="enabled" id="enabled" value="1" {% if edit_task.enabled %}checked{% endif %}>
+                                            <span class="switch-ui" aria-hidden="true"></span>
+                                            <span class="task-switch-text">
+                                                <span class="task-switch-title">Activée</span>
+                                                <span class="task-switch-help">Génère la ligne cron si la planification n’est pas manuelle.</span>
+                                            </span>
+                                        </label>
+                                        <label class="task-switch-card" for="notify_success">
+                                            <input type="checkbox" name="notify_success" id="notify_success" value="1" {% if edit_task.notify_success %}checked{% endif %}>
+                                            <span class="switch-ui" aria-hidden="true"></span>
+                                            <span class="task-switch-text">
+                                                <span class="task-switch-title">Notification succès</span>
+                                                <span class="task-switch-help">Envoie “Task Manager” + le titre si tout se termine correctement.</span>
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    <div class="form-group task-description-field">
+                                        <label>Description</label>
+                                        <textarea class="form-control" name="description" placeholder="Description lisible pour le tableau">{{ edit_task.description }}</textarea>
+                                    </div>
+
+                                    <div class="form-group task-chain-field">
+                                        <label>Mode chaîne</label>
+                                        <div class="task-choice-grid" role="radiogroup" aria-label="Mode chaîne">
+                                            <label class="task-choice-card {% if edit_task.chain_mode != 'continue' %}is-active{% endif %}">
+                                                <input type="radio" name="chain_mode" value="and" {% if edit_task.chain_mode != 'continue' %}checked{% endif %}>
+                                                <span class="task-choice-title">Stop si erreur</span>
+                                                <span class="task-choice-help">Arrête les commandes suivantes dès qu’une ligne échoue.</span>
+                                                <span class="task-choice-flag">&&</span>
+                                            </label>
+                                            <label class="task-choice-card {% if edit_task.chain_mode == 'continue' %}is-active{% endif %}">
+                                                <input type="radio" name="chain_mode" value="continue" {% if edit_task.chain_mode == 'continue' %}checked{% endif %}>
+                                                <span class="task-choice-title">Continuer</span>
+                                                <span class="task-choice-help">Lance les lignes suivantes même si une commande retourne une erreur.</span>
+                                                <span class="task-choice-flag">;</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="task-form-section task-section-schedule">
+                                <div class="task-form-section-head">
+                                    <span>Planification</span>
+                                    <span>Manuel, récurrence simple ou expression cron complète.</span>
+                                </div>
+                                <div class="task-schedule-grid">
+                                    <div class="form-group task-schedule-main">
+                                        <label>Quand lancer la tâche ?</label>
+                                        <select class="form-control" name="schedule_type" id="schedule_type" onchange="refreshScheduleFields()">
+                                            {% for value, label in schedule_labels.items() %}
+                                                <option value="{{ value }}" {% if edit_task.schedule_type == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="form-help">“Manuel uniquement” garde la tâche dans le tableau sans ligne cron.</div>
+                                    </div>
+
+                                    <div class="form-group schedule-field schedule-time">
+                                        <label>Heure</label>
+                                        <div class="inline-time">
+                                            <input type="number" class="form-control" name="time_hour" value="{{ edit_task.time_hour }}" min="0" max="23" style="text-align:center;">
+                                            <input type="number" class="form-control" name="time_minute" value="{{ edit_task.time_minute }}" min="0" max="59" style="text-align:center;">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group schedule-field schedule-every-minutes">
+                                        <label>Toutes les X minutes</label>
+                                        <input type="number" class="form-control" name="every_minutes" value="{{ edit_task.every_minutes }}" min="1" max="59">
+                                    </div>
+
+                                    <div class="form-group schedule-field schedule-every-hours">
+                                        <label>Toutes les X heures</label>
+                                        <input type="number" class="form-control" name="every_hours" value="{{ edit_task.every_hours }}" min="1" max="23">
+                                    </div>
+
+                                    <div class="form-group schedule-field schedule-week-days task-schedule-wide">
+                                        <label>Jours sélectionnés</label>
+                                        {% set selected_days = (edit_task.week_days or '').split(',') %}
+                                        <div class="days-row">
+                                            {% for value, label in days_labels.items() %}
+                                                <label><input type="checkbox" name="week_days" value="{{ value }}" {% if value in selected_days %}checked{% endif %}> {{ label }}</label>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group schedule-field schedule-month-day">
+                                        <label>Jour du mois</label>
+                                        <input type="number" class="form-control" name="month_day" value="{{ edit_task.month_day }}" min="1" max="31">
+                                    </div>
+
+                                    <div class="form-group schedule-field schedule-month">
+                                        <label>Mois</label>
+                                        <input type="number" class="form-control" name="month" value="{{ edit_task.month }}" min="1" max="12">
+                                    </div>
+
+                                    <div class="form-group schedule-field schedule-custom-cron task-schedule-wide">
+                                        <label>Cron personnalisé</label>
+                                        <div class="cron-custom-grid">
+                                            <div class="cron-mini">
+                                                <label title="Minute">Minute</label>
+                                                <input type="text" class="form-control cron-part" name="custom_cron_minute" value="{{ edit_task.custom_cron_minute or '*' }}" maxlength="64" placeholder="*" oninput="updateCronPreview()">
+                                            </div>
+                                            <div class="cron-mini">
+                                                <label title="Heure">Heure</label>
+                                                <input type="text" class="form-control cron-part" name="custom_cron_hour" value="{{ edit_task.custom_cron_hour or '*' }}" maxlength="64" placeholder="*" oninput="updateCronPreview()">
+                                            </div>
+                                            <div class="cron-mini">
+                                                <label title="Jour du mois">Jour</label>
+                                                <input type="text" class="form-control cron-part" name="custom_cron_day" value="{{ edit_task.custom_cron_day or '*' }}" maxlength="64" placeholder="*" oninput="updateCronPreview()">
+                                            </div>
+                                            <div class="cron-mini">
+                                                <label title="Mois">Mois</label>
+                                                <input type="text" class="form-control cron-part" name="custom_cron_month" value="{{ edit_task.custom_cron_month or '*' }}" maxlength="64" placeholder="*" oninput="updateCronPreview()">
+                                            </div>
+                                            <div class="cron-mini">
+                                                <label title="Jour de semaine">Semaine</label>
+                                                <input type="text" class="form-control cron-part" name="custom_cron_weekday" value="{{ edit_task.custom_cron_weekday or '*' }}" maxlength="64" placeholder="*" oninput="updateCronPreview()">
+                                            </div>
+                                        </div>
+                                        <div class="cron-preview" id="cron-preview">* * * * *</div>
+                                        <div class="form-help">Ordre Linux : minute heure jour-du-mois mois jour-semaine. Exemples : <code>*/5 * * * *</code> ou <code>0 12 * * 1-5</code>.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="task-form-section task-section-commands">
+                                <div class="task-form-section-head">
+                                    <span>Commandes / scripts</span>
+                                    <span>Une à cinq lignes, exécutées dans l’ordre.</span>
+                                </div>
+                                <div class="task-command-list">
+                                    {% for i in range(1, 6) %}
+                                        <div class="command-grid">
+                                            <div class="command-num">{{ i }}</div>
+                                            <input type="text" class="form-control" name="command_{{ i }}" value="{{ edit_task.commands[i-1] if edit_task.commands and edit_task.commands|length >= i else '' }}" placeholder="Commande ou script {{ i }}">
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="form-help">Exemple : <code>/usr/bin/python3 /mnt/user/dockers/scripts/MB_plus_belle_la_vie.py</code></div>
+                            </div>
+
+                            <div class="form-group task-create-actions">
+                                <div class="action-row" style="justify-content:flex-start;">
+                                    <button type="submit" class="btn btn-glow">💾 {{ 'Enregistrer les modifications' if is_edit else 'Créer la tâche' }}</button>
+                                    <a href="{{ url_for('task_bp.task_new') }}" class="btn btn-outline">🧹 Nouveau formulaire</a>
+                                    <a href="{{ url_for('task_bp.task_home') }}" class="btn btn-outline">📋 Retour tableau</a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- ====================================================== -->
+            <!-- ONGLET LOGS -->
+            <!-- ====================================================== -->
+            <section id="tab-progress" class="tab-panel {{ 'active' if active_tab == 'progress' else '' }}">
+                <div class="card card-success task-log-only">
+                    <div class="section-title">
+                        <span>🧾 Logs SQLite</span>
+                        <span class="title-meta">Table <code>task_log</code></span>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label>Choisir une tâche</label>
+                        <select class="form-control" id="log-task-select" onchange="loadTaskLog()">
+                            {% for task in tasks %}
+                                <option value="{{ task.id }}" {% if selected_log_task|int == task.id %}selected{% endif %}>#{{ task.id }} - {{ task.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <pre class="log-box" id="log-box">Sélectionne une tâche pour voir ses logs.</pre>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+</div>
+
+<div class="modal-backdrop" id="confirm-modal" aria-hidden="true">
+    <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="confirm-modal-head">
+            <div class="confirm-modal-icon" id="confirm-modal-icon">⛔</div>
+            <div>
+                <h2 class="confirm-modal-title" id="confirm-modal-title">Confirmation</h2>
+                <p class="confirm-modal-message" id="confirm-modal-message">Confirmer l’action ?</p>
+            </div>
+        </div>
+        <div class="confirm-modal-details" id="confirm-modal-details"></div>
+        <div class="confirm-modal-actions">
+            <button type="button" class="btn btn-outline" id="confirm-modal-cancel">Annuler</button>
+            <button type="button" class="btn btn-danger" id="confirm-modal-confirm">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTaskFilter = 'all';
+const TASK_HOME_URL = "{{ url_for('task_bp.task_home') }}";
+const TASK_NEW_URL = "{{ url_for('task_bp.task_new') }}";
+const TASK_PROGRESS_URL = "{{ url_for('task_bp.task_progress') }}";
+const TASK_INFO_URL = "{{ url_for('task_bp.task_info') }}";
+const TASK_ROUTES = {
+    tasks: TASK_HOME_URL,
+    create: TASK_NEW_URL,
+    progress: TASK_PROGRESS_URL,
+    info: TASK_INFO_URL
+};
+const TASK_API_STATUS_URL = "{{ url_for('task_bp.task_api_status') }}";
+const TASK_PUSH_CONFIG_URL = "{{ url_for('task_bp.task_api_push_config') }}";
+const TASK_PUSH_SUBSCRIBE_URL = "{{ url_for('task_bp.task_api_push_subscribe') }}";
+const TASK_PUSH_UNSUBSCRIBE_URL = "{{ url_for('task_bp.task_api_push_unsubscribe') }}";
+const TASK_PUSH_CLEANUP_URL = "{{ url_for('task_bp.task_api_push_cleanup') }}";
+const TASK_PUSH_TEST_URL = "{{ url_for('task_bp.task_api_push_test') }}";
+const TASK_SW_URL = "{{ url_for('task_bp.sw') }}";
+const TASK_SW_SCOPE = "/system/task/";
+const TASK_DELETE_BASE_URL = "{{ url_for('task_bp.task_delete', task_id=0).rsplit('/0', 1)[0] }}";
+const TASK_TOGGLE_BASE_URL = "{{ url_for('task_bp.task_toggle', task_id=0).rsplit('/0', 1)[0] }}";
+const TASK_STOP_BASE_URL = "{{ url_for('task_bp.task_stop', task_id=0).rsplit('/0', 1)[0] }}";
+const TASK_RUN_BASE_URL = "{{ url_for('task_bp.task_run', task_id=0).rsplit('/0', 1)[0] }}";
+const TASK_LOG_API_BASE_URL = "{{ url_for('task_bp.task_api_log', task_id=0).rsplit('/0', 1)[0] }}";
+const INITIAL_LOG_TASK = "{{ selected_log_task }}";
+let activeConfirmModalClose = null;
+let pushConfig = null;
+let pushSubscription = null;
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+}
+
+function setPushStatus(message, showCard = true) {
+    const card = document.getElementById('push-card');
+    const status = document.getElementById('push-status');
+    if (card && showCard) card.classList.add('show');
+    if (status) status.textContent = message || '';
+}
+
+function setPushButtons(state) {
+    const subscribe = document.getElementById('push-subscribe-btn');
+    const test = document.getElementById('push-test-btn');
+    const cleanup = document.getElementById('push-cleanup-btn');
+    const unsubscribe = document.getElementById('push-unsubscribe-btn');
+    const isOn = state === 'on';
+    if (subscribe) subscribe.style.display = isOn ? 'none' : 'inline-flex';
+    if (test) test.style.display = isOn ? 'inline-flex' : 'none';
+    if (cleanup) cleanup.style.display = 'inline-flex';
+    if (unsubscribe) unsubscribe.style.display = isOn ? 'inline-flex' : 'none';
+}
+
+let taskSwRegistrationPromise = null;
+
+function getTaskPushClientId() {
+    const key = 'yoleo_task_push_client_id';
+    try {
+        let value = localStorage.getItem(key);
+        if (!value) {
+            if (window.crypto && crypto.randomUUID) {
+                value = crypto.randomUUID();
+            } else {
+                value = 'client-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+            }
+            localStorage.setItem(key, value);
+        }
+        return value;
+    } catch (e) {
+        return 'volatile-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    }
+}
+
+function serializePushSubscription(subscription) {
+    const data = subscription && subscription.toJSON ? subscription.toJSON() : Object.assign({}, subscription || {});
+    data.yoleo_client_id = getTaskPushClientId();
+    data.yoleo_page_origin = window.location.origin;
+    return data;
+}
+
+async function getTaskServiceWorkerRegistration() {
+    if (!('serviceWorker' in navigator)) return null;
+
+    if (!taskSwRegistrationPromise) {
+        taskSwRegistrationPromise = navigator.serviceWorker.register(TASK_SW_URL, {scope: TASK_SW_SCOPE}).then(async (registration) => {
+            try {
+                if (registration.update) await registration.update();
+            } catch (e) {
+                console.warn('Mise à jour service worker Task Manager:', e);
+            }
+            return registration;
+        });
+    }
+
+    return taskSwRegistrationPromise;
+}
+
+async function initPushNotifications() {
+    const card = document.getElementById('push-card');
+    if (!card) return;
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+        setPushStatus('Notifications non supportées par ce navigateur.', false);
+        setPushButtons('off');
+        return;
+    }
+
+    card.classList.add('show');
+    try {
+        const resp = await fetch(TASK_PUSH_CONFIG_URL, {cache: 'no-store'});
+        pushConfig = await resp.json();
+        if (!pushConfig.ok || !pushConfig.public_key) {
+            setPushStatus('Notifications indisponibles : clé VAPID absente côté serveur.');
+            setPushButtons('off');
+            return;
+        }
+
+        const registration = await getTaskServiceWorkerRegistration();
+        if (!registration) {
+            setPushStatus('Service worker Task Manager indisponible.');
+            setPushButtons('off');
+            return;
+        }
+        pushSubscription = await registration.pushManager.getSubscription();
+        if (pushSubscription) {
+            const saveResp = await fetch(TASK_PUSH_SUBSCRIBE_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(serializePushSubscription(pushSubscription))
+            });
+            const saveData = await saveResp.json();
+            if (pushConfig) pushConfig.subscription_count = saveData.subscription_count || pushConfig.subscription_count || 0;
+            setPushStatus('Notifications activées sur ce navigateur. Abonnements actifs : ' + (saveData.subscription_count || pushConfig.subscription_count || 0) + (pushConfig.webpush_available ? '' : ' — pywebpush absent côté NAS.'));
+            setPushButtons('on');
+        } else if (Notification.permission === 'denied') {
+            setPushStatus('Notifications bloquées par le navigateur. Il faut les réautoriser dans les réglages du site.');
+            setPushButtons('off');
+        } else {
+            setPushStatus('Notifications non activées sur ce navigateur. Clique sur Activer pour t’abonner.');
+            setPushButtons('off');
+        }
+    } catch (e) {
+        console.error(e);
+        setPushStatus('Erreur pendant l’initialisation des notifications : ' + e);
+        setPushButtons('off');
+    }
+}
+
+async function enablePushNotifications() {
+    try {
+        if (!pushConfig) await initPushNotifications();
+        if (!pushConfig || !pushConfig.public_key) return;
+
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            setPushStatus('Notifications refusées par le navigateur.');
+            return;
+        }
+
+        const registration = await getTaskServiceWorkerRegistration();
+        if (!registration) {
+            setPushStatus('Service worker Task Manager indisponible.');
+            setPushButtons('off');
+            return;
+        }
+        pushSubscription = await registration.pushManager.getSubscription();
+        if (!pushSubscription) {
+            pushSubscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(pushConfig.public_key)
+            });
+        }
+
+        const resp = await fetch(TASK_PUSH_SUBSCRIBE_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(serializePushSubscription(pushSubscription))
+        });
+        const data = await resp.json();
+        if (pushConfig) pushConfig.subscription_count = data.subscription_count || pushConfig.subscription_count || 0;
+        setPushStatus(data.ok ? ('Notifications activées sur ce navigateur. Abonnements actifs : ' + (data.subscription_count || 0) + '.') : ('Erreur abonnement : ' + (data.message || 'inconnue')));
+        setPushButtons(data.ok ? 'on' : 'off');
+    } catch (e) {
+        console.error(e);
+        setPushStatus('Erreur abonnement notification : ' + e);
+        setPushButtons('off');
+    }
+}
+
+async function disablePushNotifications() {
+    try {
+        const registration = await getTaskServiceWorkerRegistration();
+        if (!registration) {
+            setPushStatus('Service worker Task Manager indisponible.');
+            setPushButtons('off');
+            return;
+        }
+        const sub = await registration.pushManager.getSubscription();
+        if (sub) {
+            await fetch(TASK_PUSH_UNSUBSCRIBE_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({endpoint: sub.endpoint})
+            });
+            await sub.unsubscribe();
+        }
+        pushSubscription = null;
+        setPushStatus('Notifications désactivées sur ce navigateur.');
+        setPushButtons('off');
+    } catch (e) {
+        console.error(e);
+        setPushStatus('Erreur désabonnement notification : ' + e);
+    }
+}
+
+async function sendPushTest() {
+    try {
+        const resp = await fetch(TASK_PUSH_TEST_URL, {method: 'POST', cache: 'no-store'});
+        const data = await resp.json();
+        let message = data.ok
+            ? ('Notification de test envoyée : ' + data.sent)
+            : ('Test impossible : ' + data.sent + ' envoyée, ' + data.failed + ' échec.');
+        if (!data.ok && data.details && data.details.length && data.details[0].error) {
+            message += ' Détail : ' + data.details[0].error;
+        }
+        if (!data.ok && data.subscription_count === 0) {
+            message += ' Aucun navigateur/téléphone actif enregistré côté serveur.';
+        }
+        setPushStatus(message);
+    } catch (e) {
+        console.error(e);
+        setPushStatus('Erreur test notification : ' + e);
+    }
+}
+
+async function cleanupPushSubscriptions() {
+    try {
+        const resp = await fetch(TASK_PUSH_CLEANUP_URL, {method: 'POST', cache: 'no-store'});
+        const data = await resp.json();
+        if (pushConfig) pushConfig.subscription_count = data.subscription_count || 0;
+        const removed = data.removed || 0;
+        const count = data.subscription_count || 0;
+        setPushStatus(removed
+            ? ('Nettoyage terminé : ' + removed + ' ancien(s) abonnement(s) supprimé(s). Abonnements actifs : ' + count + '.')
+            : ('Nettoyage terminé : aucun ancien abonnement à supprimer. Abonnements actifs : ' + count + '.'));
+    } catch (e) {
+        console.error(e);
+        setPushStatus('Erreur nettoyage notifications : ' + e);
+    }
+}
+
+function showConfirmModal(options) {
+    const cfg = Object.assign({
+        icon: '⚠️',
+        title: 'Confirmation',
+        message: 'Confirmer cette action ?',
+        details: '',
+        confirmLabel: 'Confirmer',
+        cancelLabel: 'Annuler',
+        danger: true
+    }, options || {});
+
+    const modal = document.getElementById('confirm-modal');
+    const icon = document.getElementById('confirm-modal-icon');
+    const title = document.getElementById('confirm-modal-title');
+    const message = document.getElementById('confirm-modal-message');
+    const details = document.getElementById('confirm-modal-details');
+    const cancelBtn = document.getElementById('confirm-modal-cancel');
+    const confirmBtn = document.getElementById('confirm-modal-confirm');
+
+    if (!modal || !cancelBtn || !confirmBtn) {
+        return Promise.resolve(false);
+    }
+
+    if (activeConfirmModalClose) activeConfirmModalClose(false);
+
+    icon.textContent = cfg.icon;
+    title.textContent = cfg.title;
+    message.textContent = cfg.message;
+    details.textContent = cfg.details || '';
+    details.style.display = cfg.details ? 'block' : 'none';
+    cancelBtn.textContent = cfg.cancelLabel;
+    confirmBtn.textContent = cfg.confirmLabel;
+    confirmBtn.className = cfg.danger ? 'btn btn-danger' : 'btn btn-glow';
+
+    return new Promise(resolve => {
+        let closed = false;
+
+        const close = (answer) => {
+            if (closed) return;
+            closed = true;
+            modal.classList.remove('show');
+            modal.setAttribute('aria-hidden', 'true');
+            document.removeEventListener('keydown', onKeyDown);
+            activeConfirmModalClose = null;
+            resolve(Boolean(answer));
+        };
+
+        const onKeyDown = (e) => {
+            if (e.key === 'Escape') close(false);
+            if (e.key === 'Enter') close(true);
+        };
+
+        activeConfirmModalClose = close;
+        cancelBtn.onclick = () => close(false);
+        confirmBtn.onclick = () => close(true);
+        modal.onclick = (e) => { if (e.target === modal) close(false); };
+
+        document.addEventListener('keydown', onKeyDown);
+        modal.classList.add('show');
+        modal.setAttribute('aria-hidden', 'false');
+        setTimeout(() => cancelBtn.focus(), 0);
+    });
+}
+
+async function confirmDeleteTask(taskId, event) {
+    if (event) event.preventDefault();
+
+    const ok = await showConfirmModal({
+        icon: '🗑️',
+        title: 'Supprimer cette tâche ?',
+        message: 'Voulez-vous vraiment supprimer cette tâche ?',
+        details: 'La tâche sera retirée de SQLite et le cron sera régénéré depuis la base. Le tableau ne sera pas rechargé.',
+        confirmLabel: 'Oui, supprimer',
+        cancelLabel: 'Annuler',
+        danger: true
+    });
+    if (!ok) return false;
+
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+
+    try {
+        const resp = await fetch(TASK_DELETE_BASE_URL + '/' + encodeURIComponent(taskId) + '?ajax=1', {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {
+                'X-Requested-With': 'fetch',
+                'Accept': 'application/json'
+            }
+        });
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || data.ok === false) {
+            await showConfirmModal({
+                icon: '⚠️',
+                title: 'Suppression impossible',
+                message: data.message || 'La tâche n’a pas pu être supprimée.',
+                details: '',
+                confirmLabel: 'OK',
+                cancelLabel: 'Fermer',
+                danger: true
+            });
+            return false;
+        }
+
+        removeTaskFromDom(taskId);
+        updateStatsFromPayload(data);
+        updateMainTaskRows(data.tasks || []);
+        refreshLogTaskOptions(data.tasks || [], taskId);
+        filterTasks();
+        setTimeout(refreshProgress, 150);
+    } catch (e) {
+        console.error(e);
+        await showConfirmModal({
+            icon: '⚠️',
+            title: 'Erreur navigateur',
+            message: 'Erreur pendant la suppression : ' + e,
+            details: '',
+            confirmLabel: 'OK',
+            cancelLabel: 'Fermer',
+            danger: true
+        });
+    } finally {
+        window.scrollTo(scrollX, scrollY);
+    }
+
+    return false;
+}
+
+function goNewTask() {
+    window.location.href = TASK_NEW_URL;
+}
+
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.task-subnav .yoleo-subnav-link').forEach(b => b.classList.remove('is-active'));
+    const panel = document.getElementById('tab-' + name);
+    if (panel) panel.classList.add('active');
+    if (btn) btn.classList.add('is-active');
+    const url = new URL(TASK_ROUTES[name] || TASK_HOME_URL, window.location.origin);
+    history.replaceState(null, '', url.toString());
+    if (name === 'progress') {
+        refreshProgress();
+        loadTaskLog();
+    }
+}
+
+function updateCronPreview() {
+    const preview = document.getElementById('cron-preview');
+    if (!preview) return;
+    const names = ['custom_cron_minute', 'custom_cron_hour', 'custom_cron_day', 'custom_cron_month', 'custom_cron_weekday'];
+    const parts = names.map(name => {
+        const el = document.querySelector(`[name="${name}"]`);
+        return el && el.value.trim() ? el.value.trim() : '*';
+    });
+    preview.textContent = parts.join(' ');
+}
+
+function refreshScheduleFields() {
+    const type = document.getElementById('schedule_type').value;
+    document.querySelectorAll('.schedule-field').forEach(el => el.style.display = 'none');
+
+    if (type === 'manual') {
+        updateCronPreview();
+        return;
+    }
+    if (type === 'every_minutes') {
+        show('.schedule-every-minutes');
+        return;
+    }
+    if (type === 'every_hours') {
+        show('.schedule-every-hours');
+        show('.schedule-time');
+        return;
+    }
+    if (type === 'daily') {
+        show('.schedule-time');
+        return;
+    }
+    if (type === 'week_days') {
+        show('.schedule-time');
+        show('.schedule-week-days');
+        return;
+    }
+    if (type === 'monthly') {
+        show('.schedule-time');
+        show('.schedule-month-day');
+        return;
+    }
+    if (type === 'yearly') {
+        show('.schedule-time');
+        show('.schedule-month-day');
+        show('.schedule-month');
+        updateCronPreview();
+        return;
+    }
+    if (type === 'custom') {
+        show('.schedule-custom-cron');
+        updateCronPreview();
+        return;
+    }
+    updateCronPreview();
+}
+
+function show(selector) {
+    document.querySelectorAll(selector).forEach(el => el.style.display = 'flex');
+}
+
+function badgeClass(result, running) {
+    if (running) return 'badge badge-yellow';
+    if (result === 'Erreur') return 'badge badge-red';
+    if (result === 'Succès') return 'badge badge-green';
+    if (result === 'Arrêté') return 'badge badge-yellow';
+    return 'badge badge-gray';
+}
+
+function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+function setBadge(id, text, cls) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = cls;
+    el.textContent = text;
+}
+
+function updateStatsFromPayload(data) {
+    if (!data || !data.stats) return;
+    const total = Number(data.stats.total || 0);
+    const enabled = Number(data.stats.enabled || 0);
+    const disabled = Number(data.stats.disabled ?? (total - enabled));
+    const running = Number(data.stats.running || 0);
+    setText('stat-total', total);
+    setText('stat-enabled', enabled);
+    setText('stat-disabled', disabled);
+    setText('stat-running', running);
+}
+
+function removeTaskFromDom(taskId) {
+    document.querySelectorAll('[data-task-id="' + String(taskId) + '"]').forEach(el => el.remove());
+    const select = document.getElementById('log-task-select');
+    if (select) {
+        Array.from(select.options).forEach(opt => {
+            if (String(opt.value) === String(taskId)) opt.remove();
+        });
+    }
+}
+
+function updateTaskActivationUi(taskId, enabled) {
+    const isEnabled = Number(enabled) === 1;
+    setBadge('task-enabled-badge-' + taskId, isEnabled ? 'Activé' : 'Désactivé', isEnabled ? 'badge badge-green' : 'badge badge-gray');
+    setBadge('mobile-task-enabled-badge-' + taskId, isEnabled ? 'Activé' : 'Désactivé', isEnabled ? 'badge badge-green' : 'badge badge-gray');
+
+    const desktopBtn = document.getElementById('task-toggle-btn-' + taskId);
+    if (desktopBtn) {
+        desktopBtn.dataset.enabled = isEnabled ? '1' : '0';
+        desktopBtn.className = isEnabled ? 'btn btn-warning icon-btn' : 'btn btn-success icon-btn';
+        desktopBtn.title = isEnabled ? 'Désactiver' : 'Activer';
+        desktopBtn.textContent = isEnabled ? '⏸' : '✅';
+        desktopBtn.disabled = false;
+        desktopBtn.style.opacity = '';
+    }
+
+    const mobileBtn = document.getElementById('mobile-task-toggle-btn-' + taskId);
+    if (mobileBtn) {
+        mobileBtn.dataset.enabled = isEnabled ? '1' : '0';
+        mobileBtn.className = isEnabled ? 'btn btn-warning' : 'btn btn-success';
+        mobileBtn.textContent = isEnabled ? '⏸ Désactiver' : '✅ Activer';
+        mobileBtn.disabled = false;
+        mobileBtn.style.opacity = '';
+    }
+}
+
+function refreshLogTaskOptions(tasks, deletedTaskId) {
+    const select = document.getElementById('log-task-select');
+    const box = document.getElementById('log-box');
+    if (!select) return;
+
+    if (deletedTaskId && String(select.value) === String(deletedTaskId)) {
+        const firstTask = Array.isArray(tasks) && tasks.length ? tasks[0] : null;
+        select.value = firstTask ? String(firstTask.id) : '';
+        if (!firstTask && box) box.textContent = 'Aucun log pour le moment.';
+    }
+}
+
+async function toggleTask(taskId, event) {
+    if (event) event.preventDefault();
+
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const buttons = [
+        document.getElementById('task-toggle-btn-' + taskId),
+        document.getElementById('mobile-task-toggle-btn-' + taskId)
+    ].filter(Boolean);
+
+    buttons.forEach(btn => {
+        btn.disabled = true;
+        btn.style.opacity = '0.65';
+    });
+
+    try {
+        const resp = await fetch(TASK_TOGGLE_BASE_URL + '/' + encodeURIComponent(taskId) + '?ajax=1', {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {
+                'X-Requested-With': 'fetch',
+                'Accept': 'application/json'
+            }
+        });
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || data.ok === false) {
+            throw new Error(data.message || 'Action impossible');
+        }
+
+        updateTaskActivationUi(taskId, data.enabled);
+        updateStatsFromPayload(data);
+        updateMainTaskRows(data.tasks || []);
+        filterTasks();
+        setTimeout(refreshProgress, 150);
+    } catch (e) {
+        console.error(e);
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '';
+        });
+        await showConfirmModal({
+            icon: '⚠️',
+            title: 'Action impossible',
+            message: 'Impossible de changer l’activation : ' + e.message,
+            details: '',
+            confirmLabel: 'OK',
+            cancelLabel: 'Fermer',
+            danger: true
+        });
+    } finally {
+        window.scrollTo(scrollX, scrollY);
+    }
+
+    return false;
+}
+
+function updateMainTaskRows(tasks) {
+    if (!tasks) return;
+    tasks.forEach(t => {
+        const cls = badgeClass(t.result, t.running);
+        setBadge('task-status-badge-' + t.id, t.status || '—', cls);
+        setText('task-message-' + t.id, t.last_message || '—');
+        setText('task-last-run-' + t.id, 'Début : ' + (t.last_run || '—'));
+        setText('task-last-end-' + t.id, 'Fin : ' + (t.last_end || '—'));
+        setText('task-source-' + t.id, 'Source : ' + (t.source || '—'));
+        setText('mobile-task-status-' + t.id, t.status || '—');
+        setText('mobile-task-last-run-' + t.id, t.last_run || '—');
+        setText('mobile-task-message-' + t.id, t.last_message || '—');
+        if (typeof t.enabled !== 'undefined') updateTaskActivationUi(t.id, t.enabled);
+        refreshMessageToggle(t.id);
+    });
+}
+
+function setTaskFilter(filterName, btn) {
+    currentTaskFilter = filterName || 'all';
+    document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    filterTasks();
+}
+
+function matchesTaskFilter(category) {
+    if (currentTaskFilter === 'all') return true;
+    return String(category || 'manual') === currentTaskFilter;
+}
+
+function filterTasks() {
+    const input = document.getElementById('task-search');
+    const needle = input ? input.value.trim().toUpperCase() : '';
+    const rows = Array.from(document.querySelectorAll('[data-task-row]'));
+    const cards = Array.from(document.querySelectorAll('[data-task-card]'));
+    let visible = 0;
+
+    rows.forEach(row => {
+        const okSearch = !needle || String(row.dataset.search || '').includes(needle);
+        const okFilter = matchesTaskFilter(row.dataset.scheduleCategory);
+        const showRow = okSearch && okFilter;
+        row.classList.toggle('task-hidden', !showRow);
+        if (showRow) visible += 1;
+    });
+
+    cards.forEach(card => {
+        const okSearch = !needle || String(card.dataset.search || '').includes(needle);
+        const okFilter = matchesTaskFilter(card.dataset.scheduleCategory);
+        card.classList.toggle('task-hidden', !(okSearch && okFilter));
+    });
+
+    const count = document.getElementById('filter-visible-count');
+    if (count) {
+        const total = rows.length || cards.length;
+        count.textContent = visible + ' tâche(s) affichée(s) sur ' + total;
+    }
+
+    const noMatch = document.getElementById('task-no-match');
+    if (noMatch) noMatch.style.display = (visible === 0 && (rows.length || cards.length)) ? 'block' : 'none';
+}
+
+function toggleCommands(taskId) {
+    ['cmd-list-', 'mobile-cmd-list-'].forEach(prefix => {
+        const list = document.getElementById(prefix + taskId);
+        if (!list) return;
+        const expanded = list.classList.toggle('expanded');
+        list.classList.toggle('compact', !expanded);
+    });
+
+    ['cmd-toggle-', 'mobile-cmd-toggle-'].forEach(prefix => {
+        const btn = document.getElementById(prefix + taskId);
+        if (!btn) return;
+        const listId = prefix.startsWith('mobile') ? 'mobile-cmd-list-' + taskId : 'cmd-list-' + taskId;
+        const list = document.getElementById(listId);
+        const expanded = list && list.classList.contains('expanded');
+        btn.textContent = expanded ? '⌃ Réduire' : '⌄ Voir tout';
+    });
+}
+
+function toggleMessage(taskId) {
+    ['task-message-', 'mobile-task-message-'].forEach(prefix => {
+        const msg = document.getElementById(prefix + taskId);
+        if (!msg) return;
+        const expanded = msg.classList.toggle('expanded');
+        msg.classList.toggle('compact', !expanded);
+    });
+
+    ['msg-toggle-', 'mobile-msg-toggle-'].forEach(prefix => {
+        const btn = document.getElementById(prefix + taskId);
+        if (!btn) return;
+        const msgId = prefix.startsWith('mobile') ? 'mobile-task-message-' + taskId : 'task-message-' + taskId;
+        const msg = document.getElementById(msgId);
+        const expanded = msg && msg.classList.contains('expanded');
+        btn.textContent = expanded ? '⌃ Réduire' : '⌄ Voir tout';
+    });
+}
+
+function refreshMessageToggle(taskId) {
+    [
+        ['task-message-', 'msg-toggle-'],
+        ['mobile-task-message-', 'mobile-msg-toggle-']
+    ].forEach(([msgPrefix, btnPrefix]) => {
+        const msg = document.getElementById(msgPrefix + taskId);
+        const btn = document.getElementById(btnPrefix + taskId);
+        if (!msg || !btn) return;
+
+        const wasExpanded = msg.classList.contains('expanded');
+        if (!wasExpanded) {
+            msg.classList.add('compact');
+            msg.classList.remove('expanded');
+        }
+
+        requestAnimationFrame(() => {
+            const needsToggle = msg.scrollHeight > msg.clientHeight + 2 || String(msg.textContent || '').length > 180;
+            btn.classList.toggle('visible', needsToggle);
+            if (!needsToggle) {
+                msg.classList.add('compact');
+                msg.classList.remove('expanded');
+                btn.textContent = '⌄ Voir tout';
+            } else {
+                btn.textContent = msg.classList.contains('expanded') ? '⌃ Réduire' : '⌄ Voir tout';
+            }
+        });
+    });
+}
+
+function refreshAllMessageToggles() {
+    const ids = new Set();
+    document.querySelectorAll('[id^="task-message-"], [id^="mobile-task-message-"]').forEach(el => {
+        const id = el.id.replace('task-message-', '').replace('mobile-task-message-', '');
+        if (id) ids.add(id);
+    });
+    ids.forEach(id => refreshMessageToggle(id));
+}
+
+function openLogs(taskId) {
+    const progressBtn = Array.from(document.querySelectorAll('.task-subnav .yoleo-subnav-link')).find(btn => btn.href && btn.href.includes('/system/task/progress'));
+    switchTab('progress', progressBtn || null);
+    const select = document.getElementById('log-task-select');
+    if (select) select.value = String(taskId);
+    const url = new URL(TASK_PROGRESS_URL, window.location.origin);
+    url.searchParams.set('log_task', String(taskId));
+    history.replaceState(null, '', url.toString());
+    refreshProgress();
+    loadTaskLog();
+}
+
+async function stopTask(taskId, event) {
+    if (event) event.preventDefault();
+
+    const ok = await showConfirmModal({
+        icon: '⛔',
+        title: 'Arrêter la tâche de force ?',
+        message: 'Voulez-vous vraiment arrêter cette tâche de force ?',
+        details: 'Le moteur va envoyer SIGTERM puis SIGKILL si nécessaire au processus lancé par la tâche.',
+        confirmLabel: 'Oui, arrêter',
+        cancelLabel: 'Annuler',
+        danger: true
+    });
+    if (!ok) return false;
+
+    try {
+        await fetch(TASK_STOP_BASE_URL + '/' + encodeURIComponent(taskId) + '?ajax=1', {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {'X-Requested-With': 'fetch'}
+        });
+    } catch (e) {
+        console.error(e);
+    }
+
+    setTimeout(refreshProgress, 150);
+    setTimeout(loadTaskLog, 250);
+    return false;
+}
+
+async function launchTask(taskId, event) {
+    if (event) event.preventDefault();
+
+    // Confort d'usage : le bouton ▶ lance la tâche sans quitter le tableau.
+    // Les logs restent accessibles uniquement via le bouton 🧾 Logs.
+    const tasksBtn = Array.from(document.querySelectorAll('.task-subnav .yoleo-subnav-link')).find(btn => btn.href && btn.href.endsWith('/system/task'));
+    switchTab('tasks', tasksBtn || null);
+
+    setBadge('task-status-badge-' + taskId, '🚀 Démarrage...', 'badge badge-yellow');
+    setText('task-message-' + taskId, 'Lancement manuel demandé depuis le tableau.');
+    setText('task-source-' + taskId, 'Source : Manuel');
+    setText('mobile-task-status-' + taskId, '🚀 Démarrage...');
+    setText('mobile-task-message-' + taskId, 'Lancement manuel demandé depuis le tableau.');
+    refreshMessageToggle(taskId);
+
+    try {
+        const resp = await fetch(TASK_RUN_BASE_URL + '/' + encodeURIComponent(taskId) + '?ajax=1', {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {'X-Requested-With': 'fetch'}
+        });
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || data.ok === false) {
+            const message = data.message || 'Impossible de lancer la tâche.';
+            setBadge('task-status-badge-' + taskId, data.already_running ? '⏳ Déjà en cours' : 'Erreur lancement', data.already_running ? 'badge badge-yellow' : 'badge badge-red');
+            setText('task-message-' + taskId, message);
+            setText('mobile-task-status-' + taskId, data.already_running ? '⏳ Déjà en cours' : 'Erreur lancement');
+            setText('mobile-task-message-' + taskId, message);
+        }
+    } catch (e) {
+        console.error(e);
+        setBadge('task-status-badge-' + taskId, 'Erreur lancement', 'badge badge-red');
+        setText('task-message-' + taskId, 'Erreur navigateur pendant le lancement : ' + e);
+        setText('mobile-task-status-' + taskId, 'Erreur lancement');
+        setText('mobile-task-message-' + taskId, 'Erreur navigateur pendant le lancement : ' + e);
+    }
+
+    setTimeout(refreshProgress, 150);
+    setTimeout(refreshProgress, 700);
+    return false;
+}
+
+async function refreshProgress() {
+    try {
+        const resp = await fetch(TASK_API_STATUS_URL, {cache: 'no-store'});
+        const data = await resp.json();
+        const body = document.getElementById('progress-body');
+        const updated = document.getElementById('live-updated-at');
+        if (updated) updated.textContent = data.updated_at || '—';
+
+        const stTotal = document.getElementById('stat-total');
+        const stEnabled = document.getElementById('stat-enabled');
+        const stDisabled = document.getElementById('stat-disabled');
+        const stRunning = document.getElementById('stat-running');
+        if (stTotal) stTotal.textContent = data.stats.total;
+        if (stEnabled) stEnabled.textContent = data.stats.enabled;
+        if (stDisabled) stDisabled.textContent = data.stats.total - data.stats.enabled;
+        if (stRunning) stRunning.textContent = data.stats.running;
+        updateMainTaskRows(data.tasks);
+        filterTasks();
+
+        if (!body) return;
+        if (!data.tasks || data.tasks.length === 0) {
+            body.innerHTML = '<tr><td colspan="6" class="empty-state">Aucune tâche.</td></tr>';
+            return;
+        }
+
+        body.innerHTML = data.tasks.map(t => `
+            <tr>
+                <td><div class="task-title">#${t.id} - ${escapeHtml(t.title || '')}</div><div class="tiny">${escapeHtml(t.schedule_label || '')}</div></td>
+                <td><span class="${badgeClass(t.result, t.running)}">${escapeHtml(t.status || '—')}</span></td>
+                <td><div class="tiny">Début : ${escapeHtml(t.last_run || '—')}</div><div class="tiny">Fin : ${escapeHtml(t.last_end || '—')}</div><div class="tiny">Source : ${escapeHtml(t.source || '—')}</div></td>
+                <td><span class="${badgeClass(t.result, t.running)}">${escapeHtml(t.result || '—')}</span></td>
+                <td class="message-cell">${escapeHtml(t.last_message || '—')}</td>
+                <td style="text-align:right;"><button type="button" class="btn btn-danger icon-btn" title="Forcer l'arrêt" onclick="return stopTask(${t.id}, event)">⛔</button></td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function loadTaskLog() {
+    const select = document.getElementById('log-task-select');
+    const box = document.getElementById('log-box');
+    if (!select || !box || !select.value) return;
+    try {
+        const resp = await fetch(TASK_LOG_API_BASE_URL + '/' + encodeURIComponent(select.value) + '?limit=300', {cache: 'no-store'});
+        const data = await resp.json();
+        if (!data.lines || data.lines.length === 0) {
+            box.textContent = 'Aucun log pour cette tâche.';
+            return;
+        }
+        box.textContent = data.lines.map(l => `[${l.created_at}] ${l.source ? '[' + l.source + '] ' : ''}${l.line}`).join('\n');
+        box.scrollTop = box.scrollHeight;
+    } catch (e) {
+        box.textContent = 'Erreur lecture logs : ' + e;
+    }
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function syncTaskChoiceCards() {
+    document.querySelectorAll('.task-choice-grid').forEach(grid => {
+        grid.querySelectorAll('.task-choice-card').forEach(card => {
+            const input = card.querySelector('input[type="radio"]');
+            card.classList.toggle('is-active', !!input && input.checked);
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    refreshScheduleFields();
+    updateCronPreview();
+    syncTaskChoiceCards();
+    document.querySelectorAll('.task-choice-card input[type="radio"]').forEach(input => {
+        input.addEventListener('change', syncTaskChoiceCards);
+    });
+    filterTasks();
+    refreshAllMessageToggles();
+    initPushNotifications();
+    if (INITIAL_LOG_TASK) {
+        const select = document.getElementById('log-task-select');
+        if (select) select.value = INITIAL_LOG_TASK;
+    }
+    refreshProgress();
+    loadTaskLog();
+    setInterval(() => {
+        refreshProgress();
+        const active = document.querySelector('#tab-progress.active');
+        if (active) loadTaskLog();
+    }, 1500);
+});
+</script>
+{% endblock %}

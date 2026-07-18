@@ -1,0 +1,20 @@
+{% extends "menu.html" %}
+
+{% block title %}Partage - Yoleo{% endblock %}
+{% block page_title %}Partage{% endblock %}
+{% block page_subtitle %}Samba, NFS, réglages et logs{% endblock %}
+
+{% block content %}
+{% set section = section|default('samba') %}
+{% set samba_tab = samba_tab|default('main') %}
+{% set sg = state.samba['global'] %}
+
+<div class="partage-page">
+    <div class="partage-panel">
+
+        <div id="messageBox" class="status-box" style="display:none;"></div>
+
+        <div class="partage-section-shell">
+{% block route_content %}{% endblock %}
+{% include "partage/common_after.html" %}
+{% endblock %}

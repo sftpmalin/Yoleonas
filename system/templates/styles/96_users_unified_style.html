@@ -1,0 +1,230 @@
+/* ============================================================
+   Utilisateurs - alignement avec la charte commune Yoleo
+   Objectif : même rendu carte/table que les autres modules,
+   sans toucher à la logique JS ni au mode mobile liste.
+   ============================================================ */
+
+/* Page Utilisateurs : cette couche est chargee apres la charte commune.
+   Elle neutralise les reglages plus anciens du module utilisateurs
+   (24_users.html) et empeche la barre haute de descendre quand /users
+   ajoute le menu de page dans .yoleo-top-actions. */
+body:has(.users-page) .yoleo-topbar {
+    height: var(--yoleo-topbar-height, 64px) !important;
+    min-height: var(--yoleo-topbar-height, 64px) !important;
+    max-height: var(--yoleo-topbar-height, 64px) !important;
+    flex: 0 0 var(--yoleo-topbar-height, 64px) !important;
+    align-items: flex-start !important;
+    box-sizing: border-box !important;
+}
+
+body:has(.users-page) .yoleo-page-title {
+    align-self: flex-start !important;
+    align-content: start !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+body:has(.users-page) .yoleo-page-title h1 {
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+}
+
+body:has(.users-page) .yoleo-page-title p {
+    height: 16px !important;
+    min-height: 16px !important;
+    max-height: 16px !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+body:has(.users-page) .yoleo-top-actions {
+    align-self: flex-start !important;
+    flex-wrap: nowrap !important;
+    max-height: 45px !important;
+}
+
+.lu-wrap,
+.yoleo-content > .lu-wrap {
+    width: min(var(--yoleo-content-wide, 1680px), calc(100% - (var(--yoleo-page-gap-x, 18px) * 2))) !important;
+    margin: var(--yoleo-page-gap-top, 14px) auto var(--yoleo-page-gap-bottom, 34px) !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+}
+
+.lu-wrap .users-page {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: grid !important;
+    gap: 14px !important;
+}
+
+.lu-wrap .users-section {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+}
+
+.users-page .lu-card,
+.users-page .card,
+.users-page .form-card {
+    background: var(--yoleo-card-bg, linear-gradient(180deg, #131d2b 0%, #101722 100%)) !important;
+    border: 1px solid var(--yoleo-card-border, #26364b) !important;
+    border-radius: var(--yoleo-card-radius, 14px) !important;
+    box-shadow: var(--yoleo-card-shadow, 0 14px 30px rgba(0,0,0,.18)) !important;
+}
+
+.users-page .lu-card {
+    overflow: hidden !important;
+}
+
+.users-page .card,
+.users-page .form-card {
+    padding: 14px !important;
+}
+
+.users-page .section-title,
+.users-page .form-title,
+.users-page .lu-title {
+    color: var(--yoleo-title-color, #1AEBFF) !important;
+    font-size: 17px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0 !important;
+    line-height: 1.25 !important;
+    margin-top: 0 !important;
+}
+
+.users-page .hint,
+.users-page .muted,
+.users-page .form-sub,
+.users-page .lu-sub {
+    color: var(--yoleo-title-sub, #99acc2) !important;
+}
+
+@media (min-width: 901px) {
+    .users-page .lu-table-wrap {
+        max-height: none !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        background: #0c131e !important;
+        border-radius: var(--yoleo-card-radius, 14px) var(--yoleo-card-radius, 14px) 0 0 !important;
+    }
+
+    .users-page .lu-table {
+        width: 100% !important;
+        min-width: 1080px !important;
+        border-collapse: collapse !important;
+        table-layout: fixed !important;
+    }
+
+    .users-page .lu-table th {
+        position: static !important;
+        top: auto !important;
+        z-index: auto !important;
+        height: 32px !important;
+        padding: 8px 10px !important;
+        background: #1a2636 !important;
+        color: #a8eaff !important;
+        border-bottom: 1px solid #273447 !important;
+        font-size: 10px !important;
+        font-weight: 900 !important;
+        letter-spacing: 0 !important;
+        text-transform: uppercase !important;
+    }
+
+    .users-page .lu-table td {
+        padding: 9px 10px !important;
+        border-bottom: 1px solid rgba(255,255,255,.055) !important;
+        color: #eaf2ff !important;
+        font-size: 12px !important;
+        line-height: 1.2 !important;
+        vertical-align: middle !important;
+        white-space: nowrap !important;
+    }
+
+    .users-page .lu-row {
+        background: #0d1520 !important;
+    }
+
+    .users-page .lu-row:nth-child(even) {
+        background: #0b121c !important;
+    }
+
+    .users-page .lu-row:hover {
+        background: #142238 !important;
+    }
+
+    .users-page .lu-row.selected {
+        background: linear-gradient(90deg, rgba(122, 44, 255, .82), rgba(79, 28, 171, .62)) !important;
+        color: #fff !important;
+        box-shadow: inset 3px 0 0 var(--yoleo-accent-2, #1AEBFF) !important;
+    }
+
+    .users-page .lu-row.kbd-selected {
+        outline: 1px solid rgba(26,235,255,.78) !important;
+        outline-offset: -1px !important;
+    }
+
+    .users-page .lu-row.selected td,
+    .users-page .lu-row.selected .muted,
+    .users-page .lu-row.selected .pwd-ok,
+    .users-page .lu-row.selected .pwd-lock,
+    .users-page .lu-row.selected .lu-user-main-cell b {
+        color: #fff !important;
+    }
+
+    .users-page .lu-user-main-cell b {
+        color: #fff !important;
+        font-weight: 900 !important;
+    }
+
+    .users-page .badge {
+        min-height: 20px !important;
+        padding: 3px 8px !important;
+        border-radius: 999px !important;
+        font-size: 10px !important;
+        font-weight: 900 !important;
+        line-height: 1 !important;
+    }
+
+    .users-page .lu-status {
+        min-height: 32px !important;
+        padding: 9px 12px !important;
+        background: #111822 !important;
+        border-top: 1px solid #273447 !important;
+        color: #99acc2 !important;
+        font-size: 12px !important;
+        line-height: 1.2 !important;
+    }
+
+    .users-page .lu-table td.ssh-cell,
+    .users-page .lu-table td.lu-action-cell,
+    .users-page .lu-table th:nth-last-child(-n+3) {
+        text-align: center !important;
+    }
+
+    .users-page .lu-row-ssh,
+    .users-page .lu-row-action {
+        box-shadow: none !important;
+    }
+}
+
+@media (max-width: 900px) {
+    .lu-wrap,
+    .yoleo-content > .lu-wrap {
+        width: calc(100% - 20px) !important;
+        margin-top: var(--yoleo-page-gap-top, 10px) !important;
+        margin-bottom: var(--yoleo-page-gap-bottom, 28px) !important;
+    }
+}
+

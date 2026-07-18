@@ -1,0 +1,18 @@
+{% extends "partage_base.html" %}
+
+{% block title %}{% if samba_tab == 'main' %}Samba - état des services (réglages){% elif samba_tab == 'shares' %}Partages Samba{% else %}Samba{% endif %} - Yoleo{% endblock %}
+{% block page_title %}{% if samba_tab == 'main' %}Samba - état des services (réglages){% elif samba_tab == 'shares' %}Partages Samba{% else %}Samba{% endif %}{% endblock %}
+{% block page_subtitle %}Partages Windows, utilisateurs, dossiers partagés et réglages{% endblock %}
+
+{% block route_content %}
+
+                <nav class="yoleo-subnav service-inner-subnav partage-samba-subnav-v4" aria-label="Navigation Samba">
+                    <a class="yoleo-subnav-link {{ 'is-active' if samba_tab == 'main' else '' }}" href="{{ url_for('partage_bp.show_samba_main') }}">🏠 Général</a>
+                    <a class="yoleo-subnav-link {{ 'is-active' if samba_tab == 'shares' else '' }}" href="{{ url_for('partage_bp.show_samba_shares') }}">📁 Dossier partagé</a>
+                    <a class="yoleo-subnav-link {{ 'is-active' if samba_tab == 'settings' else '' }}" href="{{ url_for('partage_bp.show_samba_settings') }}">⚙️ Réglage</a>
+                    <a class="yoleo-subnav-link {{ 'is-active' if samba_tab == 'info' else '' }}" href="{{ url_for('partage_bp.show_samba_info') }}">ℹ️ Info</a>
+                </nav>
+
+{% block samba_content %}{% endblock %}
+
+{% endblock %}

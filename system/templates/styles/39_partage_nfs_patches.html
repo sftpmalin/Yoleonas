@@ -1,0 +1,552 @@
+/* Partage > NFS : table des exports actifs sans ascenseur horizontal. */
+.partage-page .partage-nfs-active-wrap-v4 {
+    overflow-x: hidden;
+}
+
+.partage-page .partage-nfs-active-table-v4 {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.partage-page .partage-nfs-active-table-v4 th:nth-child(1),
+.partage-page .partage-nfs-active-table-v4 td:nth-child(1) {
+    width: 32%;
+}
+
+.partage-page .partage-nfs-active-table-v4 th:nth-child(2),
+.partage-page .partage-nfs-active-table-v4 td:nth-child(2) {
+    width: 22%;
+}
+
+.partage-page .partage-nfs-active-table-v4 th:nth-child(3),
+.partage-page .partage-nfs-active-table-v4 td:nth-child(3) {
+    width: 46%;
+}
+
+.partage-page .partage-nfs-active-table-v4 .path-pill {
+    max-width: 100%;
+}
+
+.partage-nfs-options-active-cell-v4 {
+    min-width: 0;
+}
+
+.partage-nfs-options-active-v4 {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #b9c9dc;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+}
+
+
+/* Partage > NFS : résumé compact avec état des services à droite. */
+.partage-page .partage-nfs-summary-v4 {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.25fr) minmax(74px, .38fr) minmax(74px, .38fr) minmax(132px, .58fr) minmax(245px, 1fr);
+    align-items: stretch;
+    gap: 8px;
+}
+
+.partage-page .partage-nfs-summary-v4 .summary-card {
+    min-width: 0;
+}
+
+.partage-page .partage-nfs-summary-count-v4 {
+    max-width: 120px;
+}
+
+.partage-page .partage-nfs-summary-count-v4 .summary-label,
+.partage-page .partage-nfs-summary-client-v4 .summary-label,
+.partage-page .partage-nfs-service-mini-v4 .summary-label {
+    font-size: 10px;
+    line-height: 1.15;
+}
+
+.partage-page .partage-nfs-summary-count-v4 .summary-value {
+    font-size: 20px;
+    line-height: 1.1;
+}
+
+.partage-page .partage-nfs-summary-client-v4 {
+    max-width: 170px;
+}
+
+.partage-page .partage-nfs-summary-client-v4 .summary-value,
+.partage-page .partage-nfs-summary-file-v4 .summary-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.partage-page .partage-nfs-services-inline-v4 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(112px, 1fr));
+    gap: 8px;
+    min-width: 0;
+}
+
+.partage-page .partage-nfs-service-mini-v4 {
+    padding: 8px 9px;
+}
+
+.partage-page .partage-nfs-service-mini-v4 .summary-value {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 12px;
+}
+
+.partage-page .partage-nfs-service-mini-v4 .badge {
+    padding: 3px 6px;
+    font-size: 9px;
+}
+
+@media (max-width: 1450px) {
+    .partage-page .partage-nfs-summary-v4 {
+        grid-template-columns: minmax(200px, 1fr) minmax(74px, 110px) minmax(74px, 110px) minmax(120px, 150px);
+    }
+
+    .partage-page .partage-nfs-services-inline-v4 {
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .partage-page .partage-nfs-summary-v4,
+    .partage-page .partage-nfs-services-inline-v4 {
+        grid-template-columns: 1fr;
+    }
+
+    .partage-page .partage-nfs-summary-count-v4,
+    .partage-page .partage-nfs-summary-client-v4 {
+        max-width: none;
+    }
+}
+
+/* Partage : message d'action flottant.
+   Succès : overlay court qui ne pousse plus la page.
+   Erreur : overlay rouge/orange persistant avec lien vers les logs. */
+.partage-panel {
+    position: relative;
+}
+
+.partage-page #messageBox.partage-message-float-v4 {
+    position: absolute;
+    top: 30px;
+    left: clamp(280px, 36vw, 620px);
+    right: 220px;
+    z-index: 80;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    width: auto;
+    min-width: 260px;
+    max-width: 560px;
+    margin: 0;
+    padding: 9px 12px;
+    border-radius: 999px;
+    line-height: 1.25;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: normal;
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: opacity .16s ease, transform .16s ease;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, .38);
+}
+
+.partage-page #messageBox.partage-message-float-v4.is-visible-v4 {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.partage-page #messageBox.partage-message-float-v4.partage-message-ok-v4 {
+    border: 1px solid rgba(76, 255, 130, .52);
+    background: linear-gradient(180deg, rgba(26, 128, 66, .94), rgba(11, 86, 43, .94));
+    color: #ecfff0;
+}
+
+.partage-page #messageBox.partage-message-float-v4.partage-message-error-v4 {
+    border: 1px solid rgba(255, 92, 92, .62);
+    background: linear-gradient(180deg, rgba(128, 34, 38, .96), rgba(72, 18, 24, .96));
+    color: #ffe7e7;
+    border-radius: 16px;
+    max-width: 680px;
+}
+
+.partage-message-icon-v4 {
+    flex: 0 0 auto;
+}
+
+.partage-page #messageBox.partage-message-float-v4 .partage-log-link-v4 {
+    color: #ffd1ff;
+    text-decoration: underline;
+}
+
+@media (max-width: 1100px) {
+    .partage-page #messageBox.partage-message-float-v4 {
+        top: 18px;
+        left: 18px;
+        right: 18px;
+        min-width: 0;
+        max-width: none;
+        border-radius: 14px;
+    }
+}
+
+
+/* Partage > NFS serveur : ligne haute compacte.
+   Objectif : tout reste sur une seule ligne desktop.
+   A gauche : Fichier exports + compteurs + services.
+   A droite : bouton Enregistrer exports sur la même ligne. */
+.partage-page .partage-nfs-server-hero-v6 {
+    padding: 14px 14px 18px;
+}
+
+.partage-page .partage-nfs-server-top-v6 {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+    flex-wrap: nowrap;
+}
+
+.partage-page .partage-nfs-summary-in-header-v6 {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    display: grid;
+    /* Équilibrage de la ligne haute NFS serveur :
+       - le chemin exports ne prend plus toute la place ;
+       - les compteurs à droite restent lisibles ;
+       - le bouton Enregistrer reste sur la même ligne. */
+    grid-template-columns: minmax(205px, 220px) minmax(100px, 105px) minmax(100px, 105px) minmax(140px, 150px) minmax(185px, 1fr);
+    align-items: stretch;
+    gap: 8px;
+}
+
+.partage-page .partage-nfs-summary-in-header-v6 .partage-nfs-services-inline-v4 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    min-width: 0;
+}
+
+.partage-page .partage-nfs-server-toolbar-v6 {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    min-width: max-content;
+    margin-left: 0;
+    padding: 0;
+}
+
+.partage-page .partage-nfs-server-toolbar-v6 .yoleo-btn {
+    white-space: nowrap;
+    align-self: center;
+}
+
+.partage-page .partage-nfs-server-hero-v6 .summary-card {
+    min-height: 56px;
+    padding: 8px 10px;
+}
+
+.partage-page .partage-nfs-server-hero-v6 .partage-nfs-summary-count-v4,
+.partage-page .partage-nfs-server-hero-v6 .partage-nfs-summary-client-v4 {
+    max-width: none;
+}
+
+.partage-page .partage-nfs-server-hero-v6 .summary-label {
+    font-size: 9px;
+    line-height: 1.1;
+}
+
+.partage-page .partage-nfs-server-hero-v6 .partage-nfs-summary-file-v4 .summary-value {
+    font-size: 12px;
+    line-height: 1.18;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.partage-page .partage-nfs-server-hero-v6 .partage-nfs-summary-count-v4 .summary-value {
+    font-size: 18px;
+    line-height: 1.1;
+}
+
+.partage-page .partage-nfs-server-hero-v6 .partage-nfs-summary-client-v4 .summary-value {
+    font-size: 16px;
+    line-height: 1.1;
+}
+
+.partage-page .partage-nfs-server-hero-v6 .partage-nfs-service-mini-v4 {
+    padding: 7px 7px;
+}
+
+.partage-page .partage-nfs-server-hero-v6 .partage-nfs-service-mini-v4 .summary-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.partage-page .partage-nfs-server-hero-v6 .partage-nfs-service-mini-v4 .badge {
+    padding: 2px 5px;
+    font-size: 8px;
+}
+
+@media (max-width: 900px) {
+    .partage-page .partage-nfs-server-top-v6 {
+        flex-direction: column;
+        flex-wrap: nowrap;
+    }
+
+    .partage-page .partage-nfs-summary-in-header-v6,
+    .partage-page .partage-nfs-summary-in-header-v6 .partage-nfs-services-inline-v4 {
+        grid-template-columns: 1fr;
+    }
+
+    .partage-page .partage-nfs-server-toolbar-v6,
+    .partage-page .partage-nfs-server-toolbar-v6 .yoleo-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+
+/* Partage > NFS serveur : même logique que Samba, sans bouton Enregistrer global.
+   Chaque ligne enregistre directement son export, donc la rangée haute peut respirer. */
+.partage-page .partage-nfs-server-hero-v7 {
+    padding: 14px;
+}
+
+.partage-page .partage-nfs-server-hero-v7 .partage-nfs-server-top-v6 {
+    display: block;
+}
+
+.partage-page .partage-nfs-server-hero-v7 .partage-nfs-summary-in-header-v6 {
+    width: 100%;
+    grid-template-columns:
+        minmax(190px, 1.05fr)
+        minmax(84px, .48fr)
+        minmax(84px, .48fr)
+        minmax(126px, .62fr)
+        minmax(250px, 1.35fr);
+}
+
+.partage-page .partage-nfs-server-hero-v7 .partage-nfs-services-inline-v4 {
+    grid-template-columns: repeat(2, minmax(112px, 1fr));
+}
+
+/* Annule l'ancien passage sur deux lignes autour de 1450px : maintenant le bouton global est supprimé. */
+@media (max-width: 1450px) and (min-width: 901px) {
+    .partage-page .partage-nfs-server-hero-v7 .partage-nfs-summary-in-header-v6 {
+        grid-template-columns:
+            minmax(170px, .95fr)
+            minmax(78px, .42fr)
+            minmax(78px, .42fr)
+            minmax(116px, .58fr)
+            minmax(230px, 1.25fr) !important;
+    }
+
+    .partage-page .partage-nfs-server-hero-v7 .partage-nfs-services-inline-v4 {
+        grid-column: auto !important;
+        grid-template-columns: repeat(2, minmax(104px, 1fr)) !important;
+    }
+}
+
+/* Partage > NFS serveur : tableau clavier + cartes mobile rectangulaires. */
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable {
+    table-layout: fixed !important;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .nfs-col-path { width: 25%; }
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .nfs-col-client { width: 17%; }
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .nfs-col-access { width: 9%; }
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .nfs-col-options { width: 27%; }
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .nfs-col-state { width: 14%; }
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .nfs-col-actions { width: 8%; }
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable th,
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable td {
+    padding-left: 7px;
+    padding-right: 7px;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable th {
+    white-space: nowrap;
+    font-size: 10.5px;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable tr:focus-visible {
+    outline: 2px solid var(--yoleo-accent-2);
+    outline-offset: -2px;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .path-edit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .path-edit .text-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .path-edit .yoleo-btn {
+    flex: 0 0 34px;
+    width: 34px;
+    min-width: 34px;
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .text-input,
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .select-input {
+    height: 34px;
+    font-size: 12px;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable td:nth-child(3) .select-input {
+    width: auto;
+    min-width: 58px;
+    max-width: 86px;
+    padding-left: 8px;
+    padding-right: 22px;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .actions-cell {
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.partage-page .partage-nfs-exports-auto-v7 #nfsTable .is-invalid-v5 {
+    border-color: rgba(255, 92, 92, .92) !important;
+    box-shadow: 0 0 0 2px rgba(255, 92, 92, .18) !important;
+    background: rgba(90, 18, 24, .40) !important;
+}
+
+@media (max-width: 900px) {
+    .partage-page .partage-nfs-exports-auto-v7 .partage-nfs-exports-table-wrap-v7 {
+        display: block !important;
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable,
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable tbody,
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable tr,
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td {
+        display: block;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable {
+        border-collapse: separate;
+        border-spacing: 0;
+        table-layout: auto !important;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable colgroup,
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable thead {
+        display: none !important;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable tbody {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(285px, 1fr));
+        gap: 10px;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable tr {
+        padding: 10px;
+        border: 1px solid var(--yoleo-border);
+        border-radius: 14px;
+        background: rgba(12, 18, 27, .92);
+        box-shadow: 0 12px 26px rgba(0, 0, 0, .18);
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable tr.share-editing {
+        border-color: rgba(26, 235, 255, .40);
+        background: rgba(10, 20, 31, .96);
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td {
+        min-height: 34px;
+        display: grid;
+        grid-template-columns: 104px minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+        padding: 6px 0 !important;
+        border: 0 !important;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td::before {
+        color: #8fb4d6;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td:nth-child(1)::before { content: "Chemin"; }
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td:nth-child(2)::before { content: "Client"; }
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td:nth-child(3)::before { content: "Droit"; }
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td:nth-child(4)::before { content: "Options"; }
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td:nth-child(5)::before { content: "État"; }
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td:nth-child(6)::before { content: "Actions"; }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable .path-pill,
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable .readonly-cell,
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable .badge {
+        justify-self: start;
+        max-width: 100%;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable .path-pill {
+        width: 100%;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable .text-input,
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable .select-input,
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable .path-edit {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td:nth-child(3) .select-input {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable .actions-cell {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 430px) {
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable tbody {
+        grid-template-columns: 1fr;
+    }
+
+    .partage-page .partage-nfs-exports-auto-v7 #nfsTable td {
+        grid-template-columns: 86px minmax(0, 1fr);
+        gap: 6px;
+    }
+}

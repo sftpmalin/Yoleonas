@@ -1,0 +1,30 @@
+/* Bouton en action : spinner générique réutilisable */
+.yoleo-btn.is-running {
+    pointer-events: none;
+    opacity: 0.88;
+}
+
+.yoleo-btn-spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    vertical-align: -0.16em;
+    animation: yoleo-btn-spin 0.7s linear infinite;
+}
+
+.yoleo-btn-spinner + .yoleo-btn-running-label {
+    margin-left: 0.45rem;
+}
+
+.yoleo-btn-icon .yoleo-btn-spinner + .yoleo-btn-running-label {
+    display: none;
+}
+
+@keyframes yoleo-btn-spin {
+    to { transform: rotate(360deg); }
+}
+
+

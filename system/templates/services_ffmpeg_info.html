@@ -1,0 +1,93 @@
+{% extends "services_ffmpeg_base.html" %}
+
+{% block ffmpeg_content %}
+<section class="card ffoi-card ffoi-info-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+  <div class="card-head">
+    <div>
+      <h2 class="card-title">ℹ️ Info FFmpeg over IP</h2>
+      <div class="hint">Lecture seule : résumé technique, cartes détectées, JSON généré et détails des partages.</div>
+    </div>
+  </div>
+  <div class="table-wrap ffoi-info-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+    <table class="info-table ffoi-info-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+      <tr><th>Fichier conf Yoleo</th><td>{{ status.config_file }}</td></tr>
+      <tr><th>JSON serveur</th><td>{{ status.json_path }} — {{ 'existe' if status.json_exists else 'absent' }}</td></tr>
+      <tr><th>Binaire serveur</th><td>{{ status.server_bin }}</td></tr>
+      <tr><th>Client Windows</th><td>{{ status.client_bin }} — {{ 'présent' if status.client_bin_exists else 'absent' }}</td></tr>
+      <tr><th>FFmpeg</th><td>{{ status.ffmpeg_path }}</td></tr>
+      <tr><th>Unit systemd</th><td>{{ status.service_path }} — {{ 'installé' if status.service_installed else 'absent' }}</td></tr>
+      <tr><th>Adresse serveur</th><td>{{ conf.ADDRESS }}:{{ conf.PORT }}</td></tr>
+      <tr><th>Adresse client générée</th><td>{{ status.client_address }}</td></tr>
+      <tr><th>Mode partage</th><td>{{ conf.SHARE_MODE }}</td></tr>
+      <tr><th>Chemin client</th><td>{{ conf.CLIENT_PATH or 'non configuré' }}</td></tr>
+      <tr><th>Chemin serveur</th><td>{{ conf.SERVER_PATH or 'non configuré' }}</td></tr>
+      <tr><th>Dossier de travail service</th><td>{{ service_workdir }}</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="card ffoi-card ffoi-info-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+  <div class="card-head"><div><h2 class="card-title">🎮 Cartes graphiques détectées</h2><div class="hint">Lecture informative seulement. Le choix exact des encodeurs reste dans les commandes FFmpeg côté client.</div></div></div>
+  <div class="ffoi-gpu-list">
+    {% for gpu in gpus %}<div class="ffoi-gpu-item">{{ gpu }}</div>{% endfor %}
+  </div>
+</section>
+
+<section class="card ffoi-card ffoi-info-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+  <div class="card-head"><div><h2 class="card-title">🧾 Aperçu JSON / systemd</h2><div class="hint">Lecture seule : généré depuis ffmpeg-over-ip.conf.</div></div></div>
+  <div class="grid-2 ffoi-pre-grid">
+    <div><label>ffmpeg-over-ip.server.json</label><pre class="terminal ffoi-pre">{{ server_json_preview }}</pre></div>
+    <div><label>Unit systemd</label><pre class="terminal ffoi-pre">{{ unit_preview }}</pre></div>
+    <div><label>JSON client Windows</label><pre class="terminal ffoi-pre">{{ client_json_preview }}</pre></div>
+  </div>
+</section>
+
+<section class="card ffoi-card ffoi-info-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+  <div class="card-head"><div><h2 class="card-title">🪟 Partages Samba détectés</h2><div class="hint">Samba donne les deux bouts : chemin Windows exposé et chemin physique local côté NAS.</div></div></div>
+  {% if samba_shares %}
+  <div class="table-wrap ffoi-share-table-wrap ffoi-info-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+    <table class="info-table ffoi-info-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+      <thead><tr><th>Partage</th><th>Chemin Windows</th><th>Chemin physique NAS</th><th>Source</th></tr></thead>
+      <tbody>
+        {% for share in samba_shares %}
+        <tr><td>{{ share.name }}</td><td>{{ share.client_path }}</td><td>{{ share.server_path }}</td><td>{{ share.source }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="ffoi-alert ffoi-alert-warning">Aucun partage Samba détecté.</div>
+  {% endif %}
+</section>
+
+<section class="card ffoi-card ffoi-info-page no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+  <div class="card-head"><div><h2 class="card-title">🧭 Montages NFS / distants détectés</h2><div class="hint">Pour NFS, Yoleo détecte seulement le montage côté NAS. Le chemin vu par le client reste manuel.</div></div></div>
+  {% if nfs_mounts %}
+  <div class="table-wrap ffoi-share-table-wrap ffoi-info-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+    <table class="info-table ffoi-info-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+      <thead><tr><th>Type</th><th>Montage côté NAS</th><th>Source distante</th></tr></thead>
+      <tbody>
+        {% for mount in nfs_mounts %}
+        <tr><td>{{ mount.fstype }}</td><td>{{ mount.target }}</td><td>{{ mount.source }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="ffoi-alert ffoi-alert-warning">Aucun dossier NFS monté trouvé côté NAS.</div>
+  {% endif %}
+
+  {% if remote_mounts %}
+  <div class="table-wrap ffoi-share-table-wrap ffoi-info-table-wrap no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+    <table class="info-table ffoi-info-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
+      <thead><tr><th>Type</th><th>Montage côté NAS</th><th>Source distante</th></tr></thead>
+      <tbody>
+        {% for mount in remote_mounts %}
+        <tr><td>{{ mount.fstype }}</td><td>{{ mount.target }}</td><td>{{ mount.source }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

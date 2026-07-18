@@ -1,0 +1,1031 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<div class="pers-page cli-menu-page cli-menu-browser-page">
+    {% include "partials/system_personnalisation_subnav.html" %}
+
+    <div id="cliMenuStatus" class="status-line cli-menu-status-top" hidden></div>
+
+    <div class="card cli-menu-card cli-browser-card">
+        <div class="card-body">
+            <div class="cli-menu-head cli-browser-head">
+                <div>
+                    <h2>Menu CLI</h2>
+                    <div id="cliBrowserCounter" class="cli-browser-counter cli-browser-counter-head"></div>
+                    <div id="cliBrowserCrumbs" class="cli-browser-crumbs"></div>
+                </div>
+                <div class="cli-menu-actions">
+                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="addCliRow('section')">+ Dossier</button>
+                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="addCliRow('submenu')">+ Sous-dossier</button>
+                    <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="addCliRow('command')">+ Commande</button>
+                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="addCliRow('separator')">+ Séparateur</button>
+                    <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-small" onclick="openCliDemoTerminal()">▶ Démo</button>
+                </div>
+            </div>
+
+            <div id="cliBrowserGrid" class="cli-browser-grid"></div>
+            <div id="cliMenuRows" class="cli-menu-rows" hidden></div>
+        </div>
+    </div>
+
+    <div class="card cli-menu-card cli-menu-preview-card">
+        <div class="card-body">
+            <div class="cli-menu-preview-head">
+                <h3>Aperçu brut</h3>
+                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="syncCliPreview()">Actualiser</button>
+            </div>
+            <textarea id="cliMenuPreview" class="cli-menu-preview" readonly spellcheck="false"></textarea>
+        </div>
+    </div>
+
+    <div id="cliEmojiPanel" class="cli-emoji-panel" hidden></div>
+
+    <div id="cliConfirmModal" class="cli-confirm-modal" hidden>
+        <div class="cli-confirm-box" role="dialog" aria-modal="true" aria-labelledby="cliConfirmTitle">
+            <h3 id="cliConfirmTitle">Confirmer la suppression</h3>
+            <p id="cliConfirmText">Supprimer cette entrée du menu CLI ?</p>
+            <div class="cli-confirm-actions">
+                <button type="button" id="cliConfirmCancel" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" onclick="cancelCliDelete()">Annuler</button>
+                <button type="button" id="cliConfirmDelete" class="yoleo-btn yoleo-btn-danger yoleo-btn-small" onclick="confirmCliDelete()">Supprimer</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="cli-demo-modal" id="cliDemoModal" hidden aria-hidden="true">
+        <div class="cli-demo-backdrop" onclick="closeCliDemoTerminal()"></div>
+        <section class="cli-demo-box" role="dialog" aria-modal="true" aria-labelledby="cliDemoTitle">
+            <header class="cli-demo-header">
+                <div>
+                    <strong id="cliDemoTitle">Démo Menu CLI</strong>
+                    <span id="cliDemoHint">../scripts/menu.sh dans ttyd</span>
+                </div>
+                <div class="cli-demo-actions">
+                    <a id="cliDemoExternal" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" href="#" target="_blank" rel="noopener" hidden>Ouvrir onglet</a>
+                    <button type="button" class="cli-demo-close" onclick="closeCliDemoTerminal()" aria-label="Fermer">×</button>
+                </div>
+            </header>
+            <iframe class="cli-demo-frame" id="cliDemoFrame" title="Démo Menu CLI ttyd"></iframe>
+        </section>
+    </div>
+</div>
+
+<style>
+.cli-menu-page { display:flex; flex-direction:column; gap:10px; }
+.cli-menu-card .card-body { display:flex; flex-direction:column; gap:14px; }
+.cli-menu-head, .cli-menu-preview-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.cli-menu-head h2, .cli-menu-preview-head h3 { margin:0; font-size:1.15rem; }
+.cli-browser-counter-head { margin-top:4px; color:#b8c7dc; font-size:.84rem; }
+.cli-menu-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.cli-browser-crumbs { margin-top:8px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; color:#a7f3d0; font-size:.84rem; }
+.cli-browser-crumbs button { border:1px solid rgba(34,211,238,.26); border-radius:999px; background:rgba(2,6,23,.54); color:#dbeafe; padding:4px 9px; cursor:pointer; }
+.cli-browser-crumbs button:hover { border-color:rgba(34,211,238,.62); color:#fff; }
+.cli-browser-counter { color:#9fb3c8; font-size:.84rem; }
+.cli-menu-status-top { align-self:flex-start; margin:0; padding:7px 11px; border-radius:10px; font-size:.84rem; }
+.cli-menu-status-top[hidden] { display:none !important; margin:0 !important; padding:0 !important; border:0 !important; min-height:0 !important; height:0 !important; }
+.cli-menu-status-top.ok { border:1px solid rgba(34,197,94,.45); background:rgba(22,163,74,.13); color:#bbf7d0; }
+.cli-menu-status-top.bad { border:1px solid rgba(244,63,94,.5); background:rgba(127,29,29,.18); color:#fecdd3; }
+.cli-browser-grid { display:flex; flex-direction:column; align-items:center; gap:8px; min-height:210px; padding:2px; }
+.cli-browser-empty { width:100%; box-sizing:border-box; padding:26px; border:1px dashed rgba(148,163,184,.28); border-radius:14px; color:#9fb3c8; text-align:center; background:rgba(2,6,23,.22); }
+.cli-tile { position:relative; min-height:64px; width:fit-content; max-width:100%; min-width:min(420px, 100%); display:grid; grid-template-columns:48px minmax(150px, max-content) auto; grid-template-rows:auto auto; align-items:center; column-gap:12px; row-gap:2px; padding:9px 10px; border:1px solid rgba(148,163,184,.24); border-radius:12px; background:linear-gradient(180deg, rgba(15,23,42,.74), rgba(15,23,42,.46)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.018); cursor:default; user-select:none; }
+.cli-tile:hover { border-color:rgba(34,211,238,.46); background:linear-gradient(180deg, rgba(18,31,54,.82), rgba(15,23,42,.54)); }
+.cli-tile:focus-visible { outline:2px solid rgba(34,211,238,.95); outline-offset:2px; border-color:rgba(34,211,238,.72); }
+.cli-tile.is-key-focused { border-color:rgba(34,211,238,.72); box-shadow:0 0 0 2px rgba(34,211,238,.12), inset 0 0 0 1px rgba(255,255,255,.028); }
+.cli-tile.is-folder { border-color:rgba(34,211,238,.28); }
+.cli-tile.is-folder:hover { border-color:rgba(34,211,238,.68); }
+.cli-tile.is-command { border-color:rgba(168,85,247,.28); }
+.cli-tile.is-command:hover { border-color:rgba(168,85,247,.58); }
+.cli-tile.is-separator { min-height:34px; width:fit-content; min-width:min(360px, 100%); grid-template-columns:minmax(190px, max-content) auto; opacity:1; border-style:dashed; border-color:rgba(34,211,238,.32); background:rgba(2,6,23,.18); box-shadow:none; }
+.cli-separator-rule { grid-column:1; grid-row:1 / span 2; display:flex; align-items:center; gap:10px; min-width:0; color:#7dd3fc; font-size:.72rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.cli-separator-rule::before, .cli-separator-rule::after { content:""; height:1px; flex:1 1 auto; min-width:28px; background:linear-gradient(90deg, rgba(34,211,238,.08), rgba(34,211,238,.55), rgba(34,211,238,.08)); }
+.cli-separator-rule span { flex:0 0 auto; color:#bae6fd; opacity:.95; }
+.cli-tile-icon { grid-column:1; grid-row:1 / span 2; width:42px; height:42px; display:grid; place-items:center; border-radius:10px; font-size:28px; background:rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.18); }
+.cli-tile.is-command .cli-tile-icon { font-size:25px; }
+.cli-tile.is-separator .cli-tile-icon { width:30px; height:30px; font-size:18px; border-radius:8px; }
+.cli-tile-label { grid-column:2; grid-row:1; min-width:0; max-width:clamp(150px, 24vw, 520px); color:#fff; font-weight:800; font-size:.94rem; line-height:1.18; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cli-tile-sub { grid-column:2; grid-row:2; min-width:0; max-width:clamp(150px, 24vw, 520px); min-height:16px; color:#8edcff; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:.73rem; line-height:1.2; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cli-tile.is-command .cli-tile-label, .cli-tile.is-command .cli-tile-sub { max-width:clamp(220px, 42vw, 760px); }
+.cli-tile-actions { grid-column:3; grid-row:1 / span 2; margin-left:auto; display:flex; align-items:center; justify-content:flex-end; gap:5px; flex-wrap:nowrap; }
+.cli-tile.is-separator .cli-tile-actions { grid-column:2; }
+.cli-tile-action { width:27px; height:27px; flex:0 0 27px; display:grid; place-items:center; border:1px solid rgba(148,163,184,.28); border-radius:8px; background:rgba(15,23,42,.78); color:#dbeafe; cursor:pointer; font-size:13px; padding:0; }
+.cli-tile-action:hover { border-color:rgba(34,211,238,.62); color:#fff; }
+.cli-tile-action.is-danger { border-color:rgba(244,63,94,.45); color:#fecdd3; }
+.cli-tile-action.is-save { border-color:rgba(34,197,94,.5); color:#bbf7d0; }
+.cli-tile-edit { grid-column:2; grid-row:1 / span 2; min-width:0; width:auto; display:flex; align-items:center; justify-content:center; gap:7px; }
+.cli-tile-edit input { width:auto; min-width:12ch; max-width:min(70vw, 72ch); text-align:left; transition:width .08s ease; }
+.cli-tile-command-edit { display:flex; gap:6px; flex:0 0 auto; min-width:0; align-items:center; }
+.cli-tile-command-edit input { width:auto; min-width:24ch; max-width:min(70vw, 82ch); text-align:left; transition:width .08s ease; }
+.cli-tile.is-editing { justify-content:center; }
+.cli-tile.is-editing .cli-tile-actions { margin-left:4px; }
+.cli-emoji-panel { position:fixed; z-index:5000; display:grid; grid-template-columns:repeat(8, 34px); gap:6px; padding:10px; border:1px solid rgba(148,163,184,.35); border-radius:8px; background:#0f172a; box-shadow:0 18px 44px rgba(0,0,0,.45); }
+.cli-emoji-panel[hidden] { display:none !important; }
+.cli-emoji-panel button { width:34px; height:34px; display:grid; place-items:center; border:1px solid rgba(148,163,184,.28); border-radius:7px; background:rgba(15,23,42,.92); cursor:pointer; font-size:18px; }
+.cli-menu-preview-card { opacity:.82; }
+.cli-menu-preview { width:100%; min-height:150px; height:auto; overflow:hidden; resize:none; border-radius:8px; border:1px solid rgba(148,163,184,.24); background:rgba(2,6,23,.62); color:#dbeafe; padding:12px; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:.86rem; line-height:1.45; box-sizing:border-box; }
+.cli-confirm-modal { position:fixed; inset:0; z-index:7000; display:grid; place-items:center; padding:18px; background:rgba(2,6,23,.62); backdrop-filter:blur(3px); }
+.cli-confirm-modal[hidden] { display:none !important; }
+.cli-confirm-box { width:min(420px, calc(100vw - 28px)); border:1px solid rgba(244,63,94,.38); border-radius:14px; background:linear-gradient(180deg, rgba(15,23,42,.98), rgba(15,23,42,.92)); box-shadow:0 22px 70px rgba(0,0,0,.58); padding:16px; }
+.cli-confirm-box h3 { margin:0 0 8px; font-size:1.02rem; color:#fff; }
+.cli-confirm-box p { margin:0; color:#cbd5e1; line-height:1.4; }
+.cli-confirm-actions { margin-top:16px; display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+.cli-confirm-actions button:focus-visible, .cli-tile-action:focus-visible { outline:2px solid rgba(34,211,238,.95); outline-offset:2px; }
+.cli-demo-modal[hidden] { display:none !important; }
+.cli-demo-modal { position:fixed; inset:0; z-index:6900; display:grid; place-items:center; padding:18px; background:rgba(2,6,23,.66); backdrop-filter:blur(3px); }
+.cli-demo-backdrop { position:absolute; inset:0; }
+.cli-demo-box { position:relative; width:min(1180px, calc(100vw - 28px)); height:min(760px, calc(100vh - 34px)); display:flex; flex-direction:column; overflow:hidden; border:1px solid rgba(34,211,238,.36); border-radius:15px; background:#020617; box-shadow:0 24px 80px rgba(0,0,0,.62); }
+.cli-demo-header { min-height:44px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 11px; border-bottom:1px solid rgba(148,163,184,.2); background:linear-gradient(180deg, rgba(15,23,42,.98), rgba(15,23,42,.88)); }
+.cli-demo-header strong { color:#fff; font-size:.98rem; }
+.cli-demo-header span { margin-left:8px; color:#9fb3c8; font-size:.78rem; }
+.cli-demo-actions { display:flex; align-items:center; gap:8px; }
+.cli-demo-close { width:32px; height:32px; display:grid; place-items:center; border:1px solid rgba(244,63,94,.42); border-radius:10px; background:rgba(127,29,29,.18); color:#fecdd3; cursor:pointer; font-size:18px; line-height:1; }
+.cli-demo-close:hover { border-color:rgba(244,63,94,.75); color:#fff; }
+.cli-demo-frame { flex:1 1 auto; width:100%; min-height:0; border:0; background:#000; }
+body.cli-demo-open { overflow:hidden; }
+@media (max-width: 860px) {
+    .cli-browser-head { align-items:flex-start; }
+    .cli-menu-actions { justify-content:flex-start; }
+    .cli-browser-grid { gap:7px; align-items:stretch; }
+    .cli-tile { width:100%; min-width:0; min-height:60px; grid-template-columns:44px minmax(0, 1fr) auto; column-gap:9px; padding:8px; }
+    .cli-tile-icon { width:38px; height:38px; font-size:25px; }
+    .cli-tile-label { font-size:.9rem; }
+    .cli-tile-sub { font-size:.7rem; }
+    .cli-tile-actions { gap:4px; }
+    .cli-tile-action { width:25px; height:25px; flex-basis:25px; font-size:12px; }
+    .cli-browser-counter-head { width:100%; }
+}
+</style>
+
+<script>
+let cliRows = {{ cli_menu.rows|tojson }};
+let cliCurrentPath = [];
+let cliEditingIndex = -1;
+let cliEditBackup = null;
+let cliFocusIndex = -1;
+let cliDeletePendingIndex = -1;
+let cliSaveTimer = null;
+let cliSaveInFlight = false;
+let cliPendingSave = false;
+let cliStatusTimer = null;
+let currentCliBrowserIndex = -1;
+let currentCliEmojiIndex = -1;
+const cliEmojiChoices = ['⚙️','🧰','🧪','🛠️','🔧','🔨','🪛','🚀','📦','📥','📤','💾','💿','🗄️','🧹','🧽','🔁','🔄','♻️','▶️','⏸️','⏹️','⏺️','⏭️','⏮️','📋','📊','📈','📉','🧾','📜','📝','📁','📂','🗂️','🧲','🔌','🔋','⚡','🌐','🛜','📡','🔐','🔑','🛡️','🧯','🧭','🖥️','💻','🖱️','⌨️','🧠','🤖','🐳','🐋','📀','💽','🎬','🎞️','🎧','🎵','📺','📱','☁️','🌦️','☀️','🌙','🏠','🏷️','⭐','✅','☑️','❌','⚠️','🚨','ℹ️','🔍','🟢','🟡','🟠','🔴','🔵','🟣'];
+
+function cliEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function cliHideStatus() {
+    const el = document.getElementById('cliMenuStatus');
+    if (!el) return;
+    el.textContent = '';
+    el.className = 'status-line cli-menu-status-top';
+    el.setAttribute('hidden', 'hidden');
+    el.style.display = 'none';
+}
+
+function cliSetStatus(message, ok=true) {
+    const el = document.getElementById('cliMenuStatus');
+    if (!el) return;
+    if (cliStatusTimer) {
+        clearTimeout(cliStatusTimer);
+        cliStatusTimer = null;
+    }
+    message = String(message || '').trim();
+    if (!message) {
+        cliHideStatus();
+        return;
+    }
+    el.textContent = message;
+    el.className = 'status-line cli-menu-status-top ' + (ok ? 'ok' : 'bad');
+    el.removeAttribute('hidden');
+    el.style.display = 'inline-flex';
+    if (ok) {
+        cliStatusTimer = setTimeout(cliHideStatus, 1000);
+    }
+}
+
+function cliAutosave(delay=500) {
+    if (cliSaveTimer) clearTimeout(cliSaveTimer);
+    cliSaveTimer = setTimeout(() => saveCliMenu(true), delay);
+}
+
+function cliChanged(delay=500) {
+    syncCliPreview();
+    cliAutosave(delay);
+}
+
+function cliNewId() {
+    return 'cli_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+function normalizeCliRow(row) {
+    let type = String(row?.type || 'raw').trim().toLowerCase();
+    if (!['section', 'submenu', 'command', 'separator', 'raw'].includes(type)) type = 'raw';
+
+    let raw = String(row?.raw || '');
+    let title = String(row?.title || '');
+    let depth = Number(row?.depth || 0);
+    const rawTrimmed = raw.trim();
+    if (type === 'raw') {
+        const commaMatch = raw.match(/^(,+)\s*(.*)$/);
+        if (commaMatch && raw.indexOf('=') < 0) {
+            type = 'submenu';
+            depth = Math.max(1, Math.min(6, commaMatch[1].length));
+            title = title || commaMatch[2].trim();
+        } else if (depth > 0 && title && rawTrimmed && rawTrimmed.indexOf('=') < 0) {
+            type = 'submenu';
+        }
+    }
+
+    return {
+        id: row?.id || cliNewId(),
+        type,
+        title,
+        label: row?.label || '',
+        command: row?.command || '',
+        raw,
+        depth
+    };
+}
+
+function cliLabel(row) {
+    row = normalizeCliRow(row);
+    if (row.type === 'section' || row.type === 'submenu') return row.title || row.raw || 'Dossier';
+    if (row.type === 'command') return row.label || row.raw || 'Commande';
+    if (row.type === 'separator') return 'Séparateur';
+    return row.raw || 'Ligne libre';
+}
+
+function cliFolderIcon(row) {
+    const text = cliLabel(row).trim();
+    const match = text.match(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u);
+    return match ? match[0] : '📁';
+}
+
+function cliCommandIcon(row) {
+    const text = cliLabel(row).trim();
+    const match = text.match(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u);
+    return match ? match[0] : '📄';
+}
+
+function cliCleanLabel(text) {
+    return String(text || '').replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]\s*/u, '').trim();
+}
+
+function cliCompareIndexes(a, b) {
+    return cliCleanLabel(cliLabel(cliRows[a])).localeCompare(cliCleanLabel(cliLabel(cliRows[b])), 'fr', {sensitivity: 'base', numeric: true});
+}
+
+function cliParentIndex(index) {
+    const row = normalizeCliRow(cliRows[index]);
+    if (row.type === 'section') return -1;
+    if (row.type !== 'submenu' && row.type !== 'command') return -1;
+    const depth = Number(row.depth || 0);
+    for (let i = index - 1; i >= 0; i--) {
+        const cur = normalizeCliRow(cliRows[i]);
+        if (cur.type === 'section') return depth === 0 ? i : i;
+        if (cur.type === 'submenu' && Number(cur.depth || 1) === depth) return i;
+    }
+    return -1;
+}
+
+function cliScopeEndFor(index) {
+    const row = normalizeCliRow(cliRows[index]);
+    if (index < 0) return cliRows.length;
+    if (row.type === 'section') {
+        for (let i = index + 1; i < cliRows.length; i++) {
+            if (normalizeCliRow(cliRows[i]).type === 'section') return i;
+        }
+        return cliRows.length;
+    }
+    if (row.type === 'submenu') {
+        const depth = Number(row.depth || 1);
+        for (let i = index + 1; i < cliRows.length; i++) {
+            const cur = normalizeCliRow(cliRows[i]);
+            if (cur.type === 'section') return i;
+            if (cur.type === 'submenu' && Number(cur.depth || 1) <= depth) return i;
+        }
+        return cliRows.length;
+    }
+    return cliRows.length;
+}
+
+function cliCurrentContainer() {
+    if (!cliCurrentPath.length) return {kind: 'root', index: -1, depth: -1, start: 0, end: cliRows.length, title: 'Racine'};
+    const index = cliCurrentPath[cliCurrentPath.length - 1];
+    const row = normalizeCliRow(cliRows[index]);
+    if (row.type === 'section') return {kind: 'section', index, depth: 0, start: index + 1, end: cliScopeEndFor(index), title: cliLabel(row)};
+    if (row.type === 'submenu') return {kind: 'submenu', index, depth: Number(row.depth || 1), start: index + 1, end: cliScopeEndFor(index), title: cliLabel(row)};
+    return {kind: 'root', index: -1, depth: -1, start: 0, end: cliRows.length, title: 'Racine'};
+}
+
+function cliEntryKind(index) {
+    const row = normalizeCliRow(cliRows[index]);
+    if (row.type === 'section' || row.type === 'submenu') return 'folder';
+    if (row.type === 'command') return 'command';
+    return 'other';
+}
+
+function cliEntryBelongsToContext(index, ctx) {
+    const row = normalizeCliRow(cliRows[index]);
+    if (row.type === 'section') return ctx.kind === 'root';
+    if (row.type === 'submenu' || row.type === 'command') return cliParentIndex(index) === ctx.index;
+    if (row.type === 'raw') return ctx.kind === 'root';
+    return false;
+}
+
+function cliNextMeaningfulIndex(index) {
+    for (let i = index + 1; i < cliRows.length; i++) {
+        const row = normalizeCliRow(cliRows[i]);
+        const line = formatCliRow(row).trim();
+        if (!line || row.type === 'separator') continue;
+        return i;
+    }
+    return -1;
+}
+
+function cliPreviousMeaningfulIndex(index) {
+    for (let i = index - 1; i >= 0; i--) {
+        const row = normalizeCliRow(cliRows[i]);
+        const line = formatCliRow(row).trim();
+        if (!line || row.type === 'separator') continue;
+        return i;
+    }
+    return -1;
+}
+
+function cliSeparatorBelongsToContext(index, ctx) {
+    // Le tiret "-" n'a pas de profondeur dans le fichier.
+    // Pour garder la vraie lecture du menu, on l'attache à l'entrée visible qui suit.
+    // Exemple : dossier, contenu du dossier, "-", dossier suivant => le séparateur reste au niveau parent,
+    // et ne tombe plus tout en bas quand on entre dans le dossier.
+    const next = cliNextMeaningfulIndex(index);
+    if (next >= 0) return cliEntryBelongsToContext(next, ctx);
+
+    const previous = cliPreviousMeaningfulIndex(index);
+    if (previous >= 0) return cliEntryBelongsToContext(previous, ctx);
+
+    return ctx.kind === 'root';
+}
+
+function cliDirectChildren() {
+    const ctx = cliCurrentContainer();
+    const entries = [];
+    let folderCount = 0;
+    let commandCount = 0;
+
+    const pushEntry = (index, kind) => {
+        entries.push({index, kind});
+        if (kind === 'folder') folderCount += 1;
+        if (kind === 'command') commandCount += 1;
+    };
+
+    // Important : ordre exact du fichier menu.conf, séparateurs compris.
+    // On n'affiche pas les enfants profonds du dossier courant, mais les séparateurs
+    // restent au bon niveau au lieu d'être aspirés dans le sous-menu ouvert.
+    cliRows.forEach((row, index) => {
+        row = normalizeCliRow(row);
+        if (row.type === 'separator') {
+            if (cliSeparatorBelongsToContext(index, ctx)) pushEntry(index, 'other');
+            return;
+        }
+        if (cliEntryBelongsToContext(index, ctx)) pushEntry(index, cliEntryKind(index));
+    });
+
+    return {entries, folderCount, commandCount};
+}
+
+function cliRenderCrumbs() {
+    const crumbs = document.getElementById('cliBrowserCrumbs');
+    if (!crumbs) return;
+    const parts = [`<button type="button" onclick="cliGoRoot()">🏠 Racine</button>`];
+    cliCurrentPath.forEach((index, pos) => {
+        const row = cliRows[index];
+        if (!row) return;
+        parts.push(`<span>›</span><button type="button" onclick="cliGoToPath(${pos})">${cliEscape(cliCleanLabel(cliLabel(row)) || 'Dossier')}</button>`);
+    });
+    crumbs.innerHTML = parts.join('');
+}
+
+function renderCliRows() {
+    cliRows = cliRows.map(normalizeCliRow);
+    cliCurrentPath = cliCurrentPath.filter(index => cliRows[index] && ['section', 'submenu'].includes(normalizeCliRow(cliRows[index]).type));
+    const grid = document.getElementById('cliBrowserGrid');
+    const counter = document.getElementById('cliBrowserCounter');
+    const {entries, folderCount, commandCount} = cliDirectChildren();
+
+    cliRenderCrumbs();
+    if (counter) counter.textContent = `${folderCount} dossier(s) · ${commandCount} commande(s)`;
+
+    if (!entries.length) {
+        grid.innerHTML = `<div class="cli-browser-empty">Dossier vide. Ajoute un sous-dossier ou une commande avec les boutons du haut.</div>`;
+        syncCliPreview();
+        return;
+    }
+
+    grid.innerHTML = entries.map(entry => renderCliTile(entry.index, entry.kind)).join('');
+    syncCliPreview();
+    cliAfterRenderFocus();
+}
+
+
+function cliInputWidthCh(value, min=14, max=72, extra=5) {
+    const text = String(value || '');
+    const len = Math.max(text.length, 1) + extra;
+    return Math.max(min, Math.min(max, len));
+}
+
+function cliInputStyle(value, min=14, max=72, extra=5) {
+    return `width:${cliInputWidthCh(value, min, max, extra)}ch`;
+}
+
+function autoSizeCliInput(input, min=14, max=72, extra=5) {
+    if (!input) return;
+    input.style.width = cliInputWidthCh(input.value, min, max, extra) + 'ch';
+}
+
+function renderCliTile(index, kind) {
+    const row = normalizeCliRow(cliRows[index]);
+    const isEditing = cliEditingIndex === index;
+    const label = cliLabel(row);
+    const cleanLabel = cliCleanLabel(label) || label;
+    const safeTitle = cliEscape(cleanLabel);
+    const command = row.type === 'command' ? String(row.command || '') : '';
+
+    if (isEditing) {
+        if (row.type === 'command') {
+            return `
+                <div class="cli-tile is-command is-editing" data-index="${index}" tabindex="0" onfocus="cliFocusIndex=${index}">
+                    <div class="cli-tile-icon">${cliEscape(cliCommandIcon(row))}</div>
+                    <div class="cli-tile-edit">
+                        <input class="input" value="${cliEscape(cliCleanLabel(row.label || ''))}" placeholder="Nom affiché" style="${cliInputStyle(cliCleanLabel(row.label || ''), 14, 34, 4)}" oninput="cliRows[${index}].label = this.value; autoSizeCliInput(this, 14, 34, 4); cliChanged(800)">
+                        <div class="cli-tile-command-edit">
+                            <input class="input" value="${cliEscape(command)}" placeholder="script.py --option" style="${cliInputStyle(command, 26, 82, 7)}" oninput="cliRows[${index}].command = this.value; autoSizeCliInput(this, 26, 82, 7); cliChanged(800)">
+                            <button type="button" class="cli-tile-action" title="Parcourir" onclick="openCliCommandBrowser(${index})">📂</button>
+                        </div>
+                    </div>
+                    <div class="cli-tile-actions">
+                        <button type="button" class="cli-tile-action" title="Icône" onclick="openCliEmojiPanel(${index}, event)">☺</button>
+                        <button type="button" class="cli-tile-action is-save" title="OK" onclick="stopCliEdit()">💾</button>
+                        <button type="button" class="cli-tile-action" title="Annuler" onclick="cancelCliEdit()">↩</button>
+                    </div>
+                </div>`;
+        }
+        if (row.type === 'separator') {
+            return `
+                <div class="cli-tile is-separator is-editing" data-index="${index}" tabindex="0" onfocus="cliFocusIndex=${index}">
+                    <div class="cli-separator-rule"><span>Séparateur</span></div>
+                    <div class="cli-tile-actions">
+                        <button type="button" class="cli-tile-action is-save" title="OK" onclick="stopCliEdit()">💾</button>
+                        <button type="button" class="cli-tile-action" title="Annuler" onclick="cancelCliEdit()">↩</button>
+                    </div>
+                </div>`;
+        }
+        return `
+            <div class="cli-tile is-folder is-editing" data-index="${index}" tabindex="0" onfocus="cliFocusIndex=${index}">
+                <div class="cli-tile-icon">${cliEscape(cliFolderIcon(row))}</div>
+                <div class="cli-tile-edit">
+                    <input class="input" value="${cliEscape(cliCleanLabel(row.title || ''))}" placeholder="Nom du dossier" style="${cliInputStyle(cliCleanLabel(row.title || ''), 14, 42, 5)}" oninput="cliRows[${index}].title = this.value; autoSizeCliInput(this, 14, 42, 5); cliChanged(800)">
+                </div>
+                <div class="cli-tile-actions">
+                    <button type="button" class="cli-tile-action" title="Icône" onclick="openCliEmojiPanel(${index}, event)">☺</button>
+                    <button type="button" class="cli-tile-action is-save" title="OK" onclick="stopCliEdit()">💾</button>
+                    <button type="button" class="cli-tile-action" title="Annuler" onclick="cancelCliEdit()">↩</button>
+                </div>
+            </div>`;
+    }
+
+    if (row.type === 'section' || row.type === 'submenu') {
+        return `
+            <div class="cli-tile is-folder${cliFocusIndex === index ? ' is-key-focused' : ''}" data-index="${index}" tabindex="0" onfocus="cliFocusIndex=${index}" onkeydown="cliTileKeydown(event, ${index})" onclick="if (!event.target.closest('.cli-tile-action, input, button')) openCliFolder(${index})">
+                <div class="cli-tile-icon">${cliEscape(cliFolderIcon(row))}</div>
+                <div class="cli-tile-label">${safeTitle}</div>
+                <div class="cli-tile-sub">clic pour ouvrir</div>
+                <div class="cli-tile-actions">
+                    <button type="button" class="cli-tile-action" title="Ouvrir" onclick="openCliFolder(${index})">↵</button>
+                    <button type="button" class="cli-tile-action" title="Renommer" onclick="startCliEdit(${index})">✎</button>
+                    <button type="button" class="cli-tile-action" title="Monter" onclick="moveCliRow(${index}, -1)">▲</button>
+                    <button type="button" class="cli-tile-action" title="Descendre" onclick="moveCliRow(${index}, 1)">▼</button>
+                    <button type="button" class="cli-tile-action is-danger" title="Supprimer" onclick="deleteCliRow(${index})">×</button>
+                </div>
+            </div>`;
+    }
+
+    if (row.type === 'command') {
+        return `
+            <div class="cli-tile is-command${cliFocusIndex === index ? ' is-key-focused' : ''}" data-index="${index}" tabindex="0" onfocus="cliFocusIndex=${index}" onkeydown="cliTileKeydown(event, ${index})">
+                <div class="cli-tile-icon">${cliEscape(cliCommandIcon(row))}</div>
+                <div class="cli-tile-label">${safeTitle}</div>
+                <div class="cli-tile-sub">${cliEscape(command || 'commande vide')}</div>
+                <div class="cli-tile-actions">
+                    <button type="button" class="cli-tile-action" title="Modifier" onclick="startCliEdit(${index})">✎</button>
+                    <button type="button" class="cli-tile-action" title="Parcourir" onclick="openCliCommandBrowser(${index})">📂</button>
+                    <button type="button" class="cli-tile-action" title="Retrait" onclick="indentCliRow(${index}, -1)">←</button>
+                    <button type="button" class="cli-tile-action" title="Sous-menu" onclick="indentCliRow(${index}, 1)">→</button>
+                    <button type="button" class="cli-tile-action is-danger" title="Supprimer" onclick="deleteCliRow(${index})">×</button>
+                </div>
+            </div>`;
+    }
+
+    return `
+        <div class="cli-tile is-separator${cliFocusIndex === index ? ' is-key-focused' : ''}" data-index="${index}" tabindex="0" onfocus="cliFocusIndex=${index}" onkeydown="cliTileKeydown(event, ${index})">
+            <div class="cli-separator-rule"><span>${safeTitle || 'Séparateur'}</span></div>
+            <div class="cli-tile-actions">
+                <button type="button" class="cli-tile-action" title="Modifier" onclick="startCliEdit(${index})">✎</button>
+                <button type="button" class="cli-tile-action" title="Monter" onclick="moveCliRow(${index}, -1)">▲</button>
+                <button type="button" class="cli-tile-action" title="Descendre" onclick="moveCliRow(${index}, 1)">▼</button>
+                <button type="button" class="cli-tile-action is-danger" title="Supprimer" onclick="deleteCliRow(${index})">×</button>
+            </div>
+        </div>`;
+}
+
+function openCliFolder(index) {
+    const row = normalizeCliRow(cliRows[index]);
+    if (!['section', 'submenu'].includes(row.type)) return;
+    cliCurrentPath.push(index);
+    cliEditingIndex = -1;
+    renderCliRows();
+}
+
+function cliGoRoot() {
+    cliCurrentPath = [];
+    cliEditingIndex = -1;
+    renderCliRows();
+}
+
+function cliGoUp() {
+    cliCurrentPath.pop();
+    cliEditingIndex = -1;
+    renderCliRows();
+}
+
+function cliGoToPath(pos) {
+    cliCurrentPath = cliCurrentPath.slice(0, pos + 1);
+    cliEditingIndex = -1;
+    renderCliRows();
+}
+
+function cliCloneRow(row) {
+    return JSON.parse(JSON.stringify(normalizeCliRow(row)));
+}
+
+function startCliEdit(index) {
+    cliEditingIndex = index;
+    cliFocusIndex = index;
+    cliEditBackup = cliRows[index] ? cliCloneRow(cliRows[index]) : null;
+    renderCliRows();
+}
+
+function stopCliEdit() {
+    cliEditingIndex = -1;
+    cliEditBackup = null;
+    renderCliRows();
+    cliAutosave(120);
+}
+
+function cancelCliEdit() {
+    if (cliEditingIndex >= 0 && cliEditBackup) cliRows[cliEditingIndex] = cliCloneRow(cliEditBackup);
+    cliEditingIndex = -1;
+    cliEditBackup = null;
+    renderCliRows();
+}
+
+function currentInsertIndex() {
+    const ctx = cliCurrentContainer();
+    if (ctx.kind === 'root') return cliRows.length;
+    return ctx.end;
+}
+
+function currentCommandDepth() {
+    const ctx = cliCurrentContainer();
+    if (ctx.kind === 'root') return 0;
+    return ctx.depth;
+}
+
+function currentSubmenuDepth() {
+    const ctx = cliCurrentContainer();
+    if (ctx.kind === 'root') return 1;
+    return ctx.depth + 1;
+}
+
+function addCliRow(type) {
+    const row = normalizeCliRow({type});
+    let insertAt = currentInsertIndex();
+
+    if (type === 'section') {
+        row.title = 'Nouveau dossier';
+        row.depth = 0;
+        insertAt = cliRows.length;
+    }
+    if (type === 'submenu') {
+        row.title = 'Nouveau sous-dossier';
+        row.depth = Math.max(1, Math.min(6, currentSubmenuDepth()));
+    }
+    if (type === 'command') {
+        row.label = 'Nouvelle commande';
+        row.command = '';
+        row.depth = Math.max(0, Math.min(6, currentCommandDepth()));
+    }
+    if (type === 'separator') row.raw = '-';
+
+    cliRows.splice(insertAt, 0, row);
+    cliEditingIndex = insertAt;
+    renderCliRows();
+    cliAutosave(800);
+}
+
+function moveCliRow(index, direction) {
+    const target = index + direction;
+    if (target < 0 || target >= cliRows.length) return;
+    const [row] = cliRows.splice(index, 1);
+    cliRows.splice(target, 0, row);
+    cliCurrentPath = cliCurrentPath.map(i => {
+        if (i === index) return target;
+        if (direction < 0 && i === target) return target + 1;
+        if (direction > 0 && i === target) return target - 1;
+        return i;
+    });
+    cliEditingIndex = -1;
+    renderCliRows();
+    cliAutosave(200);
+}
+
+function indentCliRow(index, direction) {
+    const row = cliRows[index];
+    if (!row || !['command', 'submenu'].includes(normalizeCliRow(row).type)) return;
+    const normalized = normalizeCliRow(row);
+    normalized.depth = Math.max(normalized.type === 'submenu' ? 1 : 0, Math.min(6, Number(normalized.depth || 0) + Number(direction || 0)));
+    cliRows[index] = normalized;
+    renderCliRows();
+    cliAutosave(200);
+}
+
+function deleteCliRow(index) {
+    const row = normalizeCliRow(cliRows[index]);
+    const modal = document.getElementById('cliConfirmModal');
+    const text = document.getElementById('cliConfirmText');
+    if (!modal || !text) return;
+    cliDeletePendingIndex = index;
+    const kind = (row.type === 'section' || row.type === 'submenu') ? 'dossier' : (row.type === 'command' ? 'commande' : 'séparateur');
+    text.textContent = `Supprimer ce ${kind} : ${cliCleanLabel(cliLabel(row)) || cliLabel(row)} ?`;
+    modal.hidden = false;
+    setTimeout(() => document.getElementById('cliConfirmDelete')?.focus(), 0);
+}
+
+function cancelCliDelete() {
+    cliDeletePendingIndex = -1;
+    const modal = document.getElementById('cliConfirmModal');
+    if (modal) modal.hidden = true;
+    cliAfterRenderFocus();
+}
+
+function confirmCliDelete() {
+    const index = cliDeletePendingIndex;
+    cliDeletePendingIndex = -1;
+    const modal = document.getElementById('cliConfirmModal');
+    if (modal) modal.hidden = true;
+    if (index < 0 || !cliRows[index]) return;
+    cliRows.splice(index, 1);
+    cliCurrentPath = cliCurrentPath.filter(i => i !== index).map(i => i > index ? i - 1 : i);
+    cliEditingIndex = -1;
+    cliEditBackup = null;
+    cliFocusIndex = Math.max(0, Math.min(index, cliRows.length - 1));
+    renderCliRows();
+    cliAutosave(120);
+}
+
+function changeCliType(index, type) {
+    const row = cliRows[index];
+    if (!row) return;
+    row.type = type;
+    if (type === 'separator') row.raw = '-';
+    if (type === 'section' && !row.title) row.title = row.raw || 'Dossier';
+    if (type === 'submenu') {
+        if (!row.title) row.title = row.raw || row.label || 'Sous-dossier';
+        if (!row.depth) row.depth = 1;
+    }
+    if (type === 'command' && !row.label) row.label = row.raw || 'Commande';
+    renderCliRows();
+    cliAutosave(200);
+}
+
+function updateCliMain(index, value) {
+    const row = cliRows[index];
+    if (!row) return;
+    if (row.type === 'section' || row.type === 'submenu') row.title = value;
+    else if (row.type === 'command') row.label = value;
+    else row.raw = value;
+    cliChanged(800);
+}
+
+function formatCliRow(row) {
+    row = normalizeCliRow(row);
+    const clean = value => String(value ?? '').replace(/[\r\n]/g, ' ').trim();
+    if (row.type === 'section') return `--- ${clean(row.title) || 'Section'} ---`;
+    if (row.type === 'submenu') return `${','.repeat(Math.max(1, Math.min(6, Number(row.depth || 1))))}${clean(row.title) || 'Sous-menu'}`;
+    if (row.type === 'command') return `${','.repeat(Math.max(0, Math.min(6, Number(row.depth || 0))))}${clean(row.label) || 'Commande'} = ${clean(row.command)}`;
+    if (row.type === 'separator') return '-';
+    return clean(row.raw);
+}
+
+function syncCliPreview() {
+    const preview = document.getElementById('cliMenuPreview');
+    if (!preview) return;
+    preview.value = cliRows.map(formatCliRow).join('\n') + '\n';
+    preview.style.height = 'auto';
+    preview.style.height = Math.max(150, preview.scrollHeight + 2) + 'px';
+}
+
+function validateCliRows() {
+    let visible = 0;
+    let headings = {0: true};
+    for (const row of cliRows.map(normalizeCliRow)) {
+        const line = formatCliRow(row).trim();
+        if (!line) continue;
+        visible += 1;
+        if (row.type === 'section') {
+            headings = {0: true};
+        } else if (row.type === 'submenu') {
+            const depth = Math.max(1, Math.min(6, Number(row.depth || 1)));
+            if (!headings[depth - 1]) return `Ligne ${visible} : ajoute un titre parent au-dessus avant d’indenter ce sous-menu.`;
+            for (const key of Object.keys(headings)) {
+                if (Number(key) >= depth) delete headings[key];
+            }
+            headings[depth] = true;
+        } else if (row.type === 'command') {
+            const depth = Math.max(0, Math.min(6, Number(row.depth || 0)));
+            if (depth > 0 && !headings[depth]) return `Ligne ${visible} : cette commande est en sous-menu sans titre parent.`;
+        }
+    }
+    return '';
+}
+
+async function saveCliMenu(auto=false) {
+    if (cliSaveInFlight) {
+        cliPendingSave = true;
+        return;
+    }
+    const validationError = validateCliRows();
+    if (validationError) {
+        cliSetStatus(validationError, false);
+        return;
+    }
+    cliSaveInFlight = true;
+    const fd = new FormData();
+    fd.append('action', 'cli_menu_save');
+    fd.append('rows', JSON.stringify(cliRows.map(normalizeCliRow)));
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', {method: 'POST', body: fd});
+        const text = await res.text();
+        if (res.ok) cliSetStatus('Sauvegardé', true);
+        else cliSetStatus(text || 'Erreur sauvegarde.', false);
+    } catch (err) {
+        cliSetStatus(String(err), false);
+    } finally {
+        cliSaveInFlight = false;
+        if (cliPendingSave) {
+            cliPendingSave = false;
+            cliAutosave(120);
+        }
+    }
+}
+
+async function openCliDemoTerminal() {
+    const modal = document.getElementById('cliDemoModal');
+    const frame = document.getElementById('cliDemoFrame');
+    const link = document.getElementById('cliDemoExternal');
+    if (!modal || !frame) return;
+    cliSetStatus('Ouverture de la démo ttyd...', true);
+    try {
+        const res = await fetch('/system/personnalisation/menu-cli/demo-url', {method: 'POST'});
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok || !data.url) throw new Error(data.message || 'Impossible d’ouvrir la démo ttyd.');
+        frame.src = data.url;
+        if (link) {
+            link.href = data.url;
+            link.hidden = false;
+        }
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('cli-demo-open');
+        cliSetStatus('Démo ouverte', true);
+    } catch (err) {
+        cliSetStatus(String(err && err.message ? err.message : err), false);
+    }
+}
+
+function closeCliDemoTerminal() {
+    const modal = document.getElementById('cliDemoModal');
+    const frame = document.getElementById('cliDemoFrame');
+    if (frame) frame.src = 'about:blank';
+    if (modal) {
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('cli-demo-open');
+}
+
+function openCliCommandBrowser(index) {
+    currentCliBrowserIndex = index;
+    const url = '/browser/file?' + new URLSearchParams({target: 'cli_menu_command_' + index, path: '/mnt/user/appdata/media/scripts'}).toString();
+    const popup = window.open(url, 'yoleo_cli_menu_browser', 'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+    if (popup) popup.focus();
+}
+
+function commandFromBrowserPath(path) {
+    const clean = String(path || '').replace(/\\/g, '/');
+    const scriptsMarkers = ['/scripts/'];
+    for (const marker of scriptsMarkers) {
+        const pos = clean.indexOf(marker);
+        if (pos >= 0) return clean.slice(pos + marker.length);
+    }
+    return clean;
+}
+
+window.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type !== 'yoleo-browser-select' || data.mode !== 'file') return;
+    if (currentCliBrowserIndex < 0 || !cliRows[currentCliBrowserIndex]) return;
+    cliRows[currentCliBrowserIndex].command = commandFromBrowserPath(data.path || '');
+    cliEditingIndex = currentCliBrowserIndex;
+    renderCliRows();
+    cliAutosave(200);
+});
+
+function openCliEmojiPanel(index, event) {
+    currentCliEmojiIndex = index;
+    const panel = document.getElementById('cliEmojiPanel');
+    panel.innerHTML = cliEmojiChoices.map(icon => `<button type="button" onclick="pickCliEmoji('${icon}')">${icon}</button>`).join('');
+    panel.hidden = false;
+    const rect = event.currentTarget.getBoundingClientRect();
+    panel.style.left = Math.min(rect.left, window.innerWidth - 310) + 'px';
+    panel.style.top = (rect.bottom + 8) + 'px';
+}
+
+function pickCliEmoji(icon) {
+    const row = cliRows[currentCliEmojiIndex];
+    if (!row) return;
+    const withEmoji = (value) => {
+        let text = String(value || '').trim();
+        for (const existing of cliEmojiChoices) {
+            if (text === existing) text = '';
+            if (text.startsWith(existing + ' ')) text = text.slice(existing.length).trim();
+        }
+        text = text.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]\s*/u, '').trim();
+        return `${icon} ${text}`.trim();
+    };
+    if (row.type === 'section' || row.type === 'submenu') row.title = withEmoji(row.title);
+    if (row.type === 'command') row.label = withEmoji(row.label);
+    document.getElementById('cliEmojiPanel').hidden = true;
+    renderCliRows();
+    cliAutosave(200);
+}
+
+
+function cliVisibleTiles() {
+    return Array.from(document.querySelectorAll('#cliBrowserGrid .cli-tile[data-index]'));
+}
+
+function cliAfterRenderFocus() {
+    setTimeout(() => {
+        if (cliEditingIndex >= 0) {
+            const editTile = document.querySelector(`.cli-tile[data-index="${cliEditingIndex}"]`);
+            const firstInput = editTile?.querySelector('input');
+            if (firstInput) {
+                firstInput.focus();
+                firstInput.select?.();
+                return;
+            }
+        }
+        if (cliFocusIndex >= 0) {
+            const tile = document.querySelector(`.cli-tile[data-index="${cliFocusIndex}"]`);
+            if (tile) tile.focus({preventScroll:true});
+        }
+    }, 0);
+}
+
+function cliFocusTile(index) {
+    cliFocusIndex = index;
+    const tile = document.querySelector(`.cli-tile[data-index="${index}"]`);
+    if (tile) tile.focus({preventScroll:false});
+}
+
+function cliFocusByStep(index, step) {
+    const tiles = cliVisibleTiles();
+    if (!tiles.length) return;
+    let pos = tiles.findIndex(tile => Number(tile.dataset.index) === Number(index));
+    if (pos < 0) pos = 0;
+    pos = Math.max(0, Math.min(tiles.length - 1, pos + step));
+    cliFocusTile(Number(tiles[pos].dataset.index));
+}
+
+function cliFocusFirstLast(last=false) {
+    const tiles = cliVisibleTiles();
+    if (!tiles.length) return;
+    const tile = last ? tiles[tiles.length - 1] : tiles[0];
+    cliFocusTile(Number(tile.dataset.index));
+}
+
+function cliActivateKeyboardIndex(index) {
+    const row = normalizeCliRow(cliRows[index]);
+    if (row.type === 'section' || row.type === 'submenu') openCliFolder(index);
+    else startCliEdit(index);
+}
+
+function cliTileKeydown(event, index) {
+    if (document.getElementById('cliConfirmModal')?.hidden === false) return;
+    const key = event.key;
+    if (key === 'ArrowDown') { event.preventDefault(); cliFocusByStep(index, 1); return; }
+    if (key === 'ArrowUp') { event.preventDefault(); cliFocusByStep(index, -1); return; }
+    if (key === 'Home') { event.preventDefault(); cliFocusFirstLast(false); return; }
+    if (key === 'End') { event.preventDefault(); cliFocusFirstLast(true); return; }
+    if (key === 'Enter') { event.preventDefault(); cliActivateKeyboardIndex(index); return; }
+    if (key === ' ') { event.preventDefault(); cliActivateKeyboardIndex(index); return; }
+    if (key === 'F2') { event.preventDefault(); startCliEdit(index); return; }
+    if (key === 'Delete') { event.preventDefault(); deleteCliRow(index); return; }
+    if (key === 'Backspace' || key === 'ArrowLeft') { event.preventDefault(); cliGoUp(); return; }
+    if (key === 'ArrowRight') {
+        const row = normalizeCliRow(cliRows[index]);
+        if (row.type === 'section' || row.type === 'submenu') {
+            event.preventDefault();
+            openCliFolder(index);
+        }
+    }
+}
+
+
+function cliConfirmButtons() {
+    return [document.getElementById('cliConfirmCancel'), document.getElementById('cliConfirmDelete')].filter(Boolean);
+}
+
+function cliFocusConfirmButton(step=1) {
+    const buttons = cliConfirmButtons();
+    if (!buttons.length) return;
+    const active = document.activeElement;
+    let pos = buttons.indexOf(active);
+    if (pos < 0) pos = 0;
+    pos = (pos + step + buttons.length) % buttons.length;
+    buttons[pos].focus();
+}
+
+function cliHandleGlobalKeys(event) {
+    const modalOpen = document.getElementById('cliConfirmModal')?.hidden === false;
+    const demoOpen = document.getElementById('cliDemoModal')?.hidden === false;
+    const target = event.target;
+    const isTextInput = target && (target.matches?.('input, textarea') || target.isContentEditable);
+
+    if (demoOpen && event.key === 'Escape') {
+        event.preventDefault();
+        closeCliDemoTerminal();
+        return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 's') {
+        event.preventDefault();
+        saveCliMenu();
+        return;
+    }
+
+    if (modalOpen) {
+        if (event.key === 'Escape') { event.preventDefault(); cancelCliDelete(); return; }
+        if (event.key === 'Enter' || event.key === 'Delete') {
+            event.preventDefault();
+            if (target?.id === 'cliConfirmCancel') cancelCliDelete();
+            else confirmCliDelete();
+            return;
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') { event.preventDefault(); cliFocusConfirmButton(-1); return; }
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); cliFocusConfirmButton(1); return; }
+        if (event.key === 'Tab') { event.preventDefault(); cliFocusConfirmButton(event.shiftKey ? -1 : 1); return; }
+        return;
+    }
+
+    if (cliEditingIndex >= 0 && isTextInput) {
+        if (event.key === 'Enter') { event.preventDefault(); stopCliEdit(); }
+        if (event.key === 'Escape') { event.preventDefault(); cancelCliEdit(); }
+        return;
+    }
+
+    if (!isTextInput && event.key === 'Escape' && cliCurrentPath.length) {
+        event.preventDefault();
+        cliGoUp();
+    }
+}
+
+document.addEventListener('keydown', cliHandleGlobalKeys);
+
+document.addEventListener('click', (event) => {
+    const modal = document.getElementById('cliConfirmModal');
+    if (modal && !modal.hidden && event.target === modal) {
+        cancelCliDelete();
+        return;
+    }
+    const panel = document.getElementById('cliEmojiPanel');
+    if (!panel || panel.hidden) return;
+    if (panel.contains(event.target) || event.target.closest('.cli-tile-action')) return;
+    panel.hidden = true;
+});
+
+renderCliRows();
+setTimeout(() => { if (cliFocusIndex < 0) cliFocusFirstLast(false); }, 0);
+</script>
+{% endblock %}

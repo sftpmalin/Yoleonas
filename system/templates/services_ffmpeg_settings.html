@@ -1,0 +1,45 @@
+{% extends "services_ffmpeg_base.html" %}
+
+{% block ffmpeg_content %}
+<form method="post" action="{{ url_for('services_bp.ffoi_settings_save') }}" class="ffoi-form">
+<section class="card ffoi-card">
+  <div class="card-head">
+    <div>
+      <h2 class="card-title">⚙️ Réglages FFmpeg over IP</h2>
+      <div class="hint">FFmpeg n'est pas installé par défaut : c'est un service NAS optionnel. Port par défaut : 3333.</div>
+    </div>
+    <div class="toolbar ffoi-toolbar">
+      <button class="yoleo-btn yoleo-btn-green" type="submit" name="apply" value="1">💾 Enregistrer + appliquer</button>
+    </div>
+  </div>
+
+  <div class="grid-4 ffoi-grid">
+    <div><label>Adresse écoute</label><input name="ADDRESS" value="{{ conf.ADDRESS }}" placeholder="0.0.0.0"></div>
+    <div><label>Port</label><input name="PORT" value="{{ conf.PORT }}" placeholder="3333" inputmode="numeric"></div>
+    <div><label>IP / nom client</label><input name="CLIENT_HOST" value="{{ conf.CLIENT_HOST }}" placeholder="auto : {{ status.client_address.split(':')[0] }}"></div>
+    <div class="ffoi-secret-field"><label>Mot de passe / authSecret</label><input id="ffoiAuthSecret" name="AUTH_SECRET" value="{{ conf.AUTH_SECRET }}" type="password" autocomplete="new-password"><button type="button" class="ffoi-inline-btn" onclick="ffoiToggleSecret()">👁️</button><button type="button" class="ffoi-inline-btn" onclick="ffoiGenerateSecret()">🎲</button></div>
+    <div><label>Chemin FFmpeg</label><input name="FFMPEG_PATH" value="{{ conf.FFMPEG_PATH }}" placeholder="/usr/bin/ffmpeg"></div>
+    <div><label>Binaire serveur</label><input name="SERVER_BIN" value="{{ conf.SERVER_BIN }}" placeholder="../bin/ffmpeg-over-ip-server"></div>
+    <div><label>Client Windows</label><input name="CLIENT_BIN" value="{{ conf.CLIENT_BIN }}" placeholder="../bin/ffmpeg-over-ip-client.exe"></div>
+    <div><label>JSON serveur</label><input name="SERVER_JSON" value="{{ conf.SERVER_JSON }}" placeholder="../conf/ffmpeg-over-ip.server.json"></div>
+    <div><label>Arguments serveur</label><input name="SERVER_ARGS" value="{{ conf.SERVER_ARGS }}" placeholder="{config}"></div>
+    <div><label>Service systemd</label><input name="SERVICE_NAME" value="{{ conf.SERVICE_NAME }}" placeholder="ffmpeg-over-ip.service"></div>
+    <div class="grid-span-2"><label>Log</label><input name="LOG_FILE" value="{{ conf.LOG_FILE }}" placeholder="/var/log/yoleo/ffmpeg-over-ip.log"></div>
+  </div>
+</section>
+</form>
+<script>
+function ffoiGenerateSecret(){
+  const input = document.getElementById('ffoiAuthSecret');
+  if(!input) return;
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  input.value = Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function ffoiToggleSecret(){
+  const input = document.getElementById('ffoiAuthSecret');
+  if(!input) return;
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+</script>
+{% endblock %}

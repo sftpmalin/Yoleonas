@@ -1,0 +1,63 @@
+/* Maintenance disques : pop-up démontage compacte.
+   Périphérique réduit, options de suppression sur la même hauteur pour limiter le scroll. */
+.unmount-modal-compact {
+    width: min(720px, 100%);
+    max-height: min(86vh, 560px);
+}
+
+.unmount-modal-body {
+    gap: 8px;
+    padding: 12px 14px;
+}
+
+.unmount-note {
+    margin-bottom: 0;
+}
+
+.unmount-modal-row {
+    display: grid;
+    align-items: end;
+    column-gap: 12px;
+    row-gap: 8px;
+}
+
+.unmount-modal-row-main {
+    grid-template-columns: minmax(170px, 30%) minmax(0, 1fr);
+}
+
+.unmount-modal-row-bottom {
+    grid-template-columns: minmax(250px, 1fr) minmax(250px, 1fr);
+    align-items: start;
+}
+
+.unmount-modal-row .form-row {
+    margin-bottom: 0;
+}
+
+.unmount-modal-row input[type="text"],
+.unmount-modal-row .form-row input {
+    height: 34px;
+}
+
+.unmount-check-row {
+    min-height: 34px;
+    margin: 0;
+}
+
+.unmount-hints {
+    display: grid;
+    gap: 4px;
+    align-self: center;
+}
+
+.unmount-hints .hint {
+    margin: 0;
+    line-height: 1.35;
+}
+
+@media (max-width: 720px) {
+    .unmount-modal-row-main,
+    .unmount-modal-row-bottom {
+        grid-template-columns: 1fr;
+    }
+}

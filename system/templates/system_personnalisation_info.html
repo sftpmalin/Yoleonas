@@ -1,0 +1,637 @@
+{% extends "system_base.html" %}
+
+{% block system_content %}
+<div class="pers-page">
+
+    {% include "partials/system_personnalisation_subnav.html" %}
+
+    {% if pers_subtab == 'menu' %}
+                <div class="pers-menu-page pers-menu-folder-page">
+                    <div class="pers-menu-top-grid">
+                        <div class="card pers-menu-card pers-menu-identity-card">
+                            <div class="card-body pers-menu-card-body">
+                                <div class="pers-menu-section-title">Identité</div>
+                                <div class="pers-menu-identity-grid">
+                                    <label class="field-box pers-menu-field">
+                                        <div class="field-label">Onglet</div>
+                                        <div class="field-row pers-menu-field-row">
+                                            <input class="input" id="cfg_titre_tab" value="{{ config.titre_tab }}">
+                                            <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-icon yoleo-btn-small" title="Sauvegarder" aria-label="Sauvegarder le titre de l’onglet" onclick="saveConfig('titre_tab','cfg_titre_tab')">💾</button>
+                                        </div>
+                                    </label>
+                                    <label class="field-box pers-menu-field">
+                                        <div class="field-label">Titre sidebar</div>
+                                        <div class="field-row pers-menu-field-row">
+                                            <input class="input" id="cfg_titre_logo" value="{{ config.titre_logo }}">
+                                            <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-icon yoleo-btn-small" title="Sauvegarder" aria-label="Sauvegarder le titre de la sidebar" onclick="saveConfig('titre_logo','cfg_titre_logo')">💾</button>
+                                        </div>
+                                    </label>
+                                    <label class="field-box pers-menu-field">
+                                        <div class="field-label">Logo / favoris</div>
+                                        <div class="field-row pers-menu-field-row">
+                                            <input class="input" id="cfg_nav_icons" value="{{ config.nav_icons }}">
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" aria-label="Choisir une icône" onclick="openStaticBrowser('cfg_nav_icons')">📂</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-icon yoleo-btn-small" title="Sauvegarder" aria-label="Sauvegarder l’icône" onclick="saveConfig('nav_icons','cfg_nav_icons')">💾</button>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div id="configStatus" class="status-line"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card pers-menu-card pers-menu-list-card">
+                        <div class="card-body pers-menu-card-body">
+                            <div class="pers-menu-list-titlebar">
+                                <div>
+                                    <div class="pers-menu-section-title">Menu personnalisé</div>
+                                </div>
+                                <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="openMenuEntryModal('', '', 'Catégorie')">➕ Groupe</button>
+                            </div>
+
+                            <div class="pers-menu-folder-list">
+                                {% for item in menu_items %}
+                                <section class="pers-menu-folder" data-menu-folder="{{ item.safe_id }}">
+                                    <button type="button" class="pers-menu-folder-head" onclick="toggleMenuFolder('{{ item.safe_id }}')">
+                                        <span class="pers-menu-folder-icon">{% if item.icon and (item.icon.startswith('/static') or item.icon.startswith('static/')) %}<img src="{{ item.icon if item.icon.startswith('/') else '/' ~ item.icon }}" alt="">{% else %}{{ item.icon or '📁' }}{% endif %}</span>
+                                        <span class="pers-menu-folder-name">{{ item.label }}</span>
+                                        <span class="pers-menu-folder-count">{{ item.children|length }} entrée{{ 's' if item.children|length > 1 else '' }}</span>
+                                        <span class="pers-menu-folder-actions" onclick="event.stopPropagation()">
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Monter le groupe" onclick="moveMenuItem('', '{{ item.id }}', -1, '{{ item.safe_id }}')">▲</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Descendre le groupe" onclick="moveMenuItem('', '{{ item.id }}', 1, '{{ item.safe_id }}')">▼</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-icon yoleo-btn-small" title="Ajouter dans {{ item.label|e }}" onclick="openMenuEntryModal('{{ item.id }}', '', 'Sous-menu')">➕</button>
+                                        </span>
+                                    </button>
+
+                                    <div class="pers-menu-folder-edit" id="folder_edit_{{ item.safe_id }}">
+                                        <div class="pers-menu-folder-edit-grid">
+                                            <label>
+                                                <div class="menu-field-label">Titre du groupe</div>
+                                                <input class="input" id="m_{{ item.safe_id }}_label" value="{{ item.label }}">
+                                            </label>
+                                            <label>
+                                                <div class="menu-field-label">Lien direct</div>
+                                                <input class="input" id="m_{{ item.safe_id }}_url" value="{{ item.url }}">
+                                            </label>
+                                            <label>
+                                                <div class="menu-field-label">Icône</div>
+                                                <div class="menu-icon-row">
+                                                    <span class="menu-icon-preview-box" id="m_{{ item.safe_id }}_preview">{% if item.icon and (item.icon.startswith('/static') or item.icon.startswith('static/')) %}<img src="{{ item.icon if item.icon.startswith('/') else '/' ~ item.icon }}" alt="">{% else %}{{ item.icon or '📁' }}{% endif %}</span>
+                                                    <input class="input" id="m_{{ item.safe_id }}_icon" value="{{ item.icon }}" oninput="refreshIconPreview('m_{{ item.safe_id }}_icon','m_{{ item.safe_id }}_preview')">
+                                                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" aria-label="Choisir l’icône" onclick="openStaticBrowser('m_{{ item.safe_id }}_icon')">📂</button>
+                                                </div>
+                                            </label>
+                                            <div class="pers-menu-folder-edit-actions">
+                                                <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-small" onclick="saveMenuItem('', '{{ item.id }}', '{{ item.safe_id }}')">💾 Sauvegarder</button>
+                                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Monter le groupe" onclick="moveMenuItem('', '{{ item.id }}', -1, '{{ item.safe_id }}')">▲</button>
+                                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Descendre le groupe" onclick="moveMenuItem('', '{{ item.id }}', 1, '{{ item.safe_id }}')">▼</button>
+                                                <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-small" onclick="deleteMenuItem('', '{{ item.id }}', '{{ item.label|e }}')">🗑️ Supprimer</button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="pers-menu-folder-children">
+                                        {% for child in item.children %}
+                                        <article class="pers-menu-entry-row" data-menu-entry="{{ child.safe_id }}">
+                                            <span class="pers-menu-entry-icon" id="m_{{ child.safe_id }}_preview">{% if child.icon and (child.icon.startswith('/static') or child.icon.startswith('static/')) %}<img src="{{ child.icon if child.icon.startswith('/') else '/' ~ child.icon }}" alt="">{% else %}{{ child.icon or '↳' }}{% endif %}</span>
+                                            <input class="input" id="m_{{ child.safe_id }}_label" value="{{ child.label }}" title="Nom">
+                                            <input class="input" id="m_{{ child.safe_id }}_url" value="{{ child.url }}" title="URL">
+                                            <div class="menu-icon-row pers-menu-entry-icon-field">
+                                                <input class="input" id="m_{{ child.safe_id }}_icon" value="{{ child.icon }}" title="Icône" oninput="refreshIconPreview('m_{{ child.safe_id }}_icon','m_{{ child.safe_id }}_preview')">
+                                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" onclick="openStaticBrowser('m_{{ child.safe_id }}_icon')">📂</button>
+                                            </div>
+                                            <button type="button" class="yoleo-btn yoleo-btn-primary yoleo-btn-icon yoleo-btn-small" title="Sauvegarder" onclick="saveMenuItem('{{ item.id }}', '{{ child.id }}', '{{ child.safe_id }}')">💾</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Monter" onclick="moveMenuItem('{{ item.id }}', '{{ child.id }}', -1, '{{ child.safe_id }}')">▲</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Descendre" onclick="moveMenuItem('{{ item.id }}', '{{ child.id }}', 1, '{{ child.safe_id }}')">▼</button>
+                                            <button type="button" class="yoleo-btn yoleo-btn-red yoleo-btn-icon yoleo-btn-small" title="Supprimer" onclick="deleteMenuItem('{{ item.id }}', '{{ child.id }}', '{{ child.label|e }}')">🗑️</button>
+                                        </article>
+                                        {% else %}
+                                        <div class="menu-child-empty">Aucune entrée dans ce groupe.</div>
+                                        {% endfor %}
+                                    </div>
+                                </section>
+                                {% else %}
+                                <div class="menu-empty">Aucune entrée de menu.</div>
+                                {% endfor %}
+                            </div>
+                            <div id="menuStatus" class="status-line"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="menuEntryModal" class="modal-overlay pers-menu-entry-modal">
+                    <div class="modal-box pers-menu-entry-modal-box">
+                        <h2 class="modal-title" id="menuEntryModalTitle">Ajouter une entrée</h2>
+                        <input type="hidden" id="modal_menu_parent_id">
+                        <input type="hidden" id="modal_menu_item_id">
+                        <div class="pers-menu-modal-grid">
+                            <label>
+                                <div class="field-label">Nom</div>
+                                <input class="input" id="modal_menu_label" placeholder="Nom affiché">
+                            </label>
+                            <label>
+                                <div class="field-label">URL</div>
+                                <input class="input" id="modal_menu_url" placeholder="/system/info">
+                            </label>
+                            <label>
+                                <div class="field-label">Icône</div>
+                                <div class="menu-icon-row">
+                                    <span class="menu-icon-preview-box" id="modal_menu_icon_preview">🌐</span>
+                                    <input class="input" id="modal_menu_icon" placeholder="🌐 ou /static/logo.png" oninput="refreshIconPreview('modal_menu_icon','modal_menu_icon_preview')">
+                                    <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" onclick="openStaticBrowser('modal_menu_icon')">📂</button>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="closeModal('menuEntryModal')">Annuler</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-green" onclick="submitMenuEntryModal()">➕ Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+    {% elif pers_subtab == 'home' %}
+
+                {% macro home_toggle(key, label, desc='', emoji='🔘') -%}
+                <label class="home-toggle">
+                    <span class="home-toggle-icon">{{ emoji }}</span>
+                    <input type="checkbox" class="home-check" name="{{ key }}" {% if home_config.get(key|lower, '1')|int %}checked{% endif %} onchange="toggleNvidiaSshSettings()">
+                    <span>
+                        <span class="home-toggle-title">{{ label }}</span>
+                        {% if desc %}<span class="home-toggle-desc">{{ desc }}</span>{% endif %}
+                    </span>
+                </label>
+                {%- endmacro %}
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="toolbar">
+                            <button type="button" class="yoleo-btn yoleo-btn-green yoleo-btn-small" onclick="saveHomeConfig()">💾 Sauvegarder l’accueil</button>
+                        </div>
+                        <div class="home-note">Fichier utilisé : <span class="home-path">{{ home_config_path }}</span></div>
+                        <div class="home-config-groups">
+                            <section class="home-config-group">
+                                <div class="home-group-head"><span class="home-group-icon">🎮</span><div><h3>Carte graphique</h3><p>NVIDIA locale et Intel iGPU.</p></div></div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_NVIDIA_LOCAL', 'NVIDIA GPU local', 'Carte NVIDIA présente sur l’hôte Flask.', '🟢') }}
+                                    {{ home_toggle('SHOW_INTEL_GPU', 'Intel GPU', 'Jauge Intel iGPU locale.', '🔵') }}
+                                </div>
+                            </section>
+
+                            <section class="home-config-group">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">⚙️</span>
+                                    <div class="home-group-title"><h3>Système</h3><p>Identité du NAS, heure, uptime et services.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_TIME', 'Heure', 'Horloge et date dans le panneau principal.', '🕒') }}
+                                    {{ home_toggle('SHOW_HOST', 'Hôte', 'Hostname, système et démarrage.', '🏠') }}
+                                    {{ home_toggle('SHOW_UPTIME', 'Uptime', 'Durée de fonctionnement et kernel.', '⏱️') }}
+                                    {{ home_toggle('SHOW_SERVICES', 'Services', 'Résumé des services systemd.', '🧰') }}
+                                </div>
+                            </section>
+
+                            <section class="home-config-group">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">🐳</span>
+                                    <div class="home-group-title"><h3>Docker / VM</h3><p>Compteurs des conteneurs et des machines virtuelles.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_DOCKER_TOTAL', 'Docker', 'Tuile avec total, en exécution et arrêtés.', '🐳') }}
+                                    {{ home_toggle('SHOW_DOCKER_RUNNING', 'VM', 'Tuile avec total VM, en exécution et arrêtées.', '🖥️') }}
+                                </div>
+                            </section>
+
+                            <section class="home-config-group">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">📊</span>
+                                    <div class="home-group-title"><h3>Ressources</h3><p>CPU, RAM, stockage et réseau.</p></div>
+                                </div>
+                                <div class="home-toggle-grid home-toggle-grid-compact">
+                                    {{ home_toggle('SHOW_CPU', 'Processeur', 'Jauge CPU et load average.', '🧠') }}
+                                    {{ home_toggle('SHOW_RAM', 'Mémoire RAM', 'Jauge RAM et total utilisé.', '📊') }}
+                                    {{ home_toggle('SHOW_STORAGE', 'Stockage', 'Tuile stockage rapide.', '💾') }}
+                                    {{ home_toggle('SHOW_DISK_MOUNTS', 'Vérifier montages disque', 'Affiche le contrôle des points de montage configurés dans disk_top.conf.', '💿') }}
+                                    {{ home_toggle('SHOW_NETWORK', 'Réseau local', 'IP, passerelle, débit et IP publique.', '🌐') }}
+                                    {{ home_toggle('SHOW_LOCAL_RESOLUTION', 'Résolution locale', 'Bloc réseau/résolution locale, façon OMV.', '🧭') }}
+                                </div>
+                            </section>
+
+                            <section id="sshSettingsCard" class="home-config-group pers-home-ssh-group">
+                                <div class="home-group-head">
+                                    <span class="home-group-icon">🖥️</span>
+                                    <div class="home-group-title"><h3>GPU SSH</h3><p>Carte NVIDIA d’une machine distante ou d’une VM.</p></div>
+                                </div>
+                                <div class="pers-home-ssh-toggle-row">
+                                    {{ home_toggle('SHOW_NVIDIA_SSH', 'GPU SSH', 'Active le bloc GPU distant sur l’accueil uniquement si les champs SSH sont renseignés.', '🖥️') }}
+                                </div>
+                                <div id="sshDisabledNote" class="pers-home-ssh-note">Si GPU SSH est coché, l’IP, le port, le nom d’utilisateur et le chemin de clé sont obligatoires.</div>
+                                <div class="pers-home-ssh-grid">
+                                    <div class="field-box"><div class="field-label">IP de la machine</div><input class="input" data-home-ssh="SSH_GPU_HOST" value="{{ home_ssh_config.get('SSH_GPU_HOST','') }}" placeholder="192.168.1.4"></div>
+                                    <div class="field-box"><div class="field-label">Port de la machine</div><input class="input" data-home-ssh="SSH_GPU_PORT" value="{{ home_ssh_config.get('SSH_GPU_PORT','22') or '22' }}" placeholder="22"></div>
+                                    <div class="field-box"><div class="field-label">Nom d’utilisateur de la machine</div><input class="input" data-home-ssh="SSH_GPU_USER" value="{{ home_ssh_config.get('SSH_GPU_USER','') }}" placeholder="yoan"></div>
+                                    <div class="field-box">
+                                        <div class="field-label">Chemin ou dossier de votre clé</div>
+                                        <div class="ssh-key-row pers-home-ssh-key-row">
+                                            <input id="sshGpuKeyPath" class="input" data-home-ssh="SSH_GPU_KEY_PATH" value="{{ home_ssh_config.get('SSH_GPU_KEY_PATH','') }}" placeholder="/home/key/yoan">
+                                            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon yoleo-btn-small" title="Parcourir" aria-label="Choisir la clé SSH" onclick="openKeyBrowser('sshGpuKeyPath')">📁</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <input type="hidden" data-home-ssh="REMOTE_NVIDIA_SMI" value="{{ home_ssh_config.get('REMOTE_NVIDIA_SMI','/usr/bin/nvidia-smi') or '/usr/bin/nvidia-smi' }}">
+                                <input type="hidden" data-home-ssh="SSH_GPU_CONNECT_TIMEOUT" value="{{ home_ssh_config.get('SSH_GPU_CONNECT_TIMEOUT','5') or '5' }}">
+                                <input type="hidden" data-home-ssh="SSH_GPU_COMMAND_TIMEOUT" value="{{ home_ssh_config.get('SSH_GPU_COMMAND_TIMEOUT','8') or '8' }}">
+                                <input type="hidden" data-home-ssh="SSH_GPU_CACHE_SECONDS" value="{{ home_ssh_config.get('SSH_GPU_CACHE_SECONDS','2') or '2' }}">
+                            </section>
+                        </div>
+                        <div id="homeConfigStatus" class="status-line"></div>
+                    </div>
+                </div>
+
+
+    {% elif pers_subtab == 'disk' %}
+
+                <div class="card disk-top-card">
+                    <div class="card-body">
+                        <div class="disk-top-head">
+                            <div>
+                                <h2 class="disk-top-title">💿 Montages affichés sur l’accueil</h2>
+                                <p class="disk-top-subtitle">Coche les chemins à vérifier. Yoleo contrôle seulement que chaque chemin est un vrai point de montage : cette page ne monte rien et ne modifie pas fstab.</p>
+                            </div>
+                            <div class="disk-top-conf">Conf : <code>{{ disk_top_config.path }}</code></div>
+                        </div>
+
+                        <form method="post" action="/system/personnalisation/disque">
+                            <div class="yoleo-table-wrap disk-top-table-wrap">
+                                <table class="yoleo-table disk-top-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Afficher</th>
+                                            <th>Point de montage</th>
+                                            <th>État réel</th>
+                                            <th>Source</th>
+                                            <th>FS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in disk_top_candidates.rows %}
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" name="mount_path" value="{{ row.path }}" {% if row.selected %}checked{% endif %}>
+                                            </td>
+                                            <td><code>{{ row.path }}</code></td>
+                                            <td>
+                                                <span class="disk-top-badge disk-top-badge-{{ row.status }}">{{ row.status_label }}</span>
+                                            </td>
+                                            <td>{{ row.source }}</td>
+                                            <td>{{ row.fstype }}</td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="5" class="muted">Aucun montage détecté. Ajoute un chemin manuel ci-dessous.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="disk-top-custom-row">
+                                <label class="field-box">
+                                    <div class="field-label">Ajouter un chemin manuel</div>
+                                    <input class="input" name="custom_mount" placeholder="/mnt/cache">
+                                </label>
+                                <button type="submit" class="yoleo-btn yoleo-btn-green">💾 Enregistrer</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+
+    {% elif pers_subtab == 'info' %}
+
+                <div class="card pers-info-card pers-info-details-card">
+                    <div class="card-body pers-info-body pers-info-details-body">
+                        <div class="pers-info-header">
+                            <div class="pers-info-icon">ℹ️</div>
+                            <div>
+                                <h2>Info</h2>
+                                <p>Notes déplacées depuis les pages Accueil, Menu et l’ancienne page SSH GPU.</p>
+                            </div>
+                        </div>
+                        <div class="pers-info-grid">
+                            <section class="pers-info-note-card">
+                                <h3>Menu démarré</h3>
+                                <p>Source : <code>../conf/menu/menu.conf</code> + dossiers de catégories.</p>
+                            </section>
+                            <section class="pers-info-note-card">
+                                <h3>GPU SSH</h3>
+                                <p><b>Usage</b> : lecture de <code>nvidia-smi</code> sur une machine distante ou une VM.</p>
+                                <p><b>Affichage</b> : le bloc n’apparaît sur l’accueil que si la carte <b>GPU SSH</b> est activée.</p>
+                                <p><b>Conf</b> : les valeurs sont sauvegardées dans <code>system.conf</code>.</p>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+    {% endif %}
+</div>
+
+
+<div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+        <h2 class="modal-title" id="confirmTitle">Confirmation</h2>
+        <div id="confirmBody" class="pers-subtitle"></div>
+        <div class="modal-actions">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" id="confirmCancel">Annuler</button>
+            <button type="button" class="yoleo-btn yoleo-btn-red" id="confirmOk">Supprimer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentBrowseTarget = '';
+let confirmResolver = null;
+
+function setStatus(id, msg, ok=true) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg || '';
+    el.className = 'status-line ' + (ok ? 'ok' : 'bad');
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+}
+
+function showConfirm(title, body, okLabel='Valider') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('confirmTitle').textContent = title || 'Confirmation';
+        document.getElementById('confirmBody').textContent = body || '';
+        document.getElementById('confirmOk').textContent = okLabel || 'Valider';
+        confirmResolver = resolve;
+        modal.style.display = 'flex';
+    });
+}
+
+function settleConfirm(value) {
+    closeModal('confirmModal');
+    if (confirmResolver) confirmResolver(value === true);
+    confirmResolver = null;
+}
+
+document.getElementById('confirmCancel')?.addEventListener('click', () => settleConfirm(false));
+document.getElementById('confirmOk')?.addEventListener('click', () => settleConfirm(true));
+
+function toggleMenuFolder(safeId) {
+    const box = document.getElementById('folder_edit_' + safeId);
+    if (!box) return;
+    box.classList.toggle('is-open');
+}
+
+function openMenuEntryModal(parentId='', itemId='', title='Entrée') {
+    document.getElementById('modal_menu_parent_id').value = parentId || '';
+    document.getElementById('modal_menu_item_id').value = itemId || '';
+    document.getElementById('modal_menu_label').value = '';
+    document.getElementById('modal_menu_url').value = parentId ? '' : '#';
+    document.getElementById('modal_menu_icon').value = parentId ? '↳' : '🌐';
+    refreshIconPreview('modal_menu_icon', 'modal_menu_icon_preview');
+    document.getElementById('menuEntryModalTitle').textContent = parentId ? 'Ajouter une entrée' : 'Ajouter un groupe';
+    const modal = document.getElementById('menuEntryModal');
+    if (modal) modal.style.display = 'flex';
+    setTimeout(() => document.getElementById('modal_menu_label')?.focus(), 50);
+}
+
+async function submitMenuEntryModal() {
+    const fd = new FormData();
+    fd.append('action', 'menu_upsert');
+    fd.append('parent_id', document.getElementById('modal_menu_parent_id')?.value || '');
+    fd.append('item_id', document.getElementById('modal_menu_item_id')?.value || '');
+    fd.append('nom', document.getElementById('modal_menu_label')?.value || '');
+    fd.append('url', document.getElementById('modal_menu_url')?.value || '#');
+    fd.append('icone', document.getElementById('modal_menu_icon')?.value || '🌐');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur ajout.', false); return; }
+        closeModal('menuEntryModal');
+        setStatus('menuStatus', 'Menu sauvegardé. Rechargement…', true);
+        location.reload();
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+async function saveConfig(key, inputId) {
+    const value = document.getElementById(inputId)?.value || '';
+    const fd = new FormData();
+    fd.append('action', 'update_config');
+    fd.append('cle', key);
+    fd.append('valeur', value);
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        setStatus('configStatus', res.ok ? 'Sauvegardé.' : txt, res.ok);
+    } catch (e) {
+        setStatus('configStatus', String(e), false);
+    }
+}
+
+async function saveMenuItem(parentId, itemId, safeId) {
+    const fd = new FormData();
+    fd.append('action', 'menu_upsert');
+    fd.append('parent_id', parentId || '');
+    fd.append('item_id', itemId || '');
+    fd.append('nom', document.getElementById(`m_${safeId}_label`)?.value || '');
+    fd.append('url', document.getElementById(`m_${safeId}_url`)?.value || '');
+    fd.append('icone', document.getElementById(`m_${safeId}_icon`)?.value || '');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur sauvegarde.', false); return; }
+        setStatus('menuStatus', 'Menu sauvegardé. Rechargement…', true);
+        location.reload();
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+async function deleteMenuItem(parentId, itemId, label) {
+    const ok = await showConfirm('Supprimer cette entrée ?', `Entrée : ${label || itemId}. Cette action modifiera ../conf/menu.`, 'Supprimer');
+    if (!ok) return;
+    const fd = new FormData();
+    fd.append('action', 'menu_delete');
+    fd.append('parent_id', parentId || '');
+    fd.append('item_id', itemId || '');
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur suppression.', false); return; }
+        setStatus('menuStatus', 'Entrée supprimée. Rechargement…', true);
+        location.reload();
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+async function moveMenuItem(parentId, itemId, direction, safeId) {
+    const fd = new FormData();
+    fd.append('action', 'menu_move');
+    fd.append('parent_id', parentId || '');
+    fd.append('item_id', itemId || '');
+    fd.append('direction', String(direction || 1));
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        if (!res.ok) { setStatus('menuStatus', txt || 'Erreur déplacement.', false); return; }
+
+        if (parentId) {
+            const row = document.querySelector(`[data-menu-entry="${CSS.escape(safeId || '')}"]`);
+            const list = row?.parentElement;
+            if (row && list) {
+                if (Number(direction) < 0 && row.previousElementSibling) {
+                    list.insertBefore(row, row.previousElementSibling);
+                } else if (Number(direction) > 0 && row.nextElementSibling) {
+                    list.insertBefore(row.nextElementSibling, row);
+                }
+            }
+        } else {
+            const section = document.querySelector(`[data-menu-folder="${CSS.escape(safeId || '')}"]`);
+            const list = section?.parentElement;
+            if (section && list) {
+                if (Number(direction) < 0 && section.previousElementSibling) {
+                    list.insertBefore(section, section.previousElementSibling);
+                } else if (Number(direction) > 0 && section.nextElementSibling) {
+                    list.insertBefore(section.nextElementSibling, section);
+                }
+            }
+        }
+        setStatus('menuStatus', txt || 'Ordre mis à jour.', true);
+    } catch (e) {
+        setStatus('menuStatus', String(e), false);
+    }
+}
+
+function normalizeBrowserStartPath(value, fallbackPath) {
+    const fallback = fallbackPath || '/';
+    const raw = String(value || '').trim();
+    if (!raw) return fallback;
+
+    // Emoji / texte libre : on ouvre le browser au dossier utile au lieu de tenter un faux chemin.
+    if (!raw.startsWith('/')) {
+        if (raw.startsWith('static/')) return '/' + raw;
+        return fallback;
+    }
+    return raw;
+}
+
+function openYoleoSystemBrowser(mode, targetId, title, fallbackPath) {
+    currentBrowseTarget = targetId || '';
+    const browserMode = mode || 'file';
+    const input = document.getElementById(currentBrowseTarget);
+    const startPath = normalizeBrowserStartPath(input ? input.value : '', fallbackPath || '/');
+    const params = new URLSearchParams({target: currentBrowseTarget, path: startPath});
+    const url = '/browser/' + browserMode + '?' + params.toString();
+    const safeTarget = String(currentBrowseTarget || 'target').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    const popup = window.open(
+        url,
+        'yoleo_system_browser_' + browserMode + '_' + safeTarget,
+        'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+    );
+    if (popup) popup.focus();
+}
+
+function openStaticBrowser(targetId) {
+    openYoleoSystemBrowser('image', targetId, 'Parcourir une image', '/static');
+}
+
+window.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type !== 'yoleo-browser-select') return;
+    if (!['image', 'file', 'folder'].includes(data.mode)) return;
+    const targetId = data.target || currentBrowseTarget;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    input.value = data.path || '';
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    input.dispatchEvent(new Event('change', {bubbles: true}));
+    const preview = document.getElementById(targetId.replace(/_icon$/, '_preview'));
+    if (preview) refreshIconPreview(targetId, preview.id);
+});
+
+function openKeyBrowser(targetId) {
+    currentBrowseTarget = targetId || '';
+    const input = document.getElementById(currentBrowseTarget);
+    const startPath = normalizeBrowserStartPath(input ? input.value : '', '/');
+    const params = new URLSearchParams({target: currentBrowseTarget, path: startPath});
+    const url = '/browser/file?' + params.toString();
+
+    // Spécifique au champ clé SSH : ouverture en vraie fenêtre popup,
+    // sans passer par la boîte commune du layout.
+    const popup = window.open(
+        url,
+        'yoleo_ssh_key_browser',
+        'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+    );
+    if (popup) popup.focus();
+}
+
+function refreshIconPreview(inputId, previewId) {
+    const value = document.getElementById(inputId)?.value || '';
+    const box = document.getElementById(previewId);
+    if (!box) return;
+    if (value.startsWith('/static') || value.startsWith('static/')) {
+        const src = value.startsWith('/') ? value : '/' + value;
+        box.innerHTML = `<img src="${escapeHtml(src)}" alt="">`;
+    } else {
+        box.textContent = value || '📁';
+    }
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeJs(value) {
+    return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
+}
+
+
+async function saveHomeConfig() {
+    const fd = new FormData();
+    fd.append('action', 'update_home_config');
+    for (const input of document.querySelectorAll('.home-check')) {
+        fd.append(input.name, input.checked ? '1' : '0');
+    }
+    for (const input of document.querySelectorAll('[data-home-ssh]')) {
+        fd.append(input.dataset.homeSsh, input.value || '');
+    }
+    try {
+        const res = await fetch('{{ url_for("system_bp.system_personalization_api") }}', { method:'POST', body:fd });
+        const txt = await res.text();
+        setStatus('homeConfigStatus', res.ok ? 'index.conf sauvegardé. Réglages GPU SSH synchronisés dans system.conf.' : txt, res.ok);
+        toggleNvidiaSshSettings();
+    } catch (e) {
+        setStatus('homeConfigStatus', String(e), false);
+    }
+}
+
+function toggleNvidiaSshSettings() {
+    const checkbox = document.querySelector('.home-check[name="SHOW_NVIDIA_SSH"]');
+    const enabled = !!(checkbox && checkbox.checked);
+    const card = document.getElementById('sshSettingsCard');
+    const note = document.getElementById('sshDisabledNote');
+    if (card) card.classList.toggle('pers-home-ssh-enabled', enabled);
+    if (note) note.style.display = enabled ? 'block' : 'none';
+}
+
+(function initPersonalizationPage() {
+    toggleNvidiaSshSettings();
+})();
+
+document.addEventListener('click', function(e) {
+    for (const modal of document.querySelectorAll('.modal-overlay')) {
+        if (e.target === modal) {
+            if (modal.id === 'confirmModal') settleConfirm(false);
+            else modal.style.display = 'none';
+        }
+    }
+});
+</script>
+{% endblock %}

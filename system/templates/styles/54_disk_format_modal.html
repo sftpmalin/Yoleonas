@@ -1,0 +1,53 @@
+/* Maintenance disques : pop-up formatage compacte.
+   Périphérique + format sur une ligne, label + quick sur une ligne. */
+.format-modal-compact {
+    width: min(720px, 100%);
+    max-height: min(86vh, 560px);
+}
+
+.format-modal-body {
+    gap: 8px;
+    padding: 12px 14px;
+}
+
+.format-modal-row {
+    display: grid;
+    align-items: end;
+    column-gap: 12px;
+    row-gap: 8px;
+}
+
+.format-modal-row-top {
+    grid-template-columns: minmax(170px, 30%) minmax(110px, 150px) 1fr;
+}
+
+.format-modal-row-bottom {
+    grid-template-columns: minmax(170px, 30%) minmax(230px, max-content) 1fr;
+}
+
+.format-modal-row .form-row {
+    margin-bottom: 0;
+}
+
+.format-modal-row .format-quick-row {
+    min-height: 34px;
+    margin: 0;
+    align-self: end;
+    white-space: nowrap;
+}
+
+.format-modal-row input,
+.format-modal-row select {
+    height: 34px;
+}
+
+@media (max-width: 720px) {
+    .format-modal-row-top,
+    .format-modal-row-bottom {
+        grid-template-columns: 1fr;
+    }
+
+    .format-modal-row .format-quick-row {
+        white-space: normal;
+    }
+}

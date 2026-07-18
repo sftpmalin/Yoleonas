@@ -1,0 +1,302 @@
+{% extends "menu.html" %}
+
+{% block title %}Météo - Yoleo{% endblock %}
+{% block page_title %}Personnalisation météo{% endblock %}
+{% block page_subtitle %}Villes et affichage météo du bandeau haut{% endblock %}
+
+{% block content %}
+<div class="personnalisation-page">
+    {% include "partials/system_personnalisation_subnav.html" %}
+</div>
+
+<div class="meteo-page">
+    <section class="yoleo-card meteo-card">
+        <form class="meteo-top-form" action="{{ url_for('meteo_bp.meteo_action') }}" data-page-save-url="{{ url_for('meteo_bp.meteo_home') }}" method="post">
+            <input type="hidden" name="action" value="top_apply">
+            <input type="hidden" name="active_id" value="{{ active_id }}">
+            <input type="hidden" name="top_icon" value="">
+            <input type="hidden" name="top_temperature" value="">
+            <div class="meteo-top-head">
+                <div>
+                    <h2>🌦️ Villes météo</h2>
+                    <p>Coche une ville pour l’afficher directement dans le bandeau haut. Aucune ville cochée = météo désactivée.</p>
+                </div>
+                <div id="meteoTopAutoStatus" class="status-line meteo-top-autosave-status" hidden></div>
+            </div>
+
+            <div class="meteo-city-grid" data-yoleo-context-zone="meteo-cities">
+                {% for city in cities %}
+                    <div class="meteo-city-card {% if city.active %}is-active{% endif %} {% if city.top %}is-top{% endif %}">
+                        <div class="meteo-city-main" onclick="window.location.href='{{ url_for('meteo_bp.meteo_home', id=city.id) }}'">
+                            <div class="meteo-city-name">{{ city.nom }}</div>
+                            <div class="meteo-city-temp">{{ city.icon }} {{ city.temp }}</div>
+                        </div>
+                        <label class="meteo-top-check" title="Afficher cette ville dans le bandeau haut">
+                            <input type="checkbox" name="top_city" value="{{ city.id }}" data-city-name="{{ city.nom }}" data-city-icon="{{ city.icon }}" data-city-temp="{{ city.temp }}" {% if city.top %}checked{% endif %}>
+                            <span>Bandeau</span>
+                        </label>
+                    </div>
+                {% endfor %}
+            </div>
+        </form>
+    </section>
+
+</div>
+
+<div id="meteoAddModal" class="meteo-modal" hidden>
+    <div class="meteo-modal-backdrop" onclick="meteoCloseModal('meteoAddModal')"></div>
+    <section class="meteo-modal-box">
+        <header class="meteo-modal-head"><h2>Ajouter une ville</h2><button type="button" onclick="meteoCloseModal('meteoAddModal')">×</button></header>
+        <form action="{{ url_for('meteo_bp.meteo_action') }}" method="post">
+            <input type="hidden" name="action" value="ajouter">
+            <input type="hidden" name="nom" id="meteoInputNom">
+            <input type="hidden" name="lat" id="meteoInputLat">
+            <input type="hidden" name="lng" id="meteoInputLng">
+            <div class="meteo-field">
+                <label>Recherche ville</label>
+                <input type="text" class="yoleo-input" id="meteoSearchInput" placeholder="Tape au moins 2 lettres" autocomplete="off">
+                <div class="meteo-results" id="meteoSearchResults"></div>
+            </div>
+            <div class="meteo-modal-actions">
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="meteoCloseModal('meteoAddModal')">Annuler</button>
+                <button type="submit" class="yoleo-btn yoleo-btn-primary" id="meteoAddConfirm" disabled>Ajouter</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<div id="meteoOrderModal" class="meteo-modal" hidden>
+    <div class="meteo-modal-backdrop" onclick="meteoCloseModal('meteoOrderModal')"></div>
+    <section class="meteo-modal-box">
+        <header class="meteo-modal-head"><h2>Modifier l’ordre</h2><button type="button" onclick="meteoCloseModal('meteoOrderModal')">×</button></header>
+        <form action="{{ url_for('meteo_bp.meteo_action') }}" method="post">
+            <input type="hidden" name="action" value="reordonner">
+            <div class="meteo-order-list" id="meteoOrderList">
+                {% for city in cities %}
+                    <div class="meteo-order-item">
+                        <strong>{{ city.nom }}</strong>
+                        <input type="hidden" name="ordre_villes" value="{{ city.nom }}">
+                        <span>
+                            <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-icon" onclick="meteoMoveUp(this)">▲</button>
+                            <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-icon" onclick="meteoMoveDown(this)">▼</button>
+                        </span>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="meteo-modal-actions">
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="meteoCloseModal('meteoOrderModal')">Annuler</button>
+                <button type="submit" class="yoleo-btn yoleo-btn-primary">Sauvegarder</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<div id="meteoDeleteModal" class="meteo-modal" hidden>
+    <div class="meteo-modal-backdrop" onclick="meteoCloseModal('meteoDeleteModal')"></div>
+    <section class="meteo-modal-box">
+        <header class="meteo-modal-head"><h2>Supprimer des villes</h2><button type="button" onclick="meteoCloseModal('meteoDeleteModal')">×</button></header>
+        <form action="{{ url_for('meteo_bp.meteo_action') }}" method="post" onsubmit="return meteoValidateDelete()">
+            <input type="hidden" name="action" value="supprimer">
+            <div class="meteo-order-list">
+                {% for city in cities %}
+                    <label class="meteo-order-item meteo-delete-item"><input type="checkbox" name="villes_check" value="{{ city.nom }}"> <strong>{{ city.nom }}</strong></label>
+                {% endfor %}
+            </div>
+            <div class="meteo-delete-error" id="meteoDeleteError" hidden>Il doit rester au moins une ville.</div>
+            <div class="meteo-modal-actions">
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="meteoCloseModal('meteoDeleteModal')">Annuler</button>
+                <button type="submit" class="yoleo-btn yoleo-btn-red">Supprimer</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<script>
+(function(){
+    const topForm = document.querySelector('.meteo-top-form');
+    const topStatus = document.getElementById('meteoTopAutoStatus');
+    let topTimer = null;
+    let hideTimer = null;
+    let currentController = null;
+
+    function showTopStatus(message, ok, duration) {
+        if (!topStatus) return;
+        clearTimeout(hideTimer);
+        topStatus.hidden = false;
+        topStatus.textContent = message || '';
+        topStatus.className = 'status-line meteo-top-autosave-status ' + (ok ? 'ok' : 'bad');
+        if (duration) {
+            hideTimer = setTimeout(function () {
+                topStatus.hidden = true;
+                topStatus.textContent = '';
+            }, duration);
+        }
+    }
+
+    function selectedTopPayload() {
+        const checked = topForm ? topForm.querySelector('input[name="top_city"]:checked') : null;
+        const iconField = topForm ? topForm.querySelector('input[name="top_icon"]') : null;
+        const tempField = topForm ? topForm.querySelector('input[name="top_temperature"]') : null;
+        if (!checked) {
+            if (iconField) iconField.value = '';
+            if (tempField) tempField.value = '';
+            return {enabled: false};
+        }
+        const payload = {
+            enabled: true,
+            city: checked.dataset.cityName || '',
+            icon: checked.dataset.cityIcon || '🌤️',
+            temperature: checked.dataset.cityTemp || ''
+        };
+        if (iconField) iconField.value = payload.icon;
+        if (tempField) tempField.value = payload.temperature;
+        return payload;
+    }
+
+    function refreshTopCards() {
+        const checked = topForm ? topForm.querySelector('input[name="top_city"]:checked') : null;
+        document.querySelectorAll('.meteo-city-card').forEach(function (card) {
+            const input = card.querySelector('input[name="top_city"]');
+            card.classList.toggle('is-top', !!checked && input === checked);
+        });
+    }
+
+    async function saveTopMeteoNow() {
+        if (!topForm) return;
+        if (currentController) currentController.abort();
+        currentController = new AbortController();
+        const controller = currentController;
+        const localPayload = selectedTopPayload();
+        refreshTopCards();
+        try {
+            const fd = new FormData(topForm);
+            if (!fd.get('action')) fd.set('action', 'top_apply');
+            const saveUrls = [];
+            const actionUrl = topForm.getAttribute('action') || '/system/personnalisation/meteo/action';
+            const pageUrl = topForm.dataset.pageSaveUrl || window.location.pathname;
+            [actionUrl, '/system/personnalisation/meteo/action', '/system/personnalisation/meteo/top/save', pageUrl].forEach(function (url) {
+                if (url && !saveUrls.includes(url)) saveUrls.push(url);
+            });
+
+            let payload = null;
+            let lastError = null;
+            for (const url of saveUrls) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        body: fd,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        },
+                        signal: controller.signal
+                    });
+                    const rawText = await response.text().catch(function () { return ''; });
+                    payload = {ok: response.ok};
+                    try {
+                        if (rawText && rawText.trim().startsWith('{')) payload = JSON.parse(rawText);
+                    } catch (parseError) {
+                        payload = {ok: response.ok};
+                    }
+                    if (!response.ok || payload.ok === false) {
+                        const raw = rawText.trim();
+                        const clean = raw.startsWith('<')
+                            ? ('Endpoint introuvable ou non à jour : ' + url + ' (HTTP ' + response.status + ')')
+                            : (payload.message || payload.error || raw.slice(0, 180) || ('HTTP ' + response.status));
+                        throw new Error(clean);
+                    }
+                    lastError = null;
+                    break;
+                } catch (err) {
+                    if (err && err.name === 'AbortError') throw err;
+                    lastError = err;
+                    payload = null;
+                }
+            }
+            if (lastError) throw lastError;
+            if (typeof window.yoleoSetTopbarMeteoData === 'function') {
+                window.yoleoSetTopbarMeteoData((payload && payload.meteo_top) || localPayload);
+            }
+            showTopStatus((payload && payload.message) || 'Enregistré', true, 650);
+        } catch (error) {
+            if (error && error.name === 'AbortError') return;
+            showTopStatus('Erreur : ' + (error && error.message ? error.message : error), false, 0);
+        } finally {
+            if (currentController === controller) currentController = null;
+        }
+    }
+
+    function scheduleTopMeteoSave() {
+        clearTimeout(topTimer);
+        topTimer = setTimeout(saveTopMeteoNow, 80);
+    }
+
+    document.querySelectorAll('.meteo-top-check input[type="checkbox"]').forEach(function(box){
+        box.addEventListener('change', function(){
+            if (box.checked) {
+                document.querySelectorAll('.meteo-top-check input[type="checkbox"]').forEach(function(other){
+                    if (other !== box) other.checked = false;
+                });
+            }
+            scheduleTopMeteoSave();
+        });
+    });
+
+    if (topForm) {
+        topForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            saveTopMeteoNow();
+        });
+    }
+
+    const input = document.getElementById('meteoSearchInput');
+    const results = document.getElementById('meteoSearchResults');
+    const btn = document.getElementById('meteoAddConfirm');
+    if (!input || !results || !btn) return;
+    input.addEventListener('input', function(){
+        const q = input.value.trim();
+        document.getElementById('meteoInputNom').value = '';
+        document.getElementById('meteoInputLat').value = '';
+        document.getElementById('meteoInputLng').value = '';
+        btn.disabled = true;
+        if (q.length < 2) { results.innerHTML = ''; results.hidden = true; return; }
+        fetch('{{ url_for('meteo_bp.meteo_search') }}?q=' + encodeURIComponent(q), {headers:{'Accept':'application/json'}})
+            .then(r => r.json())
+            .then(data => {
+                results.innerHTML = '';
+                if (!Array.isArray(data) || !data.length) { results.hidden = true; return; }
+                data.forEach(function(city){
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'meteo-result-item';
+                    item.textContent = (city.name || '') + (city.admin1 ? ' — ' + city.admin1 : '') + (city.country_code ? ' (' + city.country_code + ')' : '');
+                    item.onclick = function(){
+                        document.getElementById('meteoInputNom').value = city.name || '';
+                        document.getElementById('meteoInputLat').value = city.latitude || '';
+                        document.getElementById('meteoInputLng').value = city.longitude || '';
+                        input.value = city.name || '';
+                        results.hidden = true;
+                        btn.disabled = false;
+                    };
+                    results.appendChild(item);
+                });
+                results.hidden = false;
+            })
+            .catch(() => { results.innerHTML = ''; results.hidden = true; });
+    });
+})();
+
+function meteoOpenModal(id){ const el = document.getElementById(id); if (el) el.hidden = false; }
+function meteoCloseModal(id){ const el = document.getElementById(id); if (el) el.hidden = true; }
+function meteoMoveUp(btn){ const row = btn.closest('.meteo-order-item'); if (row && row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling); }
+function meteoMoveDown(btn){ const row = btn.closest('.meteo-order-item'); if (row && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row); }
+function meteoValidateDelete(){
+    const all = document.querySelectorAll('input[name="villes_check"]');
+    const checked = document.querySelectorAll('input[name="villes_check"]:checked');
+    const error = document.getElementById('meteoDeleteError');
+    if (all.length && checked.length >= all.length) { if (error) error.hidden = false; return false; }
+    if (error) error.hidden = true;
+    return true;
+}
+</script>
+{% endblock %}

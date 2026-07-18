@@ -1,0 +1,295 @@
+/* Correctif mobile : pages système en tableau classique, sans mosaïque.
+   Les pages marquées no-mobile-mosaic doivent afficher le vrai tableau,
+   avec ascenseur horizontal, au lieu de tuiles masquées ou de colonnes écrasées. */
+@media (max-width: 900px) {
+    :where(
+        .system-tab-panel.no-mobile-mosaic,
+        .lan-route-page.no-mobile-mosaic,
+        .mdns-route-page.no-mobile-mosaic,
+        .no-mobile-mosaic,
+        .mobile-no-mosaic,
+        [data-mobile-mosaic="off"]
+    ) :where(.table-wrap, .system-table-wrap, .desktop-table-wrap, .yoleo-table-wrap),
+    :where(.table-wrap, .system-table-wrap, .desktop-table-wrap, .yoleo-table-wrap).no-mobile-mosaic,
+    :where(.table-wrap, .system-table-wrap, .desktop-table-wrap, .yoleo-table-wrap).mobile-no-mosaic,
+    :where(.table-wrap, .system-table-wrap, .desktop-table-wrap, .yoleo-table-wrap)[data-mobile-mosaic="off"] {
+        display: block !important;
+        visibility: visible !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    :where(
+        .system-tab-panel.no-mobile-mosaic,
+        .lan-route-page.no-mobile-mosaic,
+        .mdns-route-page.no-mobile-mosaic,
+        .no-mobile-mosaic,
+        .mobile-no-mosaic,
+        [data-mobile-mosaic="off"]
+    ) :where(table, thead, tbody, tfoot, tr, th, td),
+    :where(table.no-mobile-mosaic, table.mobile-no-mosaic, table[data-mobile-mosaic="off"]),
+    :where(table.no-mobile-mosaic, table.mobile-no-mosaic, table[data-mobile-mosaic="off"]) :where(thead, tbody, tfoot, tr, th, td) {
+        visibility: visible !important;
+    }
+
+    :where(
+        .system-tab-panel.no-mobile-mosaic,
+        .lan-route-page.no-mobile-mosaic,
+        .mdns-route-page.no-mobile-mosaic,
+        .no-mobile-mosaic,
+        .mobile-no-mosaic,
+        [data-mobile-mosaic="off"]
+    ) :where(table, .mini-table, .system-table, .lan-table, .mdns-table, .nft-fw-table),
+    :where(table.no-mobile-mosaic, table.mobile-no-mosaic, table[data-mobile-mosaic="off"]) {
+        display: table !important;
+        width: max-content !important;
+        min-width: 100% !important;
+        border-collapse: collapse !important;
+        table-layout: auto !important;
+    }
+
+    :where(table.no-mobile-mosaic, table.mobile-no-mosaic, table[data-mobile-mosaic="off"]) thead,
+    :where(.no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) :where(.mini-table, .system-table, .lan-table, .mdns-table, .nft-fw-table) thead {
+        display: table-header-group !important;
+    }
+
+    :where(table.no-mobile-mosaic, table.mobile-no-mosaic, table[data-mobile-mosaic="off"]) tbody,
+    :where(.no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) :where(.mini-table, .system-table, .lan-table, .mdns-table, .nft-fw-table) tbody {
+        display: table-row-group !important;
+    }
+
+    :where(table.no-mobile-mosaic, table.mobile-no-mosaic, table[data-mobile-mosaic="off"]) tr,
+    :where(.no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) :where(.mini-table, .system-table, .lan-table, .mdns-table, .nft-fw-table) tr {
+        display: table-row !important;
+    }
+
+    :where(table.no-mobile-mosaic, table.mobile-no-mosaic, table[data-mobile-mosaic="off"]) th,
+    :where(table.no-mobile-mosaic, table.mobile-no-mosaic, table[data-mobile-mosaic="off"]) td,
+    :where(.no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) :where(.mini-table, .system-table, .lan-table, .mdns-table, .nft-fw-table) th,
+    :where(.no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) :where(.mini-table, .system-table, .lan-table, .mdns-table, .nft-fw-table) td {
+        display: table-cell !important;
+        white-space: normal;
+        vertical-align: middle;
+    }
+
+    :where(
+        .system-tab-panel.no-mobile-mosaic,
+        .lan-route-page.no-mobile-mosaic,
+        .mdns-route-page.no-mobile-mosaic,
+        .no-mobile-mosaic,
+        .mobile-no-mosaic,
+        [data-mobile-mosaic="off"]
+    ) .yoleo-mobile-source-wrap,
+    .yoleo-mobile-source-wrap.no-mobile-mosaic,
+    .yoleo-mobile-source-wrap.mobile-no-mosaic,
+    .yoleo-mobile-source-wrap[data-mobile-mosaic="off"] {
+        display: block !important;
+    }
+
+    :where(
+        .system-tab-panel.no-mobile-mosaic,
+        .lan-route-page.no-mobile-mosaic,
+        .mdns-route-page.no-mobile-mosaic,
+        .no-mobile-mosaic,
+        .mobile-no-mosaic,
+        [data-mobile-mosaic="off"]
+    ) .yoleo-mobile-table-grid,
+    :where(.table-wrap, .system-table-wrap, .desktop-table-wrap, .yoleo-table-wrap).no-mobile-mosaic + .yoleo-mobile-table-grid,
+    :where(.table-wrap, .system-table-wrap, .desktop-table-wrap, .yoleo-table-wrap).mobile-no-mosaic + .yoleo-mobile-table-grid,
+    :where(.table-wrap, .system-table-wrap, .desktop-table-wrap, .yoleo-table-wrap)[data-mobile-mosaic="off"] + .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    /* Largeurs minimales d'origine restaurées pour que le tableau ne s'écrase pas. */
+    :where(.system-tab-panel.no-mobile-mosaic, .no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) .mini-table {
+        min-width: 900px !important;
+    }
+
+    :where(.system-tab-panel.no-mobile-mosaic, .no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) .system-table {
+        min-width: 980px !important;
+    }
+
+    :where(.system-tab-panel.no-mobile-mosaic, .no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) .svc-page table,
+    .svc-page table.no-mobile-mosaic,
+    .svc-page table.mobile-no-mosaic,
+    .svc-page table[data-mobile-mosaic="off"] {
+        min-width: 1220px !important;
+    }
+
+    :where(.lan-route-page.no-mobile-mosaic, .no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) .lan-table {
+        min-width: 1060px !important;
+    }
+
+    :where(.mdns-route-page.no-mobile-mosaic, .no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) .mdns-table,
+    :where(.system-tab-panel.no-mobile-mosaic, .no-mobile-mosaic, .mobile-no-mosaic, [data-mobile-mosaic="off"]) .nft-fw-table {
+        min-width: 760px !important;
+    }
+}
+
+/* Correctif ciblé : Système > mDNS > Noms .local.
+   Ce tableau contient des champs éditables ; en mobile on garde un vrai tableau compact,
+   pas une mosaïque, et on force les champs IP/Nom local à rester visibles. */
+@media (max-width: 900px) {
+    body.yoleo-mobile-mosaic-ready #tab-mdns .mdns-names-card,
+    #tab-mdns .mdns-names-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    body.yoleo-mobile-mosaic-ready #tab-mdns .mdns-names-table-wrap,
+    body.yoleo-mobile-mosaic-ready #tab-mdns .mdns-names-table-wrap.yoleo-mobile-source-wrap,
+    #tab-mdns .mdns-names-table-wrap,
+    #tab-mdns .mdns-names-table-wrap.yoleo-mobile-source-wrap {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body.yoleo-mobile-mosaic-ready #tab-mdns .mdns-names-table-wrap + .yoleo-mobile-table-grid,
+    #tab-mdns .mdns-names-table-wrap + .yoleo-mobile-table-grid,
+    #tab-mdns .mdns-names-card .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    #tab-mdns #mdns_entriesTable.mdns-names-table,
+    body.yoleo-mobile-mosaic-ready #tab-mdns #mdns_entriesTable.mdns-names-table {
+        display: table !important;
+        visibility: visible !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+    }
+
+    #tab-mdns #mdns_entriesTable col.mdns-col-ip { width: 38% !important; }
+    #tab-mdns #mdns_entriesTable col.mdns-col-name { width: auto !important; }
+    #tab-mdns #mdns_entriesTable col.mdns-col-actions { width: 70px !important; }
+
+    #tab-mdns #mdns_entriesTable thead { display: table-header-group !important; }
+    #tab-mdns #mdns_entriesTable tbody { display: table-row-group !important; }
+    #tab-mdns #mdns_entriesTable tr { display: table-row !important; }
+
+    #tab-mdns #mdns_entriesTable th,
+    #tab-mdns #mdns_entriesTable td {
+        display: table-cell !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        padding: 6px 4px !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        vertical-align: middle !important;
+    }
+
+    #tab-mdns #mdns_entriesTable .text-input,
+    #tab-mdns #mdns_entriesTable .entry-ip,
+    #tab-mdns #mdns_entriesTable .entry-name {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        box-sizing: border-box !important;
+        padding: 6px 7px !important;
+        border-radius: 8px !important;
+        font-size: 11px !important;
+        line-height: 1.2 !important;
+        color: #eaf2ff !important;
+        background: #07101b !important;
+        border: 1px solid #2b3d55 !important;
+        -webkit-text-fill-color: #eaf2ff !important;
+    }
+
+    #tab-mdns #mdns_entriesTable .actions-cell {
+        display: flex !important;
+        visibility: visible !important;
+        gap: 4px !important;
+        justify-content: center !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+    }
+
+    #tab-mdns #mdns_entriesTable .actions-cell .yoleo-btn-icon {
+        width: 28px !important;
+        min-width: 28px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+        padding: 0 !important;
+    }
+}
+
+/* Correctif ciblé : Système > Mise à jour.
+   La page APT doit garder le tableau classique sur mobile : pas de mosaïque,
+   pas de table transformée en blocs invisibles, et scroll horizontal si besoin. */
+@media (max-width: 900px) {
+    body.yoleo-mobile-mosaic-ready .system-updates-card.no-mobile-mosaic .updates-table-wrap,
+    body.yoleo-mobile-mosaic-ready .system-updates-card .updates-table-wrap.no-mobile-mosaic,
+    .system-updates-card.no-mobile-mosaic .updates-table-wrap,
+    .system-updates-card .updates-table-wrap.no-mobile-mosaic {
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body.yoleo-mobile-mosaic-ready .system-updates-card .updates-table-wrap + .yoleo-mobile-table-grid,
+    .system-updates-card .updates-table-wrap + .yoleo-mobile-table-grid,
+    .system-updates-card .yoleo-mobile-table-grid {
+        display: none !important;
+    }
+
+    .system-updates-card.no-mobile-mosaic .updates-table,
+    .system-updates-card .updates-table.no-mobile-mosaic {
+        display: table !important;
+        visibility: visible !important;
+        width: max-content !important;
+        min-width: 760px !important;
+        border-collapse: collapse !important;
+        table-layout: auto !important;
+    }
+
+    .system-updates-card.no-mobile-mosaic .updates-table thead,
+    .system-updates-card .updates-table.no-mobile-mosaic thead {
+        display: table-header-group !important;
+        visibility: visible !important;
+    }
+
+    .system-updates-card.no-mobile-mosaic .updates-table tbody,
+    .system-updates-card .updates-table.no-mobile-mosaic tbody {
+        display: table-row-group !important;
+        visibility: visible !important;
+    }
+
+    .system-updates-card.no-mobile-mosaic .updates-table tr,
+    .system-updates-card .updates-table.no-mobile-mosaic tr {
+        display: table-row !important;
+        visibility: visible !important;
+    }
+
+    .system-updates-card.no-mobile-mosaic .updates-table th,
+    .system-updates-card.no-mobile-mosaic .updates-table td,
+    .system-updates-card .updates-table.no-mobile-mosaic th,
+    .system-updates-card .updates-table.no-mobile-mosaic td {
+        display: table-cell !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        white-space: normal;
+        vertical-align: middle;
+    }
+}
+

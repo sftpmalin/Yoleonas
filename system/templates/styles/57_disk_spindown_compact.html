@@ -1,0 +1,65 @@
+/* Veille disques : tableau resserré pour supprimer l'ascenseur horizontal.
+   La règle globale .table-wrap .yoleo-table impose 1260px ; ici la page n'a que
+   5 colonnes, donc on annule ce minimum uniquement pour /disk/spindown. */
+#tab-sleep .table-wrap {
+    overflow-x: hidden;
+}
+
+#tab-sleep .table-wrap .yoleo-table {
+    min-width: 0 !important;
+    width: 100%;
+    table-layout: fixed;
+}
+
+#tab-sleep .table-wrap .yoleo-table th,
+#tab-sleep .table-wrap .yoleo-table td {
+    padding: 8px 10px;
+    min-width: 0;
+    vertical-align: middle;
+}
+
+#tab-sleep .table-wrap .yoleo-table th:nth-child(1),
+#tab-sleep .table-wrap .yoleo-table td:nth-child(1) {
+    width: 12%;
+}
+
+#tab-sleep .table-wrap .yoleo-table th:nth-child(2),
+#tab-sleep .table-wrap .yoleo-table td:nth-child(2) {
+    width: 28%;
+}
+
+#tab-sleep .table-wrap .yoleo-table th:nth-child(3),
+#tab-sleep .table-wrap .yoleo-table td:nth-child(3) {
+    width: 14%;
+}
+
+#tab-sleep .table-wrap .yoleo-table th:nth-child(4),
+#tab-sleep .table-wrap .yoleo-table td:nth-child(4) {
+    width: 12%;
+    white-space: nowrap;
+}
+
+#tab-sleep .table-wrap .yoleo-table th:nth-child(5),
+#tab-sleep .table-wrap .yoleo-table td:nth-child(5) {
+    width: 34%;
+}
+
+#tab-sleep .sleep-disk-inline,
+#tab-sleep .sleep-disk-inline .disk-name,
+#tab-sleep .sleep-disk-inline .model-sub,
+#tab-sleep .mount-path {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#tab-sleep .sleep-disk-inline {
+    gap: 6px;
+}
+
+#tab-sleep .badge {
+    max-width: 100%;
+    white-space: nowrap;
+}

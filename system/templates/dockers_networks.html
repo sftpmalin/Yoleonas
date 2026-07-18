@@ -1,0 +1,81 @@
+{% extends "dockers_base.html" %}
+
+{% block route_content %}
+<section class="docker-lan-overview">
+        <div class="summary-grid docker-lan-summary-grid">
+            <div class="yoleo-card summary-card"><div class="summary-label">Réseaux</div><div class="summary-value cyan">{{ docker_lan_summary.total }}</div></div>
+            <div class="yoleo-card summary-card"><div class="summary-label">Actifs Docker</div><div class="summary-value green">{{ docker_lan_summary.active }}</div></div>
+            <div class="yoleo-card summary-card"><div class="summary-label">Désactivés JSON</div><div class="summary-value red">{{ docker_lan_summary.disabled }}</div></div>
+            <div class="yoleo-card summary-card"><div class="summary-label">Gérés JSON</div><div class="summary-value">{{ docker_lan_summary.managed }}</div></div>
+        </div>
+        {% if not (_menu_top_active|default(false)) %}
+        <div class="docker-lan-top-actions">
+            <button class="yoleo-btn yoleo-btn-green" type="button" onclick="dockerOpenLanModal()">＋ Ajouter</button>
+            <button class="yoleo-btn yoleo-btn-orange" type="button" onclick="dockerRunStream('system_stacks_ollama')">🌐 Ollama</button>
+            <button class="yoleo-btn yoleo-btn-red" type="button" onclick="dockerRunStream('system_stacks_remove_ollama')">🧹 Remove Ollama</button>
+        </div>
+        {% endif %}
+    </section>
+    {% if docker_lan_error %}
+    {% set docker_lan_is_notice = docker_lan_error.startswith('Service Docker arrêté') or docker_lan_error.startswith('Le service Docker est arrêté') %}
+    <div class="action-message {{ '' if docker_lan_is_notice else 'bad' }}">{{ docker_lan_error }}</div>
+    {% endif %}
+    <section class="yoleo-card docker-section">
+        <div class="table-wrap" data-yoleo-context-zone="docker-networks-table"><table class="yoleo-table"><thead><tr><th>État</th><th>Nom</th><th>Driver</th><th>Parent</th><th>Subnet</th><th>Netmask</th><th>Gateway</th><th>IP range</th><th>Origine</th><th>Actions</th></tr></thead><tbody>
+            {% for net in docker_lan_networks %}
+            <tr class="docker-lan-row" data-lan-name="{{ net.name }}">
+                <td><span class="status-pill {{ 'ok' if net.system_active else 'bad' }}">{{ net.status_label }}</span></td>
+                <td><span class="mono">{{ net.name }}</span>{% if net.containers_count %}<div class="hint">{{ net.containers_count }} conteneur(s)</div>{% endif %}</td>
+                <td>{{ net.driver or '-' }}</td>
+                <td>{{ net.parent or '-' }}</td>
+                <td>{{ net.subnet or '-' }}</td>
+                <td>{{ net.netmask or '-' }}</td>
+                <td>{{ net.gateway or '-' }}</td>
+                <td>{{ net.ip_range or '-' }}</td>
+                <td><span class="hint">{{ net.origin_label }}</span></td>
+                <td class="actions-line">
+                    {% if net.protected %}
+                    <span class="hint">protégé</span>
+                    {% else %}
+                    {% if net.system_active %}
+                    <form method="post" action="{{ url_for('dockers_bp.stacks_docker_lan') }}" data-lan-confirm="Désactiver le réseau Docker {{ net.name }} ?"><input type="hidden" name="name" value="{{ net.name }}"><button class="yoleo-btn yoleo-btn-orange yoleo-btn-icon docker-lan-action-btn" name="action" value="disable_network" title="Désactiver">■</button></form>
+                    {% else %}
+                    <form method="post" action="{{ url_for('dockers_bp.stacks_docker_lan') }}"><input type="hidden" name="name" value="{{ net.name }}"><button class="yoleo-btn yoleo-btn-green yoleo-btn-icon docker-lan-action-btn" name="action" value="enable_network" title="Activer">▶</button></form>
+                    {% endif %}
+                    <button class="yoleo-btn yoleo-btn-orange yoleo-btn-icon docker-lan-action-btn" type="button" data-name="{{ net.name }}" onclick="dockerOpenLanModalByName(this.dataset.name)" title="Modifier">✎</button>
+                    <form method="post" action="{{ url_for('dockers_bp.stacks_docker_lan') }}" data-lan-confirm="Supprimer complètement le réseau {{ net.name }} du Docker et du JSON ?"><input type="hidden" name="name" value="{{ net.name }}"><button class="yoleo-btn yoleo-btn-red yoleo-btn-icon docker-lan-action-btn" name="action" value="delete_network" title="Supprimer">🗑</button></form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}<tr><td colspan="10">Aucun réseau.</td></tr>{% endfor %}
+        </tbody></table></div>
+        <pre id="docker-stream-log" class="docker-log-box docker-lan-stream-log">Prêt.</pre>
+    </section>
+
+    <div class="modal-backdrop" id="docker-lan-modal">
+        <form method="post" action="{{ url_for('dockers_bp.stacks_docker_lan') }}" class="modal wide" id="docker-lan-form">
+            <div class="modal-head"><div><div class="modal-title" id="docker-lan-modal-title">Ajouter un réseau Docker</div><div class="hint">macvlan / ipvlan / bridge, enregistré dans le JSON puis appliqué si demandé.</div></div><button class="yoleo-btn yoleo-btn-red yoleo-btn-mini" type="button" onclick="dockerCloseLanModal()">×</button></div>
+            <div class="modal-body">
+                <input type="hidden" name="action" value="save_network">
+                <input type="hidden" name="old_name" id="lan-old-name">
+                <div class="docker-form-grid">
+                    <div class="form-row"><label>Nom</label><input id="lan-name" class="yoleo-input" name="name" placeholder="media_lan" required></div>
+                    <div class="form-row"><label>État souhaité</label><select id="lan-enabled" class="yoleo-input" name="enabled"><option value="1">Actif / appliqué</option><option value="0">Désactivé JSON seulement</option></select></div>
+                    <div class="form-row"><label>Driver</label><select id="lan-driver" class="yoleo-input" name="driver"><option value="macvlan">macvlan</option><option value="ipvlan">ipvlan</option><option value="bridge">bridge</option></select></div>
+                    <div class="form-row"><label>Mode</label><input id="lan-mode" class="yoleo-input" name="mode" value="{{ docker_lan_defaults.mode }}"></div>
+                    <div class="form-row"><label>Parent</label><input id="lan-parent" class="yoleo-input" name="parent" value="{{ docker_lan_defaults.parent }}"></div>
+                    <div class="form-row"><label>Subnet</label><input id="lan-subnet" class="yoleo-input" name="subnet" value="{{ docker_lan_defaults.subnet }}"></div>
+                    <div class="form-row"><label>Netmask</label><input id="lan-netmask" class="yoleo-input" name="netmask" value="{{ docker_lan_defaults.netmask }}"></div>
+                    <div class="form-row"><label>Gateway</label><input id="lan-gateway" class="yoleo-input" name="gateway" value="{{ docker_lan_defaults.gateway }}"></div>
+                    <div class="form-row"><label>IP range</label><input id="lan-ip-range" class="yoleo-input" name="ip_range"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="dockerFillLanDefaults()">Détecter</button>
+                <button class="yoleo-btn yoleo-btn-orange" type="submit" name="apply_mode" value="save_only">Enregistrer JSON</button>
+                <button class="yoleo-btn yoleo-btn-primary" type="submit" name="apply_mode" value="apply">Enregistrer + appliquer</button>
+                <button class="yoleo-btn yoleo-btn-muted" type="button" onclick="dockerCloseLanModal()">Fermer</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

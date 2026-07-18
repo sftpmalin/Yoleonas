@@ -1,0 +1,358 @@
+{% extends "disk_base.html" %}
+
+{% block route_content %}
+<div id="tab-raid" class="disk-section disk-raid-page raid-clean-page">
+    <section class="yoleo-card disk-card raid-clean-card">
+        <div class="disk-card-head compact-head raid-clean-head">
+            <div>
+                <h3>Disques vides disponibles</h3>
+                <div class="raid-note">Sélectionne au moins deux disques totalement vides pour créer un volume RAID mdadm. Le formatage et le montage restent dans Maintenance.</div>
+            </div>
+            <div class="actions-line raid-clean-actions">
+                <span class="raid-counter" id="raid-empty-count">0 disque</span>
+                <span class="raid-selected-pill" id="raid-selected-count">0 sélectionné</span>
+                <button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-green" id="raid-create-btn" onclick="openRaidCreateModal()" disabled>➕ Créer RAID</button>
+                <button type="button" class="yoleo-btn yoleo-btn-small" onclick="loadRaid(true)" title="Actualiser la liste RAID">↻ Actualiser</button>
+            </div>
+        </div>
+        <div id="raid-flash" class="raid-flash" hidden></div>
+        <div class="table-wrap disk-table-compact raid-table-wrap">
+            <table class="yoleo-table raid-table raid-empty-table">
+                <thead>
+                    <tr>
+                        <th class="raid-select-col">Choix</th>
+                        <th>Disque</th>
+                        <th>Modèle</th>
+                        <th>Transport</th>
+                        <th>Taille</th>
+                        <th>État</th>
+                    </tr>
+                </thead>
+                <tbody id="raid-empty-tbody">
+                    <tr><td colspan="6" class="empty-state">Chargement RAID...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="yoleo-card disk-card raid-clean-card">
+        <div class="disk-card-head compact-head raid-clean-head">
+            <div>
+                <h3>Volumes RAID / ZFS / BTRFS détectés</h3>
+                <div class="raid-note">Cette page ne monte pas et ne formate pas les volumes. Le formatage et le montage restent dans Maintenance.</div>
+            </div>
+            <span class="raid-counter" id="raid-volume-count">0 volume</span>
+        </div>
+        <div class="table-wrap disk-table-compact raid-table-wrap">
+            <table class="yoleo-table raid-table">
+                <thead>
+                    <tr>
+                        <th>Moteur</th>
+                        <th>Nom</th>
+                        <th>Périphérique</th>
+                        <th>FS</th>
+                        <th>Taille</th>
+                        <th>État</th>
+                        <th class="raid-action-col">Supprimer</th>
+                    </tr>
+                </thead>
+                <tbody id="raid-volumes-tbody">
+                    <tr><td colspan="7" class="empty-state">Chargement volumes RAID...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="modal-backdrop" id="raid-create-modal">
+    <div class="modal raid-create-modal-box">
+        <div class="modal-head">
+            <div class="modal-title">Créer un volume RAID</div>
+            <button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('raid-create-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="maintenance-note">Crée uniquement le volume logique mdadm. Formatage et montage se font ensuite dans Maintenance.</div>
+            <div class="form-row">
+                <label>Disques sélectionnés</label>
+                <div id="raid-create-devices" class="raid-selected-devices">—</div>
+            </div>
+            <div class="form-row">
+                <label>Nom RAID</label>
+                <input id="raid-create-name" value="yoleo_raid" placeholder="yoleo_raid">
+            </div>
+            <div class="form-row">
+                <label>Mode RAID</label>
+                <select id="raid-create-mode"></select>
+            </div>
+            <div id="raid-create-mode-help" class="hint"></div>
+        </div>
+        <div class="modal-actions">
+            <button class="yoleo-btn yoleo-btn-small yoleo-btn-muted" onclick="closeModal('raid-create-modal')">Annuler</button>
+            <button class="yoleo-btn yoleo-btn-small yoleo-btn-red" onclick="submitRaidCreate()">Créer RAID</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let raidData = null;
+let selectedRaidDevices = new Set();
+let raidPollTimer = null;
+
+function showRaidFlash(message, ok = true, sticky = false) {
+    const box = $('raid-flash');
+    if (!box) return;
+    box.hidden = false;
+    box.className = 'raid-flash ' + (ok ? 'ok' : 'bad');
+    box.textContent = message || '';
+    if (ok && !sticky) {
+        window.clearTimeout(box._hideTimer);
+        box._hideTimer = window.setTimeout(() => { box.hidden = true; box.textContent = ''; }, 5000);
+    }
+}
+
+function setRaidCounter(id, count, singular, plural) {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = String(count || 0) + ' ' + ((count || 0) > 1 ? plural : singular);
+}
+
+function selectedRaidList() {
+    const available = Array.isArray(raidData?.available_disks) ? raidData.available_disks : [];
+    const allowed = new Set(available.map(d => String(d.device || '')));
+    selectedRaidDevices = new Set([...selectedRaidDevices].filter(dev => allowed.has(dev)));
+    return [...selectedRaidDevices];
+}
+
+function updateRaidSelection() {
+    document.querySelectorAll('.raid-disk-check').forEach(input => {
+        const dev = String(input.dataset.device || '');
+        if (!dev) return;
+        if (input.checked) selectedRaidDevices.add(dev);
+        else selectedRaidDevices.delete(dev);
+    });
+    const count = selectedRaidList().length;
+    const pill = $('raid-selected-count');
+    if (pill) pill.textContent = String(count) + ' sélectionné' + (count > 1 ? 's' : '');
+    const btn = $('raid-create-btn');
+    if (btn) btn.disabled = count < 2;
+}
+
+function raidModeOptionsForCount(count) {
+    const fromApi = raidData?.modes?.mdadm?.[String(count)];
+    if (Array.isArray(fromApi) && fromApi.length) return fromApi;
+    const out = [];
+    if (count >= 2) {
+        out.push({value:'raid1', label:'RAID 1 / miroir', hint:'Copie les données sur les disques sélectionnés.'});
+        out.push({value:'raid0', label:'RAID 0 / stripe', hint:'Additionne performances/capacité, sans redondance.'});
+        out.push({value:'linear', label:'Linear / concaténation', hint:'Concatène les disques, sans redondance.'});
+    }
+    if (count >= 3) out.push({value:'raid5', label:'RAID 5', hint:'Parité simple, minimum 3 disques.'});
+    if (count >= 4) {
+        out.push({value:'raid6', label:'RAID 6', hint:'Double parité, minimum 4 disques.'});
+        out.push({value:'raid10', label:'RAID 10', hint:'Miroirs + stripe, minimum 4 disques.'});
+    }
+    return out;
+}
+
+function fillRaidModeSelect(count) {
+    const select = $('raid-create-mode');
+    const help = $('raid-create-mode-help');
+    if (!select) return;
+    const options = raidModeOptionsForCount(count);
+    select.innerHTML = options.map(item => `<option value="${esc(item.value)}" data-hint="${esc(item.hint || '')}">${esc(item.label || item.value)}</option>`).join('');
+    const syncHelp = () => {
+        const option = select.options[select.selectedIndex];
+        if (help) help.textContent = option?.dataset?.hint || '';
+    };
+    select.onchange = syncHelp;
+    syncHelp();
+}
+
+function renderRaidEmptyDisks(disks) {
+    const tbody = $('raid-empty-tbody');
+    if (!tbody) return;
+    const list = Array.isArray(disks) ? disks : [];
+    setRaidCounter('raid-empty-count', list.length, 'disque', 'disques');
+    const allowed = new Set(list.map(d => String(d.device || '')));
+    selectedRaidDevices = new Set([...selectedRaidDevices].filter(dev => allowed.has(dev)));
+    if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Aucun disque totalement vide disponible.</td></tr>';
+        updateRaidSelection();
+        return;
+    }
+    tbody.innerHTML = list.map(d => {
+        const device = String(d.device || '');
+        const checked = selectedRaidDevices.has(device) ? 'checked' : '';
+        const ident = [d.display_device || d.device, d.serial ? 'serial=' + d.serial : ''].filter(Boolean).join(' • ');
+        return `<tr>
+            <td class="raid-select-col"><input type="checkbox" class="raid-disk-check" data-device="${esc(device)}" onchange="updateRaidSelection()" ${checked}></td>
+            <td><div class="disk-name">${esc(d.display_device || d.device || '—')}</div><div class="model-sub">${esc(ident || '—')}</div></td>
+            <td><div class="model-main" title="${esc(d.model || '—')}">${esc(d.model || '—')}</div></td>
+            <td>${d.transport ? `<span class="badge badge-fs">${esc(d.transport)}</span>` : '<span class="text-muted">—</span>'}</td>
+            <td>${escNoWrap(d.size || '—')}</td>
+            <td><span class="badge badge-temp-ok">vide</span></td>
+        </tr>`;
+    }).join('');
+    updateRaidSelection();
+}
+
+function openRaidCreateModal() {
+    const devices = selectedRaidList();
+    if (devices.length < 2) {
+        showRaidFlash('Sélectionne au moins deux disques vides.', false, true);
+        return;
+    }
+    const devicesBox = $('raid-create-devices');
+    if (devicesBox) devicesBox.innerHTML = devices.map(dev => `<span class="mount-path">${esc(dev)}</span>`).join(' ');
+    const nameInput = $('raid-create-name');
+    if (nameInput && !String(nameInput.value || '').trim()) nameInput.value = 'yoleo_raid';
+    fillRaidModeSelect(devices.length);
+    openModal('raid-create-modal');
+}
+
+async function submitRaidCreate() {
+    const devices = selectedRaidList();
+    const name = String($('raid-create-name')?.value || '').trim();
+    const mode = String($('raid-create-mode')?.value || '').trim();
+    if (devices.length < 2) {
+        showRaidFlash('Sélectionne au moins deux disques vides.', false, true);
+        return;
+    }
+    if (!name || !mode) {
+        showRaidFlash('Nom ou mode RAID manquant.', false, true);
+        return;
+    }
+    const ok = await showConfirm(
+        'Créer le volume RAID',
+        'Créer ' + name + ' en ' + mode + ' avec ' + devices.join(', ') + ' ? Les disques sélectionnés seront utilisés pour créer un volume mdadm. Le formatage et le montage se feront ensuite dans Maintenance.',
+        'CRÉER RAID',
+        true
+    );
+    if (!ok) return;
+    closeModal('raid-create-modal');
+    showRaidFlash('Création RAID en cours...', true, true);
+    try {
+        const response = await fetch('/disk/api/action/raid/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({engine:'mdadm', mode, name, devices})
+        });
+        const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+        showRaidFlash(data.message || (data.ok ? 'Création RAID lancée.' : 'Erreur création RAID.'), !!data.ok, !data.ok);
+        if (data.ok) selectedRaidDevices.clear();
+        await loadRaid(true);
+        scheduleRaidPoll(!!data.ok);
+    } catch (err) {
+        showRaidFlash('Erreur Ajax création RAID : ' + err.message, false, true);
+    }
+}
+
+function raidVolumeStatus(v) {
+    const mounts = Array.isArray(v.mounts) ? v.mounts : [];
+    if (v.mountpoint || mounts.length) return '<span class="badge badge-temp-warn">monté</span>';
+    return '<span class="badge badge-muted">non monté</span>';
+}
+
+function raidVolumeDeleteButton(v) {
+    const engine = String(v.engine || '').toLowerCase();
+    const device = String(v.device || '');
+    const name = String(v.name || '');
+    const mounted = !!v.mountpoint || (Array.isArray(v.mounts) && v.mounts.length > 0);
+    const supported = engine === 'mdadm' || engine === 'zfs';
+    const disabled = mounted || !supported;
+    const title = mounted
+        ? 'Démonte d’abord ce volume dans Maintenance avant suppression.'
+        : (supported ? 'Supprimer ce volume logique' : 'Suppression non disponible pour ce moteur.' );
+    return `<button type="button" class="yoleo-btn yoleo-btn-small yoleo-btn-red yoleo-btn-mini raid-delete-btn" ${disabled ? 'disabled' : ''}
+        data-engine="${esc(engine)}" data-device="${esc(device)}" data-name="${esc(name)}"
+        onclick="submitRaidDelete(this.dataset.engine, this.dataset.device, this.dataset.name)" title="${esc(title)}">✕</button>`;
+}
+
+function renderRaidVolumes(volumes) {
+    const tbody = $('raid-volumes-tbody');
+    if (!tbody) return;
+    const list = Array.isArray(volumes) ? volumes : [];
+    setRaidCounter('raid-volume-count', list.length, 'volume', 'volumes');
+    if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Aucun volume RAID / ZFS / BTRFS détecté.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(v => {
+        const fs = v.fstype ? `<span class="badge badge-fs">${esc(v.fstype)}</span>` : '<span class="text-muted">non formaté</span>';
+        const device = String(v.device || '');
+        const aliasDevice = String(v.alias_device || '');
+        const aliasHtml = aliasDevice && aliasDevice !== device
+            ? `<div class="model-sub" title="${esc(aliasDevice)}">alias : ${esc(aliasDevice)}</div>`
+            : '';
+        return `<tr>
+            <td><span class="badge badge-fs">${esc(v.engine || '—')}</span></td>
+            <td>${esc(v.name || '—')}</td>
+            <td><span class="mount-path">${esc(device || '—')}</span>${aliasHtml}</td>
+            <td>${fs}</td>
+            <td>${escNoWrap(v.size || '—')}</td>
+            <td>${raidVolumeStatus(v)}</td>
+            <td class="raid-action-col">${raidVolumeDeleteButton(v)}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderRaidJobs(jobs) {
+    const activeJobs = (Array.isArray(jobs) ? jobs : []).filter(job => job && job.status === 'running');
+    if (!activeJobs.length) return false;
+    const job = activeJobs[0];
+    showRaidFlash(job.message || ('Opération RAID en cours : ' + (job.name || job.id || 'volume')), true, true);
+    return true;
+}
+
+function scheduleRaidPoll(active) {
+    window.clearTimeout(raidPollTimer);
+    raidPollTimer = null;
+    if (active) {
+        raidPollTimer = window.setTimeout(() => loadRaid(true), 2200);
+    }
+}
+
+async function submitRaidDelete(engine, device, name) {
+    const label = device || name || 'volume';
+    const ok = await showConfirm(
+        'Supprimer le volume logique',
+        'Supprimer ' + label + ' ? Cette action arrête le volume RAID/ZFS et efface la signature RAID sur les membres détectés quand c’est un volume mdadm. Le volume doit être démonté.',
+        'SUPPRIMER',
+        true
+    );
+    if (!ok) return;
+    showRaidFlash('Suppression de ' + label + ' en cours...', true, true);
+    try {
+        const response = await fetch('/disk/api/action/raid/delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({engine, device, name})
+        });
+        const data = await response.json().catch(() => ({ok:false, message:'Réponse invalide'}));
+        showRaidFlash(data.message || (data.ok ? 'Volume supprimé.' : 'Erreur suppression RAID.'), !!data.ok, !data.ok);
+        await loadRaid(true);
+    } catch (err) {
+        showRaidFlash('Erreur Ajax suppression RAID : ' + err.message, false, true);
+    }
+}
+
+async function loadRaid(force = false) {
+    try {
+        const response = await fetch('/disk/api/raid', {cache:'no-store'});
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+        raidData = data;
+        renderRaidEmptyDisks(data.available_disks || []);
+        renderRaidVolumes(data.volumes || []);
+        scheduleRaidPoll(renderRaidJobs(data.jobs || []));
+    } catch (err) {
+        scheduleRaidPoll(false);
+        const emptyTbody = $('raid-empty-tbody');
+        const volumeTbody = $('raid-volumes-tbody');
+        if (emptyTbody) emptyTbody.innerHTML = '<tr><td colspan="6" class="empty-state">Erreur API /disk/api/raid</td></tr>';
+        if (volumeTbody) volumeTbody.innerHTML = '<tr><td colspan="7" class="empty-state">Erreur API /disk/api/raid</td></tr>';
+        showRaidFlash('Erreur RAID : ' + err.message, false, true);
+    }
+}
+</script>
+{% endblock %}
