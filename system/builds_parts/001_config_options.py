@@ -15,6 +15,7 @@ import threading
 import time
 import uuid
 from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple
+from urllib.parse import quote, urljoin
 
 try:
     import fcntl
@@ -66,7 +67,7 @@ DEFAULT_CONFIG_CANDIDATES = [
 
 DEFAULT_CONFIG = {
     # Le module est autonome : il n'appelle plus les scripts shell du dossier scripts.
-    # Il lance directement docker buildx et regctl depuis Python.
+    # Il lance directement docker buildx et parle à l'API Registry V2 depuis Python.
     "EXEC_MODE": "local-python",
     "UNIFIED_PATHS": "1",
 
@@ -102,7 +103,6 @@ DEFAULT_CONFIG = {
     "REGISTRY_REQUEST_TIMEOUT": "10",
 
     # Outils.
-    "REGCTL": nas_root_path("bin", "regctl"),
     "DOCKER_BIN": "docker",
     "FROM_CHECK_TIMEOUT": "30",
     "BUILDER_NAME": "mon_builder",
@@ -204,11 +204,11 @@ BUILD_CONFIG_PATH_KEYS = {
     "DOCKER_BUILDS_DIR", "DOCKER_TAR_DIR", "DOCKER_CONF_DIR", "DOCKER_LOG_DIR",
     "DOCKER_REGISTRY_FILE", "DOCKER_MODE_FILE", "DOCKER_PLATFORMS_FILE",
     "DOCKER_REGISTRY_LOGIN_FILE", "DOCKER_REGISTRY_CONFIG_FILE",
-    "REGCTL", "STATE_DIR", "DOCKER_CLI_CONFIG_DIR",
+    "STATE_DIR", "DOCKER_CLI_CONFIG_DIR",
     "SYSTEM_LOG_FILE",
     "YML_DIR",
     "REGISTRY_HOST_CONF_FILE", "REGISTRY_HOST_YAML_FILE", "REGISTRY_HOST_LOG_DIR",
-    "REGISTRY_HOST_LOG_FILE", "REGISTRY_HOST_MNT_READY_DIR", "REGISTRY_HOST_MNT_ROOT",
+    "REGISTRY_HOST_LOG_FILE", "REGISTRY_HOST_BIN_DIR", "REGISTRY_HOST_MNT_READY_DIR", "REGISTRY_HOST_MNT_ROOT",
 }
 
 BUILD_CONFIG_CSV_PATH_KEYS = {
@@ -277,7 +277,6 @@ def builds_default_conf_text(conf: Optional[Dict[str, str]] = None) -> str:
         "DOCKER_REGISTRY_LOGIN_FILE": "../conf/registre_login.conf",
         "DOCKER_REGISTRY_CONFIG_FILE": "../conf/builds.conf",
 
-        "REGCTL": "../bin/regctl",
         "DOCKER_BIN": "docker",
         "BUILDER_NAME": "mon_builder",
         "KEEP_BUILDX_BUILDER": "0",
@@ -305,6 +304,7 @@ def builds_default_conf_text(conf: Optional[Dict[str, str]] = None) -> str:
 
         "REGISTRY_HOST_CONF_FILE": "../conf/registry.conf",
         "REGISTRY_HOST_YAML_FILE": "../conf/registry.yml",
+        "REGISTRY_HOST_BIN_DIR": "../bin",
         "REGISTRY_HOST_LOG_DIR": "/var/log/registry",
         "REGISTRY_HOST_LOG_FILE": "/var/log/registry/registry.log",
         "REGISTRY_HOST_RUNTIME_BIN": "/tmp/registry-host-labo",
@@ -360,7 +360,6 @@ def builds_default_conf_text(conf: Optional[Dict[str, str]] = None) -> str:
         kv("DOCKER_REGISTRY_CONFIG_FILE"),
         "",
         "# Outils et état",
-        kv("REGCTL"),
         kv("DOCKER_BIN"),
         kv("BUILDER_NAME"),
         kv("KEEP_BUILDX_BUILDER"),
@@ -390,6 +389,7 @@ def builds_default_conf_text(conf: Optional[Dict[str, str]] = None) -> str:
         "# Registry host",
         kv("REGISTRY_HOST_CONF_FILE"),
         kv("REGISTRY_HOST_YAML_FILE"),
+        kv("REGISTRY_HOST_BIN_DIR"),
         kv("REGISTRY_HOST_LOG_DIR"),
         kv("REGISTRY_HOST_LOG_FILE"),
         kv("REGISTRY_HOST_RUNTIME_BIN"),

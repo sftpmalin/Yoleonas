@@ -246,6 +246,19 @@ def tail_log_file(log_path: str, shell: str, start_dir: str, title: str = "Log")
     run_and_keep_shell(["tail", "-n", "300", "-f", path], shell, start_dir, title)
 
 
+def script_manager_attach(session: str) -> None:
+    """Remplace le processus ttyd par un client attaché à la session tmux.
+
+    Le serveur tmux est lancé indépendamment de Flask/Gunicorn par le module
+    scripts.py. Ici, ttyd ne fait qu'attacher un client interactif.
+    """
+    session = safe_value(session)
+    if "/" in session or ":" in session:
+        raise ValueError("Nom de session tmux invalide.")
+    tmux = "/usr/bin/tmux" if os.path.isfile("/usr/bin/tmux") else "tmux"
+    os.execvp(tmux, [tmux, "-L", "yoleo-scripts", "attach-session", "-t", session])
+
+
 def menu_demo(shell: str, start_dir: str) -> None:
     base_dir = os.path.dirname(os.path.abspath(__file__))
     script = os.path.abspath(os.path.join(base_dir, "..", "scripts", "menu.sh"))
@@ -284,6 +297,8 @@ def main() -> None:
             compose_logs(known.compose_log, known.shell, known.start_dir)
         elif action == "tail-log" and len(args) >= 2:
             tail_log_file(args[1], known.shell, known.start_dir, "Log Yoleo")
+        elif action == "script-manager" and len(args) >= 2:
+            script_manager_attach(args[1])
         elif action == "menu-demo":
             menu_demo(known.shell, known.start_dir)
         elif action == "nvidia-smi-local":

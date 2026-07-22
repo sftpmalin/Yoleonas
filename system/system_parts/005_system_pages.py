@@ -296,7 +296,9 @@ def firewall_current_request_ports() -> List[int]:
 def firewall_detect_yoleo_ports() -> List[int]:
     ports = set(firewall_current_request_ports())
 
-    env_values = firewall_read_kv_file(nas_conf_file("flask_system.env"))
+    env_values = firewall_read_kv_file(nas_conf_file(".env"))
+    if not env_values:
+        env_values = firewall_read_kv_file(nas_conf_file("flask_system.env"))
     firewall_add_port_value(ports, env_values.get("PORT"))
 
     try:

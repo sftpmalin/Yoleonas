@@ -558,14 +558,20 @@ def build_inventory_sources(conf: Dict[str, str]) -> Tuple[Dict[str, str], Dict[
 
     project_names = list_project_names(conf["DOCKER_BUILDS_DIR"])
     tar_names = list_tar_names(conf["DOCKER_TAR_DIR"])
-    names = sorted(
+    all_names = (
         set(project_names)
         | set(tar_names)
         | {k for k in registry.keys() if k != "_default" and is_valid_name(k)}
         | {k for k in platforms.keys() if k != "_default" and is_valid_name(k)}
-        | {k for k in modes.keys() if k != "_default" and is_valid_name(k)},
-        key=str.lower,
+        | {k for k in modes.keys() if k != "_default" and is_valid_name(k)}
     )
+    names = []
+    used = set()
+    for key in registry.keys():
+        if key != "_default" and key in all_names and key not in used and is_valid_name(key):
+            names.append(key)
+            used.add(key)
+    names.extend(sorted((name for name in all_names if name not in used), key=str.lower))
     return registry, platforms, modes, names
 
 
@@ -1273,27 +1279,3 @@ def get_registry_mode_for(conf: Dict[str, str], name: str) -> str:
     clean_name = normalize_item_name(name)
     raw = data.get(clean_name, data.get("_default", "0"))
     return normalize_registry_mode(raw)
-
-
-def regctl_host_args_for(conf: Dict[str, str], name: str, target: str) -> List[str]:
-    if get_registry_mode_for(conf, name) != "http":
-        return []
-    host = registry_host_from_target(target)
-    return ["--host", f"reg={host},tls=disabled"]
-
-
-def should_login_registry(conf: Dict[str, str], name: str) -> bool:
-    # Mode 0 : HTTP local, pas de login. Mode 1 : HTTPS normal, login si configuré.
-    return get_registry_mode_for(conf, name) != "http"
-
-
-def regctl_mode_label(conf: Dict[str, str], name: str) -> str:
-    return "HTTP local" if get_registry_mode_for(conf, name) == "http" else "HTTPS"
-
-
-def regctl_path(conf: Dict[str, str]) -> Optional[str]:
-    configured = conf.get("REGCTL", "regctl").strip() or "regctl"
-    if os.path.isabs(configured):
-        return configured if os.path.exists(configured) else None
-    found = shutil.which(configured)
-    return found or configured

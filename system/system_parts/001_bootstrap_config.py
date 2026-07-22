@@ -73,6 +73,7 @@ SYSTEM_APP_CONF_REQUIRED_MODULES = [
     "partage=partage",
     "services=services",
     "backup=backup",
+    "scripts=scripts",
     "terminal=terminal",
 ]
 

@@ -1,0 +1,31 @@
+name: Construire install.zip
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire l'archive
+        run: |
+          zip -r install.zip system scripts bin appli install \
+            -x '*/.gitkeep' '*/__pycache__/*' '*.pyc'
+          sha256sum install.zip > install.zip.sha256
+      - name: Publier la version stable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest install.zip install.zip.sha256 --clobber
+          else
+            gh release create latest install.zip install.zip.sha256 \
+              --title "Dernière version de Yoleonas" \
+              --notes "Archive reconstruite automatiquement depuis la branche main."
+          fi

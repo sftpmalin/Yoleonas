@@ -39,24 +39,15 @@ def registry_host_settings(conf: Dict[str, str]) -> Dict[str, str]:
     base_dir = conf.get("REGISTRY_HOST_BASE_DIR", "").strip()
     if base_dir:
         # Les chemins REGISTRY_HOST_* viennent du fichier conf. Un chemin relatif
-        # doit donc être compris depuis le dossier conf, comme REGCTL=../bin/regctl.
+        # doit donc être compris depuis le dossier conf.
         base_dir = registry_host_resolve_path(base_dir, conf_dir)
     else:
         base_dir = os.path.abspath(os.path.join(conf_dir, ".."))
 
-    # Une seule source pour le dossier des binaires : on réutilise REGCTL=../bin/regctl.
-    # Ainsi registry_amd64/registry_arm64 et regctl restent dans le même ../bin.
-    regctl_raw = strip_quotes(conf.get("REGCTL", "")).strip()
-    regctl_path = registry_host_resolve_path(regctl_raw, conf_dir) if regctl_raw else ""
-    regctl_bin_dir = os.path.dirname(regctl_path) if regctl_path else ""
-
-    explicit_bin_dir = strip_quotes(conf.get("REGISTRY_HOST_BIN_DIR", "")).strip()
-    if explicit_bin_dir:
-        bin_dir = registry_host_resolve_path(explicit_bin_dir, conf_dir)
-    elif regctl_bin_dir:
-        bin_dir = regctl_bin_dir
-    else:
-        bin_dir = registry_host_resolve_path(os.path.join(base_dir, "bin"), conf_dir)
+    # Le serveur Registry conserve ses binaires amd64/arm64 dans son propre
+    # dossier configurable. Il ne depend plus du chemin d'un autre executable.
+    explicit_bin_dir = strip_quotes(conf.get("REGISTRY_HOST_BIN_DIR", "../bin")).strip() or "../bin"
+    bin_dir = registry_host_resolve_path(explicit_bin_dir, conf_dir)
 
     log_dir = registry_host_resolve_path(conf.get("REGISTRY_HOST_LOG_DIR", "/var/log/registry"), conf_dir)
     yaml_conf = registry_host_resolve_path(conf.get("REGISTRY_HOST_YAML_FILE", os.path.join(conf_dir, "registry.yml")), conf_dir)
@@ -75,7 +66,6 @@ def registry_host_settings(conf: Dict[str, str]) -> Dict[str, str]:
         "human_conf": human_conf,
         "yaml_conf": yaml_conf,
         "bin_dir": bin_dir,
-        "regctl_path": regctl_path,
         "bin_amd64": os.path.join(bin_dir, "registry_amd64"),
         "bin_arm64": os.path.join(bin_dir, "registry_arm64"),
         "runtime_bin": runtime_bin,
@@ -641,7 +631,6 @@ def registry_host_status_payload(conf: Dict[str, str]) -> Dict[str, object]:
             f"BIN_DIR     : {settings['bin_dir']}",
             f"BIN SOURCE  : {source_bin or '—'} ({'OK' if source_bin_ok else 'absent'})",
             f"BIN RUNTIME : {settings['runtime_bin']} ({'OK' if runtime_bin_ok else 'absent'})",
-            f"REGCTL      : {settings.get('regctl_path') or '—'}",
             f"DATA_DIR    : {values.get('DATA_DIR', '—')}",
             f"LOG         : {settings['log_file']}",
             f"PID         : {settings['pid_file']}",
@@ -1173,6 +1162,5 @@ def save_build_options(conf: Dict[str, str], form) -> Tuple[bool, List[str]]:
     ok = ok and ok_registry_auto
 
     return ok, lines
-
 
 

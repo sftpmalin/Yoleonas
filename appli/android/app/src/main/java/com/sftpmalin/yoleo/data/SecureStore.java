@@ -63,6 +63,7 @@ public final class SecureStore {
         settings.mountSelectionConfigured = preferences.getBoolean("mount_selection_configured", false);
         settings.displayedMountPaths = loadDisplayedMountPaths();
         settings.homeItems = loadHomeItems();
+        settings.homeOrder = loadHomeOrder();
         settings.navigationOrder = loadNavigationOrder();
         settings.lastFilePath = normalizeFilePath(preferences.getString("last_file_path", "/mnt"));
         normalizeNotificationSettings(settings);
@@ -242,6 +243,7 @@ public final class SecureStore {
                 .putBoolean("mount_selection_configured", settings.mountSelectionConfigured)
                 .putStringSet("displayed_mount_paths", new LinkedHashSet<>(settings.displayedMountPaths))
                 .putStringSet("home_items", new LinkedHashSet<>(settings.homeItems))
+                .putString("home_order", String.join(",", settings.homeOrder))
                 .putString("navigation_order", String.join(",", settings.navigationOrder))
                 .putString("last_file_path", normalizeFilePath(settings.lastFilePath));
     }
@@ -287,6 +289,25 @@ public final class SecureStore {
         return result;
     }
 
+    private List<String> loadHomeOrder() {
+        String raw = preferences.getString("home_order", "");
+        List<String> result = new ArrayList<>();
+        if (raw != null) {
+            for (String item : raw.split(",")) {
+                String id = item.trim();
+                if (AppSettings.defaultHomeOrder().contains(id) && !result.contains(id)) {
+                    result.add(id);
+                }
+            }
+        }
+        for (String required : AppSettings.defaultHomeOrder()) {
+            if (!result.contains(required)) {
+                result.add(required);
+            }
+        }
+        return result;
+    }
+
     private static void normalizeNotificationSettings(AppSettings settings) {
         if (settings.pollIntervalMinutes != 15 &&
                 settings.pollIntervalMinutes != 30 &&
@@ -313,6 +334,18 @@ public final class SecureStore {
             if (AppSettings.defaultHomeItems().contains(id)) home.add(id);
         }
         settings.homeItems = home;
+        List<String> homeOrder = new ArrayList<>();
+        for (String id : settings.homeOrder) {
+            if (AppSettings.defaultHomeOrder().contains(id) && !homeOrder.contains(id)) {
+                homeOrder.add(id);
+            }
+        }
+        for (String required : AppSettings.defaultHomeOrder()) {
+            if (!homeOrder.contains(required)) {
+                homeOrder.add(required);
+            }
+        }
+        settings.homeOrder = homeOrder;
         List<String> order = new ArrayList<>();
         for (String id : settings.navigationOrder) {
             if (AppSettings.defaultNavigationOrder().contains(id) && !order.contains(id)) {

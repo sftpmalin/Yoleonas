@@ -556,7 +556,7 @@ public final class MainActivity extends Activity {
                 if (evaluateAlerts) {
                     MonitoringState.evaluateSuccess(this, snapshot, settings);
                 } else {
-                    MonitoringState.recordBaseline(this, snapshot, true);
+                    MonitoringState.recordBaseline(this, snapshot);
                 }
                 mainHandler.post(() -> {
                     if (generation == refreshGeneration && dashboardView == target && !showingSetup && !showingOptions) {
@@ -1206,18 +1206,12 @@ public final class MainActivity extends Activity {
             Log.e(TAG, "Reprogrammation de la surveillance impossible", error);
         }
 
-        if (lastSnapshot != null) {
-            try {
-                MonitoringState.evaluateSuccess(this, lastSnapshot, settings);
-            } catch (Throwable error) {
-                Log.e(TAG, "Vérification immédiate des alertes impossible", error);
-            }
-        }
-
         try {
             Toast.makeText(this, "Réglages enregistrés", Toast.LENGTH_SHORT).show();
             showDashboard();
-            showLastSnapshotOrRefresh();
+            // Les transitions doivent toujours être évaluées sur un cliché frais :
+            // le cache peut appartenir à l'ancien serveur ou précéder les nouveaux réglages.
+            refreshDashboard(true, true);
         } catch (Throwable error) {
             Log.e(TAG, "Retour au tableau de bord impossible après enregistrement", error);
             Toast.makeText(

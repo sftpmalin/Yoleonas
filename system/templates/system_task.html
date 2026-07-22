@@ -277,6 +277,7 @@
         cursor: pointer;
         text-transform: uppercase;
         transition: .18s ease;
+        text-decoration: none;
     }
     .filter-chip:hover { background: rgba(255,255,255,.07); }
     .filter-chip.active { color: #000; background: var(--accent); border-color: var(--accent); }
@@ -624,6 +625,33 @@
     .task-page .card-success,
     .task-page .card-warning { border-top:1px solid #26364b; }
     .task-page .section-title { color:#1AEBFF; border-bottom:1px solid #273447; margin-bottom:12px; letter-spacing:0; }
+    .task-page .task-view-switch { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-left:auto; }
+    .task-page .task-view-btn {
+        min-height:30px;
+        padding:7px 13px;
+        border-radius:999px;
+        border:1px solid #2b3d55;
+        background:#07101b;
+        color:#e9eef5;
+        font-size:12px;
+        font-weight:900;
+        line-height:1;
+        text-decoration:none;
+        white-space:nowrap;
+        cursor:pointer;
+        transition:border-color .15s ease, background .15s ease, color .15s ease, box-shadow .15s ease, transform .12s ease;
+    }
+    .task-page .task-view-btn:hover {
+        border-color:#1AEBFF;
+        color:#fff;
+        box-shadow:0 0 0 1px rgba(26,235,255,.12), 0 0 14px rgba(26,235,255,.13);
+    }
+    .task-page .task-view-btn.is-active {
+        background:rgba(26,235,255,.14);
+        border-color:#1AEBFF;
+        color:#fff;
+        box-shadow:0 0 0 1px rgba(26,235,255,.18), inset 0 0 16px rgba(26,235,255,.08);
+    }
     .task-page .form-control { background:#07101b; border-color:#2b3d55; color:#eaf2ff; }
     .task-page .desktop-table-wrap { border-color:#26364b; background:#0c131e; }
     .task-page th { background:#1a2636; color:#a8eaff; border-bottom-color:#30435b; letter-spacing:0; }
@@ -660,37 +688,43 @@
         padding-left:8px;
         padding-right:8px;
     }
-    .task-page #tab-tasks th:nth-child(1) { width:13%; }
-    .task-page #tab-tasks th:nth-child(2) { width:15%; }
-    .task-page #tab-tasks th:nth-child(3) { width:11%; }
-    .task-page #tab-tasks th:nth-child(4) { width:15%; }
-    .task-page #tab-tasks th:nth-child(5) { width:12%; }
-    .task-page #tab-tasks th:nth-child(6) { width:18%; }
-    .task-page #tab-tasks th:nth-child(7) { width:16%; }
-    .task-page #tab-tasks th:nth-child(3),
-    .task-page #tab-tasks td:nth-child(3) {
+    .task-page #tab-tasks .active-task-table th:nth-child(1) { width:13%; }
+    .task-page #tab-tasks .active-task-table th:nth-child(2) { width:15%; }
+    .task-page #tab-tasks .active-task-table th:nth-child(3) { width:11%; }
+    .task-page #tab-tasks .active-task-table th:nth-child(4) { width:15%; }
+    .task-page #tab-tasks .active-task-table th:nth-child(5) { width:12%; }
+    .task-page #tab-tasks .active-task-table th:nth-child(6) { width:18%; }
+    .task-page #tab-tasks .active-task-table th:nth-child(7) { width:16%; }
+    .task-page #tab-tasks .archive-task-table th:nth-child(1) { width:22%; }
+    .task-page #tab-tasks .archive-task-table th:nth-child(2) { width:20%; }
+    .task-page #tab-tasks .archive-task-table th:nth-child(3) { width:14%; }
+    .task-page #tab-tasks .archive-task-table th:nth-child(4) { width:17%; }
+    .task-page #tab-tasks .archive-task-table th:nth-child(5) { width:17%; }
+    .task-page #tab-tasks .archive-task-table th:nth-child(6) { width:10%; }
+    .task-page #tab-tasks .active-task-table th:nth-child(3),
+    .task-page #tab-tasks .active-task-table td:nth-child(3) {
         padding-left:16px;
     }
-    .task-page #tab-tasks th:nth-child(4),
-    .task-page #tab-tasks td:nth-child(4) {
+    .task-page #tab-tasks .active-task-table th:nth-child(4),
+    .task-page #tab-tasks .active-task-table td:nth-child(4) {
         padding-left:18px;
     }
-    .task-page #tab-tasks th:nth-child(5),
-    .task-page #tab-tasks td:nth-child(5) {
+    .task-page #tab-tasks .active-task-table th:nth-child(5),
+    .task-page #tab-tasks .active-task-table td:nth-child(5) {
         padding-left:22px;
     }
-    .task-page #tab-tasks th:nth-child(6),
-    .task-page #tab-tasks td:nth-child(6) {
+    .task-page #tab-tasks .active-task-table th:nth-child(6),
+    .task-page #tab-tasks .active-task-table td:nth-child(6) {
         padding-left:18px;
     }
-    .task-page #tab-tasks td:nth-child(3) .badge,
+    .task-page #tab-tasks .active-task-table td:nth-child(3) .badge,
     .task-page #tab-tasks .activation-badges .badge,
-    .task-page #tab-tasks td:nth-child(5) .badge {
+    .task-page #tab-tasks .active-task-table td:nth-child(5) .badge {
         max-width:100%;
         overflow:hidden;
         text-overflow:ellipsis;
     }
-    .task-page #tab-tasks td:nth-child(2) {
+    .task-page #tab-tasks .active-task-table td:nth-child(2) {
         min-width:0;
         overflow:visible;
     }
@@ -1090,6 +1124,8 @@
     }
     @media (max-width:700px) {
         .task-page { padding:10px; }
+        .task-page .section-title { align-items:flex-start; flex-direction:column; }
+        .task-page .task-view-switch { width:100%; justify-content:flex-start; margin-left:0; }
     }
 </style>
 
@@ -1151,10 +1187,14 @@
 
                 <div class="card card-accent">
                     <div class="section-title">
-                        <span>📋 Tableau des tâches</span>
-                        <span class="title-meta">Activation corrigée : case cochée = activé, case décochée = désactivé</span>
+                        <span>{{ '🗄️ Archives' if task_view == 'archive' else '📋 Tableau des tâches' }}</span>
+                        <div class="task-view-switch" aria-label="Catégorie du tableau">
+                            <a class="task-view-btn {{ 'is-active' if task_view == 'tasks' else '' }}" href="{{ url_for('task_bp.task_home') }}">Tâches</a>
+                            <a class="task-view-btn {{ 'is-active' if task_view == 'archive' else '' }}" href="{{ url_for('task_bp.task_home', view='archive') }}">Archives ({{ archived_count }})</a>
+                        </div>
                     </div>
 
+                    {% if task_view == 'tasks' %}
                     <div class="task-toolbar">
                         <div class="form-group" style="gap:6px;">
                             <label for="task-search">Recherche</label>
@@ -1177,7 +1217,7 @@
                         <div class="empty-state" data-yoleo-context-zone="task-empty">Aucune tâche pour le moment. Va dans l’onglet “Créer / Modifier”.</div>
                     {% else %}
                         <div class="desktop-table-wrap" data-yoleo-context-zone="task-table">
-                            <table>
+                            <table class="active-task-table">
                                 <thead>
                                     <tr>
                                         <th>Tâche</th>
@@ -1251,7 +1291,7 @@
                                                 <button type="button" class="btn btn-danger icon-btn" title="Forcer l'arrêt de la tâche" onclick="return stopTask({{ task.id }}, event)">⛔</button>
                                                 <button type="button" class="btn btn-outline icon-btn" title="Voir les logs" onclick="openLogs({{ task.id }})">🧾</button>
                                                 <button type="button" id="task-toggle-btn-{{ task.id }}" data-enabled="{{ 1 if task.enabled else 0 }}" class="btn {{ 'btn-warning' if task.enabled else 'btn-success' }} icon-btn" title="{{ 'Désactiver' if task.enabled else 'Activer' }}" onclick="return toggleTask({{ task.id }}, event)">{{ '⏸' if task.enabled else '✅' }}</button>
-                                                <button type="button" class="btn btn-danger icon-btn" title="Supprimer" onclick="return confirmDeleteTask({{ task.id }}, event)">🗑️</button>
+                                                <button type="button" class="btn btn-danger icon-btn" title="Archiver" onclick="return archiveTask({{ task.id }}, event)">🗑️</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -1302,12 +1342,95 @@
                                     <button type="button" class="btn btn-danger" onclick="return stopTask({{ task.id }}, event)">⛔ Stop forcé</button>
                                     <button type="button" class="btn btn-outline" onclick="openLogs({{ task.id }})">🧾 Logs</button>
                                     <button type="button" id="mobile-task-toggle-btn-{{ task.id }}" data-enabled="{{ 1 if task.enabled else 0 }}" class="btn {{ 'btn-warning' if task.enabled else 'btn-success' }}" onclick="return toggleTask({{ task.id }}, event)">{{ '⏸ Désactiver' if task.enabled else '✅ Activer' }}</button>
-                                    <button type="button" class="btn btn-danger" onclick="return confirmDeleteTask({{ task.id }}, event)">🗑️ Supprimer</button>
+                                    <button type="button" class="btn btn-danger" onclick="return archiveTask({{ task.id }}, event)">🗑️ Archiver</button>
                                 </div>
                             </div>
                         {% endfor %}
                         </div>
                         <div class="empty-state no-match" id="task-no-match">Aucune tâche ne correspond à cette recherche.</div>
+                    {% endif %}
+                    {% else %}
+                    <div class="task-toolbar" style="grid-template-columns:minmax(240px, 430px);">
+                        <div class="form-group" style="gap:6px;">
+                            <label for="task-search">Recherche</label>
+                            <input type="search" class="form-control" id="task-search" placeholder="Rechercher dans les archives..." oninput="filterTasks()">
+                        </div>
+                    </div>
+                    <div class="filter-count" id="filter-visible-count">—</div>
+
+                    {% if not archived_tasks %}
+                        <div class="empty-state" data-yoleo-context-zone="task-archive-empty">Aucune tâche archivée.</div>
+                    {% else %}
+                        <div class="desktop-table-wrap" data-yoleo-context-zone="task-archive-table">
+                            <table class="archive-task-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tâche</th>
+                                        <th>Planification</th>
+                                        <th>Commandes</th>
+                                        <th>Dernier état</th>
+                                        <th>Archivée le</th>
+                                        <th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for task in archived_tasks %}
+                                    {% set st = task.status %}
+                                    <tr data-task-row="1" data-task-id="{{ task.id }}" data-schedule-category="{{ task.schedule_category }}" data-search="{{ (task.title ~ ' ' ~ (task.description or '') ~ ' ' ~ task.schedule_label ~ ' ' ~ (task.commands|join(' ')) ~ ' ' ~ st.status)|upper }}">
+                                        <td>
+                                            <div class="task-title">{{ task.title }}</div>
+                                            <div class="tiny">ID interne : {{ task.id }}</div>
+                                        </td>
+                                        <td><span class="badge badge-cyan task-schedule-badge">{{ task.schedule_label }}</span></td>
+                                        <td><span class="badge badge-blue">{{ task.commands_count }} commande(s)</span></td>
+                                        <td>
+                                            {% if st.result == 'Erreur' %}
+                                                <span class="badge badge-red">{{ st.status }}</span>
+                                            {% elif st.result == 'Succès' %}
+                                                <span class="badge badge-green">{{ st.status }}</span>
+                                            {% else %}
+                                                <span class="badge badge-gray">{{ st.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><div class="tiny">{{ task.archived_at or '—' }}</div></td>
+                                        <td>
+                                            <div class="action-row">
+                                                <button type="button" class="btn btn-success icon-btn" title="Restaurer" onclick="return restoreTask({{ task.id }}, event)">🔄</button>
+                                                <button type="button" class="btn btn-danger icon-btn" title="Supprimer définitivement" onclick="return confirmDeleteForever({{ task.id }}, event)">🗑️</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mobile-cards">
+                        {% for task in archived_tasks %}
+                            {% set st = task.status %}
+                            <div class="mobile-card" data-task-card="1" data-task-id="{{ task.id }}" data-schedule-category="{{ task.schedule_category }}" data-search="{{ (task.title ~ ' ' ~ (task.description or '') ~ ' ' ~ task.schedule_label ~ ' ' ~ (task.commands|join(' ')) ~ ' ' ~ st.status)|upper }}">
+                                <div class="mobile-card-head">
+                                    <div>
+                                        <div class="task-title">{{ task.title }}</div>
+                                        <div class="task-desc">{{ task.description or '—' }}</div>
+                                    </div>
+                                    <span class="badge badge-gray">Archivée</span>
+                                </div>
+                                <div class="mobile-meta-grid">
+                                    <div class="mobile-meta"><div class="meta-label">Planification</div><div class="meta-value">{{ task.schedule_label }}</div></div>
+                                    <div class="mobile-meta"><div class="meta-label">État</div><div class="meta-value">{{ st.status }}</div></div>
+                                    <div class="mobile-meta"><div class="meta-label">Commandes</div><div class="meta-value">{{ task.commands_count }}</div></div>
+                                    <div class="mobile-meta"><div class="meta-label">Archivée le</div><div class="meta-value">{{ task.archived_at or '—' }}</div></div>
+                                </div>
+                                <div class="action-row">
+                                    <button type="button" class="btn btn-success" onclick="return restoreTask({{ task.id }}, event)">🔄 Restaurer</button>
+                                    <button type="button" class="btn btn-danger" onclick="return confirmDeleteForever({{ task.id }}, event)">🗑️ Supprimer définitivement</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                        <div class="empty-state no-match" id="task-no-match">Aucune archive ne correspond à cette recherche.</div>
+                    {% endif %}
                     {% endif %}
                 </div>
             </section>
@@ -1557,7 +1680,10 @@ const TASK_PUSH_CLEANUP_URL = "{{ url_for('task_bp.task_api_push_cleanup') }}";
 const TASK_PUSH_TEST_URL = "{{ url_for('task_bp.task_api_push_test') }}";
 const TASK_SW_URL = "{{ url_for('task_bp.sw') }}";
 const TASK_SW_SCOPE = "/system/task/";
-const TASK_DELETE_BASE_URL = "{{ url_for('task_bp.task_delete', task_id=0).rsplit('/0', 1)[0] }}";
+const TASK_ARCHIVE_BASE_URL = "{{ url_for('task_bp.task_delete', task_id=0).rsplit('/0', 1)[0] }}";
+const TASK_RESTORE_BASE_URL = "{{ url_for('task_bp.task_restore', task_id=0).rsplit('/0', 1)[0] }}";
+const TASK_DELETE_FOREVER_BASE_URL = "{{ url_for('task_bp.task_delete_forever', task_id=0).rsplit('/0', 1)[0] }}";
+const TASK_ARCHIVE_VIEW_URL = "{{ url_for('task_bp.task_home', view='archive') }}";
 const TASK_TOGGLE_BASE_URL = "{{ url_for('task_bp.task_toggle', task_id=0).rsplit('/0', 1)[0] }}";
 const TASK_STOP_BASE_URL = "{{ url_for('task_bp.task_stop', task_id=0).rsplit('/0', 1)[0] }}";
 const TASK_RUN_BASE_URL = "{{ url_for('task_bp.task_run', task_id=0).rsplit('/0', 1)[0] }}";
@@ -1857,68 +1983,73 @@ function showConfirmModal(options) {
     });
 }
 
-async function confirmDeleteTask(taskId, event) {
-    if (event) event.preventDefault();
+async function postTaskStorageAction(baseUrl, taskId) {
+    const resp = await fetch(baseUrl + '/' + encodeURIComponent(taskId) + '?ajax=1', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+            'X-Requested-With': 'fetch',
+            'Accept': 'application/json'
+        }
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data.ok === false) throw new Error(data.message || 'Action impossible');
+    return data;
+}
 
+async function showTaskStorageError(title, error) {
+    console.error(error);
+    await showConfirmModal({
+        icon: '⚠️',
+        title,
+        message: error && error.message ? error.message : String(error),
+        details: '',
+        confirmLabel: 'OK',
+        cancelLabel: 'Fermer',
+        danger: true
+    });
+}
+
+async function archiveTask(taskId, event) {
+    if (event) event.preventDefault();
+    try {
+        await postTaskStorageAction(TASK_ARCHIVE_BASE_URL, taskId);
+        window.location.href = TASK_HOME_URL;
+    } catch (e) {
+        await showTaskStorageError('Archivage impossible', e);
+    }
+    return false;
+}
+
+async function restoreTask(taskId, event) {
+    if (event) event.preventDefault();
+    try {
+        await postTaskStorageAction(TASK_RESTORE_BASE_URL, taskId);
+        window.location.href = TASK_ARCHIVE_VIEW_URL;
+    } catch (e) {
+        await showTaskStorageError('Restauration impossible', e);
+    }
+    return false;
+}
+
+async function confirmDeleteForever(taskId, event) {
+    if (event) event.preventDefault();
     const ok = await showConfirmModal({
         icon: '🗑️',
-        title: 'Supprimer cette tâche ?',
-        message: 'Voulez-vous vraiment supprimer cette tâche ?',
-        details: 'La tâche sera retirée de SQLite et le cron sera régénéré depuis la base. Le tableau ne sera pas rechargé.',
-        confirmLabel: 'Oui, supprimer',
+        title: 'Supprimer définitivement ?',
+        message: 'Cette tâche sera définitivement supprimée.',
+        details: 'La configuration, les commandes, les états et les logs de cette tâche seront effacés. Cette action est irréversible.',
+        confirmLabel: 'Supprimer définitivement',
         cancelLabel: 'Annuler',
         danger: true
     });
     if (!ok) return false;
-
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-
     try {
-        const resp = await fetch(TASK_DELETE_BASE_URL + '/' + encodeURIComponent(taskId) + '?ajax=1', {
-            method: 'POST',
-            cache: 'no-store',
-            headers: {
-                'X-Requested-With': 'fetch',
-                'Accept': 'application/json'
-            }
-        });
-        const data = await resp.json().catch(() => ({}));
-
-        if (!resp.ok || data.ok === false) {
-            await showConfirmModal({
-                icon: '⚠️',
-                title: 'Suppression impossible',
-                message: data.message || 'La tâche n’a pas pu être supprimée.',
-                details: '',
-                confirmLabel: 'OK',
-                cancelLabel: 'Fermer',
-                danger: true
-            });
-            return false;
-        }
-
-        removeTaskFromDom(taskId);
-        updateStatsFromPayload(data);
-        updateMainTaskRows(data.tasks || []);
-        refreshLogTaskOptions(data.tasks || [], taskId);
-        filterTasks();
-        setTimeout(refreshProgress, 150);
+        await postTaskStorageAction(TASK_DELETE_FOREVER_BASE_URL, taskId);
+        window.location.href = TASK_ARCHIVE_VIEW_URL;
     } catch (e) {
-        console.error(e);
-        await showConfirmModal({
-            icon: '⚠️',
-            title: 'Erreur navigateur',
-            message: 'Erreur pendant la suppression : ' + e,
-            details: '',
-            confirmLabel: 'OK',
-            cancelLabel: 'Fermer',
-            danger: true
-        });
-    } finally {
-        window.scrollTo(scrollX, scrollY);
+        await showTaskStorageError('Suppression impossible', e);
     }
-
     return false;
 }
 

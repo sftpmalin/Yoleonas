@@ -57,7 +57,7 @@ def build_tmux_systemd_unit_name(session: str) -> str:
     return f"yoleo-build-{safe}"[:120]
 
 
-def launch_build_tmux_worker(state: Dict[str, object]) -> Tuple[bool, str]:
+def launch_build_tmux_worker(conf: Dict[str, str], state: Dict[str, object]) -> Tuple[bool, str]:
     """Lance uniquement le build Docker dans une session tmux autonome.
 
     Point important : la session tmux ne doit pas être enfant du service
@@ -126,12 +126,30 @@ def launch_build_tmux_worker(state: Dict[str, object]) -> Tuple[bool, str]:
             "/bin/bash", "-lc", wrapper,
         ])
         if rc == 0:
-            # systemd-run rend la main immédiatement : on attend juste que tmux apparaisse.
+            # systemd-run rend la main immédiatement : on attend que tmux apparaisse.
+            # Un build très court peut aussi avoir déjà terminé avant le premier contrôle.
             for _ in range(20):
                 if tmux_session_exists(session):
                     return True, f"Build lancé dans tmux autonome : {session} ({unit}.service)"
+                latest = read_build_background_state(conf)
+                if latest.get("id") == state.get("id") and latest.get("done") and not latest.get("running"):
+                    if latest.get("success") is True:
+                        return True, f"Build terminé rapidement : {session} ({unit}.service)"
+                    return False, str(latest.get("status") or f"Le worker tmux {session} s'est arrêté en erreur.")
                 time.sleep(0.15)
-            return True, f"Build lancé via systemd-run : {unit}.service"
+
+            # Ne jamais annoncer un succès si ni tmux ni l'unité ne sont encore actifs.
+            if systemd_unit_is_active(f"{unit}.service"):
+                return True, f"Build lancé via systemd-run : {unit}.service"
+            latest = read_build_background_state(conf)
+            if latest.get("id") == state.get("id") and latest.get("done") and not latest.get("running"):
+                if latest.get("success") is True:
+                    return True, f"Build terminé rapidement : {session} ({unit}.service)"
+                return False, str(latest.get("status") or f"Le worker tmux {session} s'est arrêté en erreur.")
+            return False, (
+                f"La session tmux {session} n'est jamais apparue et l'unité "
+                f"{unit}.service est inactive."
+            )
         # On ne masque pas l'erreur systemd-run, mais on tente l'ancien mode
         # pour ne pas bloquer totalement une machine sans systemd opérationnel.
         systemd_error = out.strip() or f"systemd-run impossible pour {unit}.service"
@@ -178,9 +196,15 @@ def run_build_worker_from_cli(job_id: str, action: str, name: str, mode: str) ->
         "runner": "tmux-systemd",
         "running": True,
         "done": False,
+        "success": None,
+        "had_error": False,
+        "already_running": False,
         "updated_at": build_background_now(),
         "status": f"Build en cours dans tmux : {session}",
     })
+    # Un ancien état marqué stale ne doit jamais contaminer une nouvelle exécution.
+    state.pop("stale", None)
+    state.pop("stale_reason", None)
     write_build_background_state(conf, state)
     run_build_background_job(conf, state)
     return 0
@@ -617,7 +641,19 @@ def build_background_has_clean_final_summary(state: Dict) -> bool:
 
 
 def reconcile_build_background_success(state: Dict) -> Dict:
-    if not isinstance(state, dict) or state.get("running") or state.get("stale"):
+    if not isinstance(state, dict) or state.get("running"):
+        return state
+
+    # Une tâche réellement terminée ne doit pas conserver les drapeaux stale
+    # hérités d'un ancien lancement. Ils faisaient afficher un état contradictoire
+    # (success=true mais stale=true) et perturbaient le lancement suivant.
+    if state.get("success") is True and state.get("stale"):
+        cleaned = dict(state)
+        cleaned.pop("stale", None)
+        cleaned.pop("stale_reason", None)
+        state = cleaned
+
+    if state.get("stale"):
         return state
     action = str(state.get("action") or "")
     if action not in BUILD_TMUX_ACTIONS:
@@ -748,17 +784,27 @@ def start_build_background_job(conf: Dict[str, str], action: str, name: str, mod
             return state
 
         write_build_background_state(conf, state)
-        ok_tmux, tmux_msg = launch_build_tmux_worker(state)
+        ok_tmux, tmux_msg = launch_build_tmux_worker(conf, state)
+
+        # Le worker peut écrire dans le JSON pendant que Flask attend tmux.
+        # On recharge donc l'état le plus récent avant toute écriture afin de
+        # ne pas écraser sa progression, son PID ou son résultat final.
+        latest = read_build_background_state(conf)
+        if latest.get("id") == state.get("id"):
+            state = latest
+
         if not ok_tmux:
-            state["running"] = False
-            state["done"] = True
-            state["success"] = False
-            state["had_error"] = True
-            state["status"] = tmux_msg
-            state["updated_at"] = build_background_now()
-            state["log_tail"] = (state.get("log_tail", "") + f"❌ {tmux_msg}\n")[-BACKGROUND_TAIL_CHARS:]
-            write_build_background_state(conf, state)
-        else:
+            # Si le worker a malgré tout terminé proprement, on respecte son résultat.
+            if not (state.get("done") and state.get("success") is True):
+                state["running"] = False
+                state["done"] = True
+                state["success"] = False
+                state["had_error"] = True
+                state["status"] = tmux_msg
+                state["updated_at"] = build_background_now()
+                state["log_tail"] = (state.get("log_tail", "") + f"❌ {tmux_msg}\n")[-BACKGROUND_TAIL_CHARS:]
+                write_build_background_state(conf, state)
+        elif state.get("running"):
             state["status"] = tmux_msg
             state["updated_at"] = build_background_now()
             state["log_tail"] = (state.get("log_tail", "") + f"✅ {tmux_msg}\n")[-BACKGROUND_TAIL_CHARS:]

@@ -10,22 +10,13 @@ public final class MonitoringAlarmReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent == null ? "" : intent.getAction();
-        if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
-            MonitoringScheduler.schedule(context);
-            MonitoringScheduler.scheduleImmediate(context);
+        if (Intent.ACTION_BOOT_COMPLETED.equals(action) ||
+                Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+            MonitoringScheduler.restoreAfterBootOrUpdate(context);
             return;
         }
         if (ACTION_WATCHDOG.equals(action)) {
-            MonitoringScheduler.scheduleWatchdogAlarm(context);
-            PendingResult pending = goAsync();
-            Context app = context.getApplicationContext();
-            new Thread(() -> {
-                try {
-                    MonitoringCheck.run(app);
-                } finally {
-                    pending.finish();
-                }
-            }, "yoleo-monitoring-alarm").start();
+            MonitoringScheduler.onWatchdogAlarm(context);
         }
     }
 }

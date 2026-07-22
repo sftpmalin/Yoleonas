@@ -197,7 +197,7 @@ def _uibackup_system_files() -> List[_UiBackupPath]:
     return sorted(files, key=lambda item: _uibackup_rel_for(item))
 
 
-def _uibackup_archive_sha_ok(path: _UiBackupPath) -> Tuple[bool, str]:
+def _uibackup_archive_sha_ok(path: _UiBackupPath, verify_content: bool = True) -> Tuple[bool, str]:
     sha_path = path.with_name(path.name + ".sha256")
     if not sha_path.exists():
         return False, ""
@@ -206,8 +206,13 @@ def _uibackup_archive_sha_ok(path: _UiBackupPath) -> Tuple[bool, str]:
         expected = sha_path.read_text(encoding="utf-8", errors="replace").split()[0].strip()
     except Exception:
         return False, ""
-    if not expected:
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
         return False, ""
+    expected = expected.lower()
+    if not verify_content:
+        # L'affichage ne doit pas relire plusieurs dizaines de Go à chaque page.
+        # La restauration conserve, elle, la vérification complète ci-dessous.
+        return True, expected
     try:
         actual = _uibackup_file_sha256(path)
     except Exception:
@@ -246,7 +251,7 @@ def _uibackup_backup_rows() -> List[Dict[str, Any]]:
         if path.name.startswith("."):
             continue
         stat = path.stat()
-        sha_ok, sha = _uibackup_archive_sha_ok(path)
+        sha_ok, sha = _uibackup_archive_sha_ok(path, verify_content=False)
         created = _uibackup_datetime.datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
         match = re.match(r"system-(\d{8})-(\d{6})\.tar\.gz$", path.name)
         if match:
@@ -285,7 +290,7 @@ def _uibackup_reference_state() -> Dict[str, Any]:
     }
     if UIBACKUP_REFERENCE_ARCHIVE.exists():
         state["archive_size_label"] = _uibackup_size_label(UIBACKUP_REFERENCE_ARCHIVE.stat().st_size)
-        state["archive_sha_ok"] = _uibackup_archive_sha_ok(UIBACKUP_REFERENCE_ARCHIVE)[0]
+        state["archive_sha_ok"] = _uibackup_archive_sha_ok(UIBACKUP_REFERENCE_ARCHIVE, verify_content=False)[0]
     return state
 
 

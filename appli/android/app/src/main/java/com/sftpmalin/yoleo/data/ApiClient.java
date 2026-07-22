@@ -278,7 +278,7 @@ public final class ApiClient {
         connection.setReadTimeout(20_000);
         connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("Accept", "image/png,image/webp,image/jpeg,image/*;q=0.8");
-        connection.setRequestProperty("User-Agent", "Yoleo-Android/0.6.7");
+        connection.setRequestProperty("User-Agent", "Yoleo-Android/0.6.9");
         int status = connection.getResponseCode();
         if (status < 200 || status >= 300) {
             connection.disconnect();
@@ -331,7 +331,7 @@ public final class ApiClient {
         connection.setInstanceFollowRedirects(false);
         connection.setRequestMethod(method);
         connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("User-Agent", "Yoleo-Android/0.6.7");
+        connection.setRequestProperty("User-Agent", "Yoleo-Android/0.6.9");
         if (accessToken != null && !accessToken.isEmpty()) {
             connection.setRequestProperty("Authorization", "Bearer " + accessToken);
         }

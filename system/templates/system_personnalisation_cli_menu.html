@@ -205,12 +205,19 @@ function cliSetStatus(message, ok=true) {
 
 function cliAutosave(delay=500) {
     if (cliSaveTimer) clearTimeout(cliSaveTimer);
-    cliSaveTimer = setTimeout(() => saveCliMenu(true), delay);
+    cliSaveTimer = setTimeout(() => {
+        cliSaveTimer = null;
+        if (cliEditingIndex >= 0) return;
+        saveCliMenu(true);
+    }, delay);
 }
 
-function cliChanged(delay=500) {
+function cliChanged() {
     syncCliPreview();
-    cliAutosave(delay);
+    if (cliSaveTimer) {
+        clearTimeout(cliSaveTimer);
+        cliSaveTimer = null;
+    }
 }
 
 function cliNewId() {
@@ -457,9 +464,9 @@ function renderCliTile(index, kind) {
                 <div class="cli-tile is-command is-editing" data-index="${index}" tabindex="0" onfocus="cliFocusIndex=${index}">
                     <div class="cli-tile-icon">${cliEscape(cliCommandIcon(row))}</div>
                     <div class="cli-tile-edit">
-                        <input class="input" value="${cliEscape(cliCleanLabel(row.label || ''))}" placeholder="Nom affiché" style="${cliInputStyle(cliCleanLabel(row.label || ''), 14, 34, 4)}" oninput="cliRows[${index}].label = this.value; autoSizeCliInput(this, 14, 34, 4); cliChanged(800)">
+                        <input class="input" value="${cliEscape(cliCleanLabel(row.label || ''))}" placeholder="Nom affiché" style="${cliInputStyle(cliCleanLabel(row.label || ''), 14, 34, 4)}" oninput="cliRows[${index}].label = this.value; autoSizeCliInput(this, 14, 34, 4); cliChanged()">
                         <div class="cli-tile-command-edit">
-                            <input class="input" value="${cliEscape(command)}" placeholder="script.py --option" style="${cliInputStyle(command, 26, 82, 7)}" oninput="cliRows[${index}].command = this.value; autoSizeCliInput(this, 26, 82, 7); cliChanged(800)">
+                            <input class="input" value="${cliEscape(command)}" placeholder="script.py --option" style="${cliInputStyle(command, 26, 82, 7)}" oninput="cliRows[${index}].command = this.value; autoSizeCliInput(this, 26, 82, 7); cliChanged()">
                             <button type="button" class="cli-tile-action" title="Parcourir" onclick="openCliCommandBrowser(${index})">📂</button>
                         </div>
                     </div>
@@ -484,7 +491,7 @@ function renderCliTile(index, kind) {
             <div class="cli-tile is-folder is-editing" data-index="${index}" tabindex="0" onfocus="cliFocusIndex=${index}">
                 <div class="cli-tile-icon">${cliEscape(cliFolderIcon(row))}</div>
                 <div class="cli-tile-edit">
-                    <input class="input" value="${cliEscape(cliCleanLabel(row.title || ''))}" placeholder="Nom du dossier" style="${cliInputStyle(cliCleanLabel(row.title || ''), 14, 42, 5)}" oninput="cliRows[${index}].title = this.value; autoSizeCliInput(this, 14, 42, 5); cliChanged(800)">
+                    <input class="input" value="${cliEscape(cliCleanLabel(row.title || ''))}" placeholder="Nom du dossier" style="${cliInputStyle(cliCleanLabel(row.title || ''), 14, 42, 5)}" oninput="cliRows[${index}].title = this.value; autoSizeCliInput(this, 14, 42, 5); cliChanged()">
                 </div>
                 <div class="cli-tile-actions">
                     <button type="button" class="cli-tile-action" title="Icône" onclick="openCliEmojiPanel(${index}, event)">☺</button>

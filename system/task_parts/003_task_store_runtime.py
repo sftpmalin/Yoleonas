@@ -63,9 +63,12 @@ def enrich_task(task):
     return task
 
 
-def get_task(task_id):
+def get_task(task_id, include_archived=False):
     with connect_db() as db:
-        row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if include_archived:
+            row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        else:
+            row = db.execute("SELECT * FROM tasks WHERE id=? AND archived=0", (task_id,)).fetchone()
     if not row:
         return None
     return enrich_task(row_to_dict(row))
@@ -73,11 +76,23 @@ def get_task(task_id):
 
 def get_all_tasks():
     with connect_db() as db:
-        rows = db.execute("SELECT * FROM tasks ORDER BY id DESC").fetchall()
+        rows = db.execute("SELECT * FROM tasks WHERE archived=0 ORDER BY id DESC").fetchall()
     tasks = []
     for row in rows:
         tasks.append(enrich_task(row_to_dict(row)))
     return tasks
+
+
+def get_archived_tasks():
+    with connect_db() as db:
+        rows = db.execute("SELECT * FROM tasks WHERE archived=1 ORDER BY id DESC").fetchall()
+    return [enrich_task(row_to_dict(row)) for row in rows]
+
+
+def get_archived_task_count():
+    with connect_db() as db:
+        row = db.execute("SELECT COUNT(*) AS count FROM tasks WHERE archived=1").fetchone()
+    return safe_int(row["count"] if row else 0, 0)
 
 
 def set_status(task_id, **updates):
@@ -336,5 +351,4 @@ def kill_tmux_session(session_name):
         return False, "Commande tmux introuvable"
     except Exception as e:
         return False, f"Erreur arrêt tmux {session_name}: {e}"
-
 

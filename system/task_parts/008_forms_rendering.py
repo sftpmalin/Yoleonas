@@ -161,8 +161,9 @@ def save_task_from_form(task_id=None):
     return task_id
 
 
-def render_task_page(active_tab="tasks", edit_task=None, selected_log_task=""):
+def render_task_page(active_tab="tasks", edit_task=None, selected_log_task="", task_view="tasks"):
     tasks = get_all_tasks()
+    archived_tasks = get_archived_tasks()
     conf = read_task_conf()
     conf_for_display = dict(conf)
     for key in PATH_CONFIG_KEYS:
@@ -170,11 +171,16 @@ def render_task_page(active_tab="tasks", edit_task=None, selected_log_task=""):
     allowed_tabs = {"tasks", "create", "progress", "info"}
     if active_tab not in allowed_tabs:
         active_tab = "tasks"
+    if task_view not in {"tasks", "archive"}:
+        task_view = "tasks"
     stats = build_task_stats(tasks)
 
     return render_template(
         "system_task.html",
         tasks=tasks,
+        archived_tasks=archived_tasks,
+        archived_count=len(archived_tasks),
+        task_view=task_view,
         edit_task=edit_task or blank_task(),
         is_edit=bool(edit_task and edit_task.get("id")),
         active_tab=active_tab,
@@ -187,5 +193,4 @@ def render_task_page(active_tab="tasks", edit_task=None, selected_log_task=""):
         push_subscription_count=push_subscription_count(),
         webpush_available=webpush is not None,
     )
-
 

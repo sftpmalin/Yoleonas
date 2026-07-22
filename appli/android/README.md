@@ -1,6 +1,6 @@
 # Yoleo NAS Android
 
-Application Android native de Yoleo. La version 0.6.7 contient :
+Application Android native de Yoleo. La version 0.6.9 contient :
 
 - une configuration HTTPS/mTLS avec sélection d'un P12 ;
 - un test facultatif en quatre étapes : P12, HTTPS, identifiants, jeton ;
@@ -28,8 +28,8 @@ Application Android native de Yoleo. La version 0.6.7 contient :
 - une surveillance différée par Android JobScheduler, sans service permanent :
   serveur hors ligne/retour en ligne, CPU, RAM, stockage, montage perdu, Docker,
   Samba, tâche en échec, build en attente et rappel de registre ;
-- une mémoire locale des alertes avec un délai de 24 heures pour empêcher une
-  même notification de revenir à chaque contrôle.
+- une mémoire locale des états avec première référence silencieuse, hystérésis
+  sur les seuils et notifications uniquement lors d'un véritable changement ;
 - un enregistrement synchrone et vérifié des réglages, indépendant d'une
   éventuelle erreur du planificateur Android/Samsung.
 - une actualisation toutes les trois secondes après une commande Tâche ou
@@ -51,7 +51,7 @@ Application Android native de Yoleo. La version 0.6.7 contient :
   répétition du chemin ni des titres ;
 - la suppression du double titre et de l'ancien bandeau de chargement dans le
   gestionnaire de fichiers après réception de la liste.
-- un onglet Réglages > Accueil pour choisir quinze groupes d'informations :
+- un onglet Réglages > Accueil pour choisir et réordonner librement quinze groupes d'informations :
   CPU, RAM, stockage, températures, ventilateurs, GPU, hôte, réseau, uptime,
   services systemd, Docker, Samba, tâches, VM et builds.
 - un accueil matériel compact : jusqu'à trois ventilateurs par ligne, puis
@@ -61,9 +61,11 @@ Application Android native de Yoleo. La version 0.6.7 contient :
 - le téléchargement ponctuel d'un fichier ou d'un dossier depuis son menu :
   Android crée automatiquement `Download/Yoleo`, et un dossier NAS est reçu
   sous forme d'archive ZIP sans réintroduire de synchronisation.
-- une surveillance en arrière-plan renforcée : le JobScheduler reste présent,
-  complété par une alarme Android ponctuelle et non exacte autorisée pendant
-  Doze, sans service permanent ;
+- une surveillance en arrière-plan renforcée : permission réseau Android 14+,
+  JobScheduler persistant, job immédiat et alarme ponctuelle auto-réarmée
+  autorisée pendant Doze, sans service permanent ;
+- une restauration automatique de la surveillance après redémarrage ou mise à
+  jour de l'application, avec création anticipée du canal de notification ;
 - une demande unique d'exclusion de l'optimisation batterie et une notification
   unique confirmant la réussite du premier véritable contrôle en arrière-plan.
 
@@ -82,4 +84,4 @@ Le SDK Android doit être indiqué dans `local.properties` ou par
 APK produit : `app\build\outputs\apk\debug\app-debug.apk`.
 
 Copie prête à installer pour les essais :
-`dist\YoleoNAS-0.6.7.apk`.
+`dist\YoleoNAS-0.6.9.apk`.

@@ -657,37 +657,6 @@ def local_oci_digests(tar_file: str) -> List[str]:
     return digests
 
 
-def registry_login_for_status(conf: Dict[str, str], target: str, regctl: str) -> Tuple[bool, str]:
-    login_file = conf.get("DOCKER_REGISTRY_LOGIN_FILE") or os.path.join(conf.get("DOCKER_CONF_DIR", ""), "registre_login.conf")
-    values = read_env_login_file(login_file)
-    host = values.get("REGISTRY_HOST") or registry_host_from_target(target)
-    user = values.get("REGISTRY_USER", "")
-    password = values.get("REGISTRY_PASS", "")
-    pass_file = values.get("REGISTRY_PASS_FILE", "")
-
-    if not host or not user:
-        return True, "login ignoré"
-    if not password and pass_file and os.path.isfile(pass_file):
-        password = local_read_text(pass_file).strip()
-    if not password:
-        return True, "login ignoré : mot de passe absent"
-
-    try:
-        completed = subprocess.run(
-            [regctl, "registry", "login", host, "-u", user, "--pass-stdin"],
-            input=password,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            check=False,
-        )
-        if completed.returncode == 0:
-            return True, "login OK"
-        return False, (completed.stdout or "login registre échoué").strip()
-    except Exception as exc:
-        return False, str(exc)
-
-
 def platforms_to_arches(platforms: str) -> set:
     """Convertit linux/amd64,linux/arm64 en ensemble {amd64, arm64}."""
     arches = set()
@@ -763,37 +732,6 @@ def registry_target_repo_tag(target: str) -> Tuple[str, str]:
     return value, "latest"
 
 
-def registry_get_tag_arches_fresh(conf: Dict[str, str], repo: str, tag: str) -> Tuple[bool, set, str]:
-    """Vérifie le registre réel, sans cache local ni cache mémoire."""
-    if requests is None:
-        return False, set(), "module Python requests introuvable"
-    if not registry_browser_url(conf):
-        return False, set(), "REGISTRY_URL absent"
-    if not repo:
-        return False, set(), "repo registre vide"
-
-    headers = {
-        "Accept": ", ".join([
-            "application/vnd.docker.distribution.manifest.list.v2+json",
-            "application/vnd.oci.image.index.v1+json",
-            "application/vnd.docker.distribution.manifest.v2+json",
-            "application/vnd.oci.image.manifest.v1+json",
-            "application/json",
-        ])
-    }
-    response = registry_catalog_request(conf, f"{repo}/manifests/{tag}", method="GET", headers=headers)
-    if response is None:
-        return False, set(), "registre injoignable"
-    if response.status_code == 404:
-        return False, set(), "tag absent du registre"
-    if response.status_code != 200:
-        return False, set(), f"HTTP {response.status_code} pendant la lecture du manifest"
-
-    data = registry_parse_json(response)
-    arches = arches_from_manifest_payload(data)
-    return True, arches, ""
-
-
 def registry_status_for(conf: Dict[str, str], name: str) -> Dict[str, object]:
     name = normalize_item_name(name)
     if not is_valid_name(name):
@@ -828,55 +766,51 @@ def registry_status_for(conf: Dict[str, str], name: str) -> Dict[str, object]:
         )
 
     repo, tag = registry_target_repo_tag(target)
-    exists, registry_arches, registry_msg = registry_get_tag_arches_fresh(conf, repo, tag)
+    exists, registry_digest, registry_payload, registry_msg = registry_v2_manifest_status(conf, name, target)
+    registry_arches = arches_from_manifest_payload(registry_payload)
     if not exists:
+        detail = registry_msg or "vérification impossible"
         return make_status_payload(
             "registry", name, "needed", "Envoyer",
-            f"Registre à mettre à jour : {registry_msg}.",
+            f"Registre à mettre à jour ou vérification impossible : {detail}.",
             True, True, target=target, repo=repo, tag=tag, tar_hash=saved_tar_hash, local_arches=sorted(tar_arches), desired_arches=sorted(desired_arches), registry_arches=sorted(registry_arches),
         )
 
-    if desired_arches and registry_arches:
-        if registry_arches == desired_arches:
-            return make_status_payload(
-                "registry", name, "current", "À jour",
-                f"Tag présent dans le registre avec les plateformes attendues : {format_arches(registry_arches)}.",
-                True, False, target=target, repo=repo, tag=tag, tar_hash=saved_tar_hash, local_arches=sorted(tar_arches), desired_arches=sorted(desired_arches), registry_arches=sorted(registry_arches),
-            )
-        return make_status_payload(
-            "registry", name, "needed", "Envoyer",
-            f"Plateformes registre {format_arches(registry_arches)} ≠ plateformes demandées {format_arches(desired_arches)}.",
-            True, True, target=target, repo=repo, tag=tag, tar_hash=saved_tar_hash, local_arches=sorted(tar_arches), desired_arches=sorted(desired_arches), registry_arches=sorted(registry_arches),
-        )
-
-    # Fallback si le registre répond mais ne donne pas les architectures.
-    # On compare alors les digests, mais jamais l'ancien état local .save_state.
+    # L'etat "À jour" repose uniquement sur le digest réellement lu dans le
+    # registre. Des architectures identiques ne prouvent pas que l'image est
+    # identique : le contenu des layers peut avoir changé.
     try:
         local_digests = local_oci_digests(tar_file)
     except Exception:
         local_digests = []
 
-    regctl = regctl_path(conf)
-    if regctl:
-        host_args = regctl_host_args_for(conf, name, target)
-        mode = get_registry_mode_for(conf, name)
-        if should_login_registry(conf, name):
-            login_ok, login_msg = registry_login_for_status(conf, target, regctl)
-            if not login_ok:
-                return make_status_payload("registry", name, "unknown", "Envoyer", f"Comparaison digest impossible : {login_msg}", True, True, target=target, local_digests=local_digests, mode=mode)
-        rc, out = run_capture([regctl, *host_args, "image", "digest", target])
-        registry_digest = (out or "").strip().splitlines()[-1].strip() if (out or "").strip() else ""
-        if rc == 0 and registry_digest.startswith("sha256:") and registry_digest in local_digests:
-            return make_status_payload("registry", name, "current", "À jour", "Tag présent, digest identique au TAR local.", True, False, target=target, registry_digest=registry_digest, local_digests=local_digests, mode=mode)
+    if registry_digest and registry_digest in local_digests:
+        return make_status_payload(
+            "registry", name, "current", "À jour",
+            "Tag présent dans le registre avec un digest SHA-256 identique au TAR OCI local.",
+            True, False, target=target, repo=repo, tag=tag, tar_hash=saved_tar_hash,
+            registry_digest=registry_digest, local_digests=local_digests,
+            local_arches=sorted(tar_arches), desired_arches=sorted(desired_arches), registry_arches=sorted(registry_arches),
+        )
+
+    if desired_arches and registry_arches and registry_arches != desired_arches:
+        return make_status_payload(
+            "registry", name, "needed", "Envoyer",
+            f"Plateformes registre {format_arches(registry_arches)} ≠ plateformes demandées {format_arches(desired_arches)}.",
+            True, True, target=target, repo=repo, tag=tag, tar_hash=saved_tar_hash,
+            registry_digest=registry_digest, local_digests=local_digests,
+            local_arches=sorted(tar_arches), desired_arches=sorted(desired_arches), registry_arches=sorted(registry_arches),
+        )
 
     return make_status_payload(
         "registry", name, "needed", "Envoyer",
-        "Tag présent, mais plateformes/digest non confirmés : envoi conseillé.",
-        True, True, target=target, repo=repo, tag=tag, tar_hash=saved_tar_hash, local_arches=sorted(tar_arches), desired_arches=sorted(desired_arches), registry_arches=sorted(registry_arches),
+        "Tag présent, mais digest SHA-256 différent du TAR OCI local : envoi nécessaire.",
+        True, True, target=target, repo=repo, tag=tag, tar_hash=saved_tar_hash,
+        registry_digest=registry_digest, local_digests=local_digests,
+        local_arches=sorted(tar_arches), desired_arches=sorted(desired_arches), registry_arches=sorted(registry_arches),
     )
 
 # ============================================================
 # Onglet Registre intégré dans Build
 # Ancien module registry.py fusionné ici : catalogue, tags, arch, suppression.
 # ============================================================
-

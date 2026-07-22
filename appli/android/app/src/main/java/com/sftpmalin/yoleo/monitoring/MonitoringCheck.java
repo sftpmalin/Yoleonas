@@ -17,43 +17,93 @@ public final class MonitoringCheck {
     }
 
     public static void run(Context context) {
+        run(context, null);
+    }
+
+    static void run(Context context, MonitoringRunGate.Token cancellation) {
+        if (isCancelled(cancellation)) {
+            return;
+        }
         Context app = context.getApplicationContext();
         if (!RUNNING.compareAndSet(false, true)) {
             return;
         }
         try {
+            if (isCancelled(cancellation)) {
+                return;
+            }
             SecureStore store = new SecureStore(app);
             AppSettings settings = store.loadSettings();
             String token = store.loadAccessToken();
-            if (!settings.configured || token.isEmpty() || !store.hasP12()) {
+            if (isCancelled(cancellation) ||
+                    !settings.configured || token.isEmpty() || !store.hasP12()) {
                 return;
             }
+            JSONObject snapshot;
             try {
                 ApiClient client = new ApiClient(
                         settings,
                         store.getP12File(),
                         store.loadP12Password());
-                JSONObject snapshot = client.monitoringSnapshot(token);
-                MonitoringState.evaluateSuccess(app, snapshot, settings);
-                MonitoringState.recordBackgroundSuccess(app);
-            } catch (Exception error) {
-                if (error instanceof ApiClient.ApiException &&
-                        ((ApiClient.ApiException) error).statusCode == 401) {
-                    store.clearAccessToken();
-                    MonitoringState.recordBackgroundFailure(app, "Authentification expirée");
-                    MonitoringNotifier.show(
-                            app,
-                            "background_authentication",
-                            "Yoleo doit être réauthentifié",
-                            "Ouvre l'application pour renouveler l'authentification du serveur.",
-                            "home");
+                if (isCancelled(cancellation)) {
                     return;
                 }
-                MonitoringState.recordBackgroundFailure(app, error.getClass().getSimpleName());
-                MonitoringState.recordFailure(app, settings);
+                snapshot = client.monitoringSnapshot(token);
+            } catch (Exception error) {
+                if (isCancelled(cancellation)) {
+                    return;
+                }
+                if (error instanceof ApiClient.ApiException &&
+                        ((ApiClient.ApiException) error).statusCode == 401) {
+                    runMutation(cancellation, () -> {
+                        store.clearAccessToken();
+                        MonitoringState.recordBackgroundFailure(app, "Authentification expirée");
+                        MonitoringNotifier.show(
+                                app,
+                                "background_authentication",
+                                "Yoleo doit être réauthentifié",
+                                "Ouvre l'application pour renouveler l'authentification du serveur.",
+                                "home");
+                    });
+                    return;
+                }
+                runMutation(cancellation, () -> {
+                    MonitoringState.recordBackgroundFailure(
+                            app,
+                            error.getClass().getSimpleName());
+                    MonitoringState.recordFailure(app, settings);
+                });
+                return;
             }
+            if (isCancelled(cancellation)) {
+                return;
+            }
+            // Les erreurs locales d'évaluation/persistance ne doivent jamais être
+            // requalifiées en panne serveur par le catch réseau ci-dessus.
+            runMutation(cancellation, () -> {
+                MonitoringState.evaluateSuccess(app, snapshot, settings);
+                MonitoringState.recordBackgroundSuccess(app);
+            });
         } finally {
             RUNNING.set(false);
         }
+    }
+
+    private static boolean isCancelled(MonitoringRunGate.Token cancellation) {
+        return Thread.currentThread().isInterrupted() ||
+                (cancellation != null && cancellation.isCancelled());
+    }
+
+    private static boolean runMutation(
+            MonitoringRunGate.Token cancellation,
+            Runnable mutation) {
+        if (Thread.currentThread().isInterrupted()) {
+            return false;
+        }
+        if (cancellation == null) {
+            mutation.run();
+            return true;
+        }
+        return cancellation.runIfActive(mutation);
     }
 }

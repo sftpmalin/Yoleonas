@@ -1,0 +1,623 @@
+{% extends "menu.html" %}
+{% block title %}Gestionnaire de scripts - Yoleo{% endblock %}
+{% block page_title %}Gestionnaire de scripts{% endblock %}
+{% block page_subtitle %}Scripts ponctuels Shell et Python, exécutés dans des sessions tmux indépendantes de Flask/Gunicorn.{% endblock %}
+{% block content %}
+<style>
+:root {
+    --scripts-accent:#19e3ff;
+    --scripts-bg:#0b1017;
+    --scripts-card:#131b26;
+    --scripts-soft:#0e151f;
+    --scripts-border:#2d3948;
+    --scripts-text:#e4edf7;
+    --scripts-muted:#91a0b2;
+    --scripts-ok:#3ddc84;
+    --scripts-warn:#f5bf42;
+    --scripts-bad:#ff6270;
+}
+.scripts-page{max-width:1540px;margin:0 auto;color:var(--scripts-text)}
+.scripts-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.scripts-stat{background:linear-gradient(180deg,#151e2a,#101721);border:1px solid var(--scripts-border);border-radius:14px;padding:14px 16px;min-height:82px}
+.scripts-stat-label{font-size:11px;text-transform:uppercase;color:var(--scripts-muted);letter-spacing:.45px;margin-bottom:8px;font-weight:800}
+.scripts-stat-value{font-size:28px;line-height:1;font-weight:950;color:#fff}
+.scripts-stat-value.cyan{color:var(--scripts-accent)}
+.scripts-stat-value.green{color:var(--scripts-ok)}
+.scripts-stat-value.yellow{color:var(--scripts-warn)}
+.scripts-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.scripts-toolbar-left,.scripts-toolbar-right,.scripts-fallback-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.scripts-fallback-actions{padding:10px 12px;margin-bottom:14px;background:linear-gradient(180deg,#151e2a,#101721);border:1px solid var(--scripts-border);border-radius:13px}
+.scripts-path{color:var(--scripts-muted);font:12px Consolas,monospace;background:var(--scripts-soft);border:1px solid var(--scripts-border);border-radius:9px;padding:8px 10px;word-break:break-all}
+.scripts-btn{appearance:none;border:1px solid var(--scripts-border);background:#172231;color:var(--scripts-text);min-height:38px;padding:8px 13px;border-radius:10px;font-weight:800;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.16s ease;white-space:nowrap}
+.scripts-btn:hover{transform:translateY(-1px);border-color:#53677e;background:#1b2a3c}
+.scripts-btn-primary{background:var(--scripts-accent);color:#001014;border-color:var(--scripts-accent)}
+.scripts-btn-danger{color:#ff9aa4;border-color:rgba(255,98,112,.52);background:rgba(255,98,112,.08)}
+.scripts-btn-stop{color:#ffd36b;border-color:rgba(245,191,66,.48);background:rgba(245,191,66,.08)}
+.scripts-btn-icon{width:36px;height:36px;min-height:36px;padding:0;font-size:16px}
+.scripts-card{background:linear-gradient(180deg,#151e2a,#101721);border:1px solid var(--scripts-border);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.28);overflow:hidden}
+.scripts-card-head{padding:15px 17px;border-bottom:1px solid var(--scripts-border);display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.scripts-card-title{color:var(--scripts-accent);font-size:15px;text-transform:uppercase;letter-spacing:.5px;font-weight:950;margin-bottom:5px}
+.scripts-card-description{color:var(--scripts-muted);font-size:12px;line-height:1.45}
+.scripts-card-meta{display:flex;flex-direction:column;align-items:flex-end;gap:7px;min-width:220px}
+.scripts-count{color:var(--scripts-muted);font-size:12px}
+.scripts-table-wrap{overflow:auto}
+.scripts-table{width:100%;border-collapse:collapse;min-width:850px}
+.scripts-table th{padding:12px 14px;text-align:left;color:var(--scripts-muted);font-size:11px;text-transform:uppercase;letter-spacing:.45px;border-bottom:1px solid var(--scripts-border);background:#0f1620}
+.scripts-table td{padding:13px 14px;border-bottom:1px solid rgba(45,57,72,.72);vertical-align:middle}
+.scripts-table tr:last-child td{border-bottom:0}
+.scripts-table tbody tr:hover td{background:rgba(255,255,255,.018)}
+.script-main{display:flex;align-items:center;gap:11px;min-width:240px}
+.script-icon{width:40px;height:40px;border-radius:9px;object-fit:contain;background:#0b1118;border:1px solid var(--scripts-border);padding:4px;flex:0 0 auto}
+.script-title{font-weight:900;color:#f2f7fc;margin-bottom:3px}
+.script-file{color:var(--scripts-muted);font:11px Consolas,monospace;word-break:break-all}
+.script-description{color:#b8c5d4;line-height:1.4;max-width:620px}
+.script-date{color:var(--scripts-muted);white-space:nowrap;font-size:12px}
+.script-actions{display:flex;justify-content:flex-end;align-items:center;gap:7px;white-space:nowrap}
+.script-status{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;border:1px solid var(--scripts-border);color:var(--scripts-muted);background:rgba(145,160,178,.08);font-size:11px;font-weight:900;white-space:nowrap}
+.script-status::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.script-status[data-state="running"],.script-status[data-state="starting"]{color:var(--scripts-accent);border-color:rgba(25,227,255,.38);background:rgba(25,227,255,.08)}
+.script-status[data-state="running"]::before,.script-status[data-state="starting"]::before{animation:scriptPulse 1s infinite alternate}
+.script-status[data-state="success"]{color:var(--scripts-ok);border-color:rgba(61,220,132,.4);background:rgba(61,220,132,.08)}
+.script-status[data-state="error"]{color:var(--scripts-bad);border-color:rgba(255,98,112,.42);background:rgba(255,98,112,.08)}
+.script-status[data-state="stopped"]{color:var(--scripts-warn);border-color:rgba(245,191,66,.4);background:rgba(245,191,66,.08)}
+@keyframes scriptPulse{to{opacity:.35;transform:scale(.72)}}
+.scripts-empty{padding:46px 20px;text-align:center;color:var(--scripts-muted)}
+.scripts-flash{margin-bottom:14px;border-radius:12px;padding:12px 14px;border:1px solid}
+.scripts-flash-ok{color:#baffd2;border-color:rgba(61,220,132,.42);background:rgba(28,100,59,.24)}
+.scripts-flash-error{color:#ffd0d5;border-color:rgba(255,98,112,.48);background:rgba(118,23,35,.28)}
+.scripts-form-card{padding:18px 20px;max-width:1180px}
+.scripts-settings-card{max-width:920px}
+.scripts-form-heading{margin:0 0 16px;color:var(--scripts-accent);font-size:15px;text-transform:uppercase;letter-spacing:.45px}
+.scripts-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px}
+.scripts-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.scripts-field-full{grid-column:1/-1}
+.scripts-field label{color:#cbd7e4;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.35px}
+.scripts-input,.scripts-select,.scripts-textarea{width:100%;border:1px solid var(--scripts-border);background:#0b121b;color:var(--scripts-text);border-radius:10px;padding:10px 11px;font:14px 'Segoe UI',sans-serif;outline:none;box-sizing:border-box}
+.scripts-input:focus,.scripts-select:focus,.scripts-textarea:focus{border-color:var(--scripts-accent);box-shadow:0 0 0 3px rgba(25,227,255,.10)}
+.scripts-select{width:132px;flex:0 0 132px;font-weight:800}
+.scripts-textarea{min-height:390px;resize:vertical;font:13px/1.5 Consolas,Monaco,monospace;tab-size:4}
+.scripts-help{color:var(--scripts-muted);font-size:11px;line-height:1.4}
+.scripts-inline{display:flex;align-items:center;gap:8px;min-width:0}
+.scripts-inline .scripts-input{flex:1;min-width:0}
+.scripts-name-row{width:min(560px,100%)}
+.scripts-folder-row{width:min(620px,100%)}
+.script-icon-row{width:100%}
+.script-icon-preview{width:42px;height:42px;object-fit:contain;border-radius:9px;border:1px solid var(--scripts-border);background:#080d13;padding:4px;flex:0 0 auto}
+.scripts-form-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:2px}
+.script-modal[hidden]{display:none!important}
+.script-modal{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:18px}
+.script-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.76);backdrop-filter:blur(4px)}
+.script-modal-box{position:relative;width:min(1180px,96vw);height:min(780px,92vh);background:#090d12;border:1px solid #38485b;border-radius:17px;box-shadow:0 30px 90px rgba(0,0,0,.72);overflow:hidden;display:flex;flex-direction:column}
+.script-modal-header{min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid #2d3948;background:#121a24}
+.script-modal-title{display:flex;align-items:center;gap:9px;font-weight:900;color:var(--scripts-accent)}
+.script-modal-close{width:36px;height:36px;border-radius:10px;border:1px solid #3b4c60;background:#182331;color:#fff;cursor:pointer;font-size:22px}
+.script-terminal-frame{flex:1;min-width:0;min-height:0;width:100%;height:100%;border:0;background:#000;overflow:auto;scrollbar-gutter:stable}
+.script-modal-note{color:var(--scripts-muted);font-size:11px;font-weight:500}
+.script-confirm-box{position:relative;width:min(520px,94vw);background:#121a24;border:1px solid #47586d;border-radius:17px;box-shadow:0 28px 80px rgba(0,0,0,.65);overflow:hidden}
+.script-confirm-body{padding:22px}.script-confirm-body h3{margin:0 0 10px;color:#fff}.script-confirm-body p{color:#b8c5d4;line-height:1.55;margin:0}
+.script-confirm-name{color:var(--scripts-accent);font-family:Consolas,monospace;word-break:break-all}
+.script-confirm-actions{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--scripts-border);background:#0e151f}
+.scripts-toast{position:fixed;right:22px;bottom:22px;z-index:2147483100;max-width:min(430px,calc(100vw - 32px));padding:12px 14px;border-radius:12px;background:#121d29;color:#eaf5ff;border:1px solid #3b526a;box-shadow:0 18px 50px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);pointer-events:none;transition:.18s ease}
+.scripts-toast.show{opacity:1;transform:translateY(0)}.scripts-toast.error{border-color:rgba(255,98,112,.62);color:#ffd2d7}
+
+/* Affichage mobile identique à Task/Backup : cartes dédiées, pas de tableau écrasé. */
+.scripts-mobile-cards{display:none;gap:12px;padding:12px}
+.scripts-mobile-card{background:linear-gradient(180deg,var(--scripts-soft),#0b121b);border:1px solid var(--scripts-border);border-radius:16px;padding:14px;display:grid;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,.22)}
+.scripts-mobile-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.scripts-mobile-main{display:flex;align-items:flex-start;gap:11px;min-width:0}
+.scripts-mobile-main .script-icon{width:44px;height:44px}
+.scripts-mobile-title-wrap{min-width:0}
+.scripts-mobile-description{color:#b8c5d4;font-size:12px;line-height:1.5;word-break:break-word}
+.scripts-mobile-meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.scripts-mobile-meta{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.055);border-radius:12px;padding:10px;min-width:0}
+.scripts-mobile-meta-label{color:var(--scripts-muted);font-size:10px;text-transform:uppercase;letter-spacing:.45px;margin-bottom:6px;font-weight:800}
+.scripts-mobile-meta-value{color:var(--scripts-text);font-size:12px;line-height:1.45;word-break:break-word}
+.scripts-mobile-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.scripts-mobile-actions .scripts-btn{width:100%;min-width:0;min-height:42px;padding:9px 10px}
+.scripts-mobile-actions .scripts-btn-icon{height:auto;font-size:13px}
+.scripts-mobile-state{flex:0 0 auto}
+
+@media(max-width:1050px){
+    .scripts-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .scripts-form-grid{grid-template-columns:1fr}
+    .scripts-field-full{grid-column:auto}
+    .scripts-form-card{max-width:none}
+}
+@media(max-width:900px){
+    .scripts-page{width:100%;max-width:none}
+    .scripts-table-wrap{display:none}
+    .scripts-mobile-cards{display:grid}
+    .scripts-card-head{flex-direction:column;padding:14px}
+    .scripts-card-meta{align-items:flex-start;min-width:0;width:100%}
+    .scripts-path{width:100%;box-sizing:border-box}
+    .scripts-fallback-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+    .scripts-fallback-actions .scripts-btn{width:100%}
+    .scripts-form-card{padding:15px}
+    .scripts-textarea{min-height:52vh}
+    .script-modal{padding:6px}
+    .script-modal-box{width:100%;height:calc(100dvh - 12px);border-radius:12px}
+    .script-modal-note{display:none}
+}
+@media(max-width:620px){
+    .scripts-stat-grid{gap:9px;margin-bottom:12px}
+    .scripts-stat{min-height:68px;padding:11px 12px;border-radius:12px}
+    .scripts-stat-label{font-size:10px;margin-bottom:6px}
+    .scripts-stat-value{font-size:24px}
+    .scripts-card{border-radius:14px}
+    .scripts-card-head{padding:12px}
+    .scripts-card-title{font-size:13px}
+    .scripts-card-description{font-size:11px}
+    .scripts-mobile-cards{padding:10px;gap:10px}
+    .scripts-mobile-card{padding:12px;border-radius:14px}
+    .scripts-mobile-head{align-items:flex-start}
+    .scripts-mobile-meta-grid{grid-template-columns:1fr 1fr}
+    .scripts-form-grid{gap:13px}
+    .scripts-inline{align-items:stretch;flex-wrap:wrap}
+    .scripts-name-row,.scripts-folder-row,.script-icon-row{width:100%}
+    .scripts-select{width:100%;flex:1 1 100%}
+    .script-icon-row .scripts-input{flex:1 1 calc(100% - 58px)}
+    .script-icon-row .scripts-btn{width:100%;flex:1 1 100%}
+    .scripts-form-actions{display:grid;grid-template-columns:1fr;gap:8px}
+    .scripts-form-actions .scripts-btn{width:100%}
+    .scripts-toolbar{margin-bottom:10px}
+    .scripts-toolbar .scripts-btn{width:100%}
+    .script-confirm-actions{display:grid;grid-template-columns:1fr}
+    .script-confirm-actions .scripts-btn{width:100%}
+}
+@media(max-width:420px){
+    .scripts-stat-grid{grid-template-columns:1fr 1fr}
+    .scripts-mobile-meta-grid{grid-template-columns:1fr}
+    .scripts-mobile-actions{grid-template-columns:1fr 1fr}
+    .scripts-fallback-actions{grid-template-columns:1fr}
+    .scripts-mobile-head{display:grid;grid-template-columns:minmax(0,1fr) auto}
+    .script-status{padding:5px 8px;font-size:10px}
+}
+</style>
+
+<div class="scripts-page">
+    {% if message %}<div class="scripts-flash scripts-flash-ok">✅ {{ message }}</div>{% endif %}
+    {% if error %}<div class="scripts-flash scripts-flash-error">❌ {{ error }}</div>{% endif %}
+
+    {% if view == 'list' %}
+        <section class="scripts-stat-grid" aria-label="Compteurs des scripts">
+            <div class="scripts-stat"><div class="scripts-stat-label">Total</div><div class="scripts-stat-value cyan">{{ stats.total }}</div></div>
+            <div class="scripts-stat"><div class="scripts-stat-label">Shell</div><div class="scripts-stat-value">{{ stats.shell }}</div></div>
+            <div class="scripts-stat"><div class="scripts-stat-label">Python</div><div class="scripts-stat-value">{{ stats.python }}</div></div>
+            <div class="scripts-stat"><div class="scripts-stat-label">En cours</div><div class="scripts-stat-value {{ 'green' if stats.running else 'yellow' }}">{{ stats.running }}</div></div>
+        </section>
+
+        {% if not (_menu_top_active|default(false)) %}
+        <div class="scripts-fallback-actions" aria-label="Actions du gestionnaire de scripts">
+            <a class="scripts-btn scripts-btn-primary" href="{{ url_for('scripts_bp.create_page') }}">➕ Créer un script</a>
+            <a class="scripts-btn" href="{{ url_for('scripts_bp.settings_page') }}">⚙️ Réglages</a>
+        </div>
+        {% endif %}
+
+        <section class="scripts-card" data-yoleo-context-zone="scripts-table">
+            <div class="scripts-card-head">
+                <div>
+                    <div class="scripts-card-title">Gestionnaire de scripts</div>
+                    <div class="scripts-card-description">Scripts ponctuels conservés hors du gestionnaire de tâches. Un clic droit dans le tableau ouvre les actions du menu supérieur.</div>
+                </div>
+                <div class="scripts-card-meta">
+                    <span class="scripts-count">{{ scripts|length }} script(s) .sh / .py</span>
+                    <div class="scripts-path" title="Dossier configuré">📂 {{ conf.SCRIPTS_DIR }}</div>
+                </div>
+            </div>
+            {% if scripts %}
+            <div class="scripts-table-wrap" data-yoleo-context-zone="scripts-table">
+                <table class="scripts-table">
+                    <thead><tr><th>Nom du script</th><th>Description</th><th>État</th><th>Modifié</th><th style="text-align:right">Options</th></tr></thead>
+                    <tbody>
+                    {% for script in scripts %}
+                    <tr data-script-row="{{ script.name|e }}" data-yoleo-context-zone="scripts-table">
+                        <td><div class="script-main"><img class="script-icon" src="{{ script.icon_url }}" alt=""><div><div class="script-title">{{ script.title }}</div><div class="script-file">{{ script.name }}</div></div></div></td>
+                        <td><div class="script-description">{{ script.description }}</div></td>
+                        <td><span class="script-status" data-script-status data-state="{{ script.status.state }}">{{ script.status_label }}</span></td>
+                        <td><span class="script-date">{{ script.mtime }}</span></td>
+                        <td><div class="script-actions">
+                            <button type="button" class="scripts-btn scripts-btn-icon scripts-btn-primary" title="Exécuter dans tmux" data-script-run="{{ script.name|e }}" data-script-title="{{ script.title|e }}">▶</button>
+                            <button type="button" class="scripts-btn scripts-btn-icon scripts-btn-stop" title="Arrêter la session tmux" data-script-stop="{{ script.name|e }}">■</button>
+                            <a class="scripts-btn scripts-btn-icon" title="Modifier" href="{{ url_for('scripts_bp.edit_page', filename=script.name) }}">✎</a>
+                            <button type="button" class="scripts-btn scripts-btn-icon scripts-btn-danger" title="Supprimer" data-script-delete="{{ script.name|e }}">🗑</button>
+                        </div></td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scripts-mobile-cards" data-yoleo-context-zone="scripts-table" aria-label="Scripts disponibles sur mobile">
+                {% for script in scripts %}
+                <article class="scripts-mobile-card" data-script-row="{{ script.name|e }}" data-yoleo-context-zone="scripts-table">
+                    <div class="scripts-mobile-head">
+                        <div class="scripts-mobile-main">
+                            <img class="script-icon" src="{{ script.icon_url }}" alt="">
+                            <div class="scripts-mobile-title-wrap">
+                                <div class="script-title">{{ script.title }}</div>
+                                <div class="script-file">{{ script.name }}</div>
+                            </div>
+                        </div>
+                        <span class="script-status scripts-mobile-state" data-script-status data-state="{{ script.status.state }}">{{ script.status_label }}</span>
+                    </div>
+                    <div class="scripts-mobile-description">{{ script.description or 'Aucune description.' }}</div>
+                    <div class="scripts-mobile-meta-grid">
+                        <div class="scripts-mobile-meta">
+                            <div class="scripts-mobile-meta-label">Type</div>
+                            <div class="scripts-mobile-meta-value">{{ 'Python' if script.name.lower().endswith('.py') else 'Shell' }}</div>
+                        </div>
+                        <div class="scripts-mobile-meta">
+                            <div class="scripts-mobile-meta-label">Modifié</div>
+                            <div class="scripts-mobile-meta-value">{{ script.mtime }}</div>
+                        </div>
+                    </div>
+                    <div class="scripts-mobile-actions">
+                        <button type="button" class="scripts-btn scripts-btn-primary" data-script-run="{{ script.name|e }}" data-script-title="{{ script.title|e }}">▶ Lancer</button>
+                        <button type="button" class="scripts-btn scripts-btn-stop" data-script-stop="{{ script.name|e }}">■ Arrêter</button>
+                        <a class="scripts-btn" href="{{ url_for('scripts_bp.edit_page', filename=script.name) }}">✎ Modifier</a>
+                        <button type="button" class="scripts-btn scripts-btn-danger" data-script-delete="{{ script.name|e }}">🗑 Supprimer</button>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="scripts-empty" data-yoleo-context-zone="scripts-table"><div style="font-size:38px;margin-bottom:10px">📝</div>Aucun script .sh ou .py dans le dossier configuré.<br>Les scripts déjà présents apparaîtront automatiquement ici.</div>
+            {% endif %}
+        </section>
+
+    {% elif view == 'form' %}
+        <div class="scripts-toolbar"><div class="scripts-toolbar-left"><a class="scripts-btn" href="{{ url_for('scripts_bp.home') }}">← Retour au tableau</a></div></div>
+        <section class="scripts-card scripts-form-card">
+            <h2 class="scripts-form-heading">{{ 'Modifier le script' if form_data.old_filename else 'Créer un script' }}</h2>
+            <form method="post" action="{{ url_for('scripts_bp.save_script') }}" id="scriptEditorForm">
+                <input type="hidden" name="old_filename" value="{{ form_data.old_filename }}">
+                <div class="scripts-form-grid">
+                    <div class="scripts-field">
+                        <label for="script_filename_base">Nom du script</label>
+                        <div class="scripts-inline scripts-name-row">
+                            <input class="scripts-input" id="script_filename_base" name="filename_base" value="{{ form_data.filename_base|default(form_data.filename, true) }}" placeholder="scan_nextcloud" required>
+                            <select class="scripts-select" id="script_type" name="script_type" aria-label="Type du script">
+                                <option value="sh" {% if form_data.script_type|default('sh') == 'sh' %}selected{% endif %}>Shell (.sh)</option>
+                                <option value="py" {% if form_data.script_type|default('sh') == 'py' %}selected{% endif %}>Python (.py)</option>
+                            </select>
+                        </div>
+                        <div class="scripts-help">L’extension et le shebang sont ajoutés automatiquement selon le type choisi.</div>
+                    </div>
+                    <div class="scripts-field">
+                        <label for="script_title">Titre affiché</label>
+                        <input class="scripts-input" id="script_title" name="title" value="{{ form_data.title }}" placeholder="Scanner tous les fichiers Nextcloud" required>
+                    </div>
+                    <div class="scripts-field">
+                        <label for="script_description">Description</label>
+                        <input class="scripts-input" id="script_description" name="description" value="{{ form_data.description }}" placeholder="Description courte affichée dans le tableau">
+                    </div>
+                    <div class="scripts-field">
+                        <label for="script_icon">Icône du script</label>
+                        <div class="scripts-inline script-icon-row">
+                            <img class="script-icon-preview" id="scriptIconPreview" src="{{ form_data.icon_url or '/static/logo/Terminal.png' }}" alt="Aperçu">
+                            <input class="scripts-input" id="script_icon" name="icon" value="{{ form_data.icon }}" placeholder="logo/Nextcloud.png">
+                            <button type="button" class="scripts-btn" id="browseScriptIcon">📂 Parcourir</button>
+                        </div>
+                        <div class="scripts-help">Le chemin enregistré reste relatif à <code>/static/</code>.</div>
+                    </div>
+                    <div class="scripts-field scripts-field-full">
+                        <label for="script_body">Corps du script</label>
+                        <textarea class="scripts-textarea" id="script_body" name="body" spellcheck="false" placeholder="Colle ici le contenu du script…">{{ form_data.body }}</textarea>
+                        <div class="scripts-help">Yoleo écrit automatiquement le shebang choisi puis <code># title=</code>, <code># description=</code> et <code># icon=</code>.</div>
+                    </div>
+                    <div class="scripts-field scripts-field-full"><div class="scripts-form-actions"><button type="submit" class="scripts-btn scripts-btn-primary">💾 Enregistrer le script</button><a class="scripts-btn" href="{{ url_for('scripts_bp.home') }}">Annuler</a></div></div>
+                </div>
+            </form>
+        </section>
+
+    {% elif view == 'settings' %}
+        <div class="scripts-toolbar"><div class="scripts-toolbar-left"><a class="scripts-btn" href="{{ url_for('scripts_bp.home') }}">← Retour au tableau</a></div></div>
+        <section class="scripts-card scripts-form-card scripts-settings-card">
+            <h2 class="scripts-form-heading">Dossier par défaut des scripts</h2>
+            <form method="post" action="{{ url_for('scripts_bp.settings_save') }}">
+                <div class="scripts-field">
+                    <div class="scripts-inline scripts-folder-row">
+                        <input class="scripts-input" id="scripts_dir" name="scripts_dir" value="{{ conf.SCRIPTS_DIR }}" placeholder="/mnt/user/scripts" required>
+                        <button type="button" class="scripts-btn" id="browseScriptsFolder">📂 Parcourir</button>
+                    </div>
+                    <div class="scripts-help">Le tableau analyse automatiquement ce dossier et affiche tous les scripts Shell et Python qu’il contient.</div>
+                </div>
+                <div class="scripts-form-actions" style="margin-top:16px"><button type="submit" class="scripts-btn scripts-btn-primary">💾 Sauvegarder les réglages</button></div>
+            </form>
+        </section>
+    {% endif %}
+</div>
+
+<div class="script-modal" id="scriptTerminalModal" hidden aria-hidden="true">
+    <div class="script-modal-backdrop" data-terminal-close></div>
+    <section class="script-modal-box" role="dialog" aria-modal="true" aria-labelledby="scriptTerminalTitle">
+        <header class="script-modal-header"><div class="script-modal-title">▶ <span id="scriptTerminalTitle">Exécution du script</span> <span class="script-modal-note">tmux indépendant de Gunicorn</span></div><button type="button" class="script-modal-close" data-terminal-close aria-label="Fermer">×</button></header>
+        <iframe class="script-terminal-frame" id="scriptTerminalFrame" title="Terminal du script" scrolling="yes"></iframe>
+    </section>
+</div>
+
+<div class="script-modal" id="scriptDeleteModal" hidden aria-hidden="true">
+    <div class="script-modal-backdrop" data-delete-cancel></div>
+    <section class="script-confirm-box" role="dialog" aria-modal="true" aria-labelledby="scriptDeleteTitle">
+        <div class="script-confirm-body"><h3 id="scriptDeleteTitle">Supprimer définitivement ce script ?</h3><p>Le fichier <strong class="script-confirm-name" id="scriptDeleteName"></strong> sera supprimé du serveur. Cette action n’est pas réversible.</p></div>
+        <footer class="script-confirm-actions"><button type="button" class="scripts-btn" data-delete-cancel>Annuler</button><button type="button" class="scripts-btn scripts-btn-danger" id="scriptDeleteConfirm">🗑 Supprimer</button></footer>
+    </section>
+</div>
+
+<div class="scripts-toast" id="scriptsToast" aria-live="polite"></div>
+
+<script>
+(() => {
+    const terminalModal = document.getElementById('scriptTerminalModal');
+    const terminalFrame = document.getElementById('scriptTerminalFrame');
+    const terminalTitle = document.getElementById('scriptTerminalTitle');
+    const deleteModal = document.getElementById('scriptDeleteModal');
+    const deleteName = document.getElementById('scriptDeleteName');
+    const deleteConfirm = document.getElementById('scriptDeleteConfirm');
+    const toast = document.getElementById('scriptsToast');
+    let activeTerminalScript = '';
+    let terminalPoll = 0;
+
+    /* ttyd/xterm masque parfois son ascenseur dans l'iframe.
+       Comme le terminal passe par le proxy Yoleo de même origine, on remet
+       explicitement l'ascenseur vertical du viewport xterm. */
+    function enableTerminalScrollbar() {
+        if (!terminalFrame) return;
+        try {
+            const frameDocument = terminalFrame.contentDocument;
+            if (!frameDocument || !frameDocument.head) return;
+            const styleId = 'yoleo-script-terminal-scrollbar';
+            if (frameDocument.getElementById(styleId)) return;
+            const style = frameDocument.createElement('style');
+            style.id = styleId;
+            style.textContent = `
+                .xterm .xterm-viewport {
+                    overflow-y: scroll !important;
+                    scrollbar-width: auto !important;
+                    scrollbar-color: #526a84 #080c11 !important;
+                    scrollbar-gutter: stable !important;
+                }
+                .xterm .xterm-viewport::-webkit-scrollbar {
+                    display: block !important;
+                    width: 14px !important;
+                }
+                .xterm .xterm-viewport::-webkit-scrollbar-track {
+                    background: #080c11 !important;
+                }
+                .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+                    background: #526a84 !important;
+                    border: 3px solid #080c11 !important;
+                    border-radius: 999px !important;
+                }
+                .xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
+                    background: #6f8cac !important;
+                }
+            `;
+            frameDocument.head.appendChild(style);
+        } catch (_error) {
+            /* En accès direct sur un autre port, le navigateur peut bloquer
+               l'accès au document de l'iframe. Le terminal reste utilisable. */
+        }
+    }
+
+    if (terminalFrame) {
+        terminalFrame.addEventListener('load', () => {
+            enableTerminalScrollbar();
+            window.setTimeout(enableTerminalScrollbar, 250);
+            window.setTimeout(enableTerminalScrollbar, 1000);
+        });
+    }
+    let pendingDelete = '';
+
+    const endpoint = (action, name) => `/system/scripts/${action}/${encodeURIComponent(name)}`;
+
+    function showToast(message, isError=false) {
+        if (!toast) return;
+        toast.textContent = message || '';
+        toast.classList.toggle('error', !!isError);
+        toast.classList.add('show');
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 3200);
+    }
+
+    async function jsonFetch(url, options={}) {
+        const response = await fetch(url, {credentials:'same-origin', headers:{'Accept':'application/json', ...(options.headers || {})}, ...options});
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false) throw new Error(data.message || `Erreur HTTP ${response.status}`);
+        return data;
+    }
+
+    function updateStatus(name, status) {
+        if (!status) return;
+        const label = status.label || ({idle:'Prêt',starting:'Démarrage',running:'En cours',success:'Succès',error:'Erreur',stopped:'Arrêté'}[status.state] || status.state || 'Prêt');
+        document.querySelectorAll(`[data-script-row="${CSS.escape(name)}"] [data-script-status]`).forEach(badge => {
+            badge.dataset.state = status.state || 'idle';
+            badge.textContent = label;
+        });
+    }
+
+    async function refreshStatus(name) {
+        try {
+            const data = await jsonFetch(endpoint('api/status', name));
+            updateStatus(name, data.status);
+            return data.status;
+        } catch (_) { return null; }
+    }
+
+    function closeTerminal(callCloseEndpoint=true) {
+        if (!terminalModal) return;
+        const name = activeTerminalScript;
+        terminalModal.hidden = true;
+        terminalModal.setAttribute('aria-hidden','true');
+        document.body.style.overflow = '';
+        if (terminalFrame) terminalFrame.src = 'about:blank';
+        window.clearInterval(terminalPoll);
+        terminalPoll = 0;
+        activeTerminalScript = '';
+        if (callCloseEndpoint && name) {
+            fetch(endpoint('close', name), {method:'POST', credentials:'same-origin', headers:{'Accept':'application/json'}}).catch(() => {});
+            refreshStatus(name);
+        }
+    }
+
+    function openTerminal(name, title, url) {
+        activeTerminalScript = name;
+        terminalTitle.textContent = title || name;
+        terminalFrame.src = url;
+        terminalModal.hidden = false;
+        terminalModal.setAttribute('aria-hidden','false');
+        document.body.style.overflow = 'hidden';
+        window.clearInterval(terminalPoll);
+        terminalPoll = window.setInterval(async () => {
+            const status = await refreshStatus(name);
+            if (!status) return;
+            if (status.state === 'success') {
+                showToast('Script terminé sans erreur.');
+                closeTerminal(false);
+            }
+        }, 1000);
+    }
+
+    document.querySelectorAll('[data-terminal-close]').forEach(el => el.addEventListener('click', () => closeTerminal(true)));
+
+    document.querySelectorAll('[data-script-run]').forEach(button => {
+        button.addEventListener('click', async () => {
+            const name = button.dataset.scriptRun;
+            const title = button.dataset.scriptTitle || name;
+            button.disabled = true;
+            try {
+                const data = await jsonFetch(endpoint('run', name), {method:'POST'});
+                updateStatus(name, data.status);
+                if (!data.terminal_ok || !data.terminal_url) {
+                    showToast(data.terminal_message || 'Script lancé, mais TTyd est indisponible.', true);
+                    return;
+                }
+                openTerminal(name, title, data.terminal_url);
+            } catch (error) { showToast(error.message, true); }
+            finally { button.disabled = false; }
+        });
+    });
+
+    document.querySelectorAll('[data-script-stop]').forEach(button => {
+        button.addEventListener('click', async () => {
+            const name = button.dataset.scriptStop;
+            button.disabled = true;
+            try {
+                const data = await jsonFetch(endpoint('stop', name), {method:'POST'});
+                updateStatus(name, data.status);
+                showToast(data.message || 'Script arrêté.');
+                if (activeTerminalScript === name) closeTerminal(false);
+            } catch (error) { showToast(error.message, true); }
+            finally { button.disabled = false; }
+        });
+    });
+
+    function openDelete(name) {
+        pendingDelete = name;
+        deleteName.textContent = name;
+        deleteModal.hidden = false;
+        deleteModal.setAttribute('aria-hidden','false');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeDelete() {
+        pendingDelete = '';
+        deleteModal.hidden = true;
+        deleteModal.setAttribute('aria-hidden','true');
+        document.body.style.overflow = '';
+    }
+    document.querySelectorAll('[data-script-delete]').forEach(button => button.addEventListener('click', () => openDelete(button.dataset.scriptDelete)));
+    document.querySelectorAll('[data-delete-cancel]').forEach(button => button.addEventListener('click', closeDelete));
+    if (deleteConfirm) deleteConfirm.addEventListener('click', async () => {
+        if (!pendingDelete) return;
+        const name = pendingDelete;
+        deleteConfirm.disabled = true;
+        try {
+            const data = await jsonFetch(endpoint('delete', name), {method:'POST'});
+            closeDelete();
+            showToast(data.message || 'Script supprimé.');
+            window.setTimeout(() => window.location.reload(), 250);
+        } catch (error) { showToast(error.message, true); }
+        finally { deleteConfirm.disabled = false; }
+    });
+
+    function openScriptsBrowser(mode, target, start, windowName) {
+        const params = new URLSearchParams({target, path:start || '/'});
+        const popup = window.open(
+            `/browser/${mode}?${params.toString()}`,
+            windowName,
+            'popup=yes,width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+        );
+        if (popup) popup.focus();
+    }
+
+    const browseFolder = document.getElementById('browseScriptsFolder');
+    if (browseFolder) browseFolder.addEventListener('click', () => {
+        const field = document.getElementById('scripts_dir');
+        openScriptsBrowser('folder', 'scripts_dir', field.value || '/mnt/user', 'yoleo_scripts_folder');
+    });
+
+    const browseIcon = document.getElementById('browseScriptIcon');
+    const iconField = document.getElementById('script_icon');
+    const iconPreview = document.getElementById('scriptIconPreview');
+    function refreshIconPreview() {
+        if (!iconField || !iconPreview) return;
+        let value = (iconField.value || '').trim().replace(/\\/g,'/');
+        if (!value) value = 'logo/Terminal.png';
+        if (value.startsWith('/static/')) iconPreview.src = value;
+        else if (value.startsWith('static/')) iconPreview.src = '/' + value;
+        else iconPreview.src = '/static/' + value.replace(/^\/+/, '');
+    }
+    if (iconField) iconField.addEventListener('input', refreshIconPreview);
+    if (browseIcon) browseIcon.addEventListener('click', () => {
+        openScriptsBrowser('image', 'script_icon', '/static/logo', 'yoleo_scripts_icon');
+    });
+
+    window.addEventListener('message', event => {
+        const data = event.data || {};
+        if (data.type !== 'yoleo-browser-select') return;
+        if (data.target === 'script_icon' && iconField) {
+            let value = String(data.path || '').replace(/\\/g, '/');
+            if (value.startsWith('/static/')) value = value.slice('/static/'.length);
+            else if (value.startsWith('static/')) value = value.slice('static/'.length);
+            iconField.value = value;
+            iconField.dispatchEvent(new Event('input', {bubbles:true}));
+        }
+    });
+
+    const editorForm = document.getElementById('scriptEditorForm');
+    const typeField = document.getElementById('script_type');
+    const bodyField = document.getElementById('script_body');
+    const filenameField = document.getElementById('script_filename_base');
+    function wantedShebang() {
+        return typeField && typeField.value === 'py' ? '#!/usr/bin/env python3' : '#!/bin/bash';
+    }
+    function applySelectedShebang() {
+        if (!bodyField) return;
+        const wanted = wantedShebang();
+        let value = String(bodyField.value || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        if (!value.trim()) {
+            bodyField.value = wanted + '\n\n';
+            return;
+        }
+        const lines = value.split('\n');
+        if (lines[0].startsWith('#!')) lines[0] = wanted;
+        else lines.unshift(wanted, '');
+        bodyField.value = lines.join('\n');
+    }
+    function stripTypedExtension() {
+        if (!filenameField) return;
+        filenameField.value = String(filenameField.value || '').replace(/\.(?:sh|py)$/i, '');
+    }
+    if (typeField) typeField.addEventListener('change', applySelectedShebang);
+    if (filenameField) filenameField.addEventListener('blur', stripTypedExtension);
+    if (editorForm) editorForm.addEventListener('submit', () => { stripTypedExtension(); applySelectedShebang(); });
+
+    {% if view == 'list' %}
+    window.setInterval(() => {
+        const names = new Set(Array.from(document.querySelectorAll('[data-script-row]'), row => row.dataset.scriptRow));
+        names.forEach(name => refreshStatus(name));
+    }, 3500);
+    {% endif %}
+})();
+</script>
+{% endblock %}

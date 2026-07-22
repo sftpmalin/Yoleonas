@@ -1,0 +1,9 @@
+# Fichiers locaux de synchronisation et sauvegardes de travail
+sync.ffs_db
+scripts/docker_old.py
+scripts/registry_old.py
+scripts/menu old.sh
+
+# Fichiers temporaires Python
+__pycache__/
+*.py[cod]

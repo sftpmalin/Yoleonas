@@ -685,6 +685,18 @@ def stream_build_one(conf: Dict[str, str], name: str, mode: str, logger: StreamL
         yield from cleanup_buildx_builder(conf, logger)
 
 
+def order_build_projects_like_registry(conf: Dict[str, str], projects: List[str]) -> List[str]:
+    available = {project: project for project in projects}
+    ordered: List[str] = []
+    used = set()
+    for entry_name, _target in registry_entries(conf):
+        if entry_name in available and entry_name not in used:
+            ordered.append(entry_name)
+            used.add(entry_name)
+    ordered.extend(sorted((project for project in projects if project not in used), key=str.lower))
+    return ordered
+
+
 def stream_build_action(conf: Dict[str, str], action: str, name: str, mode: str) -> Iterator[str]:
     name = normalize_item_name(name)
     os.makedirs(conf["DOCKER_LOG_DIR"], exist_ok=True)
@@ -706,6 +718,7 @@ def stream_build_action(conf: Dict[str, str], action: str, name: str, mode: str)
             projects = [name]
         else:
             projects = [p for p in projects if os.path.isfile(os.path.join(conf["DOCKER_BUILDS_DIR"], p, "Dockerfile")) or os.path.isfile(os.path.join(conf["DOCKER_BUILDS_DIR"], p, "dockerfile"))]
+            projects = order_build_projects_like_registry(conf, projects)
         total = len(projects)
         if total == 0:
             yield logger.line("❌ Aucun Docker à builder.")
@@ -778,6 +791,7 @@ def stream_build_registry_action(conf: Dict[str, str], action: str, name: str, m
                 if os.path.isfile(os.path.join(conf["DOCKER_BUILDS_DIR"], p, "Dockerfile"))
                 or os.path.isfile(os.path.join(conf["DOCKER_BUILDS_DIR"], p, "dockerfile"))
             ]
+            projects = order_build_projects_like_registry(conf, projects)
 
         total = len(projects)
         if total == 0:
@@ -794,8 +808,6 @@ def stream_build_registry_action(conf: Dict[str, str], action: str, name: str, m
 
         done = 0
         failed = 0
-        regctl = None
-        registry_login_done = False
         registry_map = dict(registry_entries(conf))
         step_total = max(total * 2, 1)
 
@@ -858,26 +870,7 @@ def stream_build_registry_action(conf: Dict[str, str], action: str, name: str, m
                 yield logger.line(f"@@PROGRESS {json.dumps({'action': 'registry', 'phase': 'registry_error', 'phase_label': 'Erreur registre', 'running_text': 'Registre erreur', 'current': idx, 'total': total, 'percent': build_done_pct, 'done': done, 'failed': failed, 'name': project}, ensure_ascii=False)}")
                 continue
 
-            if regctl is None:
-                regctl = yield from ensure_regctl_ready(conf, logger)
-                if not regctl:
-                    failed += 1
-                    yield logger.line("❌ regctl indisponible : arrêt du workflow principal.")
-                    break
-
-            if not registry_login_done:
-                login_entry = next(((p, registry_map.get(p, "")) for p in projects if registry_map.get(p, "") and should_login_registry(conf, p)), None)
-                if login_entry is None:
-                    yield logger.line(">>> Login registre ignoré : toutes les entrées sont en mode HTTP/local.")
-                else:
-                    ok_login = yield from ensure_registry_login(conf, login_entry[1], regctl, logger)
-                    if not ok_login:
-                        failed += 1
-                        yield logger.line("❌ Login registre impossible : arrêt du workflow principal.")
-                        break
-                registry_login_done = True
-
-            ok_registry = yield from stream_import_one(conf, project, target, regctl, False, logger, idx, total)
+            ok_registry = yield from stream_import_one(conf, project, target, False, logger, idx, total)
             if ok_registry:
                 done += 1
             else:
@@ -901,54 +894,6 @@ def stream_build_registry_action(conf: Dict[str, str], action: str, name: str, m
     finally:
         lock.release()
         logger.close()
-
-def ensure_regctl_ready(conf: Dict[str, str], logger: StreamLogger) -> Iterator[str]:
-    path = regctl_path(conf)
-    if not path:
-        yield logger.line(f"❌ regctl introuvable : {conf.get('REGCTL')}")
-        return None
-    if os.path.isabs(path):
-        try:
-            os.chmod(path, 0o755)
-        except OSError:
-            pass
-    rc = yield from stream_process([path, "version"], logger)
-    if rc != 0:
-        yield logger.line(f"❌ regctl existe mais ne s'exécute pas : {path}")
-        return None
-    return path
-
-
-def ensure_registry_login(conf: Dict[str, str], target: str, regctl: str, logger: StreamLogger) -> Iterator[str]:
-    login_file = conf.get("DOCKER_REGISTRY_LOGIN_FILE") or os.path.join(conf["DOCKER_CONF_DIR"], "registre_login.conf")
-    values = read_env_login_file(login_file)
-    host = values.get("REGISTRY_HOST") or registry_host_from_target(target)
-    user = values.get("REGISTRY_USER", "")
-    password = values.get("REGISTRY_PASS", "")
-    pass_file = values.get("REGISTRY_PASS_FILE", "")
-
-    if not host:
-        yield logger.line("⚠️ Hôte registre introuvable. Login automatique ignoré.")
-        return True
-    if not user:
-        yield logger.line(f"⚠️ Login registre non configuré : {login_file}")
-        yield logger.line("⚠️ L'import continue, mais il échouera si le registre demande une authentification.")
-        return True
-    if not password and pass_file and os.path.isfile(pass_file):
-        password = local_read_text(pass_file).strip()
-    if not password:
-        yield logger.line(f"⚠️ Mot de passe registre non configuré : {login_file}")
-        yield logger.line("⚠️ Renseigne REGISTRY_PASS ou REGISTRY_PASS_FILE.")
-        return True
-
-    yield logger.line(f">>> Login registre : {host}")
-    rc = yield from stream_process([regctl, "registry", "login", host, "-u", user, "--pass-stdin"], logger, input_text=password)
-    if rc == 0:
-        yield logger.line(f"✅ Login registre OK : {host}")
-        return True
-    yield logger.line(f"❌ Login registre échoué : {host}")
-    return False
-
 
 def verify_sha_for_tar(tar_path: str) -> Tuple[bool, str]:
     sha_file = f"{tar_path}.sha256"
@@ -982,7 +927,7 @@ def registry_entries(conf: Dict[str, str]) -> List[Tuple[str, str]]:
     return rows
 
 
-def stream_import_one(conf: Dict[str, str], name: str, target: str, regctl: str, dry_run: bool, logger: StreamLogger, index: int, total: int) -> Iterator[str]:
+def stream_import_one(conf: Dict[str, str], name: str, target: str, dry_run: bool, logger: StreamLogger, index: int, total: int) -> Iterator[str]:
     tar_path = os.path.join(conf["DOCKER_TAR_DIR"], f"{name}.tar")
     yield logger.line("=" * 76)
     yield logger.line(f"[{index}/{total}] TAR -> REGISTRE : {name}")
@@ -990,11 +935,9 @@ def stream_import_one(conf: Dict[str, str], name: str, target: str, regctl: str,
     yield logger.line(f"TAR   : {tar_path}")
     yield logger.line(f"IMAGE : {target}")
     mode = get_registry_mode_for(conf, name)
-    host_args = regctl_host_args_for(conf, name, target)
     yield logger.line(f"MODE  : {'HTTP local' if mode == 'http' else 'HTTPS'}")
-    yield logger.line(f"LOGIN : {'non' if mode == 'http' else 'oui si configuré'}")
-    if host_args:
-        yield logger.line(f"REGCTL: {' '.join(host_args)}")
+    yield logger.line(f"API   : {mode}://{registry_host_from_target(target)}/v2/")
+    yield logger.line(f"LOGIN : {'non' if mode == 'http' else 'registre_login.conf si configuré'}")
 
     if not os.path.isfile(tar_path):
         yield logger.line(f"❌ MANQUANT : {tar_path}")
@@ -1011,16 +954,34 @@ def stream_import_one(conf: Dict[str, str], name: str, target: str, regctl: str,
         return True
 
     started = time.time()
-    yield logger.line(">>> Import direct vers le registre...")
-    rc = yield from stream_process([regctl, *host_args, "image", "import", target, tar_path], logger)
+    yield logger.line(">>> Lecture du TAR OCI et comparaison des SHA-256 avec le registre...")
+    try:
+        result = registry_v2_import_oci(conf, name, target, tar_path)
+    except Exception as exc:
+        duration = int(time.time() - started)
+        yield logger.line(f"❌ IMPORT ÉCHEC : {target} ({duration}s)")
+        yield logger.line(f"❌ API Registry V2 : {exc}")
+        return False
     duration = int(time.time() - started)
-    if rc == 0:
-        mark_registry_import_state(conf, name, target, tar_path)
-        yield logger.line(f"✅ OK : {target} ({duration}s)")
-        yield logger.line("✅ ÉTAT REGISTRE OK : import mémorisé localement.")
-        return True
-    yield logger.line(f"❌ IMPORT ÉCHEC : {target}")
-    return False
+    mark_registry_import_state(conf, name, target, tar_path)
+    if result.get("already_current"):
+        yield logger.line(f"⏭️  DÉJÀ À JOUR : digest {result.get('local_digest')}")
+    else:
+        yield logger.line(
+            "Blobs OCI : "
+            f"{result.get('blobs_uploaded', 0)} envoyé(s), "
+            f"{result.get('blobs_reused', 0)} déjà présent(s), "
+            f"{human_size(int(result.get('bytes_uploaded', 0)))} transférés."
+        )
+        yield logger.line(
+            "Manifests OCI : "
+            f"{result.get('manifests_uploaded', 0)} publié(s), "
+            f"{result.get('manifests_reused', 0)} déjà présent(s)."
+        )
+        yield logger.line(f"Digest final : {result.get('remote_digest_after') or result.get('local_digest')}")
+    yield logger.line(f"✅ OK : {target} ({duration}s)")
+    yield logger.line("✅ ÉTAT REGISTRE VÉRIFIÉ SUR LE REGISTRE RÉEL.")
+    return True
 
 
 def stream_registry_action(conf: Dict[str, str], action: str, name: str, dry_run: bool) -> Iterator[str]:
@@ -1047,25 +1008,14 @@ def stream_registry_action(conf: Dict[str, str], action: str, name: str, dry_run
             yield logger.line("❌ Aucune entrée registre valide à envoyer.")
             return
 
-        regctl = yield from ensure_regctl_ready(conf, logger)
-        if not regctl:
-            return
-
         yield logger.line(f"MODE_FILE : {effective_mode_file(conf)}")
-        if not dry_run:
-            login_entry = next(((entry_name, target) for entry_name, target in entries if should_login_registry(conf, entry_name)), None)
-            if login_entry is None:
-                yield logger.line(">>> Login registre ignoré : toutes les entrées sont en mode HTTP/local.")
-            else:
-                ok_login = yield from ensure_registry_login(conf, login_entry[1], regctl, logger)
-                if not ok_login:
-                    return
+        yield logger.line("MOTEUR    : API Docker Registry HTTP V2 (Python, sans regctl)")
 
         done = 0
         missing_or_failed = 0
         yield logger.line(f"@@PROGRESS {json.dumps({'action': 'registry', 'current': 0, 'total': total, 'percent': 0, 'done': 0, 'failed': 0}, ensure_ascii=False)}")
         for idx, (entry_name, target) in enumerate(entries, start=1):
-            ok = yield from stream_import_one(conf, entry_name, target, regctl, dry_run, logger, idx, total)
+            ok = yield from stream_import_one(conf, entry_name, target, dry_run, logger, idx, total)
             if ok:
                 done += 1
             else:

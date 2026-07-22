@@ -45,7 +45,9 @@ public final class SettingsView {
     private final Map<String, CheckBox> mountChoices = new LinkedHashMap<>();
     private final Map<String, CheckBox> homeChoices = new LinkedHashMap<>();
     private final List<String> navigationOrder;
+    private final List<String> homeOrder;
     private LinearLayout navigationList;
+    private LinearLayout homeList;
 
     private final EditText interval;
     private final EditText offlineFailures;
@@ -74,6 +76,7 @@ public final class SettingsView {
         this.activity = activity;
         draft = settings.copy();
         navigationOrder = new ArrayList<>(draft.navigationOrder);
+        homeOrder = new ArrayList<>(draft.homeOrder);
 
         root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -298,35 +301,54 @@ public final class SettingsView {
         LinearLayout card = Ui.card(activity);
         card.addView(Ui.text(
                 activity,
-                "Coche uniquement ce que tu veux voir. Une information absente du NAS sera masquée automatiquement.",
+                "Coche ce que tu veux voir, puis utilise les flèches pour choisir l'ordre exact de l'accueil. Une information absente du NAS sera masquée automatiquement.",
                 13,
                 Ui.GREEN));
-        addHomeChoice(card, "cpu", "Utilisation CPU");
-        addHomeChoice(card, "ram", "Utilisation RAM");
-        addHomeChoice(card, "storage", "Stockage principal");
-        addHomeChoice(card, "temperatures", "Températures");
-        addHomeChoice(card, "fans", "Ventilateurs");
-        addHomeChoice(card, "gpus", "Cartes graphiques Intel / NVIDIA");
-        addHomeChoice(card, "host", "Détails de l'hôte");
-        addHomeChoice(card, "network", "Adresse IP et réseau local");
-        addHomeChoice(card, "uptime", "Durée d'activité");
-        addHomeChoice(card, "services", "Services systemd actifs");
-        addHomeChoice(card, "docker", "Résumé Docker");
-        addHomeChoice(card, "samba", "Partages Samba");
-        addHomeChoice(card, "tasks", "Résumé des tâches");
-        addHomeChoice(card, "vms", "Résumé des VM");
-        addHomeChoice(card, "build", "Builds en attente");
+        homeList = new LinearLayout(activity);
+        homeList.setOrientation(LinearLayout.VERTICAL);
+        card.addView(homeList, Ui.margins(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                activity, 0, 12, 0, 0));
+        renderHomeOrder();
         panel.addView(card);
         return panel;
     }
 
-    private void addHomeChoice(LinearLayout parent, String id, String label) {
-        CheckBox choice = check(label, draft.homeItems.contains(id));
-        homeChoices.put(id, choice);
-        parent.addView(choice, Ui.margins(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                activity, 0, 6, 0, 0));
+    private void renderHomeOrder() {
+        if (homeList == null) {
+            return;
+        }
+        homeList.removeAllViews();
+        homeChoices.clear();
+        for (int index = 0; index < homeOrder.size(); index++) {
+            String id = homeOrder.get(index);
+            LinearLayout row = new LinearLayout(activity);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            CheckBox choice = check((index + 1) + ".  " + homeLabel(id), draft.homeItems.contains(id));
+            homeChoices.put(id, choice);
+            row.addView(choice, new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            Button up = Ui.button(activity, "↑", false);
+            Button down = Ui.button(activity, "↓", false);
+            up.setTextSize(18);
+            down.setTextSize(18);
+            up.setEnabled(index > 0);
+            down.setEnabled(index < homeOrder.size() - 1);
+            up.setAlpha(up.isEnabled() ? 1f : 0.3f);
+            down.setAlpha(down.isEnabled() ? 1f : 0.3f);
+            final int position = index;
+            up.setOnClickListener(view -> moveHome(position, position - 1));
+            down.setOnClickListener(view -> moveHome(position, position + 1));
+            row.addView(up, new LinearLayout.LayoutParams(Ui.dp(activity, 52), Ui.dp(activity, 44)));
+            row.addView(down, Ui.margins(
+                    Ui.dp(activity, 52), Ui.dp(activity, 44), activity, 6, 0, 0, 0));
+            homeList.addView(row, Ui.margins(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    activity, 0, 4, 0, 4));
+        }
     }
 
     private void renderNavigationOrder() {
@@ -369,6 +391,46 @@ public final class SettingsView {
         }
         Collections.swap(navigationOrder, from, to);
         renderNavigationOrder();
+    }
+
+    private void moveHome(int from, int to) {
+        if (from < 0 || to < 0 || from >= homeOrder.size() || to >= homeOrder.size()) {
+            return;
+        }
+        captureHomeChoices();
+        Collections.swap(homeOrder, from, to);
+        renderHomeOrder();
+    }
+
+    private void captureHomeChoices() {
+        if (homeChoices.isEmpty()) {
+            return;
+        }
+        draft.homeItems.clear();
+        for (Map.Entry<String, CheckBox> entry : homeChoices.entrySet()) {
+            if (entry.getValue().isChecked()) {
+                draft.homeItems.add(entry.getKey());
+            }
+        }
+    }
+
+    private static String homeLabel(String id) {
+        if ("cpu".equals(id)) return "Utilisation CPU";
+        if ("ram".equals(id)) return "Utilisation RAM";
+        if ("storage".equals(id)) return "Stockage principal";
+        if ("temperatures".equals(id)) return "Températures";
+        if ("fans".equals(id)) return "Ventilateurs";
+        if ("gpus".equals(id)) return "Cartes graphiques Intel / NVIDIA";
+        if ("host".equals(id)) return "Détails de l'hôte";
+        if ("network".equals(id)) return "Adresse IP et réseau local";
+        if ("uptime".equals(id)) return "Durée d'activité";
+        if ("services".equals(id)) return "Services systemd actifs";
+        if ("docker".equals(id)) return "Résumé Docker";
+        if ("samba".equals(id)) return "Partages Samba";
+        if ("tasks".equals(id)) return "Résumé des tâches";
+        if ("vms".equals(id)) return "Résumé des VM";
+        if ("build".equals(id)) return "Builds en attente";
+        return id;
     }
 
     private static String navigationLabel(String id) {
@@ -422,10 +484,8 @@ public final class SettingsView {
             }
         }
         draft.navigationOrder = new ArrayList<>(navigationOrder);
-        draft.homeItems.clear();
-        for (Map.Entry<String, CheckBox> entry : homeChoices.entrySet()) {
-            if (entry.getValue().isChecked()) draft.homeItems.add(entry.getKey());
-        }
+        captureHomeChoices();
+        draft.homeOrder = new ArrayList<>(homeOrder);
         return draft;
     }
 

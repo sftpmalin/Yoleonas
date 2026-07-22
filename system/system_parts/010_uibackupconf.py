@@ -140,7 +140,7 @@ def _confbackup_system_files() -> List[_ConfBackupPath]:
     )
 
 
-def _confbackup_archive_sha_ok(path: _ConfBackupPath) -> Tuple[bool, str]:
+def _confbackup_archive_sha_ok(path: _ConfBackupPath, verify_content: bool = True) -> Tuple[bool, str]:
     sha_path = path.with_name(path.name + ".sha256")
     if not sha_path.exists():
         return False, ""
@@ -149,8 +149,13 @@ def _confbackup_archive_sha_ok(path: _ConfBackupPath) -> Tuple[bool, str]:
         expected = sha_path.read_text(encoding="utf-8", errors="replace").split()[0].strip()
     except Exception:
         return False, ""
-    if not expected:
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
         return False, ""
+    expected = expected.lower()
+    if not verify_content:
+        # La liste lit le SHA enregistré sans recalculer toute l'archive.
+        # Une restauration effectue toujours la vérification complète.
+        return True, expected
     try:
         actual = _confbackup_file_sha256(path)
     except Exception:
@@ -189,7 +194,7 @@ def _confbackup_backup_rows() -> List[Dict[str, Any]]:
         if path.name.startswith("."):
             continue
         stat = path.stat()
-        sha_ok, sha = _confbackup_archive_sha_ok(path)
+        sha_ok, sha = _confbackup_archive_sha_ok(path, verify_content=False)
         created = _confbackup_datetime.datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
         match = re.match(r"conf-(\d{8})-(\d{6})\.tar\.gz$", path.name)
         if match:
@@ -225,7 +230,7 @@ def _confbackup_reference_state() -> Dict[str, Any]:
     }
     if CONFBACKUP_REFERENCE_ARCHIVE.exists():
         state["archive_size_label"] = _confbackup_size_label(CONFBACKUP_REFERENCE_ARCHIVE.stat().st_size)
-        state["archive_sha_ok"] = _confbackup_archive_sha_ok(CONFBACKUP_REFERENCE_ARCHIVE)[0]
+        state["archive_sha_ok"] = _confbackup_archive_sha_ok(CONFBACKUP_REFERENCE_ARCHIVE, verify_content=False)[0]
     return state
 
 

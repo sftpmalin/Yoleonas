@@ -184,7 +184,7 @@ def inject_yoleo_style_bundle_url():
 # chargé et l'interface démarre sans menu.
 APP_CONF = nas_conf_file('app.conf')
 
-APP_DEFAULT_CONF_TEXT = 'system=system\nidex=index\nbrowser=browser\nbuilds=builds\nfile=file\nvm=vm\ndisk=disk\ndockers=dockers\nusers=users\npartage=partage\nservices=services\nbackup=backup\ntask=task\nmeteo=meteo\nterminal=terminal\n'
+APP_DEFAULT_CONF_TEXT = 'system=system\nidex=index\nbrowser=browser\nbuilds=builds\nfile=file\nvm=vm\ndisk=disk\ndockers=dockers\nusers=users\npartage=partage\nservices=services\nbackup=backup\ntask=task\nscripts=scripts\nmeteo=meteo\nterminal=terminal\n'
 
 
 def ensure_app_conf_file(path: str = "") -> bool:
@@ -251,6 +251,13 @@ def ensure_app_conf_core_modules(path: str = "") -> list[str]:
         lines.append("# Module Système/Task : gestionnaire de tâches host")
         lines.append("task=task")
         added.append("task")
+
+    if "scripts" not in loaded_modules:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.append("# Module Système/Scripts : scripts ponctuels host via tmux indépendant")
+        lines.append("scripts=scripts")
+        added.append("scripts")
 
     if "meteo" not in loaded_modules:
         if lines and lines[-1].strip():

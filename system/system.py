@@ -29,6 +29,7 @@ SYSTEM_APP_CONF_REQUIRED_MODULES = [
     "services=services",
     "backup=backup",
     "task=task",
+    "scripts=scripts",
     "meteo=meteo",
     "terminal=terminal",
 ]

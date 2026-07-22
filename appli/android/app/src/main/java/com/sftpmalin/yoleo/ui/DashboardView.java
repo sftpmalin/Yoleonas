@@ -447,131 +447,13 @@ public final class DashboardView {
         JSONObject system = monitoring.optJSONObject("system");
         JSONObject storage = monitoring.optJSONObject("storage");
         JSONObject mainStorage = storage == null ? null : storage.optJSONObject("main");
-
-        String generatedAt = monitoring.optString("generated_at", "");
-        content.addView(Ui.title(activity, "Vue d'ensemble", 27));
-        content.addView(Ui.text(
-                activity,
-                generatedAt.isEmpty() ? "Données reçues" : "Dernier cliché : " + frenchTime(generatedAt),
-                14,
-                Ui.MUTED), Ui.margins(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                activity, 0, 5, 0, 0));
-
-        if (home("cpu") || home("ram") || home("storage")) {
-            addSectionTitle("Ressources");
-            LinearLayout resourceRow = new LinearLayout(activity);
-            resourceRow.setOrientation(LinearLayout.HORIZONTAL);
-            if (home("cpu")) {
-                resourceRow.addView(metricCard(
-                        "CPU",
-                        system == null ? 0 : system.optDouble("cpu_percent", 0),
-                        "Utilisation du processeur"), Ui.weighted(activity, 1, 4));
-            }
-            if (home("ram")) {
-                resourceRow.addView(metricCard(
-                        "RAM",
-                        system == null ? 0 : system.optDouble("ram_percent", 0),
-                        "Mémoire utilisée"), Ui.weighted(activity, 1, 4));
-            }
-            if (home("cpu") || home("ram")) {
-                content.addView(resourceRow, new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT));
-            }
-            if (home("storage")) {
-                LinearLayout storageCard = metricCard(
-                        "Stockage principal",
-                        mainStorage == null ? 0 : mainStorage.optDouble("percent", 0),
-                        mainStorage == null ? "/mnt/user" :
-                                safe(mainStorage.optString("used", ""), "—") + " / " +
-                                        safe(mainStorage.optString("total", ""), "—"));
-                content.addView(storageCard, Ui.margins(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        activity, 0, 8, 0, 0));
-            }
-        }
-
         JSONArray temperatures = system == null ? null : system.optJSONArray("temperatures");
         JSONObject fanData = system == null ? null : system.optJSONObject("fans");
         JSONArray fans = fanData == null ? null : fanData.optJSONArray("rows");
         JSONArray gpus = system == null ? null : system.optJSONArray("gpus");
-        if ((home("temperatures") && temperatures != null && temperatures.length() > 0) ||
-                (home("fans") && fans != null && fans.length() > 0) ||
-                (home("gpus") && gpus != null && gpus.length() > 0)) {
-            addSectionTitle("Matériel");
-        }
-        if (home("fans") && fans != null && fans.length() > 0) {
-            addHardwareCaption("Ventilateurs");
-            addFanGrid(fans);
-        }
-        if (home("temperatures") && temperatures != null && temperatures.length() > 0) {
-            JSONObject cpuTemperature = selectTemperature(temperatures, true);
-            JSONObject boardTemperature = selectTemperature(temperatures, false);
-            if (cpuTemperature != null || boardTemperature != null) {
-                addHardwareCaption("Températures");
-                addTemperatureRow(cpuTemperature, boardTemperature);
-            }
-        }
-        if (home("gpus") && gpus != null) {
-            for (int index = 0; index < gpus.length(); index++) {
-                JSONObject item = gpus.optJSONObject(index);
-                if (item == null) continue;
-                String detail = safe(item.optString("label", "GPU"), "GPU") +
-                        " · " + valueWithUnit(item.optString("temp", ""), "°C") +
-                        " · " + valueWithUnit(item.optString("fan", ""), "% ventilateur") +
-                        " · " + valueWithUnit(item.optString("power", ""), "W");
-                addListCard(
-                        safe(item.optString("name", "Carte graphique"), "Carte graphique"),
-                        detail,
-                        valueWithUnit(item.optString("load", ""), "%"),
-                        Ui.CYAN);
-            }
-        }
-
         JSONObject host = system == null ? null : system.optJSONObject("host");
         JSONObject network = system == null ? null : system.optJSONObject("network");
         JSONObject services = system == null ? null : system.optJSONObject("services");
-        if (home("host") || home("network") || home("uptime") || home("services")) {
-            addSectionTitle("Hôte et réseau");
-        }
-        if (home("host") && host != null) {
-            addListCard(
-                    safe(host.optString("hostname", "Serveur Yoleo"), "Serveur Yoleo"),
-                    safe(host.optString("os", ""), "Système Linux") + " · " +
-                            safe(host.optString("cpu_model", ""), "CPU non renseigné"),
-                    safe(host.optString("kernel", ""), "Linux"),
-                    Ui.CYAN);
-        }
-        if (home("network") && network != null) {
-            addListCard(
-                    "Réseau local",
-                    safe(network.optString("iface", "Interface"), "Interface") +
-                            " · passerelle " + safe(network.optString("gateway", ""), "—") +
-                            " · " + safe(network.optString("speed", ""), "vitesse inconnue"),
-                    safe(network.optString("ip", ""), "IP inconnue"),
-                    "up".equalsIgnoreCase(network.optString("state")) ? Ui.GREEN : Ui.CYAN);
-        }
-        if (home("uptime")) {
-            addListCard(
-                    "Durée d'activité",
-                    host == null ? "Depuis le dernier démarrage" :
-                            "Démarré le " + safe(host.optString("boot_time", ""), "—"),
-                    system == null ? "—" : safe(system.optString("uptime", ""), "—"),
-                    Ui.GREEN);
-        }
-        if (home("services") && services != null) {
-            int failed = services.optInt("failed", 0);
-            addListCard(
-                    "Services systemd",
-                    services.optInt("active", 0) + " actif(s) sur " + services.optInt("total", 0) +
-                            " · " + services.optInt("enabled", 0) + " activé(s) au démarrage",
-                    failed == 0 ? "Aucun échec" : failed + " en échec",
-                    failed == 0 ? Ui.GREEN : Ui.RED);
-        }
-
         JSONObject docker = monitoring.optJSONObject("docker");
         JSONObject dockerStats = docker == null ? null : docker.optJSONObject("stats");
         JSONObject dockerService = docker == null ? null : docker.optJSONObject("service");
@@ -581,55 +463,159 @@ public final class DashboardView {
         JSONObject vmSummary = vms == null ? null : vms.optJSONObject("summary");
         JSONArray tasks = monitoring.optJSONArray("tasks");
 
-        if (home("docker") || home("samba") || home("tasks") || home("vms") || home("build")) {
-            addSectionTitle("Services et travaux");
+        String generatedAt = monitoring.optString("generated_at", "");
+        content.addView(Ui.title(activity, "Vue d'ensemble", 27));
+        content.addView(Ui.text(
+                activity,
+                generatedAt.isEmpty() ? "Données reçues" : "Dernier cliché : " + frenchTime(generatedAt),
+                14,
+                Ui.MUTED), Ui.margins(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                 LinearLayout.LayoutParams.WRAP_CONTENT,
+                 activity, 0, 5, 0, 0));
+
+        for (String itemId : settings.homeOrder) {
+            if (!home(itemId)) {
+                continue;
+            }
+            switch (itemId) {
+                case "cpu":
+                    addHomeCard(metricCard(
+                            "CPU",
+                            system == null ? 0 : system.optDouble("cpu_percent", 0),
+                            "Utilisation du processeur"));
+                    break;
+                case "ram":
+                    addHomeCard(metricCard(
+                            "RAM",
+                            system == null ? 0 : system.optDouble("ram_percent", 0),
+                            "Mémoire utilisée"));
+                    break;
+                case "storage":
+                    addHomeCard(metricCard(
+                            "Stockage principal",
+                            mainStorage == null ? 0 : mainStorage.optDouble("percent", 0),
+                            mainStorage == null ? "/mnt/user" :
+                                    safe(mainStorage.optString("used", ""), "—") + " / " +
+                                            safe(mainStorage.optString("total", ""), "—")));
+                    break;
+                case "temperatures":
+                    if (temperatures != null && temperatures.length() > 0) {
+                        JSONObject cpuTemperature = selectTemperature(temperatures, true);
+                        JSONObject boardTemperature = selectTemperature(temperatures, false);
+                        if (cpuTemperature != null || boardTemperature != null) {
+                            addHardwareCaption("Températures");
+                            addTemperatureRow(cpuTemperature, boardTemperature);
+                        }
+                    }
+                    break;
+                case "fans":
+                    if (fans != null && fans.length() > 0) {
+                        addHardwareCaption("Ventilateurs");
+                        addFanGrid(fans);
+                    }
+                    break;
+                case "gpus":
+                    if (gpus != null && gpus.length() > 0) {
+                        addHardwareCaption("Cartes graphiques");
+                        for (int index = 0; index < gpus.length(); index++) {
+                            JSONObject item = gpus.optJSONObject(index);
+                            if (item == null) continue;
+                            String detail = safe(item.optString("label", "GPU"), "GPU") +
+                                    " · " + valueWithUnit(item.optString("temp", ""), "°C") +
+                                    " · " + valueWithUnit(item.optString("fan", ""), "% ventilateur") +
+                                    " · " + valueWithUnit(item.optString("power", ""), "W");
+                            addListCard(
+                                    safe(item.optString("name", "Carte graphique"), "Carte graphique"),
+                                    detail,
+                                    valueWithUnit(item.optString("load", ""), "%"),
+                                    Ui.CYAN);
+                        }
+                    }
+                    break;
+                case "host":
+                    if (host != null) {
+                        addListCard(
+                                safe(host.optString("hostname", "Serveur Yoleo"), "Serveur Yoleo"),
+                                safe(host.optString("os", ""), "Système Linux") + " · " +
+                                        safe(host.optString("cpu_model", ""), "CPU non renseigné"),
+                                safe(host.optString("kernel", ""), "Linux"),
+                                Ui.CYAN);
+                    }
+                    break;
+                case "network":
+                    if (network != null) {
+                        addListCard(
+                                "Réseau local",
+                                safe(network.optString("iface", "Interface"), "Interface") +
+                                        " · passerelle " + safe(network.optString("gateway", ""), "—") +
+                                        " · " + safe(network.optString("speed", ""), "vitesse inconnue"),
+                                safe(network.optString("ip", ""), "IP inconnue"),
+                                "up".equalsIgnoreCase(network.optString("state")) ? Ui.GREEN : Ui.CYAN);
+                    }
+                    break;
+                case "uptime":
+                    addListCard(
+                            "Durée d'activité",
+                            host == null ? "Depuis le dernier démarrage" :
+                                    "Démarré le " + safe(host.optString("boot_time", ""), "—"),
+                            system == null ? "—" : safe(system.optString("uptime", ""), "—"),
+                            Ui.GREEN);
+                    break;
+                case "services":
+                    if (services != null) {
+                        int failed = services.optInt("failed", 0);
+                        addListCard(
+                                "Services systemd",
+                                services.optInt("active", 0) + " actif(s) sur " + services.optInt("total", 0) +
+                                        " · " + services.optInt("enabled", 0) + " activé(s) au démarrage",
+                                failed == 0 ? "Aucun échec" : failed + " en échec",
+                                failed == 0 ? Ui.GREEN : Ui.RED);
+                    }
+                    break;
+                case "docker":
+                    boolean dockerOk = dockerService != null && dockerService.optBoolean("active", false);
+                    String dockerDetail = dockerStats == null ? "Indisponible" :
+                            dockerStats.optInt("running", 0) + " / " + dockerStats.optInt("total", 0) + " actifs";
+                    addHomeCard(summaryCard(
+                            "Docker", dockerOk ? "Actif" : "Arrêté", dockerDetail, dockerOk));
+                    break;
+                case "samba":
+                    boolean sambaOk = samba != null && samba.optBoolean("ok", false);
+                    addHomeCard(summaryCard(
+                            "Partages", sambaOk ? "Disponibles" : "À vérifier", "Samba / WSDD", sambaOk));
+                    break;
+                case "tasks":
+                    int failedTasks = countFailedTasks(tasks);
+                    addHomeCard(summaryCard(
+                            "Tâches",
+                            failedTasks == 0 ? "Aucune erreur" : failedTasks + " en erreur",
+                            (tasks == null ? 0 : tasks.length()) + " tâche(s)",
+                            failedTasks == 0));
+                    break;
+                case "vms":
+                    int runningVms = vmSummary == null ? 0 : vmSummary.optInt("running", 0);
+                    int totalVms = vmSummary == null ? 0 : vmSummary.optInt("total", 0);
+                    boolean vmAvailable = vms != null && vms.optBoolean("available", false);
+                    addHomeCard(summaryCard(
+                            "Machines virtuelles",
+                            vmAvailable ? runningVms + " active(s)" : "Indisponibles",
+                            totalVms + " VM déclarée(s)",
+                            vmAvailable));
+                    break;
+                case "build":
+                    int toBuild = build == null ? 0 : build.optInt("to_build", 0);
+                    int toPush = build == null ? 0 : build.optInt("to_push", 0);
+                    addHomeCard(summaryCard(
+                            "Build",
+                            toBuild + " à builder",
+                            toPush + " à envoyer",
+                            toBuild == 0 && toPush == 0));
+                    break;
+                default:
+                    break;
+            }
         }
-        LinearLayout serviceRow = new LinearLayout(activity);
-        serviceRow.setOrientation(LinearLayout.HORIZONTAL);
-        boolean dockerOk = dockerService != null && dockerService.optBoolean("active", false);
-        String dockerDetail = dockerStats == null ? "Indisponible" :
-                dockerStats.optInt("running", 0) + " / " + dockerStats.optInt("total", 0) + " actifs";
-        if (home("docker")) serviceRow.addView(summaryCard(
-                "Docker", dockerOk ? "Actif" : "Arrêté", dockerDetail, dockerOk), Ui.weighted(activity, 1, 4));
-        boolean sambaOk = samba != null && samba.optBoolean("ok", false);
-        if (home("samba")) serviceRow.addView(summaryCard(
-                "Partages", sambaOk ? "Disponibles" : "À vérifier", "Samba / WSDD", sambaOk),
-                Ui.weighted(activity, 1, 4));
-        if (home("docker") || home("samba")) content.addView(serviceRow, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        LinearLayout workRow = new LinearLayout(activity);
-        workRow.setOrientation(LinearLayout.HORIZONTAL);
-        int failedTasks = countFailedTasks(tasks);
-        if (home("tasks")) workRow.addView(summaryCard(
-                "Tâches",
-                failedTasks == 0 ? "Aucune erreur" : failedTasks + " en erreur",
-                (tasks == null ? 0 : tasks.length()) + " tâche(s)",
-                failedTasks == 0), Ui.weighted(activity, 1, 4));
-        int runningVms = vmSummary == null ? 0 : vmSummary.optInt("running", 0);
-        int totalVms = vmSummary == null ? 0 : vmSummary.optInt("total", 0);
-        boolean vmAvailable = vms != null && vms.optBoolean("available", false);
-        if (home("vms")) workRow.addView(summaryCard(
-                "Machines virtuelles",
-                vmAvailable ? runningVms + " active(s)" : "Indisponibles",
-                totalVms + " VM déclarée(s)",
-                vmAvailable), Ui.weighted(activity, 1, 4));
-        if (home("tasks") || home("vms")) content.addView(workRow, Ui.margins(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                activity, 0, 8, 0, 0));
-
-        int toBuild = build == null ? 0 : build.optInt("to_build", 0);
-        int toPush = build == null ? 0 : build.optInt("to_push", 0);
-        if (home("build")) content.addView(summaryCard(
-                "Build",
-                toBuild + " à builder",
-                toPush + " à envoyer",
-                toBuild == 0 && toPush == 0), Ui.margins(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                activity, 4, 8, 4, 0));
 
         JSONArray errors = monitoring.optJSONArray("errors");
         if (errors != null && errors.length() > 0) {
@@ -645,6 +631,13 @@ public final class DashboardView {
                 }
             }
         }
+    }
+
+    private void addHomeCard(View card) {
+        content.addView(card, Ui.margins(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                activity, 0, 8, 0, 0));
     }
 
     private void renderDocker() {

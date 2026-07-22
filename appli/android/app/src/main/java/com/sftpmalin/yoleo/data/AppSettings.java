@@ -32,6 +32,7 @@ public final class AppSettings {
     public boolean mountSelectionConfigured;
     public Set<String> displayedMountPaths = new LinkedHashSet<>();
     public Set<String> homeItems = defaultHomeItems();
+    public List<String> homeOrder = defaultHomeOrder();
     public List<String> navigationOrder = defaultNavigationOrder();
     public String lastFilePath = "/mnt";
 
@@ -41,7 +42,11 @@ public final class AppSettings {
     }
 
     public static Set<String> defaultHomeItems() {
-        return new LinkedHashSet<>(Arrays.asList(
+        return new LinkedHashSet<>(defaultHomeOrder());
+    }
+
+    public static List<String> defaultHomeOrder() {
+        return new ArrayList<>(Arrays.asList(
                 "cpu", "ram", "storage", "temperatures", "fans", "gpus",
                 "host", "network", "uptime", "services", "docker", "samba", "tasks", "vms", "build"));
     }
@@ -73,6 +78,7 @@ public final class AppSettings {
         copy.mountSelectionConfigured = mountSelectionConfigured;
         copy.displayedMountPaths = new LinkedHashSet<>(displayedMountPaths);
         copy.homeItems = new LinkedHashSet<>(homeItems);
+        copy.homeOrder = new ArrayList<>(homeOrder);
         copy.navigationOrder = new ArrayList<>(navigationOrder);
         copy.lastFilePath = lastFilePath;
         return copy;

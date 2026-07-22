@@ -25,8 +25,13 @@ set -Eeuo pipefail
 #   bash ./system.sh -routes
 # ============================================================
 
-SERVICE_NAME="flask-system.service"
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}"
+SERVICE_NAME="${SERVICE_NAME:-flask-system.service}"
+SERVICE_FILE_AUTO=1
+if [ -n "${SERVICE_FILE:-}" ]; then
+    SERVICE_FILE_AUTO=0
+fi
+SERVICE_FILE="${SERVICE_FILE:-/etc/systemd/system/${SERVICE_NAME}}"
+SYSTEMCTL_BIN="${SYSTEMCTL_BIN:-systemctl}"
 
 # Chemin réel du script, même s'il est appelé via un lien symbolique.
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
@@ -52,7 +57,7 @@ INTEGRITY_ROOT_DIR="${INTEGRITY_ROOT_DIR:-${DOCKERS_DIR}}"
 INTEGRITY_INCLUDE_DIRS="${INTEGRITY_INCLUDE_DIRS:-system scripts offline bin}"
 
 CONF_DIR="${CONF_DIR:-../conf}"
-ENV_FILE="${ENV_FILE:-${CONF_DIR}/flask_system.env}"
+ENV_FILE="${ENV_FILE:-${CONF_DIR}/.env}"
 SECRET_FILE="${SECRET_FILE:-${CONF_DIR}/flask_system.secret_key}"
 
 LOG_DIR="${LOG_DIR:-/var/log/flask-system}"
@@ -832,9 +837,16 @@ script_path() {
     echo "$SCRIPT_PATH"
 }
 
-refresh_bins() {
+refresh_runtime_paths() {
     PY_BIN="${VENV_DIR}/bin/python"
     PIP_BIN="${VENV_DIR}/bin/pip"
+    if [ "$SERVICE_FILE_AUTO" -eq 1 ]; then
+        SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}"
+    fi
+}
+
+systemctl_cmd() {
+    "$SYSTEMCTL_BIN" "$@"
 }
 
 build_gunicorn_bind_args() {
@@ -865,7 +877,7 @@ load_env_file() {
             INTEGRITY_INCLUDE_DIRS="system scripts offline bin"
         fi
 
-        refresh_bins
+        refresh_runtime_paths
         ensure_dirs
     fi
 }
@@ -1008,40 +1020,50 @@ PY
     [ -n "$SECRET_KEY" ] || die "SECRET_KEY vide"
 }
 
+write_env_kv() {
+    local key="$1"
+    local value="$2"
+    printf '%s=%q\n' "$key" "$value"
+}
+
 write_env_file() {
     ensure_dirs
     log "Écriture du fichier env : $ENV_FILE"
-    cat > "$ENV_FILE" <<EOFENV
+    {
+        cat <<EOFENV
 # Config System Flask hôte
 # Généré automatiquement par : $(script_path) -install
 # Tu peux modifier ces valeurs puis faire : systemctl restart ${SERVICE_NAME}
 # Confs en relatif : ../conf ; logs en standard Linux : /var/log/flask-system
-DOCKERS_DIR=${DOCKERS_DIR}
-APP_DIR=${APP_DIR}
-APP_FILE=${APP_FILE}
-APP_MODULE=${APP_MODULE}
-VENV_DIR=${VENV_DIR}
-REQ_FILE=${REQ_FILE}
-INIT_DIR=${INIT_DIR}
-INTEGRITY_MANIFEST=${INTEGRITY_MANIFEST}
-INTEGRITY_ARCHIVE=${INTEGRITY_ARCHIVE}
-INTEGRITY_ENABLED=${INTEGRITY_ENABLED}
-INTEGRITY_ROOT_DIR=${INTEGRITY_ROOT_DIR}
-INTEGRITY_INCLUDE_DIRS=${INTEGRITY_INCLUDE_DIRS}
-CONF_DIR=${CONF_DIR}
-ENV_FILE=${ENV_FILE}
-SECRET_FILE=${SECRET_FILE}
-LOG_DIR=${LOG_DIR}
-LOG_FILE=${LOG_FILE}
-ACCESS_LOG=${ACCESS_LOG}
-PID_FILE=${PID_FILE}
-HOST=${HOST}
-PORT=${PORT}
-WORKERS=${WORKERS}
-THREADS=${THREADS}
-TIMEOUT=${TIMEOUT}
-IPV6_BIND=${IPV6_BIND}
 EOFENV
+        write_env_kv "SERVICE_NAME" "$SERVICE_NAME"
+        write_env_kv "SYSTEMCTL_BIN" "$SYSTEMCTL_BIN"
+        write_env_kv "DOCKERS_DIR" "$DOCKERS_DIR"
+        write_env_kv "APP_DIR" "$APP_DIR"
+        write_env_kv "APP_FILE" "$APP_FILE"
+        write_env_kv "APP_MODULE" "$APP_MODULE"
+        write_env_kv "VENV_DIR" "$VENV_DIR"
+        write_env_kv "REQ_FILE" "$REQ_FILE"
+        write_env_kv "INIT_DIR" "$INIT_DIR"
+        write_env_kv "INTEGRITY_MANIFEST" "$INTEGRITY_MANIFEST"
+        write_env_kv "INTEGRITY_ARCHIVE" "$INTEGRITY_ARCHIVE"
+        write_env_kv "INTEGRITY_ENABLED" "$INTEGRITY_ENABLED"
+        write_env_kv "INTEGRITY_ROOT_DIR" "$INTEGRITY_ROOT_DIR"
+        write_env_kv "INTEGRITY_INCLUDE_DIRS" "$INTEGRITY_INCLUDE_DIRS"
+        write_env_kv "CONF_DIR" "$CONF_DIR"
+        write_env_kv "ENV_FILE" "$ENV_FILE"
+        write_env_kv "SECRET_FILE" "$SECRET_FILE"
+        write_env_kv "LOG_DIR" "$LOG_DIR"
+        write_env_kv "LOG_FILE" "$LOG_FILE"
+        write_env_kv "ACCESS_LOG" "$ACCESS_LOG"
+        write_env_kv "PID_FILE" "$PID_FILE"
+        write_env_kv "HOST" "$HOST"
+        write_env_kv "PORT" "$PORT"
+        write_env_kv "WORKERS" "$WORKERS"
+        write_env_kv "THREADS" "$THREADS"
+        write_env_kv "TIMEOUT" "$TIMEOUT"
+        write_env_kv "IPV6_BIND" "$IPV6_BIND"
+    } > "$ENV_FILE"
 }
 
 write_service_file() {
@@ -1062,6 +1084,7 @@ User=root
 Group=root
 WorkingDirectory=${APP_DIR}
 Environment=PYTHONUNBUFFERED=1
+Environment=SERVICE_NAME=${SERVICE_NAME}
 ExecStart=/bin/bash ${sp} -run
 Restart=always
 RestartSec=3
@@ -1074,8 +1097,8 @@ StandardError=append:${LOG_FILE}
 WantedBy=multi-user.target
 EOFUNIT
 
-    systemctl daemon-reload
-    systemctl enable "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE"
+    systemctl_cmd daemon-reload
+    systemctl_cmd enable "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE"
 }
 
 show_routes() {
@@ -1146,7 +1169,7 @@ install_service() {
     write_service_file
 
     log "Démarrage du service..."
-    systemctl restart "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE"
+    systemctl_cmd restart "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE"
     status_app
 }
 
@@ -1156,7 +1179,7 @@ start_app() {
     if [ ! -f "$SERVICE_FILE" ]; then
         die "service non installé. Lance d'abord : bash $(script_path) -install"
     fi
-    systemctl start "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE"
+    systemctl_cmd start "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE"
     status_app
 }
 
@@ -1164,7 +1187,7 @@ stop_app() {
     need_root
     load_env_file
     if [ -f "$SERVICE_FILE" ]; then
-        systemctl stop "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE" || true
+        systemctl_cmd stop "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE" || true
     else
         log "Service non installé, tentative d'arrêt via PID : $PID_FILE"
         if [ -f "$PID_FILE" ]; then
@@ -1187,7 +1210,7 @@ restart_app() {
     fi
     [ -d "$APP_DIR" ] || die "APP_DIR absent : $APP_DIR"
     integrity_check_and_restore
-    systemctl restart "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE"
+    systemctl_cmd restart "$SERVICE_NAME" 2>&1 | tee -a "$LOG_FILE"
     status_app
 }
 
@@ -1211,8 +1234,8 @@ status_app() {
     echo "LOG_FILE    : $LOG_FILE"
     echo
 
-    if command -v systemctl >/dev/null 2>&1 && [ -f "$SERVICE_FILE" ]; then
-        systemctl status "$SERVICE_NAME" --no-pager -l || true
+    if command -v "$SYSTEMCTL_BIN" >/dev/null 2>&1 && [ -f "$SERVICE_FILE" ]; then
+        systemctl_cmd status "$SERVICE_NAME" --no-pager -l || true
     else
         echo "Service systemd non installé."
     fi

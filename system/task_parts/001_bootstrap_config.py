@@ -263,6 +263,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     custom_cron_month TEXT DEFAULT '*',
     custom_cron_weekday TEXT DEFAULT '*',
     notify_success INTEGER NOT NULL DEFAULT 0,
+    archived INTEGER NOT NULL DEFAULT 0,
+    archived_at TEXT DEFAULT '',
     chain_mode TEXT NOT NULL DEFAULT 'and',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -335,6 +337,8 @@ DB_MIGRATION_SQLS = [
     "ALTER TABLE tasks ADD COLUMN custom_cron_month TEXT DEFAULT '*'",
     "ALTER TABLE tasks ADD COLUMN custom_cron_weekday TEXT DEFAULT '*'",
     "ALTER TABLE tasks ADD COLUMN notify_success INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE tasks ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE tasks ADD COLUMN archived_at TEXT DEFAULT ''",
 ]
 
 MAINTENANCE_TASKS = [
@@ -401,6 +405,7 @@ def ajax_tasks_payload(**extra):
         "updated_at": now_str(),
         "stats": build_task_stats(tasks),
         "tasks": tasks,
+        "archived_count": get_archived_task_count(),
     }
     payload.update(extra)
     return payload
@@ -523,5 +528,4 @@ def read_task_conf():
         fallback_runtime.mkdir(parents=True, exist_ok=True)
         config["TASK_RUNTIME_DIR"] = str(fallback_runtime)
     return config
-
 

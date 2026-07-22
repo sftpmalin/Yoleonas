@@ -143,6 +143,8 @@ def init_db():
                 custom_cron_month TEXT DEFAULT '*',
                 custom_cron_weekday TEXT DEFAULT '*',
                 notify_success INTEGER NOT NULL DEFAULT 0,
+                archived INTEGER NOT NULL DEFAULT 0,
+                archived_at TEXT DEFAULT '',
                 chain_mode TEXT NOT NULL DEFAULT 'and',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -215,6 +217,8 @@ def init_db():
             "ALTER TABLE tasks ADD COLUMN custom_cron_month TEXT DEFAULT '*'",
             "ALTER TABLE tasks ADD COLUMN custom_cron_weekday TEXT DEFAULT '*'",
             "ALTER TABLE tasks ADD COLUMN notify_success INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE tasks ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE tasks ADD COLUMN archived_at TEXT DEFAULT ''",
         ]:
             try:
                 db.execute(column_sql)
@@ -517,5 +521,4 @@ def run_db_maintenance(action):
             return False, "Aucun backup valide disponible"
         return restore_task_db_from_backup(backups[0])
     return False, f"Action maintenance inconnue: {action}"
-
 

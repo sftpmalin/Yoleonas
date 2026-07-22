@@ -222,10 +222,10 @@ def load_conf(conf_dir: Path, builds_conf_arg: str = "") -> Tuple[Dict[str, str]
 
     # Valeurs par défaut identiques à l'esprit de builds.py.
     conf.setdefault("HOST_CONF_DIR", str(conf_dir))
-    conf.setdefault("REGCTL", str(conf_dir.parent / "bin" / "regctl"))
     conf.setdefault("STATE_DIR", str(conf_dir / ".save_state"))
     conf.setdefault("REGISTRY_HOST_CONF_FILE", str(conf_dir / DEFAULT_REGISTRY_CONF_NAME))
     conf.setdefault("REGISTRY_HOST_YAML_FILE", str(conf_dir / DEFAULT_REGISTRY_YML_NAME))
+    conf.setdefault("REGISTRY_HOST_BIN_DIR", str(conf_dir.parent / "bin"))
     conf.setdefault("REGISTRY_HOST_LOG_DIR", DEFAULT_LOG_DIR)
     conf.setdefault("REGISTRY_HOST_LOG_FILE", DEFAULT_LOG_FILE)
     conf.setdefault("REGISTRY_HOST_RUNTIME_BIN", DEFAULT_RUNTIME_BIN)
@@ -254,15 +254,9 @@ class RegistrySettings:
         else:
             self.base_dir = self.registry_conf_dir.parent.resolve()
 
-        regctl_raw = conf.get("REGCTL", "").strip()
-        regctl_path = resolve_path(regctl_raw, self.registry_conf_dir) if regctl_raw else Path("")
-        regctl_bin_dir = regctl_path.parent if str(regctl_path) else Path("")
-
         explicit_bin_dir = conf.get("REGISTRY_HOST_BIN_DIR", "").strip()
         if explicit_bin_dir:
             self.bin_dir = resolve_path(explicit_bin_dir, self.registry_conf_dir)
-        elif str(regctl_bin_dir):
-            self.bin_dir = regctl_bin_dir
         else:
             self.bin_dir = self.base_dir / "bin"
 

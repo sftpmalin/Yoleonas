@@ -4,8 +4,9 @@ def task_home():
     # Si le fichier cron généré a été touché à la main, on le reconstruit.
     ensure_cron_synced()
     active_tab = "tasks"
+    task_view = request.args.get("view") or "tasks"
     selected_log_task = request.args.get("log_task") or ""
-    return render_task_page(active_tab=active_tab, selected_log_task=selected_log_task)
+    return render_task_page(active_tab=active_tab, selected_log_task=selected_log_task, task_view=task_view)
 
 
 def task_from_query_prefill():
@@ -142,7 +143,10 @@ def task_delete(task_id):
 
     task_title = task.get("title") or f"Tâche {task_id}"
     with connect_db() as db:
-        db.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+        db.execute(
+            "UPDATE tasks SET archived=1, archived_at=?, updated_at=? WHERE id=?",
+            (now_str(), now_str(), task_id),
+        )
         db.commit()
 
     cron_ok, cron_message = regenerate_cron()
@@ -150,13 +154,67 @@ def task_delete(task_id):
     if ajax:
         return jsonify(ajax_tasks_payload(
             task_id=task_id,
-            deleted=True,
-            deleted_title=task_title,
+            archived=True,
+            archived_title=task_title,
             cron_ok=cron_ok,
             message=cron_message,
         ))
 
     return redirect(url_for("task_bp.task_home"))
+
+
+@task_bp.route("/system/task/restore/<int:task_id>", methods=["POST"])
+def task_restore(task_id):
+    ajax = is_ajax_request()
+    task = get_task(task_id, include_archived=True)
+    if not task or not safe_int(task.get("archived"), 0):
+        if ajax:
+            return jsonify({"ok": False, "task_id": task_id, "message": "Tâche archivée introuvable"}), 404
+        return redirect(url_for("task_bp.task_home", view="archive"))
+
+    with connect_db() as db:
+        db.execute(
+            "UPDATE tasks SET archived=0, archived_at='', updated_at=? WHERE id=?",
+            (now_str(), task_id),
+        )
+        db.commit()
+
+    cron_ok, cron_message = regenerate_cron()
+    if ajax:
+        return jsonify(ajax_tasks_payload(
+            task_id=task_id,
+            restored=True,
+            restored_title=task.get("title") or f"Tâche {task_id}",
+            cron_ok=cron_ok,
+            message=cron_message,
+        ))
+    return redirect(url_for("task_bp.task_home", view="archive"))
+
+
+@task_bp.route("/system/task/delete-forever/<int:task_id>", methods=["POST"])
+def task_delete_forever(task_id):
+    ajax = is_ajax_request()
+    task = get_task(task_id, include_archived=True)
+    if not task or not safe_int(task.get("archived"), 0):
+        if ajax:
+            return jsonify({"ok": False, "task_id": task_id, "message": "Tâche archivée introuvable"}), 404
+        return redirect(url_for("task_bp.task_home", view="archive"))
+
+    task_title = task.get("title") or f"Tâche {task_id}"
+    with connect_db() as db:
+        db.execute("DELETE FROM tasks WHERE id=? AND archived=1", (task_id,))
+        db.commit()
+
+    cron_ok, cron_message = regenerate_cron()
+    if ajax:
+        return jsonify(ajax_tasks_payload(
+            task_id=task_id,
+            deleted_forever=True,
+            deleted_title=task_title,
+            cron_ok=cron_ok,
+            message=cron_message,
+        ))
+    return redirect(url_for("task_bp.task_home", view="archive"))
 
 
 @task_bp.route("/system/task/run/<int:task_id>", methods=["POST", "GET"])
