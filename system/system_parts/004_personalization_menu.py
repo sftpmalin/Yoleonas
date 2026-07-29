@@ -2937,7 +2937,7 @@ def mobile_manifest_preview(config: Dict[str, Any] | None = None) -> str:
 
 
 # --------------------------------------------------
-# MENU CLI : editeur de ../conf/menu.conf pour scripts/menu.sh
+# MENU CLI : editeur de ../conf/menu.conf pour system/menu.py
 # --------------------------------------------------
 CLI_MENU_CONF_NAME = "menu.conf"
 CLI_MENU_ROW_TYPES = {"section", "submenu", "command", "separator", "raw"}
@@ -3123,6 +3123,8 @@ def cli_menu_validate_rows(rows: List[Dict[str, Any]]) -> Tuple[bool, str]:
             row_type = "raw"
         line = cli_menu_format_row(raw_row).strip()
         if not line:
+            if row_type == "raw":
+                heading_seen = {0: True}
             continue
         visible_index += 1
 

@@ -23,8 +23,9 @@
                                 <table class="build-table db-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off" id="dbTable">
                                     <thead>
                                         <tr>
-                                            <th style="width:16%;">Entrée</th>
-                                            <th style="width:42%;">registre.conf</th>
+                                            <th style="width:15%;">Entrée</th>
+                                            <th style="width:70px; text-align:center;">Ordre</th>
+                                            <th style="width:38%;">registre.conf</th>
                                             <th style="width:20%;">platforms.conf</th>
                                             <th style="width:12%;">mode.conf</th>
                                             <th style="width:110px; text-align:center;">Actions</th>
@@ -37,6 +38,12 @@
                                                 <input type="hidden" name="db_name" value="{{ b.name }}">
                                                 <div class="name-main">{{ b.name }}</div>
                                                 {% if b.meta_missing %}<div class="hint"><span class="badge badge-warn">incomplet</span></div>{% else %}<div class="hint"><span class="badge badge-ok">OK</span></div>{% endif %}
+                                            </td>
+                                            <td class="db-order-cell">
+                                                <div class="db-order-controls">
+                                                    <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon db-order-btn" title="Monter" aria-label="Monter {{ b.name }}" onclick="moveDbRow(this, -1)">↑</button>
+                                                    <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon db-order-btn" title="Descendre" aria-label="Descendre {{ b.name }}" onclick="moveDbRow(this, 1)">↓</button>
+                                                </div>
                                             </td>
                                             <td><input class="text-input" type="text" name="db_registry" value="{{ b.registry }}" placeholder="{{ b.registry_suggested }}" data-suggest="{{ b.registry_suggested }}"></td>
                                             <td>

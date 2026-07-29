@@ -319,6 +319,7 @@ def _load_registry_v2_engine():
         "re": re,
         "requests": requests,
         "tarfile": tarfile,
+        "time": time,
         "urljoin": urljoin,
         "NAS_CONF_DIR": str(NAS_CONF_DIR),
         "strip_quotes": _strip_quotes,
@@ -1649,6 +1650,12 @@ def registry_v2_runtime_conf() -> dict[str, str]:
         "REGISTRY_REQUEST_TIMEOUT",
         conf.get("REGISTRY_REQUEST_TIMEOUT", "10"),
     )
+    for key, default in (
+        ("REGISTRY_UPLOAD_TIMEOUT", "900"),
+        ("REGISTRY_UPLOAD_VERIFY_TIMEOUT", "180"),
+        ("REGISTRY_UPLOAD_VERIFY_INTERVAL", "3"),
+    ):
+        conf[key] = os.environ.get(key, conf.get(key, default))
     return conf
 
 

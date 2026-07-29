@@ -306,22 +306,26 @@ Install Stacks = stacks.py --update
 ,Affioche les Stacks = stacks.py --list
 ,install LAN Ollama = stacks.py --ollama
 ,Remove Ollama LAN = stacks.py --remove-ollama
--
 --- Docker ---
-Docker - SAVE tous = docker.py --save
-Docker - LOAD tous = docker.py --load
+Docker - SAVE tous = docker_cli.py --save
+Docker - LOAD tous = docker_cli.py --load
 ,Option Dockers...
-,Docker - SAVE choisir = docker.py --select --save
-,Docker - LOAD choisir = docker.py --select --load
-,Docker - Liste complète = docker.py --list all
--
---- Backup ---
--
+,Docker - SAVE choisir = docker_cli.py --select --save
+,Docker - LOAD choisir = docker_cli.py --select --load
+,Docker - Liste complète = docker_cli.py --list all
 --- Registre ---
 Netoyer de Registre = registry.py
--
 --- Cache ---
-Vider le Cache = cache.py --all
+Media Cache = /mnt/user/docker/scripts_backup/media_cache.py
+Scripts Backup = menu_list.py -/mnt/user/docker/scripts_backup
+--- Update ---
+Update PIP = bash /yoleo/system/update_pip.sh
+System ADD = bash /yoleo/system/system.sh -add
+Systerm RESTART = bash /yoleo/system/system.sh -restart
+System INTEGRITY = bash /yoleo/system/system.sh -integrity
+--- Secours ---
+Gestion LAN = lan_cli.py
+Gestion Stockage = storage_cli.py
 """
 
 

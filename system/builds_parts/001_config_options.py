@@ -101,6 +101,9 @@ DEFAULT_CONFIG = {
     "REGISTRY_PASSWORD": "dome",
     "YML_DIR": nas_root_path("yml"),
     "REGISTRY_REQUEST_TIMEOUT": "10",
+    "REGISTRY_UPLOAD_TIMEOUT": "900",
+    "REGISTRY_UPLOAD_VERIFY_TIMEOUT": "180",
+    "REGISTRY_UPLOAD_VERIFY_INTERVAL": "3",
 
     # Outils.
     "DOCKER_BIN": "docker",
@@ -299,6 +302,9 @@ def builds_default_conf_text(conf: Optional[Dict[str, str]] = None) -> str:
         "REGISTRY_PASSWORD": "dome",
         "YML_DIR": "../yml",
         "REGISTRY_REQUEST_TIMEOUT": "10",
+        "REGISTRY_UPLOAD_TIMEOUT": "900",
+        "REGISTRY_UPLOAD_VERIFY_TIMEOUT": "180",
+        "REGISTRY_UPLOAD_VERIFY_INTERVAL": "3",
 
         "SYSTEM_LOG_FILE": "/var/log/builds/system_python.log",
 
@@ -384,6 +390,9 @@ def builds_default_conf_text(conf: Optional[Dict[str, str]] = None) -> str:
         kv("REGISTRY_PASSWORD"),
         kv("YML_DIR"),
         kv("REGISTRY_REQUEST_TIMEOUT"),
+        kv("REGISTRY_UPLOAD_TIMEOUT"),
+        kv("REGISTRY_UPLOAD_VERIFY_TIMEOUT"),
+        kv("REGISTRY_UPLOAD_VERIFY_INTERVAL"),
         kv("SYSTEM_LOG_FILE"),
         "",
         "# Registry host",

@@ -89,14 +89,22 @@ def handle_builds_form_post(conf: Dict[str, str], redirect_endpoint: str):
             return redirect(url_for(redirect_endpoint))
 
         changed_names = database_changed_names(conf, rows)
-        ok, message = write_database_rows(conf, rows)
+        ok, message = write_database_rows(conf, rows, reorder=True)
         if ok:
             if changed_names.get("platforms"):
                 remove_build_platform_state_files(conf, changed_names["platforms"])
                 clear_registry_import_state(conf, changed_names["platforms"])
             if changed_names.get("mode"):
                 clear_registry_import_state(conf, changed_names["mode"])
-            cache_ok = refresh_build_cache_silent(get_config(), source="database-form", check_registry=True)
+            cache_ok = update_build_cache_from_database_rows(
+                get_config(),
+                rows,
+                changed_names=changed_names,
+                reorder=True,
+                source="database-form",
+            )
+            if not cache_ok:
+                cache_ok = refresh_build_cache_silent(get_config(), source="database-form", check_registry=False)
             if not cache_ok:
                 message += " Cache Build non rafraîchi automatiquement : lance Mise à jour du cache."
         flash(message, "success" if ok else "error")
@@ -399,7 +407,7 @@ def database_autofill_json():
         names = list(stats.get("added_db") or []) + list(stats.get("removed_db") or [])
         count = len(names)
     if ok:
-        cache_ok = refresh_build_cache_silent(get_config(), source="database-autofill-button", check_registry=True)
+        cache_ok = refresh_build_cache_silent(get_config(), source="database-autofill-button", check_registry=False)
         if not cache_ok:
             message += " Cache Build non rafraîchi automatiquement : lance Mise à jour du cache."
     return jsonify({
@@ -429,7 +437,8 @@ def database_json():
         return jsonify({"ok": False, "message": "Aucune ligne à enregistrer."}), 400
 
     changed_names = database_changed_names(conf, rows)
-    ok, message = write_database_rows(conf, rows)
+    reorder = bool(payload.get("reorder") or payload.get("ordered") or payload.get("full_order"))
+    ok, message = write_database_rows(conf, rows, reorder=reorder)
     cache_ok = False
     invalidated = 0
     if ok:
@@ -438,10 +447,25 @@ def database_json():
             clear_registry_import_state(conf, changed_names["platforms"])
         if changed_names.get("mode"):
             clear_registry_import_state(conf, changed_names["mode"])
-        cache_ok = refresh_build_cache_silent(get_config(), source="database-json", check_registry=True)
+        cache_ok = update_build_cache_from_database_rows(
+            get_config(),
+            rows,
+            changed_names=changed_names,
+            reorder=reorder,
+            source="database-json",
+        )
+        if not cache_ok:
+            cache_ok = refresh_build_cache_silent(get_config(), source="database-json", check_registry=False)
         if not cache_ok:
             message += " Cache Build non rafraîchi automatiquement : lance Mise à jour du cache."
-    return jsonify({"ok": ok, "message": message, "count": len(rows), "cache_refreshed": cache_ok, "state_invalidated": invalidated}), (200 if ok else 500)
+    return jsonify({
+        "ok": ok,
+        "message": message,
+        "count": len(rows),
+        "cache_refreshed": cache_ok,
+        "cache_mode": "local",
+        "state_invalidated": invalidated,
+    }), (200 if ok else 500)
 
 
 @builds_bp.route("/builds/registry_service_status_json")
@@ -681,9 +705,34 @@ def run_start():
     return response
 
 
+BUILD_LOG_TAIL_BYTES = 768 * 1024
+BUILD_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
-@builds_bp.route("/build/main/ttyd")
-def build_main_ttyd_route():
+
+def read_build_log_tail(log_path: str, max_bytes: int = BUILD_LOG_TAIL_BYTES) -> Tuple[str, bool, int]:
+    try:
+        size = os.path.getsize(log_path)
+    except OSError:
+        return "Aucun log Build pour le moment.", False, 0
+    limit = max(8192, min(int(max_bytes or BUILD_LOG_TAIL_BYTES), 4 * 1024 * 1024))
+    truncated = size > limit
+    try:
+        with open(log_path, "rb") as handle:
+            if truncated:
+                handle.seek(max(0, size - limit))
+            raw = handle.read(limit)
+    except OSError as exc:
+        return f"Impossible de lire le log Build : {exc}", False, size
+    text = raw.decode("utf-8", errors="replace")
+    text = BUILD_ANSI_ESCAPE_RE.sub("", text)
+    if truncated:
+        text = "[log tronqué : affichage de la fin du fichier]\n\n" + text
+    return text or "Aucun log Build pour le moment.", truncated, size
+
+
+@builds_bp.route("/builds/main/log_json")
+@builds_bp.route("/build/main/log_json")
+def build_main_log_json_route():
     conf = get_config()
     log_dir = conf.get("DOCKER_LOG_DIR") or tempfile.gettempdir()
     log_path = os.path.join(log_dir, "build_main.log")
@@ -692,22 +741,18 @@ def build_main_ttyd_route():
         open(log_path, "a", encoding="utf-8").close()
     except Exception:
         pass
-
-    try:
-        import terminal as yoleo_terminal
-        term_conf = yoleo_terminal.get_config()
-        ok, message = yoleo_terminal.ensure_terminal_url_args(term_conf)
-        if not ok:
-            return jsonify({"ok": False, "message": message or "Terminal ttyd indisponible."}), 500
-        fresh_conf = yoleo_terminal.get_config()
-        return jsonify({
-            "ok": True,
-            "title": "Log Build Main",
-            "url": yoleo_terminal.ttyd_url_with_args(fresh_conf, ["tail-log", log_path]),
-            "log_path": log_path,
-        })
-    except Exception as exc:
-        return jsonify({"ok": False, "message": f"Impossible d'ouvrir le log Build Main dans ttyd : {exc}"}), 500
+    text, truncated, size = read_build_log_tail(log_path)
+    state = read_build_background_state(conf)
+    return jsonify({
+        "ok": True,
+        "title": "Log Build Main",
+        "log_text": text,
+        "log_path": log_path,
+        "truncated": truncated,
+        "size": size,
+        "running": bool(state.get("running")),
+        "status": str(state.get("status") or ""),
+    })
 
 
 @builds_bp.route("/builds/run_status")

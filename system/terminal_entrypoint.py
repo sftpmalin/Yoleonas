@@ -261,14 +261,17 @@ def script_manager_attach(session: str) -> None:
 
 def menu_demo(shell: str, start_dir: str) -> None:
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    script = os.path.abspath(os.path.join(base_dir, "..", "scripts", "menu.sh"))
+    script = os.path.abspath(os.path.join(base_dir, "menu.py"))
+    python_bin = os.path.abspath(os.path.join(base_dir, ".venv", "bin", "python"))
     if not os.path.isfile(script):
-        raise ValueError(f"Script menu introuvable : {script}")
+        raise ValueError(f"Application menu introuvable : {script}")
+    if not os.path.isfile(python_bin):
+        python_bin = sys.executable or "python3"
     clear_screen()
-    print("=== Demo Menu CLI : ../scripts/menu.sh ===")
+    print("=== Demo Menu CLI : system/menu.py ===")
     print()
     sys.stdout.flush()
-    code = subprocess.call(["bash", script], cwd=base_dir)
+    code = subprocess.call([python_bin, script], cwd=base_dir)
     print()
     print("--- Fin de la demo Menu CLI ---")
     print(f"Code retour: {code}")

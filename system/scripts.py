@@ -51,9 +51,11 @@ DEFAULT_SCRIPTS_DIR = "/mnt/user/scripts"
 DEFAULT_LOG_DIR = "/var/log/flask-system/scripts"
 DEFAULT_RUN_DIR = "/run/flask-system/script-manager"
 FALLBACK_RUN_DIR = "/tmp/flask-system-script-manager"
+MAX_LOG_BYTES = 768 * 1024
 ALLOWED_EXTENSIONS = {".sh", ".py"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico", ".bmp", ".avif"}
 SAFE_FILENAME_RE = re.compile(r"^[^/\\\x00]{1,180}$")
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 METADATA_RE = re.compile(
     r"^\s*#\s*(title|titre|description|detail|détail|icon|icone|icône)\s*=\s*(.*?)\s*$",
     re.IGNORECASE,
@@ -314,6 +316,30 @@ def log_path_for_script(path: str) -> str:
     return os.path.join(LOG_DIR, f"{stem}-{session[3:]}.log")
 
 
+def read_log_tail(log_file: str, max_bytes: int = MAX_LOG_BYTES) -> tuple[str, bool, int]:
+    """Lit la fin du log sans bloquer l'interface sur un très gros fichier."""
+    try:
+        size = os.path.getsize(log_file)
+    except OSError:
+        return "", False, 0
+
+    limit = max(8192, min(int(max_bytes or MAX_LOG_BYTES), 4 * 1024 * 1024))
+    truncated = size > limit
+    try:
+        with open(log_file, "rb") as handle:
+            if truncated:
+                handle.seek(max(0, size - limit))
+            raw = handle.read(limit)
+    except OSError:
+        return "", False, 0
+
+    text = raw.decode("utf-8", errors="replace")
+    text = ANSI_ESCAPE_RE.sub("", text)
+    if truncated:
+        text = "[log tronqué : affichage des derniers octets]\n\n" + text
+    return text, truncated, size
+
+
 def current_status(path: str) -> dict[str, Any]:
     session = session_name_for_path(path)
     status_file = status_path_for_session(session)
@@ -557,20 +583,6 @@ def launch_script_service(path: str, title: str) -> tuple[bool, str, dict[str, A
     return False, "La session tmux n'a pas été créée.", current_status(path)
 
 
-def terminal_url_for_session(session: str) -> tuple[bool, str, str]:
-    try:
-        import terminal as yoleo_terminal
-
-        conf = yoleo_terminal.get_config()
-        ok, message = yoleo_terminal.ensure_terminal_url_args(conf)
-        conf = yoleo_terminal.get_config()
-        url = yoleo_terminal.ttyd_url_with_args(conf, ["script-manager", session]) if ok else ""
-        return bool(ok and url), message, url
-    except Exception as exc:
-        return False, f"Terminal TTyd indisponible : {exc}", ""
-
-
-
 try:
     # Seul le fichier de réglages du gestionnaire est précréé.
     # Les menus YoLeo sont gérés ailleurs et ne doivent jamais être créés,
@@ -733,15 +745,13 @@ def run_script(filename: str):
             ok, message, status = launch_script_service(path, meta["title"] or Path(filename).stem)
             if not ok:
                 return jsonify({"ok": False, "message": message, "status": status}), 500
-        terminal_ok, terminal_message, terminal_url = terminal_url_for_session(status["session"])
+        status = current_status(path)
         return jsonify({
             "ok": True,
-            "message": "Session tmux existante ouverte." if reused else "Script lancé dans tmux.",
+            "message": "Session tmux existante suivie." if reused else "Script lancé dans tmux.",
             "reused": reused,
-            "terminal_ok": terminal_ok,
-            "terminal_message": terminal_message,
-            "terminal_url": terminal_url,
-            "status": current_status(path),
+            "log_file": status.get("log_file", ""),
+            "status": status,
         })
     except Exception as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
@@ -806,6 +816,28 @@ def api_status(filename: str):
         status = current_status(path)
         status["label"] = display_status_label(status["state"])
         return jsonify({"ok": True, "status": status})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 404
+
+
+@scripts_bp.route("/system/scripts/api/log/<path:filename>")
+def api_log(filename: str):
+    try:
+        path = script_path(filename, must_exist=True)
+        status = current_status(path)
+        status["label"] = display_status_label(status["state"])
+        log_file = str(status.get("log_file") or log_path_for_script(path))
+        text, truncated, size = read_log_tail(log_file)
+        if not text:
+            text = "Aucun log pour le moment."
+        return jsonify({
+            "ok": True,
+            "log_text": text,
+            "log_file": log_file,
+            "truncated": truncated,
+            "size": size,
+            "status": status,
+        })
     except Exception as exc:
         return jsonify({"ok": False, "message": str(exc)}), 404
 

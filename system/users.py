@@ -63,7 +63,7 @@ CONF_ALIASES = ("users.conf", "user.conf")
 USERS_BACKUP_NAME = "users_backup.conf"
 
 # Valeurs de base intégrées : si la conf est absente, le module la recrée.
-DEFAULT_CONF_TEXT = "# linux_users.conf\n# Configuration du module Flask linux_users_uid_gid.py\n\n# Racine réelle de l'hôte. En Flask host : /\nHOST_ROOT=/\n\n# Fichiers de l'hôte lus pour affichage\nPASSWD_FILE=/etc/passwd\nGROUP_FILE=/etc/group\nSHADOW_FILE=/etc/shadow\n\n# Active/désactive les boutons qui modifient les utilisateurs\nALLOW_ACTIONS=true\n\n# Protège root et les comptes système UID < 1000\nPROTECT_SYSTEM_USERS=true\n\n# Plage affichée comme utilisateurs utiles\nNORMAL_UID_MIN=1000\nNORMAL_UID_MAX=60000\n\n# Shell par défaut à la création\nDEFAULT_SHELL=/bin/bash\n\n# Shells proposés dans l'interface\nALLOWED_SHELLS=/bin/bash,/bin/sh,/usr/sbin/nologin\n\n# Dossier de sortie pour les certificats P12 intégrés au module UserLinux\n# Ancien paramètre repris depuis p12.conf\nP12_OUTPUT=../p12\n"
+DEFAULT_CONF_TEXT = "# linux_users.conf\n# Configuration du module Flask linux_users_uid_gid.py\n\n# Racine réelle de l'hôte. En Flask host : /\nHOST_ROOT=/\n\n# Fichiers de l'hôte lus pour affichage\nPASSWD_FILE=/etc/passwd\nGROUP_FILE=/etc/group\nSHADOW_FILE=/etc/shadow\n\n# Active/désactive les boutons qui modifient les utilisateurs\nALLOW_ACTIONS=true\n\n# Protège root et les comptes système UID < 1000\nPROTECT_SYSTEM_USERS=true\n\n# Plage affichée comme utilisateurs utiles\nNORMAL_UID_MIN=1000\nNORMAL_UID_MAX=60000\n\n# Shell par défaut à la création\nDEFAULT_SHELL=/bin/bash\n\n# Shells proposés dans l'interface\nALLOWED_SHELLS=/bin/bash,/bin/sh,/usr/sbin/nologin\n\n# Dossier de sortie pour les certificats P12 intégrés au module UserLinux\n# Ancien paramètre repris depuis p12.conf\nP12_OUTPUT=../p12\n\n# Dossier de sortie pour le générateur de clés SSH autonome\nSSH_OUTPUT=../key\n"
 
 _env_conf = os.environ.get("USERS_CONF", "").strip()
 CONF_CANDIDATES = []
@@ -102,6 +102,7 @@ ALLOWED_SHELLS = ["/bin/bash", "/bin/sh", "/usr/sbin/nologin"]
 # --- CERTIFICATS / CLÉS ---
 # P12 est intégré ici. Le dossier de sortie se règle dans users.conf.
 P12_OUTPUT = "../p12"
+SSH_OUTPUT = "../key"
 
 VALID_P12_KEY_TYPES = {
     "2048": "RSA 2048",
@@ -111,9 +112,10 @@ VALID_P12_KEY_TYPES = {
 }
 
 VALID_SSH_KEY_TYPES = {
+    "rsa2048": {"label": "RSA 2048", "cmd": ["-t", "rsa", "-b", "2048"]},
     "rsa3072": {"label": "RSA 3072", "cmd": ["-t", "rsa", "-b", "3072"]},
     "rsa4096": {"label": "RSA 4096", "cmd": ["-t", "rsa", "-b", "4096"]},
-    "ed25519": {"label": "ED25519 256", "cmd": ["-t", "ed25519"]},
+    "ed25519": {"label": "Ed25519 256 bits", "cmd": ["-t", "ed25519"]},
 }
 
 SSH_KEY_DIR_NAME = "key"
@@ -204,7 +206,7 @@ def _load_conf():
     global HOST_ROOT, PASSWD_FILE, GROUP_FILE, SHADOW_FILE
     global ALLOW_ACTIONS, PROTECT_SYSTEM_USERS
     global NORMAL_UID_MIN, NORMAL_UID_MAX, DEFAULT_SHELL, ALLOWED_SHELLS
-    global P12_OUTPUT
+    global P12_OUTPUT, SSH_OUTPUT
 
     CONFIG_FILE_USED = _ensure_conf_file()
     CONF_FILE = CONFIG_FILE_USED
@@ -245,6 +247,8 @@ def _load_conf():
                     ALLOWED_SHELLS = [x.strip() for x in value.split(",") if x.strip()]
                 elif key == "P12_OUTPUT":
                     P12_OUTPUT = value
+                elif key == "SSH_OUTPUT":
+                    SSH_OUTPUT = value
     except Exception:
         pass
 
@@ -385,9 +389,52 @@ def validate_p12_output_dir(value):
     return raw, resolved
 
 
-def browse_directories(path_value):
+def resolve_ssh_output_dir(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+
+    expanded = os.path.expandvars(os.path.expanduser(raw))
+    if os.path.isabs(expanded):
+        return os.path.abspath(expanded)
+
+    # Même convention que le P12 : ../key depuis /yoleo/conf devient /yoleo/key.
+    return os.path.abspath(os.path.join(NAS_CONF_DIR, expanded))
+
+
+def current_ssh_output_resolved():
+    return resolve_ssh_output_dir(SSH_OUTPUT)
+
+
+def validate_ssh_output_dir(value):
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("Choisis d'abord un dossier de sortie pour les clés SSH.")
+
+    resolved = resolve_ssh_output_dir(raw)
+    if not resolved:
+        raise ValueError("Dossier de sortie SSH invalide.")
+
+    return raw, resolved
+
+
+def sanitize_ssh_key_name(value):
+    raw = str(value or "").strip()
+    for suffix in (".key", ".pub", ".ppk"):
+        if raw.lower().endswith(suffix):
+            raw = raw[:-len(suffix)]
+            break
+    cleaned = re.sub(r"[^a-zA-Z0-9_.-]+", "_", raw).strip("._-")
+    if not cleaned:
+        raise ValueError("Nom de clé SSH obligatoire.")
+    if len(cleaned) > 120:
+        raise ValueError("Nom de clé SSH trop long.")
+    return cleaned
+
+
+def browse_directories(path_value, resolver=resolve_p12_output_dir):
     start = str(path_value or "").strip()
-    resolved = resolve_p12_output_dir(start) if start else NAS_ROOT_DIR
+    resolved = resolver(start) if start else NAS_ROOT_DIR
 
     if not resolved:
         resolved = "/"
@@ -432,6 +479,88 @@ def browse_directories(path_value):
         "requested": resolved,
         "parent": parent,
         "items": items,
+    }
+
+
+def generate_ssh_key_files(form_data):
+    global SSH_OUTPUT
+
+    raw_name = str(form_data.get("ssh_name", "") or "").strip()
+    safe_name = sanitize_ssh_key_name(raw_name)
+    key_type = clean_ssh_key_type(form_data.get("key_type", "rsa3072"))
+    output_dir_raw = str(form_data.get("ssh_output_dir") or SSH_OUTPUT or "").strip()
+
+    output_dir_raw, output_dir = validate_ssh_output_dir(output_dir_raw)
+    os.makedirs(output_dir, exist_ok=True)
+
+    if not os.path.isdir(output_dir):
+        raise ValueError(f"Dossier de sortie SSH invalide : {output_dir}")
+
+    ssh_keygen = find_host_command(["/usr/bin/ssh-keygen", "/bin/ssh-keygen"])
+    puttygen = find_host_command(["/usr/bin/puttygen", "/usr/local/bin/puttygen", "/bin/puttygen"])
+    if not ssh_keygen:
+        raise RuntimeError("ssh-keygen introuvable : installe openssh-client.")
+    if not puttygen:
+        raise RuntimeError("puttygen introuvable : installe le paquet Debian putty-tools.")
+
+    SSH_OUTPUT = output_dir_raw
+    _write_conf_value("SSH_OUTPUT", output_dir_raw)
+
+    key_info = VALID_SSH_KEY_TYPES[key_type]
+    private_path = os.path.join(output_dir, f"{safe_name}.key")
+    auto_public_path = f"{private_path}.pub"
+    public_path = os.path.join(output_dir, f"{safe_name}.pub")
+    ppk_path = os.path.join(output_dir, f"{safe_name}.ppk")
+    comment = f"{safe_name}@{system_hostname()}"
+
+    # Remplace uniquement les trois fichiers de la clé demandée.
+    for candidate in (private_path, auto_public_path, public_path, ppk_path):
+        try:
+            if os.path.exists(candidate):
+                os.remove(candidate)
+        except OSError as exc:
+            raise RuntimeError(f"Impossible de remplacer {candidate} : {exc}") from exc
+
+    run_command([
+        ssh_keygen,
+        "-q",
+        *key_info["cmd"],
+        "-f", private_path,
+        "-N", "",
+        "-C", comment,
+    ])
+
+    if os.path.exists(auto_public_path):
+        os.replace(auto_public_path, public_path)
+    elif not os.path.exists(public_path):
+        public_key = run_command([ssh_keygen, "-y", "-f", private_path])
+        Path(public_path).write_text(f"{public_key.strip()} {comment}\n", encoding="utf-8")
+
+    run_command([puttygen, private_path, "-O", "private", "-o", ppk_path])
+
+    try:
+        os.chmod(private_path, 0o600)
+        os.chmod(ppk_path, 0o600)
+        os.chmod(public_path, 0o644)
+    except OSError:
+        pass
+
+    fingerprint = ""
+    try:
+        fingerprint = run_command([ssh_keygen, "-lf", public_path])
+    except Exception:
+        fingerprint = ""
+
+    return {
+        "safe_name": safe_name,
+        "key_type": key_type,
+        "key_label": key_info["label"],
+        "output_dir": output_dir_raw,
+        "output_dir_resolved": output_dir,
+        "private_key": private_path,
+        "public_key": public_path,
+        "ppk_key": ppk_path,
+        "fingerprint": fingerprint,
     }
 
 
@@ -1040,7 +1169,7 @@ def restore_users_from_conf():
 
 
 # --- ROUTES PAGE ---
-USER_TABS = {"general", "p12"}
+USER_TABS = {"general", "p12", "ssh"}
 USER_TAB_ALIASES = {
     "": "general",
     "user": "general",
@@ -1048,7 +1177,7 @@ USER_TAB_ALIASES = {
     "utilisateurs": "general",
     "linux": "general",
     "general": "general",
-    "ssh": "general",
+    "ssh": "ssh",
     "p12": "p12",
 }
 
@@ -1061,6 +1190,7 @@ def normalize_user_tab(value):
 USERS_SECTION_TITLES = {
     "general": ("Utilisateur Linux", "Comptes Linux, UID/GID, mots de passe et verrouillage"),
     "p12": ("Certificats P12", "Génération P12 avec dossier de sortie choisi"),
+    "ssh": ("SSH", "Génération de clés SSH réutilisables"),
 }
 
 
@@ -1084,6 +1214,9 @@ def _users_page_context(section="general"):
         "p12_output_dir": P12_OUTPUT,
         "p12_output_dir_resolved": current_p12_output_resolved(),
         "p12_config_file": CONFIG_FILE_USED or nas_conf_file(CONF_NAME) + " introuvable",
+        "ssh_output_dir": SSH_OUTPUT,
+        "ssh_output_dir_resolved": current_ssh_output_resolved(),
+        "ssh_config_file": CONFIG_FILE_USED or nas_conf_file(CONF_NAME) + " introuvable",
     }
 
 
@@ -1093,7 +1226,12 @@ def render_users_page(section="general"):
 
 def render_system_users_page(section="general"):
     active_tab = normalize_user_tab(section or request.args.get("tab", "general"))
-    template_name = "system_p12.html" if active_tab == "p12" else "system_users.html"
+    if active_tab == "p12":
+        template_name = "system_p12.html"
+    elif active_tab == "ssh":
+        template_name = "system_ssh.html"
+    else:
+        template_name = "system_users.html"
 
     # Important : ne pas forcer une icône ici.
     # Le template global menu.html sait déjà retrouver l’icône de la page active
@@ -1165,6 +1303,12 @@ def system_users_index():
 def system_p12_index():
     """Nouvelle page Certificats P12 sous /system/p12, avec une trame système propre."""
     return render_system_users_page("p12")
+
+
+@users_bp.route("/system/ssh")
+def system_ssh_index():
+    """Générateur autonome de clés SSH : .key, .pub et .ppk dans le dossier choisi."""
+    return render_system_users_page("ssh")
 
 
 # --- API ---
@@ -1313,6 +1457,83 @@ def api_generate_p12():
     except subprocess.CalledProcessError as e:
         details = (e.stderr or e.stdout or str(e)).strip()
         return jsonify({"error": f"OpenSSL a renvoyé une erreur : {details}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@users_bp.route("/api/users/ssh/browse", methods=["GET"])
+def api_browse_ssh_dirs():
+    path = request.args.get("path", "")
+
+    try:
+        return jsonify({
+            "status": "ok",
+            **browse_directories(path, resolver=resolve_ssh_output_dir),
+        })
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@users_bp.route("/api/users/ssh/output", methods=["POST"])
+def api_set_ssh_output():
+    deny = require_action_allowed()
+    if deny:
+        return deny
+
+    data = get_json_payload()
+
+    try:
+        output_dir_raw, output_dir = validate_ssh_output_dir(data.get("ssh_output_dir", ""))
+        os.makedirs(output_dir, exist_ok=True)
+        if not os.path.isdir(output_dir):
+            raise ValueError(f"Dossier de sortie SSH invalide : {output_dir}")
+
+        global SSH_OUTPUT
+        SSH_OUTPUT = output_dir_raw
+        _write_conf_value("SSH_OUTPUT", output_dir_raw)
+
+        return jsonify({
+            "status": "ok",
+            "message": "Dossier de sortie SSH enregistré.",
+            "output_dir": output_dir_raw,
+            "output_dir_resolved": output_dir,
+            "config_file": CONFIG_FILE_USED,
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@users_bp.route("/api/users/ssh/files/generate", methods=["POST"])
+def api_generate_ssh_files():
+    deny = require_action_allowed()
+    if deny:
+        return deny
+
+    data = get_json_payload()
+
+    try:
+        info = generate_ssh_key_files({
+            "ssh_name": data.get("ssh_name", ""),
+            "key_type": data.get("key_type", "rsa3072"),
+            "ssh_output_dir": data.get("ssh_output_dir", ""),
+        })
+
+        return jsonify({
+            "status": "ok",
+            "message": f"Généré : {info['safe_name']}.key + {info['safe_name']}.pub + {info['safe_name']}.ppk ({info['key_label']})",
+            "config_file": CONFIG_FILE_USED,
+            **info,
+        })
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except subprocess.CalledProcessError as e:
+        details = (e.stderr or e.stdout or str(e)).strip()
+        return jsonify({"error": f"Génération SSH a renvoyé une erreur : {details}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

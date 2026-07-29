@@ -60,17 +60,31 @@
             $('modalProgressFill').style.width = safe + '%';
             $('modalProgressValue').textContent = safe + '%';
         }
+        function buildLogNearBottom(box, threshold = 96) {
+            if (!box) return true;
+            return (box.scrollHeight - box.scrollTop - box.clientHeight) <= threshold;
+        }
+        function buildSetScrollableLog(box, text, append = false, forceBottom = false) {
+            if (!box) return;
+            const shouldStick = forceBottom || buildLogNearBottom(box);
+            const previousScrollTop = box.scrollTop || 0;
+            if ('value' in box) {
+                box.value = append ? box.value + text : text;
+            } else {
+                box.textContent = append ? box.textContent + text : text;
+            }
+            if (shouldStick) box.scrollTop = box.scrollHeight;
+            else box.scrollTop = previousScrollTop;
+        }
         function clearLog() { const out = $('terminal-output'); if (out) out.value = ''; setProgress(0); setStatus('Prêt.'); }
         function appendLog(text) {
             const box = $('terminal-output');
             if (!box) return;
-            box.value += text;
-            box.scrollTop = box.scrollHeight;
+            buildSetScrollableLog(box, text, true);
         }
         function appendModalLog(text) {
             const box = $('modalLog');
-            box.textContent += text;
-            box.scrollTop = box.scrollHeight;
+            buildSetScrollableLog(box, text, true);
         }
         function openProgressModal(title, progressTitle) {
             $('modalTitle').textContent = title || 'Opération en cours';
@@ -95,44 +109,85 @@
         const registryServiceStatusUrl = {{ url_for('builds_bp.registry_service_status_json')|tojson }};
         const buildLogLevelUrl = {{ url_for('builds_bp.build_log_level_route')|tojson }};
         const systemLogFile = {{ conf.SYSTEM_LOG_FILE|tojson }};
-        const buildMainTtydUrl = {{ url_for('builds_bp.build_main_ttyd_route')|tojson }};
+        const buildMainLogUrl = {{ url_for('builds_bp.build_main_log_json_route')|tojson }};
         const autoBuildCacheOnLoad = {{ ((not build_setup.required) and (not build_cache.exists) and (active_build_section in ['main', 'tarbuild']))|tojson }};
         const autoBuildCachePath = {{ (build_cache.path or '')|tojson }};
 
-        function buildMainTtydElements() {
+        let buildMainLogPollTimer = 0;
+        let buildMainLogPinnedToBottom = true;
+
+        function buildMainLogElements() {
             return {
-                modal: $('buildMainTtydModal'),
-                frame: $('buildMainTtydFrame'),
-                title: $('buildMainTtydModalTitle')
+                modal: $('buildMainLogModal'),
+                box: $('buildMainLogBox'),
+                meta: $('buildMainLogMeta'),
+                title: $('buildMainLogModalTitle')
             };
         }
 
-        function closeBuildMainTtyd() {
-            const parts = buildMainTtydElements();
+        function isBuildMainLogNearBottom(box) {
+            return buildLogNearBottom(box);
+        }
+
+        function buildMainLogMetaText(data) {
+            const bits = [];
+            if (data?.running) bits.push('en cours');
+            else if (data?.status) bits.push(String(data.status));
+            if (data?.log_path) bits.push(data.log_path);
+            if (data?.truncated) bits.push('fin du log affichée');
+            if (!bits.length) bits.push('log Build');
+            return bits.join(' · ');
+        }
+
+        async function refreshBuildMainLog(forceBottom = false) {
+            const parts = buildMainLogElements();
+            if (!parts.box) return;
+            try {
+                const response = await fetch(buildMainLogUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+                const data = await response.json().catch(() => ({ok: false, message: 'Réponse serveur illisible.'}));
+                if (!response.ok || !data.ok) throw new Error(data.message || 'Impossible de lire le log Build.');
+                if (parts.title) parts.title.textContent = data.title || 'Log Build Main';
+                if (parts.meta) parts.meta.textContent = buildMainLogMetaText(data);
+                const shouldStick = forceBottom || isBuildMainLogNearBottom(parts.box);
+                buildSetScrollableLog(parts.box, data.log_text || 'Aucun log Build pour le moment.', false, forceBottom);
+                buildMainLogPinnedToBottom = shouldStick;
+            } catch (error) {
+                if (parts.meta) parts.meta.textContent = 'Erreur de lecture du log';
+                buildSetScrollableLog(parts.box, error.message || String(error));
+            }
+        }
+
+        function closeBuildMainLog() {
+            if (buildMainLogPollTimer) {
+                clearInterval(buildMainLogPollTimer);
+                buildMainLogPollTimer = 0;
+            }
+            const parts = buildMainLogElements();
             if (!parts.modal) return;
             parts.modal.hidden = true;
             parts.modal.setAttribute('aria-hidden', 'true');
             document.body.classList.remove('docker-ttyd-modal-open');
-            if (parts.frame) parts.frame.src = 'about:blank';
         }
 
-        async function openBuildMainTtyd(button) {
+        function scrollBuildMainLogBottom() {
+            const parts = buildMainLogElements();
+            if (!parts.box) return;
+            parts.box.scrollTop = parts.box.scrollHeight;
+            buildMainLogPinnedToBottom = true;
+        }
+
+        async function openBuildMainLog(button) {
             setButtonRunning(button);
             try {
-                const response = await fetch(buildMainTtydUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
-                const data = await response.json().catch(() => ({ok: false, message: 'Réponse serveur illisible.'}));
-                if (!response.ok || !data.ok || !data.url) throw new Error(data.message || 'Impossible d’ouvrir le log Build Main dans ttyd.');
-                const parts = buildMainTtydElements();
-                if (!parts.modal || !parts.frame) {
-                    window.open(data.url, 'yoleo_build_main_ttyd', 'width=1200,height=760,resizable=yes,scrollbars=yes');
-                    setButtonFinished(button, true);
-                    return;
-                }
-                if (parts.title) parts.title.textContent = data.title || 'Log Build Main';
-                parts.frame.src = data.url;
+                const parts = buildMainLogElements();
+                if (!parts.modal || !parts.box) throw new Error('Fenêtre de log Build introuvable.');
+                buildMainLogPinnedToBottom = true;
                 parts.modal.hidden = false;
                 parts.modal.setAttribute('aria-hidden', 'false');
                 document.body.classList.add('docker-ttyd-modal-open');
+                await refreshBuildMainLog(true);
+                if (buildMainLogPollTimer) clearInterval(buildMainLogPollTimer);
+                buildMainLogPollTimer = window.setInterval(() => refreshBuildMainLog(false), 1500);
                 setButtonFinished(button, true);
             } catch (error) {
                 setStatus(error.message || String(error));
@@ -140,8 +195,9 @@
             }
         }
 
-        window.openBuildMainTtyd = openBuildMainTtyd;
-        window.closeBuildMainTtyd = closeBuildMainTtyd;
+        window.openBuildMainLog = openBuildMainLog;
+        window.closeBuildMainLog = closeBuildMainLog;
+        window.scrollBuildMainLogBottom = scrollBuildMainLogBottom;
 
         function saveBuildLogLevel(level) {
             const value = String(level || '').trim();
@@ -1458,14 +1514,12 @@
             markMainBuildFailuresFromLog(logText);
             const output = $('terminal-output');
             if (output && output.value !== logText) {
-                output.value = logText;
-                output.scrollTop = output.scrollHeight;
+                buildSetScrollableLog(output, logText);
             }
             if (useModal && $('progressModal').style.display === 'flex') {
                 const modal = $('modalLog');
                 if (modal && modal.textContent !== logText) {
-                    modal.textContent = logText;
-                    modal.scrollTop = modal.scrollHeight;
+                    buildSetScrollableLog(modal, logText);
                 }
             }
 
@@ -1771,14 +1825,55 @@
             row.dataset.dbFilter = `${String(data.name).toLowerCase()} ${String(data.registry).toLowerCase()} ${String(data.platforms).toLowerCase()} ${modeLabel}`;
         }
 
-        async function postDbRows(rows, button) {
+        let dbFloatingToastTimer = 0;
+
+        function showDbFloatingToast(message, ok = true) {
+            let toast = $('buildDbFloatingToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'buildDbFloatingToast';
+                toast.className = 'build-db-floating-toast';
+                document.body.appendChild(toast);
+            }
+            if (dbFloatingToastTimer) {
+                clearTimeout(dbFloatingToastTimer);
+                dbFloatingToastTimer = 0;
+            }
+            toast.textContent = message || (ok ? 'Enregistré' : 'Erreur');
+            toast.classList.toggle('is-error', !ok);
+            toast.classList.add('is-visible');
+            dbFloatingToastTimer = window.setTimeout(() => {
+                toast.classList.remove('is-visible');
+            }, ok ? 850 : 1600);
+        }
+
+        function dbTableRows() {
+            return Array.from(document.querySelectorAll('#dbTable tbody tr'));
+        }
+
+        function setDbOrderButtonsDisabled(disabled) {
+            document.querySelectorAll('.db-order-btn').forEach(button => {
+                button.disabled = !!disabled;
+            });
+        }
+
+        function updateDbOrderButtons() {
+            const rows = dbTableRows();
+            rows.forEach((row, index) => {
+                const buttons = row.querySelectorAll('.db-order-btn');
+                if (buttons[0]) buttons[0].disabled = index === 0;
+                if (buttons[1]) buttons[1].disabled = index === rows.length - 1;
+            });
+        }
+
+        async function postDbRows(rows, button, extraPayload = {}) {
             setButtonRunning(button);
             try {
                 const response = await fetch(databaseJsonUrl, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({rows})
+                    body: JSON.stringify({rows, ...extraPayload})
                 });
                 const payload = await response.json().catch(() => ({}));
                 if (!response.ok || !payload.ok) throw new Error(payload.message || `Erreur HTTP ${response.status}`);
@@ -1787,6 +1882,41 @@
             } catch (error) {
                 setButtonFinished(button, false);
                 throw error;
+            }
+        }
+
+        async function moveDbRow(button, direction) {
+            const row = button?.closest('tr');
+            const tbody = row?.parentElement;
+            if (!row || !tbody) return;
+            const originalRows = Array.from(tbody.children);
+            const rows = dbTableRows();
+            const index = rows.indexOf(row);
+            const step = Number(direction || 0) < 0 ? -1 : 1;
+            const target = rows[index + step];
+            if (!target) return;
+
+            if (step < 0) tbody.insertBefore(row, target);
+            else tbody.insertBefore(target, row);
+            updateDbOrderButtons();
+            setupDbScroll();
+            bindKeyboardRows();
+            ensureKeyboardSelection($('dbTable'));
+
+            setDbOrderButtonsDisabled(true);
+            try {
+                await postDbRows(dbTableRows().map(dbRowPayload), null, {reorder: true});
+                showDbFloatingToast('Ordre enregistré.', true);
+            } catch (error) {
+                originalRows.forEach(savedRow => tbody.appendChild(savedRow));
+                updateDbOrderButtons();
+                setupDbScroll();
+                bindKeyboardRows();
+                ensureKeyboardSelection($('dbTable'));
+                showDbFloatingToast(error.message || 'Erreur ordre.', false);
+            } finally {
+                setDbOrderButtonsDisabled(false);
+                updateDbOrderButtons();
             }
         }
 
@@ -1848,7 +1978,7 @@
             // Compatibilité vieux HTML/cache : sauvegarde dynamique de toutes les lignes, sans submit navigateur.
             const rows = Array.from(document.querySelectorAll('#dbTable tbody tr')).map(dbRowPayload);
             try {
-                await postDbRows(rows, null);
+                await postDbRows(rows, null, {reorder: true});
                 document.querySelectorAll('#dbTable tbody tr').forEach(row => setDbRowState(row, true, 'Enregistré'));
                 refreshStatusesAfterDatabaseRows(rows, 250);
             } catch (error) {
@@ -1862,6 +1992,7 @@
             if (row.dataset.unsaved === '1') {
                 row.remove();
                 setupDbScroll();
+                updateDbOrderButtons();
                 bindKeyboardRows();
                 ensureKeyboardSelection();
                 return;
@@ -1872,6 +2003,7 @@
                 refreshStatusesAfterDatabaseRows([current]);
                 row.remove();
                 setupDbScroll();
+                updateDbOrderButtons();
                 bindKeyboardRows();
                 ensureKeyboardSelection();
             } catch (error) {
@@ -1890,7 +2022,7 @@
             const rows = rowsEls.map(dbRowPayload);
 
             try {
-                const payload = await postDbRows(rows, button);
+                const payload = await postDbRows(rows, button, {reorder: true});
                 rowsEls.forEach(row => setDbRowState(row, true, payload.message || 'Enregistré'));
 
                 // Le bouton magique lance aussi le remplissage côté serveur pour les
@@ -2144,6 +2276,7 @@
                 const haystack = row.dataset.dbFilter || row.textContent.toLowerCase();
                 row.style.display = (!query || haystack.includes(query)) ? '' : 'none';
             });
+            updateDbOrderButtons();
             bindKeyboardRows();
             ensureKeyboardSelection($('dbTable'));
         }
@@ -2158,6 +2291,7 @@
             let syncing = false;
             top.onscroll = () => { if (syncing) return; syncing = true; wrap.scrollLeft = top.scrollLeft; syncing = false; };
             wrap.onscroll = () => { if (syncing) return; syncing = true; top.scrollLeft = wrap.scrollLeft; syncing = false; };
+            updateDbOrderButtons();
         }
 
         // --- NAVIGATION CLAVIER TABLEAUX ---
@@ -2337,6 +2471,7 @@
             const wanted = new URLSearchParams(window.location.search).get('tab');
             if (wanted && $('tab-' + wanted)) switchTab(wanted);
             setupDbScroll();
+            updateDbOrderButtons();
             bindKeyboardRows();
             ensureKeyboardSelection();
         });
@@ -2377,6 +2512,7 @@
                 window.setTimeout(() => refreshRegistryServiceStatus(), 800);
             }
             bindKeyboardRows();
+            updateDbOrderButtons();
             ensureKeyboardSelection();        });
     </script>
   </div>

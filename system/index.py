@@ -218,7 +218,7 @@ def nas_root_path(*parts: str) -> str:
 # ==========================================================
 # Fichier officiel : ../conf/menu_ui.conf depuis le dossier Python.
 # Sert à mémoriser la largeur de la barre latérale entre deux redémarrages.
-# Important : ../conf/menu.conf est réservé au menu CLI scripts/menu.sh.
+# Important : ../conf/menu.conf est réservé au menu CLI system/menu.py.
 MENU_CONFIG_DEFAULTS = {
     "SIDEBAR_WIDTH": "252",
     "SIDEBAR_COMPACT": "70",

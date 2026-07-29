@@ -5,21 +5,22 @@
 {% block content %}
 <style>
 :root {
-    --scripts-accent:#19e3ff;
-    --scripts-bg:#0b1017;
-    --scripts-card:#131b26;
-    --scripts-soft:#0e151f;
-    --scripts-border:#2d3948;
-    --scripts-text:#e4edf7;
-    --scripts-muted:#91a0b2;
+    --scripts-accent:#1AEBFF;
+    --scripts-bg:#0e1218;
+    --scripts-card:#131d2b;
+    --scripts-soft:#0e1723;
+    --scripts-border:#26364b;
+    --scripts-text:#e9eef5;
+    --scripts-muted:#99acc2;
     --scripts-ok:#3ddc84;
     --scripts-warn:#f5bf42;
     --scripts-bad:#ff6270;
+    --scripts-shadow:0 14px 30px rgba(0,0,0,.18);
 }
-.scripts-page{max-width:1540px;margin:0 auto;color:var(--scripts-text)}
-.scripts-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
-.scripts-stat{background:linear-gradient(180deg,#151e2a,#101721);border:1px solid var(--scripts-border);border-radius:14px;padding:14px 16px;min-height:82px}
-.scripts-stat-label{font-size:11px;text-transform:uppercase;color:var(--scripts-muted);letter-spacing:.45px;margin-bottom:8px;font-weight:800}
+.scripts-page{width:100%;max-width:1420px;margin:0 auto;color:var(--scripts-text);font-family:'Segoe UI',system-ui,sans-serif}
+.scripts-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.scripts-stat{background:linear-gradient(180deg,var(--scripts-soft) 0%,#101722 100%);border:1px solid var(--scripts-border);border-radius:14px;padding:14px;min-height:82px;box-shadow:var(--scripts-shadow)}
+.scripts-stat-label{font-size:11px;text-transform:uppercase;color:var(--scripts-muted);letter-spacing:0;margin-bottom:8px;font-weight:900}
 .scripts-stat-value{font-size:28px;line-height:1;font-weight:950;color:#fff}
 .scripts-stat-value.cyan{color:var(--scripts-accent)}
 .scripts-stat-value.green{color:var(--scripts-ok)}
@@ -27,16 +28,16 @@
 .scripts-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .scripts-toolbar-left,.scripts-toolbar-right,.scripts-fallback-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .scripts-fallback-actions{padding:10px 12px;margin-bottom:14px;background:linear-gradient(180deg,#151e2a,#101721);border:1px solid var(--scripts-border);border-radius:13px}
-.scripts-path{color:var(--scripts-muted);font:12px Consolas,monospace;background:var(--scripts-soft);border:1px solid var(--scripts-border);border-radius:9px;padding:8px 10px;word-break:break-all}
-.scripts-btn{appearance:none;border:1px solid var(--scripts-border);background:#172231;color:var(--scripts-text);min-height:38px;padding:8px 13px;border-radius:10px;font-weight:800;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.16s ease;white-space:nowrap}
+.scripts-path{color:var(--scripts-muted);font:12px Consolas,monospace;background:var(--scripts-soft);border:1px solid var(--scripts-border);border-radius:10px;padding:8px 10px;word-break:break-all}
+.scripts-btn{appearance:none;border:1px solid var(--scripts-border);background:#172231;color:var(--scripts-text);min-height:40px;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:900;text-transform:uppercase;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:.16s ease;white-space:nowrap;box-sizing:border-box}
 .scripts-btn:hover{transform:translateY(-1px);border-color:#53677e;background:#1b2a3c}
 .scripts-btn-primary{background:var(--scripts-accent);color:#001014;border-color:var(--scripts-accent)}
 .scripts-btn-danger{color:#ff9aa4;border-color:rgba(255,98,112,.52);background:rgba(255,98,112,.08)}
 .scripts-btn-stop{color:#ffd36b;border-color:rgba(245,191,66,.48);background:rgba(245,191,66,.08)}
-.scripts-btn-icon{width:36px;height:36px;min-height:36px;padding:0;font-size:16px}
-.scripts-card{background:linear-gradient(180deg,#151e2a,#101721);border:1px solid var(--scripts-border);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.28);overflow:hidden}
+.scripts-btn-icon{width:38px;min-width:38px;height:38px;min-height:38px;padding:0;border-radius:10px;font-size:15px;line-height:1}
+.scripts-card{background:linear-gradient(180deg,var(--scripts-card) 0%,#101722 100%);border:1px solid var(--scripts-border);border-radius:16px;box-shadow:var(--scripts-shadow);overflow:hidden}
 .scripts-card-head{padding:15px 17px;border-bottom:1px solid var(--scripts-border);display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-.scripts-card-title{color:var(--scripts-accent);font-size:15px;text-transform:uppercase;letter-spacing:.5px;font-weight:950;margin-bottom:5px}
+.scripts-card-title{color:var(--scripts-accent);font-size:15px;text-transform:uppercase;letter-spacing:0;font-weight:950;margin-bottom:5px}
 .scripts-card-description{color:var(--scripts-muted);font-size:12px;line-height:1.45}
 .scripts-card-meta{display:flex;flex-direction:column;align-items:flex-end;gap:7px;min-width:220px}
 .scripts-count{color:var(--scripts-muted);font-size:12px}
@@ -52,7 +53,8 @@
 .script-file{color:var(--scripts-muted);font:11px Consolas,monospace;word-break:break-all}
 .script-description{color:#b8c5d4;line-height:1.4;max-width:620px}
 .script-date{color:var(--scripts-muted);white-space:nowrap;font-size:12px}
-.script-actions{display:flex;justify-content:flex-end;align-items:center;gap:7px;white-space:nowrap}
+.script-actions{display:flex;justify-content:flex-end;align-items:center;gap:4px;white-space:nowrap;flex-wrap:wrap}
+.scripts-table .script-actions .scripts-btn-icon{width:28px;min-width:28px;max-width:28px;height:28px;min-height:28px;max-height:28px;flex:0 0 28px;border-radius:8px;font-size:12px;padding:0;overflow:hidden}
 .script-status{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;border:1px solid var(--scripts-border);color:var(--scripts-muted);background:rgba(145,160,178,.08);font-size:11px;font-weight:900;white-space:nowrap}
 .script-status::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .script-status[data-state="running"],.script-status[data-state="starting"]{color:var(--scripts-accent);border-color:rgba(25,227,255,.38);background:rgba(25,227,255,.08)}
@@ -65,33 +67,43 @@
 .scripts-flash{margin-bottom:14px;border-radius:12px;padding:12px 14px;border:1px solid}
 .scripts-flash-ok{color:#baffd2;border-color:rgba(61,220,132,.42);background:rgba(28,100,59,.24)}
 .scripts-flash-error{color:#ffd0d5;border-color:rgba(255,98,112,.48);background:rgba(118,23,35,.28)}
-.scripts-form-card{padding:18px 20px;max-width:1180px}
+.scripts-form-card{padding:14px;max-width:1080px;margin:0 auto}
 .scripts-settings-card{max-width:920px}
-.scripts-form-heading{margin:0 0 16px;color:var(--scripts-accent);font-size:15px;text-transform:uppercase;letter-spacing:.45px}
-.scripts-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px}
-.scripts-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.scripts-form-heading{margin:0 0 14px;color:var(--scripts-accent);font-size:14px;text-transform:uppercase;letter-spacing:0;border-bottom:1px solid #273447;padding-bottom:10px}
+.scripts-form-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px 12px;align-items:start}
+.scripts-form-grid>.scripts-field{grid-column:span 6}
+.scripts-form-grid>.scripts-field-full{grid-column:1/-1}
+.scripts-field{display:flex;flex-direction:column;gap:4px;min-width:0}
 .scripts-field-full{grid-column:1/-1}
-.scripts-field label{color:#cbd7e4;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.35px}
-.scripts-input,.scripts-select,.scripts-textarea{width:100%;border:1px solid var(--scripts-border);background:#0b121b;color:var(--scripts-text);border-radius:10px;padding:10px 11px;font:14px 'Segoe UI',sans-serif;outline:none;box-sizing:border-box}
+.scripts-field label{color:var(--scripts-muted);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0;line-height:1.15}
+.scripts-input,.scripts-select,.scripts-textarea{width:100%;border:1px solid #2b3d55;background:#07101b;color:#eaf2ff;border-radius:8px;padding:8px 10px;font:12px 'Segoe UI',sans-serif;outline:none;box-sizing:border-box;min-height:36px}
 .scripts-input:focus,.scripts-select:focus,.scripts-textarea:focus{border-color:var(--scripts-accent);box-shadow:0 0 0 3px rgba(25,227,255,.10)}
-.scripts-select{width:132px;flex:0 0 132px;font-weight:800}
-.scripts-textarea{min-height:390px;resize:vertical;font:13px/1.5 Consolas,Monaco,monospace;tab-size:4}
-.scripts-help{color:var(--scripts-muted);font-size:11px;line-height:1.4}
+.scripts-select{width:126px;flex:0 0 126px;font-weight:800}
+.scripts-textarea{min-height:clamp(340px,52vh,620px);resize:vertical;font:12px/1.5 Consolas,Monaco,monospace;tab-size:4}
+.scripts-help{color:var(--scripts-muted);font-size:10px;line-height:1.35;margin-top:2px}
 .scripts-inline{display:flex;align-items:center;gap:8px;min-width:0}
 .scripts-inline .scripts-input{flex:1;min-width:0}
 .scripts-name-row{width:min(560px,100%)}
 .scripts-folder-row{width:min(620px,100%)}
 .script-icon-row{width:100%}
-.script-icon-preview{width:42px;height:42px;object-fit:contain;border-radius:9px;border:1px solid var(--scripts-border);background:#080d13;padding:4px;flex:0 0 auto}
-.scripts-form-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:2px}
+.script-icon-preview{width:36px;height:36px;object-fit:contain;border-radius:8px;border:1px solid var(--scripts-border);background:#080d13;padding:4px;flex:0 0 auto}
+.scripts-form-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:2px}
+.scripts-form-actions .scripts-btn{min-height:36px;padding:8px 11px;border-radius:8px;font-size:11px}
 .script-modal[hidden]{display:none!important}
 .script-modal{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:18px}
-.script-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.76);backdrop-filter:blur(4px)}
-.script-modal-box{position:relative;width:min(1180px,96vw);height:min(780px,92vh);background:#090d12;border:1px solid #38485b;border-radius:17px;box-shadow:0 30px 90px rgba(0,0,0,.72);overflow:hidden;display:flex;flex-direction:column}
+.script-modal-backdrop{position:absolute;inset:0;background:rgba(1,4,9,.76);backdrop-filter:blur(10px)}
+.script-modal-box{position:relative;width:min(1180px,96vw);height:min(840px,94vh);background:linear-gradient(180deg,#182231 0%,#0f151e 100%);border:1px solid #38485b;border-radius:22px;box-shadow:0 24px 80px rgba(0,0,0,.58),0 0 0 1px rgba(255,255,255,.03) inset;overflow:hidden;display:flex;flex-direction:column}
 .script-modal-header{min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid #2d3948;background:#121a24}
 .script-modal-title{display:flex;align-items:center;gap:9px;font-weight:900;color:var(--scripts-accent)}
 .script-modal-close{width:36px;height:36px;border-radius:10px;border:1px solid #3b4c60;background:#182331;color:#fff;cursor:pointer;font-size:22px}
-.script-terminal-frame{flex:1;min-width:0;min-height:0;width:100%;height:100%;border:0;background:#000;overflow:auto;scrollbar-gutter:stable}
+.script-modal-body{flex:1;min-height:0;display:flex;flex-direction:column;background:#05080c}
+.script-log-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid #1d2c3f;background:#0b121b}
+.script-log-meta{color:var(--scripts-muted);font-size:11px;font-family:Consolas,Monaco,monospace;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.script-log-box{flex:1;min-height:0;margin:0;padding:16px;overflow:auto;background:#05080c;color:#bfe8ff;border:0;font:12px/1.55 Consolas,Monaco,monospace;white-space:pre-wrap;word-break:break-word;scrollbar-gutter:stable}
+.script-log-box::-webkit-scrollbar{width:13px;height:13px}
+.script-log-box::-webkit-scrollbar-track{background:#070b10}
+.script-log-box::-webkit-scrollbar-thumb{background:#526a84;border:3px solid #070b10;border-radius:999px}
+.script-log-box::-webkit-scrollbar-thumb:hover{background:#6f8cac}
 .script-modal-note{color:var(--scripts-muted);font-size:11px;font-weight:500}
 .script-confirm-box{position:relative;width:min(520px,94vw);background:#121a24;border:1px solid #47586d;border-radius:17px;box-shadow:0 28px 80px rgba(0,0,0,.65);overflow:hidden}
 .script-confirm-body{padding:22px}.script-confirm-body h3{margin:0 0 10px;color:#fff}.script-confirm-body p{color:#b8c5d4;line-height:1.55;margin:0}
@@ -120,7 +132,7 @@
 @media(max-width:1050px){
     .scripts-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
     .scripts-form-grid{grid-template-columns:1fr}
-    .scripts-field-full{grid-column:auto}
+    .scripts-form-grid>.scripts-field,.scripts-form-grid>.scripts-field-full{grid-column:1}
     .scripts-form-card{max-width:none}
 }
 @media(max-width:900px){
@@ -216,10 +228,11 @@
                         <td><span class="script-status" data-script-status data-state="{{ script.status.state }}">{{ script.status_label }}</span></td>
                         <td><span class="script-date">{{ script.mtime }}</span></td>
                         <td><div class="script-actions">
+                            <a class="scripts-btn scripts-btn-icon" title="Modifier" href="{{ url_for('scripts_bp.edit_page', filename=script.name) }}">✏️</a>
                             <button type="button" class="scripts-btn scripts-btn-icon scripts-btn-primary" title="Exécuter dans tmux" data-script-run="{{ script.name|e }}" data-script-title="{{ script.title|e }}">▶</button>
-                            <button type="button" class="scripts-btn scripts-btn-icon scripts-btn-stop" title="Arrêter la session tmux" data-script-stop="{{ script.name|e }}">■</button>
-                            <a class="scripts-btn scripts-btn-icon" title="Modifier" href="{{ url_for('scripts_bp.edit_page', filename=script.name) }}">✎</a>
-                            <button type="button" class="scripts-btn scripts-btn-icon scripts-btn-danger" title="Supprimer" data-script-delete="{{ script.name|e }}">🗑</button>
+                            <button type="button" class="scripts-btn scripts-btn-icon scripts-btn-stop" title="Arrêter la session tmux" data-script-stop="{{ script.name|e }}">⛔</button>
+                            <button type="button" class="scripts-btn scripts-btn-icon" title="Voir les logs" data-script-log="{{ script.name|e }}" data-script-title="{{ script.title|e }}">🧾</button>
+                            <button type="button" class="scripts-btn scripts-btn-icon scripts-btn-danger" title="Supprimer" data-script-delete="{{ script.name|e }}">🗑️</button>
                         </div></td>
                     </tr>
                     {% endfor %}
@@ -252,10 +265,11 @@
                         </div>
                     </div>
                     <div class="scripts-mobile-actions">
+                        <a class="scripts-btn" href="{{ url_for('scripts_bp.edit_page', filename=script.name) }}">✏️ Modifier</a>
                         <button type="button" class="scripts-btn scripts-btn-primary" data-script-run="{{ script.name|e }}" data-script-title="{{ script.title|e }}">▶ Lancer</button>
-                        <button type="button" class="scripts-btn scripts-btn-stop" data-script-stop="{{ script.name|e }}">■ Arrêter</button>
-                        <a class="scripts-btn" href="{{ url_for('scripts_bp.edit_page', filename=script.name) }}">✎ Modifier</a>
-                        <button type="button" class="scripts-btn scripts-btn-danger" data-script-delete="{{ script.name|e }}">🗑 Supprimer</button>
+                        <button type="button" class="scripts-btn scripts-btn-stop" data-script-stop="{{ script.name|e }}">⛔ Stop</button>
+                        <button type="button" class="scripts-btn" data-script-log="{{ script.name|e }}" data-script-title="{{ script.title|e }}">🧾 Logs</button>
+                        <button type="button" class="scripts-btn scripts-btn-danger" data-script-delete="{{ script.name|e }}">🗑️ Supprimer</button>
                     </div>
                 </article>
                 {% endfor %}
@@ -328,11 +342,17 @@
     {% endif %}
 </div>
 
-<div class="script-modal" id="scriptTerminalModal" hidden aria-hidden="true">
-    <div class="script-modal-backdrop" data-terminal-close></div>
-    <section class="script-modal-box" role="dialog" aria-modal="true" aria-labelledby="scriptTerminalTitle">
-        <header class="script-modal-header"><div class="script-modal-title">▶ <span id="scriptTerminalTitle">Exécution du script</span> <span class="script-modal-note">tmux indépendant de Gunicorn</span></div><button type="button" class="script-modal-close" data-terminal-close aria-label="Fermer">×</button></header>
-        <iframe class="script-terminal-frame" id="scriptTerminalFrame" title="Terminal du script" scrolling="yes"></iframe>
+<div class="script-modal" id="scriptLogModal" hidden aria-hidden="true">
+    <div class="script-modal-backdrop" data-log-close></div>
+    <section class="script-modal-box" role="dialog" aria-modal="true" aria-labelledby="scriptLogTitle">
+        <header class="script-modal-header"><div class="script-modal-title">🧾 <span id="scriptLogTitle">Log du script</span></div><button type="button" class="script-modal-close" data-log-close aria-label="Fermer">×</button></header>
+        <div class="script-modal-body">
+            <div class="script-log-toolbar">
+                <div class="script-log-meta" id="scriptLogMeta">Aucun log chargé.</div>
+                <button type="button" class="scripts-btn" id="scriptLogBottom">Bas du log</button>
+            </div>
+            <pre class="script-log-box" id="scriptLogBox">Aucun log pour le moment.</pre>
+        </div>
     </section>
 </div>
 
@@ -348,65 +368,19 @@
 
 <script>
 (() => {
-    const terminalModal = document.getElementById('scriptTerminalModal');
-    const terminalFrame = document.getElementById('scriptTerminalFrame');
-    const terminalTitle = document.getElementById('scriptTerminalTitle');
+    const logModal = document.getElementById('scriptLogModal');
+    const logTitle = document.getElementById('scriptLogTitle');
+    const logBox = document.getElementById('scriptLogBox');
+    const logMeta = document.getElementById('scriptLogMeta');
+    const logBottom = document.getElementById('scriptLogBottom');
     const deleteModal = document.getElementById('scriptDeleteModal');
     const deleteName = document.getElementById('scriptDeleteName');
     const deleteConfirm = document.getElementById('scriptDeleteConfirm');
     const toast = document.getElementById('scriptsToast');
-    let activeTerminalScript = '';
-    let terminalPoll = 0;
-
-    /* ttyd/xterm masque parfois son ascenseur dans l'iframe.
-       Comme le terminal passe par le proxy Yoleo de même origine, on remet
-       explicitement l'ascenseur vertical du viewport xterm. */
-    function enableTerminalScrollbar() {
-        if (!terminalFrame) return;
-        try {
-            const frameDocument = terminalFrame.contentDocument;
-            if (!frameDocument || !frameDocument.head) return;
-            const styleId = 'yoleo-script-terminal-scrollbar';
-            if (frameDocument.getElementById(styleId)) return;
-            const style = frameDocument.createElement('style');
-            style.id = styleId;
-            style.textContent = `
-                .xterm .xterm-viewport {
-                    overflow-y: scroll !important;
-                    scrollbar-width: auto !important;
-                    scrollbar-color: #526a84 #080c11 !important;
-                    scrollbar-gutter: stable !important;
-                }
-                .xterm .xterm-viewport::-webkit-scrollbar {
-                    display: block !important;
-                    width: 14px !important;
-                }
-                .xterm .xterm-viewport::-webkit-scrollbar-track {
-                    background: #080c11 !important;
-                }
-                .xterm .xterm-viewport::-webkit-scrollbar-thumb {
-                    background: #526a84 !important;
-                    border: 3px solid #080c11 !important;
-                    border-radius: 999px !important;
-                }
-                .xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
-                    background: #6f8cac !important;
-                }
-            `;
-            frameDocument.head.appendChild(style);
-        } catch (_error) {
-            /* En accès direct sur un autre port, le navigateur peut bloquer
-               l'accès au document de l'iframe. Le terminal reste utilisable. */
-        }
-    }
-
-    if (terminalFrame) {
-        terminalFrame.addEventListener('load', () => {
-            enableTerminalScrollbar();
-            window.setTimeout(enableTerminalScrollbar, 250);
-            window.setTimeout(enableTerminalScrollbar, 1000);
-        });
-    }
+    let activeLogScript = '';
+    let logPoll = 0;
+    let logAutoCloseOnSuccess = false;
+    let logPinnedToBottom = true;
     let pendingDelete = '';
 
     const endpoint = (action, name) => `/system/scripts/${action}/${encodeURIComponent(name)}`;
@@ -427,6 +401,44 @@
         return data;
     }
 
+    function logIsNearBottom() {
+        if (!logBox) return true;
+        return (logBox.scrollHeight - logBox.scrollTop - logBox.clientHeight) < 48;
+    }
+
+    async function refreshLog(name, forceBottom=false) {
+        if (!name || !logBox) return null;
+        const shouldStick = forceBottom || logPinnedToBottom || logIsNearBottom();
+        const previousScrollTop = logBox.scrollTop;
+        const data = await jsonFetch(endpoint('api/log', name));
+        logBox.textContent = data.log_text || 'Aucun log pour le moment.';
+        if (logMeta) {
+            const status = data.status || {};
+            const label = status.label || status.state || '—';
+            const suffix = data.truncated ? ' · fin du fichier affichée' : '';
+            logMeta.textContent = `${label} · ${data.log_file || 'log'}${suffix}`;
+        }
+        if (data.status) updateStatus(name, data.status);
+        if (shouldStick) {
+            logBox.scrollTop = logBox.scrollHeight;
+            logPinnedToBottom = true;
+        } else {
+            logBox.scrollTop = previousScrollTop;
+        }
+        return data;
+    }
+
+    if (logBox) {
+        logBox.addEventListener('scroll', () => { logPinnedToBottom = logIsNearBottom(); });
+    }
+    if (logBottom) {
+        logBottom.addEventListener('click', () => {
+            if (!logBox) return;
+            logBox.scrollTop = logBox.scrollHeight;
+            logPinnedToBottom = true;
+        });
+    }
+
     function updateStatus(name, status) {
         if (!status) return;
         const label = status.label || ({idle:'Prêt',starting:'Démarrage',running:'En cours',success:'Succès',error:'Erreur',stopped:'Arrêté'}[status.state] || status.state || 'Prêt');
@@ -444,41 +456,56 @@
         } catch (_) { return null; }
     }
 
-    function closeTerminal(callCloseEndpoint=true) {
-        if (!terminalModal) return;
-        const name = activeTerminalScript;
-        terminalModal.hidden = true;
-        terminalModal.setAttribute('aria-hidden','true');
+    function closeLog(callCloseEndpoint=true) {
+        if (!logModal) return;
+        const name = activeLogScript;
+        logModal.hidden = true;
+        logModal.setAttribute('aria-hidden','true');
         document.body.style.overflow = '';
-        if (terminalFrame) terminalFrame.src = 'about:blank';
-        window.clearInterval(terminalPoll);
-        terminalPoll = 0;
-        activeTerminalScript = '';
+        window.clearInterval(logPoll);
+        logPoll = 0;
+        activeLogScript = '';
+        logAutoCloseOnSuccess = false;
         if (callCloseEndpoint && name) {
             fetch(endpoint('close', name), {method:'POST', credentials:'same-origin', headers:{'Accept':'application/json'}}).catch(() => {});
             refreshStatus(name);
         }
     }
 
-    function openTerminal(name, title, url) {
-        activeTerminalScript = name;
-        terminalTitle.textContent = title || name;
-        terminalFrame.src = url;
-        terminalModal.hidden = false;
-        terminalModal.setAttribute('aria-hidden','false');
+    function openLog(name, title, autoCloseOnSuccess=false) {
+        if (!logModal) return;
+        activeLogScript = name;
+        logAutoCloseOnSuccess = !!autoCloseOnSuccess;
+        logPinnedToBottom = true;
+        if (logTitle) logTitle.textContent = title || name;
+        logModal.hidden = false;
+        logModal.setAttribute('aria-hidden','false');
         document.body.style.overflow = 'hidden';
-        window.clearInterval(terminalPoll);
-        terminalPoll = window.setInterval(async () => {
+        refreshLog(name, true).catch(error => {
+            if (logBox) logBox.textContent = error.message || 'Lecture du log impossible.';
+        });
+        window.clearInterval(logPoll);
+        logPoll = window.setInterval(async () => {
             const status = await refreshStatus(name);
+            await refreshLog(name).catch(() => {});
             if (!status) return;
             if (status.state === 'success') {
-                showToast('Script terminé sans erreur.');
-                closeTerminal(false);
+                window.clearInterval(logPoll);
+                logPoll = 0;
+                if (logAutoCloseOnSuccess) {
+                    showToast('Script terminé sans erreur.');
+                    closeLog(false);
+                }
+                return;
+            }
+            if (['error', 'stopped'].includes(status.state || '')) {
+                window.clearInterval(logPoll);
+                logPoll = 0;
             }
         }, 1000);
     }
 
-    document.querySelectorAll('[data-terminal-close]').forEach(el => el.addEventListener('click', () => closeTerminal(true)));
+    document.querySelectorAll('[data-log-close]').forEach(el => el.addEventListener('click', () => closeLog(true)));
 
     document.querySelectorAll('[data-script-run]').forEach(button => {
         button.addEventListener('click', async () => {
@@ -488,14 +515,15 @@
             try {
                 const data = await jsonFetch(endpoint('run', name), {method:'POST'});
                 updateStatus(name, data.status);
-                if (!data.terminal_ok || !data.terminal_url) {
-                    showToast(data.terminal_message || 'Script lancé, mais TTyd est indisponible.', true);
-                    return;
-                }
-                openTerminal(name, title, data.terminal_url);
+                showToast(data.message || 'Script lancé.');
+                openLog(name, title, true);
             } catch (error) { showToast(error.message, true); }
             finally { button.disabled = false; }
         });
+    });
+
+    document.querySelectorAll('[data-script-log]').forEach(button => {
+        button.addEventListener('click', () => openLog(button.dataset.scriptLog, button.dataset.scriptTitle || button.dataset.scriptLog));
     });
 
     document.querySelectorAll('[data-script-stop]').forEach(button => {
@@ -506,7 +534,11 @@
                 const data = await jsonFetch(endpoint('stop', name), {method:'POST'});
                 updateStatus(name, data.status);
                 showToast(data.message || 'Script arrêté.');
-                if (activeTerminalScript === name) closeTerminal(false);
+                if (activeLogScript === name) {
+                    await refreshLog(name, true).catch(() => {});
+                    window.clearInterval(logPoll);
+                    logPoll = 0;
+                }
             } catch (error) { showToast(error.message, true); }
             finally { button.disabled = false; }
         });

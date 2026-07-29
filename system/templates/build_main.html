@@ -27,7 +27,7 @@
                                     <option value="nopull">No pull</option>
                                 </select>
                                 <button type="button" class="yoleo-btn yoleo-btn-green" onclick="runMainBuildAll(this)">🧱 Tout builder + registre</button>
-                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon build-main-ttyd-btn" onclick="openBuildMainTtyd(this)" title="Ouvrir le vrai log Build dans ttyd">📜</button>
+                                <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon build-main-log-btn" onclick="openBuildMainLog(this)" title="Ouvrir le log Build">📜</button>
                             </div>
                         </div>
                         <div class="summary-grid">
@@ -143,7 +143,7 @@ body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-tar-toolbar {
     display:contents !important;
 }
 body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-title-row,
-body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-tar-toolbar > :not(.build-main-ttyd-btn) {
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-tar-toolbar > :not(.build-main-log-btn) {
     display:none !important;
 }
 body.yoleo-has-page-settings .builds-page #tab-builds_tar .summary-card {
@@ -168,7 +168,7 @@ body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-overall-pr
     align-self:stretch;
     margin:0;
 }
-body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-ttyd-btn {
+body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-log-btn {
     grid-column:8;
     grid-row:1;
     align-self:center;
@@ -188,7 +188,7 @@ body.yoleo-has-page-settings .builds-page #tab-builds_tar .table-wrap {
         grid-column:4;
         grid-row:1 / span 2;
     }
-    body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-ttyd-btn {
+    body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-log-btn {
         grid-column:5;
         grid-row:1 / span 2;
     }
@@ -201,7 +201,7 @@ body.yoleo-has-page-settings .builds-page #tab-builds_tar .table-wrap {
     body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-overall-progress {
         grid-column:1 / -1;
     }
-    body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-ttyd-btn {
+    body.yoleo-has-page-settings .builds-page #tab-builds_tar .build-main-log-btn {
         grid-column:2;
         grid-row:auto;
     }
@@ -642,14 +642,18 @@ body.yoleo-has-page-settings .builds-page #tab-builds_tar .table-wrap {
 
 </style>
 
-    <div class="docker-ttyd-modal" id="buildMainTtydModal" hidden aria-hidden="true">
-        <div class="docker-ttyd-modal-backdrop" onclick="closeBuildMainTtyd()"></div>
-        <section class="docker-ttyd-modal-box" role="dialog" aria-modal="true" aria-labelledby="buildMainTtydModalTitle">
+    <div class="docker-ttyd-modal" id="buildMainLogModal" hidden aria-hidden="true">
+        <div class="docker-ttyd-modal-backdrop" onclick="closeBuildMainLog()"></div>
+        <section class="docker-ttyd-modal-box docker-direct-log-modal-box" role="dialog" aria-modal="true" aria-labelledby="buildMainLogModalTitle">
             <header class="docker-ttyd-modal-header">
-                <strong id="buildMainTtydModalTitle">Log Build Main</strong>
-                <button type="button" class="docker-ttyd-modal-close" onclick="closeBuildMainTtyd()" aria-label="Fermer">×</button>
+                <strong id="buildMainLogModalTitle">Log Build Main</strong>
+                <button type="button" class="docker-ttyd-modal-close" onclick="closeBuildMainLog()" aria-label="Fermer">×</button>
             </header>
-            <iframe class="docker-ttyd-modal-frame" id="buildMainTtydFrame" title="Log Build Main ttyd"></iframe>
+            <div class="docker-direct-log-toolbar">
+                <div class="docker-direct-log-meta" id="buildMainLogMeta">Chargement...</div>
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="scrollBuildMainLogBottom()">Bas du log</button>
+            </div>
+            <pre class="docker-direct-log-box" id="buildMainLogBox">Chargement du log Build...</pre>
         </section>
     </div>
 

@@ -78,7 +78,44 @@ def remove_build_platform_state_files(conf: Dict[str, str], names: Iterable[str]
     return removed
 
 
-def write_database_rows(conf: Dict[str, str], rows: List[Tuple[str, str, str, str]]) -> Tuple[bool, str]:
+def rewrite_kv_text_in_row_order(original: str, rows: List[Tuple[str, str, str, str]], value_index: int) -> str:
+    """Réécrit les clés Docker dans l'ordre demandé, en gardant les lignes hors base."""
+    names = [normalize_item_name(row[0]) for row in rows]
+    name_set = {name for name in names if name}
+    kept_lines: List[str] = []
+
+    for raw_line in (original or "").splitlines():
+        line = raw_line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            existing_key = line.split("=", 1)[0].strip()
+            if any(same_item_key(existing_key, name) for name in name_set):
+                continue
+        kept_lines.append(raw_line)
+
+    output: List[str] = []
+    for raw_line in kept_lines:
+        if not raw_line.strip() and (not output or not output[-1].strip()):
+            continue
+        output.append(raw_line)
+
+    ordered_lines: List[str] = []
+    seen = set()
+    for row in rows:
+        name = normalize_item_name(row[0])
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        value = str(row[value_index] or "").strip()
+        if value:
+            ordered_lines.append(f"{name}={value}")
+
+    if output and ordered_lines and output[-1].strip():
+        output.append("")
+    output.extend(ordered_lines)
+    return "\n".join(output).rstrip() + ("\n" if output else "")
+
+
+def write_database_rows(conf: Dict[str, str], rows: List[Tuple[str, str, str, str]], reorder: bool = False) -> Tuple[bool, str]:
     targets = [
         (conf["DOCKER_REGISTRY_FILE"], 1),
         (conf["DOCKER_PLATFORMS_FILE"], 2),
@@ -87,14 +124,103 @@ def write_database_rows(conf: Dict[str, str], rows: List[Tuple[str, str, str, st
     errors: List[str] = []
     for path, value_index in targets:
         text = local_read_text(path)
-        for row in rows:
-            text = update_kv_text(text, row[0], row[value_index])
+        if reorder:
+            text = rewrite_kv_text_in_row_order(text, rows, value_index)
+        else:
+            for row in rows:
+                text = update_kv_text(text, row[0], row[value_index])
         ok, out = local_write_text(path, text)
         if not ok:
             errors.append(f"{path}: {out.strip()}")
     if errors:
         return False, "Écriture impossible : " + " | ".join(errors)
-    return True, f"Base de données mise à jour : {len(rows)} ligne(s)."
+    suffix = " Ordre enregistré." if reorder else ""
+    return True, f"Base de données mise à jour : {len(rows)} ligne(s).{suffix}"
+
+
+def update_build_cache_from_database_rows(
+    conf: Dict[str, str],
+    rows: List[Tuple[str, str, str, str]],
+    changed_names: Optional[Dict[str, List[str]]] = None,
+    reorder: bool = False,
+    source: str = "database-json",
+) -> bool:
+    """Met à jour build.jdom depuis les mini-bases sans rescan complet.
+
+    Les actions de la page Base de données modifient uniquement registre.conf,
+    platforms.conf et mode.conf. Recalculer tout l'inventaire relit les dossiers
+    et états de build, ce qui rendait une simple flèche beaucoup trop lente.
+    """
+    try:
+        builds, _summary, warning, _meta = read_build_inventory_cache(conf)
+        if builds is None:
+            return refresh_build_cache_silent(conf, source=source, check_registry=False)
+
+        changed_names = changed_names or {}
+        changed_registry = {normalize_item_name(name) for name in changed_names.get("registry", [])}
+        changed_platforms = {normalize_item_name(name) for name in changed_names.get("platforms", [])}
+        changed_modes = {normalize_item_name(name) for name in changed_names.get("mode", [])}
+        changed_any = changed_registry | changed_platforms | changed_modes
+        row_by_name = {normalize_item_name(row[0]): row for row in rows if is_valid_name(normalize_item_name(row[0]))}
+        by_name = {normalize_item_name(str(item.get("name", ""))): item for item in builds if isinstance(item, dict)}
+
+        for name, row in row_by_name.items():
+            item = by_name.get(name)
+            if item is None:
+                continue
+
+            registry_value = str(row[1] or "").strip()
+            platform_value = normalize_platforms(str(row[2] or "").strip()) if str(row[2] or "").strip() else ""
+            effective_platform = platform_value or normalize_platforms(conf.get("DEFAULT_PLATFORMS", "linux/amd64"))
+            display_platform = platform_value if platform_value else (
+                effective_platform if conf.get("SHOW_DEFAULT_PLATFORMS_IN_TABLE", "0").strip().lower() in {"1", "true", "yes", "on"} else ""
+            )
+            mode_value = registry_mode_db_value(str(row[3] or "").strip() or "0")
+            amd64, arm64 = platform_flags(effective_platform)
+
+            item["registry"] = registry_value
+            item["registry_display"] = registry_value or suggested_registry(conf, name)
+            item["registry_suggested"] = suggested_registry(conf, name)
+            item["registry_missing"] = not bool(registry_value)
+            item["platforms"] = display_platform
+            item["platform_effective"] = effective_platform
+            item["platform_suggested"] = effective_platform
+            item["platform_missing"] = not bool(platform_value)
+            item["amd64"] = amd64
+            item["arm64"] = arm64
+            item["mode_raw"] = mode_value
+            item["mode_value"] = mode_value
+            item["mode_label"] = registry_mode_label_from_value(mode_value)
+            item["meta_missing"] = bool(item.get("registry_missing") or item.get("platform_missing"))
+
+            if name in changed_any:
+                item["registry_current"] = False
+                item["registry_status_label"] = "À vérifier"
+                item["registry_status_message"] = "Statut registre à recalculer après modification de la base."
+                item["can_import"] = bool(item.get("tar_exists") and registry_value)
+            if name in changed_platforms:
+                item["build_current"] = False
+                item["build_status_label"] = "Build"
+                item["can_build"] = bool(item.get("has_context") and item.get("dockerfile"))
+
+        if reorder:
+            ordered: List[Dict[str, object]] = []
+            used = set()
+            for row in rows:
+                name = normalize_item_name(row[0])
+                item = by_name.get(name)
+                if item is not None and name not in used:
+                    ordered.append(item)
+                    used.add(name)
+            ordered.extend(item for item in builds if normalize_item_name(str(item.get("name", ""))) not in used)
+            builds = ordered
+
+        summary = summarize_build_inventory(conf, builds)
+        warning = build_inventory_warning(conf) or warning
+        ok, _message = write_build_inventory_cache(conf, builds, summary, warning, source=source)
+        return bool(ok)
+    except Exception:
+        return False
 
 
 def autofill_database_from_build_dirs(conf: Dict[str, str]) -> Tuple[bool, str, int, List[str]]:

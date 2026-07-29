@@ -1,0 +1,212 @@
+{% extends "system_base.html" %}
+
+{% block title %}SSH - Yoleo{% endblock %}
+{% block page_title %}SSH{% endblock %}
+{% block page_subtitle %}Génération de clés SSH réutilisables{% endblock %}
+
+{% block system_content %}
+<main class="su-page su-p12-page su-ssh-page">
+    <section class="su-p12-grid">
+        <form class="su-panel su-p12-form" onsubmit="event.preventDefault(); generateSSH();">
+            <div class="su-panel-head">
+                <div>
+                    <h2>Générer une clé SSH</h2>
+                    <p>Fichiers .key, .pub et .ppk dans le dossier choisi.</p>
+                </div>
+            </div>
+
+            <div class="su-form-grid su-grid-2">
+                <label>Nom de la clé
+                    <input type="text" id="ssh-name" class="yoleo-input" placeholder="ex: Coco" required>
+                    <span>Les fichiers générés s’appelleront nom.key, nom.pub et nom.ppk.</span>
+                </label>
+                <label>Format de clé
+                    <select id="ssh-key-type" class="yoleo-input">
+                        {% for value, label in ssh_key_types.items() %}
+                        <option value="{{ value }}" {% if value == 'rsa3072' %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <span id="ssh-algoHint">RSA 3072 reste un bon compromis sécurité / compatibilité.</span>
+                </label>
+                <label class="su-wide">Dossier de sortie SSH
+                    <div class="su-path-row">
+                        <input type="text" id="ssh-output-dir" class="yoleo-input" value="{{ ssh_output_dir }}" placeholder="Choisis un dossier de sortie..." autocomplete="off">
+                        <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="openSSHBrowser()" title="Parcourir" aria-label="Parcourir">📁</button>
+                    </div>
+                    <span>Chemin absolu accepté, ou relatif au dossier conf. Exemple : ../key.</span>
+                    <strong id="ssh-output-state" class="su-output-state"></strong>
+                </label>
+            </div>
+
+            <div class="su-form-actions">
+                <button type="submit" id="ssh-generate-btn" class="yoleo-btn yoleo-btn-primary" {% if not allow_actions %}disabled{% endif %}>🔑 Créer les clés</button>
+            </div>
+            <pre id="ssh-result" class="su-result" hidden></pre>
+        </form>
+
+        <aside class="su-side-stack">
+            <section class="su-panel su-info-card">
+                <h2>Résumé rapide</h2>
+                <div class="su-summary-box">
+                    <div><b>Dossier choisi :</b> <code id="ssh-summary-output">{{ ssh_output_dir or '—' }}</code></div>
+                    <div><b>Chemin réel :</b> <code id="ssh-summary-output-resolved">{{ ssh_output_dir_resolved or '—' }}</code></div>
+                    <div><b>Fichier de conf :</b> <code id="ssh-summary-conf">{{ ssh_config_file }}</code></div>
+                    <div><b>Outil PPK :</b> puttygen</div>
+                    <div><b>Fichiers générés :</b> .key + .pub + .ppk</div>
+                </div>
+            </section>
+
+            <section class="su-panel su-info-card">
+                <h2>Utilisation</h2>
+                <div class="su-summary-box">
+                    <div><span class="su-chip">Serveur Linux</span></div>
+                    <div>Le contenu du fichier .pub va dans <code>~/.ssh/authorized_keys</code>.</div>
+                    <div><span class="su-chip">Client</span></div>
+                    <div>Le fichier .key sert aux clients OpenSSH. Le fichier .ppk sert à PuTTY et aux clients compatibles.</div>
+                </div>
+            </section>
+        </aside>
+    </section>
+</main>
+
+<script>
+    const allowActions = {{ allow_actions | tojson }};
+    const initialSSHOutputDir = {{ ssh_output_dir | tojson }};
+    const initialSSHOutputDirResolved = {{ ssh_output_dir_resolved | tojson }};
+
+    function showSSHResult(message, isError=false) {
+        const el = document.getElementById('ssh-result');
+        if (!el) return;
+        el.hidden = false;
+        el.classList.toggle('is-error', !!isError);
+        el.textContent = message;
+    }
+
+    function sshOutputValue() {
+        const input = document.getElementById('ssh-output-dir');
+        return input ? input.value.trim() : '';
+    }
+
+    function updateSSHSummary(outputDir, outputDirResolved, configFile) {
+        const rawEl = document.getElementById('ssh-summary-output');
+        const realEl = document.getElementById('ssh-summary-output-resolved');
+        const confEl = document.getElementById('ssh-summary-conf');
+        if (rawEl && outputDir !== undefined) rawEl.textContent = outputDir || '—';
+        if (realEl && outputDirResolved !== undefined) realEl.textContent = outputDirResolved || '—';
+        if (confEl && configFile) confEl.textContent = configFile;
+    }
+
+    function updateSSHOutputState() {
+        const value = sshOutputValue();
+        const state = document.getElementById('ssh-output-state');
+        const btn = document.getElementById('ssh-generate-btn');
+        if (btn) {
+            btn.disabled = !allowActions || !value;
+            btn.title = value ? '' : 'Choisis d’abord un dossier de sortie SSH.';
+        }
+        if (!state) return;
+        state.classList.toggle('is-error', !value);
+        state.textContent = value ? `Dossier sélectionné : ${value}` : 'Dossier de sortie obligatoire : génération SSH bloquée.';
+        updateSSHSummary(value, undefined, undefined);
+    }
+
+    async function saveSSHOutputDir(value) {
+        const outputDir = String(value || '').trim();
+        if (!outputDir) { updateSSHOutputState(); return false; }
+        try {
+            const response = await fetch('/api/users/ssh/output', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+                body: JSON.stringify({ssh_output_dir: outputDir})
+            });
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                showSSHResult(data.error || 'Erreur pendant l’enregistrement du dossier SSH.', true);
+                return false;
+            }
+            updateSSHSummary(data.output_dir, data.output_dir_resolved, data.config_file);
+            updateSSHOutputState();
+            return true;
+        } catch (err) {
+            showSSHResult('Erreur pendant l’enregistrement du dossier SSH.', true);
+            return false;
+        }
+    }
+
+    function updateSSHAlgoHint() {
+        const select = document.getElementById('ssh-key-type');
+        const hint = document.getElementById('ssh-algoHint');
+        if (!select || !hint) return;
+        const texts = {
+            'rsa2048': 'RSA 2048 maximise la compatibilité mais est un peu moins costaud.',
+            'rsa3072': 'RSA 3072 reste un bon compromis sécurité / compatibilité.',
+            'rsa4096': 'RSA 4096 est plus lourd à générer et pas forcément utile partout.',
+            'ed25519': 'Ed25519 256 bits est moderne, court et très pratique avec les clients récents.'
+        };
+        hint.textContent = texts[select.value] || texts['rsa3072'];
+    }
+
+    function openSSHBrowser() {
+        const start = sshOutputValue() || initialSSHOutputDirResolved || '/';
+        const params = new URLSearchParams({target: 'ssh-output-dir', path: start});
+        const popup = window.open('/browser/folder?' + params.toString(), 'yoleo_browser_ssh_output_dir', 'width=1100,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+        if (popup) popup.focus();
+    }
+
+    window.addEventListener('message', async (event) => {
+        const data = event.data || {};
+        if (data.type !== 'yoleo-browser-select' || data.mode !== 'folder' || data.target !== 'ssh-output-dir') return;
+        const input = document.getElementById('ssh-output-dir');
+        if (!input) return;
+        input.value = data.path || '';
+        updateSSHOutputState();
+        await saveSSHOutputDir(data.path || '');
+    });
+
+    async function generateSSH() {
+        const payload = {
+            ssh_name: document.getElementById('ssh-name').value.trim(),
+            key_type: document.getElementById('ssh-key-type').value,
+            ssh_output_dir: sshOutputValue()
+        };
+        if (!payload.ssh_output_dir) {
+            updateSSHOutputState();
+            showSSHResult('Choisis d’abord un dossier de sortie SSH.', true);
+            return;
+        }
+        if (!payload.ssh_name) {
+            showSSHResult('Nom de clé obligatoire.', true);
+            return;
+        }
+        showSSHResult('Génération SSH en cours...');
+        try {
+            const response = await fetch('/api/users/ssh/files/generate', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                showSSHResult(data.error || 'Erreur pendant la génération SSH.', true);
+                return;
+            }
+            updateSSHSummary(data.output_dir, data.output_dir_resolved, data.config_file);
+            showSSHResult(`✅ ${data.message}\n\nDossier : ${data.output_dir_resolved}\nClé privée OpenSSH : ${data.private_key}\nClé publique authorized_keys : ${data.public_key}\nClé PuTTY/FileZilla : ${data.ppk_key}\nEmpreinte : ${data.fingerprint || '—'}`);
+        } catch (err) {
+            showSSHResult('Erreur pendant la génération SSH.', true);
+        }
+    }
+
+    const keySelect = document.getElementById('ssh-key-type');
+    if (keySelect) {
+        keySelect.addEventListener('change', updateSSHAlgoHint);
+        updateSSHAlgoHint();
+    }
+    const outputInput = document.getElementById('ssh-output-dir');
+    if (outputInput) {
+        outputInput.addEventListener('input', updateSSHOutputState);
+        outputInput.addEventListener('blur', () => saveSSHOutputDir(outputInput.value));
+    }
+    updateSSHOutputState();
+</script>
+{% endblock %}

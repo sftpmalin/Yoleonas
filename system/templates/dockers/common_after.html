@@ -42,6 +42,21 @@
         </section>
     </div>
 
+    <div class="docker-ttyd-modal" id="dockerDirectLogModal" hidden aria-hidden="true">
+        <div class="docker-ttyd-modal-backdrop" onclick="dockerCloseDirectLogModal()"></div>
+        <section class="docker-ttyd-modal-box docker-direct-log-modal-box" role="dialog" aria-modal="true" aria-labelledby="dockerDirectLogTitle">
+            <header class="docker-ttyd-modal-header">
+                <strong id="dockerDirectLogTitle">Log Docker</strong>
+                <button type="button" class="docker-ttyd-modal-close" onclick="dockerCloseDirectLogModal()" aria-label="Fermer">×</button>
+            </header>
+            <div class="docker-direct-log-toolbar">
+                <div class="docker-direct-log-meta" id="dockerDirectLogMeta">Chargement...</div>
+                <button type="button" class="yoleo-btn yoleo-btn-muted" onclick="dockerScrollDirectLogBottom()">Bas du log</button>
+            </div>
+            <pre class="docker-direct-log-box" id="dockerDirectLogBox">Chargement du log Docker...</pre>
+        </section>
+    </div>
+
 
 <script>
 (function () {
@@ -168,20 +183,135 @@
         if (frame) frame.src = 'about:blank';
     };
 
+    let dockerDirectLogPollTimer = 0;
+    let dockerDirectLogUrl = '';
+    let dockerDirectLogPinnedToBottom = true;
+
+    function dockerScrollableLogNearBottom(box, threshold = 96) {
+        if (!box) return true;
+        return (box.scrollHeight - box.scrollTop - box.clientHeight) <= threshold;
+    }
+
+    function dockerSetScrollableLog(box, text, append = false, forceBottom = false) {
+        if (!box) return;
+        const shouldStick = forceBottom || dockerScrollableLogNearBottom(box);
+        const previousScrollTop = box.scrollTop || 0;
+        if ('value' in box) {
+            box.value = append ? box.value + text : text;
+        } else {
+            box.textContent = append ? box.textContent + text : text;
+        }
+        if (shouldStick) box.scrollTop = box.scrollHeight;
+        else box.scrollTop = previousScrollTop;
+    }
+
+    function dockerDirectLogElements() {
+        return {
+            modal: document.getElementById('dockerDirectLogModal'),
+            box: document.getElementById('dockerDirectLogBox'),
+            meta: document.getElementById('dockerDirectLogMeta'),
+            title: document.getElementById('dockerDirectLogTitle')
+        };
+    }
+
+    function dockerDirectLogNearBottom(box) {
+        return dockerScrollableLogNearBottom(box);
+    }
+
+    function dockerDirectLogMetaText(data) {
+        const bits = [];
+        if (data?.container) bits.push(data.container);
+        if (data?.state) bits.push(data.state);
+        if (data?.log_path) bits.push(data.log_path);
+        if (data?.truncated) bits.push('fin du log affichée');
+        if (data?.status?.running) bits.push('en cours');
+        if (!bits.length) bits.push('log Docker');
+        return bits.join(' · ');
+    }
+
+    async function dockerRefreshDirectLog(forceBottom = false) {
+        const parts = dockerDirectLogElements();
+        if (!parts.box || !dockerDirectLogUrl) return;
+        try {
+            const response = await fetch(dockerDirectLogUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            const data = await response.json().catch(() => ({ok: false, message: 'Réponse serveur illisible.'}));
+            if (!response.ok || !data.ok) throw new Error(data.message || 'Impossible de lire le log Docker.');
+            if (parts.title) parts.title.textContent = data.title || 'Log Docker';
+            if (parts.meta) parts.meta.textContent = dockerDirectLogMetaText(data);
+            const shouldStick = forceBottom || dockerDirectLogNearBottom(parts.box);
+            dockerSetScrollableLog(parts.box, data.log_text || 'Aucun log Docker pour le moment.', false, forceBottom);
+            dockerDirectLogPinnedToBottom = shouldStick;
+        } catch (error) {
+            if (parts.meta) parts.meta.textContent = 'Erreur de lecture du log';
+            dockerSetScrollableLog(parts.box, error.message || String(error));
+        }
+    }
+
+    function dockerOpenDirectLog(title, url) {
+        const parts = dockerDirectLogElements();
+        if (!parts.modal || !parts.box) {
+            window.open(url, 'yoleo_docker_log', 'width=1200,height=760,resizable=yes,scrollbars=yes');
+            return;
+        }
+        dockerDirectLogUrl = url;
+        dockerDirectLogPinnedToBottom = true;
+        if (parts.title) parts.title.textContent = title || 'Log Docker';
+        if (parts.meta) parts.meta.textContent = 'Chargement...';
+        dockerSetScrollableLog(parts.box, 'Chargement du log Docker...', false, true);
+        parts.modal.hidden = false;
+        parts.modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('docker-ttyd-modal-open');
+        dockerRefreshDirectLog(true);
+        if (dockerDirectLogPollTimer) clearInterval(dockerDirectLogPollTimer);
+        dockerDirectLogPollTimer = window.setInterval(() => dockerRefreshDirectLog(false), 1500);
+    }
+
+    window.dockerCloseDirectLogModal = function () {
+        if (dockerDirectLogPollTimer) {
+            clearInterval(dockerDirectLogPollTimer);
+            dockerDirectLogPollTimer = 0;
+        }
+        const {modal} = dockerDirectLogElements();
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        dockerDirectLogUrl = '';
+        document.body.classList.remove('docker-ttyd-modal-open');
+    };
+
+    window.dockerScrollDirectLogBottom = function () {
+        const {box} = dockerDirectLogElements();
+        if (!box) return;
+        box.scrollTop = box.scrollHeight;
+        dockerDirectLogPinnedToBottom = true;
+    };
+
+    window.dockerOpenContainerLog = function (containerName) {
+        if (!containerName) return;
+        const url = new URL('/docker/containers/log_json', window.location.origin);
+        url.searchParams.set('container', containerName);
+        dockerSetStatus('Ouverture des logs Docker...');
+        dockerOpenDirectLog('Logs Docker · ' + containerName, url.toString());
+    };
+
     window.dockerOpenContainerTtyd = async function (kind, containerName) {
         if (!containerName) return;
-        dockerSetStatus((kind === 'exec' ? 'Ouverture du terminal Docker...' : 'Ouverture des logs Docker...'));
+        if ((kind || 'exec') !== 'exec') {
+            window.dockerOpenContainerLog(containerName);
+            return;
+        }
+        dockerSetStatus('Ouverture du terminal Docker...');
         try {
             const url = new URL('/docker/containers/ttyd', window.location.origin);
-            url.searchParams.set('kind', kind || 'logs');
+            url.searchParams.set('kind', 'exec');
             url.searchParams.set('container', containerName);
             const response = await fetch(url.toString(), {headers: {'Accept': 'application/json'}, cache: 'no-store'});
-            const data = await response.json().catch(() => ({ok: false, message: 'Réponse serveur illisible.'}));
-            if (!response.ok || !data.ok || !data.url) throw new Error(data.message || 'Impossible d’ouvrir ttyd Docker.');
+            const data = await response.json().catch(() => ({ok: false, message: 'Reponse serveur illisible.'}));
+            if (!response.ok || !data.ok || !data.url) throw new Error(data.message || 'Impossible d’ouvrir le terminal Docker.');
 
             const {modal, frame, title} = dockerTtydModalElements();
             if (!modal || !frame) {
-                window.open(data.url, 'yoleo_docker_ttyd_' + String(kind || 'logs'), 'width=1200,height=760,resizable=yes,scrollbars=yes');
+                window.open(data.url, 'yoleo_docker_ttyd_exec', 'width=1200,height=760,resizable=yes,scrollbars=yes');
                 return;
             }
             if (title) title.textContent = data.title || 'Terminal Docker';
@@ -499,30 +629,14 @@
             logButton.hidden = false;
             logButton.classList.toggle('is-bad', !!failed);
             logButton.classList.toggle('is-ok', !failed);
-            logButton.title = failed ? 'Erreur Compose : ouvrir le vrai log ttyd' : 'Ouvrir le log Compose ttyd';
+            logButton.title = failed ? 'Erreur Compose : ouvrir le log' : 'Ouvrir le log Compose';
         });
     }
 
-    window.dockerOpenComposeTtyd = async function () {
-        dockerSetComposeStatus('Ouverture du vrai log Compose...');
-        try {
-            const response = await fetch('/docker/compose/ttyd', {headers: {'Accept': 'application/json'}, cache: 'no-store'});
-            const data = await response.json().catch(() => ({ok: false, message: 'Réponse serveur illisible.'}));
-            if (!response.ok || !data.ok || !data.url) throw new Error(data.message || 'Impossible d’ouvrir ttyd Compose.');
-            const {modal, frame, title} = dockerTtydModalElements();
-            if (!modal || !frame) {
-                window.open(data.url, 'yoleo_docker_compose_log', 'width=1200,height=760,resizable=yes,scrollbars=yes');
-                return;
-            }
-            if (title) title.textContent = data.title || 'Logs Docker Compose';
-            frame.src = data.url;
-            modal.hidden = false;
-            modal.setAttribute('aria-hidden', 'false');
-            document.body.classList.add('docker-ttyd-modal-open');
-            dockerSetComposeStatus('Log Compose ouvert.', true);
-        } catch (error) {
-            dockerSetComposeStatus(error.message || String(error), false);
-        }
+    window.dockerOpenComposeLog = function () {
+        dockerSetComposeStatus('Ouverture du log Compose...');
+        dockerOpenDirectLog('Logs Docker Compose', '/docker/compose/log_json');
+        dockerSetComposeStatus('Log Compose ouvert.', true);
     };
 
     window.dockerRunStream = async function (action, button) {
@@ -556,8 +670,7 @@
                 if (chunk.done) break;
                 const text = decoder.decode(chunk.value, {stream: true});
                 if (log) {
-                    log.textContent += text;
-                    log.scrollTop = log.scrollHeight;
+                    dockerSetScrollableLog(log, text, true);
                 }
                 tail += text;
                 const lines = tail.split(/\r?\n/);
@@ -589,7 +702,7 @@
             dockerSetComposeStatus(failed ? 'Erreur Compose. Clique sur 📜 pour ouvrir le vrai log.' : 'Action Compose terminée correctement.', !failed);
         } catch (error) {
             failed = true;
-            if (log) log.textContent += '\nErreur : ' + error;
+            if (log) dockerSetScrollableLog(log, '\nErreur : ' + error, true);
             dockerComposeProgress(100, 'Erreur', true);
             logButtons.forEach(logButton => {
                 logButton.hidden = false;
