@@ -3,7 +3,9 @@ BUILD_TMUX_ACTIONS = {"build_one", "build_all", "build_registry_one", "build_reg
 
 def build_tmux_safe_part(value: str, default: str = "all") -> str:
     value = normalize_item_name(str(value or "").strip())
-    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("._-")
+    # tmux cible session.window avec le point : un nom comme 0.debian_12_slim
+    # devient ambigu. On garde donc seulement les caractères neutres en cible.
+    value = re.sub(r"[^A-Za-z0-9_-]+", "_", value).strip("_-")
     return value or default
 
 
@@ -261,6 +263,21 @@ def build_background_default_log_path(conf: Dict[str, str], action: str) -> str:
     if "registry" in action_s and not action_s.startswith("registry_service_"):
         return os.path.join(log_dir, "registry_python.log")
     return os.path.join(log_dir, "builds_background.log")
+
+
+def write_build_background_log_file(state: Dict, text: str, append: bool = True) -> None:
+    log_path = str(state.get("log_path") or "").strip()
+    if not log_path:
+        return
+    try:
+        parent = os.path.dirname(log_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        mode = "a" if append else "w"
+        with open(log_path, mode, encoding="utf-8") as handle:
+            handle.write(str(text or ""))
+    except Exception:
+        pass
 
 
 def build_background_now() -> str:
@@ -776,6 +793,7 @@ def start_build_background_job(conf: Dict[str, str], action: str, name: str, mod
         state["runner"] = "tmux-systemd"
         state["status"] = f"Demarrage tmux : {session}."
         state["log_tail"] = f"Lancement du build dans tmux : {session}\n"
+        write_build_background_log_file(state, state["log_tail"], append=False)
 
         if tmux_session_exists(session):
             state["already_running"] = True
@@ -802,12 +820,16 @@ def start_build_background_job(conf: Dict[str, str], action: str, name: str, mod
                 state["had_error"] = True
                 state["status"] = tmux_msg
                 state["updated_at"] = build_background_now()
-                state["log_tail"] = (state.get("log_tail", "") + f"❌ {tmux_msg}\n")[-BACKGROUND_TAIL_CHARS:]
+                error_line = f"❌ {tmux_msg}\n"
+                state["log_tail"] = (state.get("log_tail", "") + error_line)[-BACKGROUND_TAIL_CHARS:]
+                write_build_background_log_file(state, error_line, append=True)
                 write_build_background_state(conf, state)
         elif state.get("running"):
             state["status"] = tmux_msg
             state["updated_at"] = build_background_now()
-            state["log_tail"] = (state.get("log_tail", "") + f"✅ {tmux_msg}\n")[-BACKGROUND_TAIL_CHARS:]
+            ok_line = f"✅ {tmux_msg}\n"
+            state["log_tail"] = (state.get("log_tail", "") + ok_line)[-BACKGROUND_TAIL_CHARS:]
+            write_build_background_log_file(state, ok_line, append=True)
             write_build_background_state(conf, state)
         return state
 

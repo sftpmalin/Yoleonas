@@ -82,6 +82,63 @@ DOCKER_SERVICE_ACTIONS = {"start_docker_service", "restart_docker_service", "sto
 DOCKER_TTYD_PID_DIR = "/tmp"
 DOCKER_TTYD_BASE_PORT = int(os.environ.get("YOLEO_DOCKER_TTYD_BASE_PORT", "7780") or "7780")
 DOCKER_TTYD_PORT_COUNT = int(os.environ.get("YOLEO_DOCKER_TTYD_PORT_COUNT", "40") or "40")
+DOCKER_DIRECT_LOG_TAIL_BYTES = 768 * 1024
+DOCKER_DIRECT_LOG_LINES = int(os.environ.get("YOLEO_DOCKER_LOG_LINES", "500") or "500")
+DOCKER_DIRECT_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+
+def docker_clean_log_text(text: str) -> str:
+    return DOCKER_DIRECT_ANSI_ESCAPE_RE.sub("", str(text or ""))
+
+
+def docker_read_file_log_tail(log_path: str, max_bytes: int = DOCKER_DIRECT_LOG_TAIL_BYTES) -> Tuple[str, bool, int]:
+    try:
+        size = os.path.getsize(log_path)
+    except OSError:
+        return "Aucun log disponible pour le moment.", False, 0
+
+    limit = max(8192, min(int(max_bytes or DOCKER_DIRECT_LOG_TAIL_BYTES), 4 * 1024 * 1024))
+    truncated = size > limit
+    try:
+        with open(log_path, "rb") as handle:
+            if truncated:
+                handle.seek(max(0, size - limit))
+            raw = handle.read(limit)
+    except OSError as exc:
+        return f"Impossible de lire le log Docker : {exc}", False, size
+
+    text = docker_clean_log_text(raw.decode("utf-8", errors="replace"))
+    if truncated:
+        text = "[log tronqué : affichage de la fin du fichier]\n\n" + text
+    return text or "Aucun log disponible pour le moment.", truncated, size
+
+
+def docker_container_logs_payload(container_ref: str, tail: int = DOCKER_DIRECT_LOG_LINES) -> Dict[str, object]:
+    container_ref = str(container_ref or "").strip()
+    if not container_ref:
+        raise ValueError("Nom du conteneur manquant.")
+
+    client = get_docker_client()
+    container = client.containers.get(container_ref)
+    container_name = str(container.name or container_ref).lstrip("/")
+    state = str(getattr(container, "status", "") or "").lower() or "unknown"
+    try:
+        raw = container.logs(
+            stdout=True,
+            stderr=True,
+            timestamps=True,
+            tail=max(50, min(int(tail or DOCKER_DIRECT_LOG_LINES), 5000)),
+        )
+    except TypeError:
+        raw = container.logs(stdout=True, stderr=True, tail=max(50, min(int(tail or DOCKER_DIRECT_LOG_LINES), 5000)))
+    text = docker_clean_log_text(raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else str(raw or ""))
+    return {
+        "title": f"Logs Docker · {container_name}",
+        "container": container_name,
+        "state": state,
+        "log_text": text or "Aucun log Docker pour ce conteneur.",
+        "tail": int(tail or DOCKER_DIRECT_LOG_LINES),
+    }
 
 
 def _docker_ttyd_slug(value: str) -> str:

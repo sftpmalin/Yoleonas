@@ -33,6 +33,28 @@ def registry_v2_digest(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+def registry_v2_int_conf(conf: Dict[str, str], key: str, default: int, minimum: int = 1) -> int:
+    try:
+        return max(minimum, int(str(conf.get(key, str(default))).strip() or str(default)))
+    except (TypeError, ValueError):
+        return max(minimum, default)
+
+
+def registry_v2_upload_timeout(conf: Dict[str, str]) -> int:
+    return max(registry_browser_timeout(conf), registry_v2_int_conf(conf, "REGISTRY_UPLOAD_TIMEOUT", 900, 30))
+
+
+def registry_v2_upload_verify_timeout(conf: Dict[str, str]) -> int:
+    return registry_v2_int_conf(conf, "REGISTRY_UPLOAD_VERIFY_TIMEOUT", 180, 10)
+
+
+def registry_v2_upload_verify_interval(conf: Dict[str, str]) -> float:
+    try:
+        return max(0.5, float(str(conf.get("REGISTRY_UPLOAD_VERIFY_INTERVAL", "3")).strip() or "3"))
+    except (TypeError, ValueError):
+        return 3.0
+
+
 def registry_v2_target_parts(target: str, mode: str) -> Dict[str, str]:
     """Decompose host:port/repo:tag sans imposer aucune adresse fixe."""
     value = strip_quotes(str(target or "")).strip().rstrip("/")
@@ -113,6 +135,9 @@ class RegistryV2Client:
         self.reference = self.target["reference"]
         self.base_url = self.target["base_url"].rstrip("/")
         self.timeout = registry_browser_timeout(conf)
+        self.upload_timeout = registry_v2_upload_timeout(conf)
+        self.upload_verify_timeout = registry_v2_upload_verify_timeout(conf)
+        self.upload_verify_interval = registry_v2_upload_verify_interval(conf)
         self.session = requests.Session()
         user, password = registry_v2_login_values(conf, self.target["host"], self.mode)
         self.basic_auth = (user, password) if user and password else None
@@ -164,6 +189,7 @@ class RegistryV2Client:
 
     def request(self, method: str, url: str, *, scope: str = "", **kwargs):
         headers = dict(kwargs.pop("headers", {}) or {})
+        request_timeout = kwargs.pop("timeout", self.timeout)
         cached_token = self.scope_tokens.get(scope, "")
         if cached_token:
             headers["Authorization"] = f"Bearer {cached_token}"
@@ -181,7 +207,7 @@ class RegistryV2Client:
                 url=url,
                 headers=headers,
                 auth=auth,
-                timeout=self.timeout,
+                timeout=request_timeout,
                 **kwargs,
             )
         except requests.RequestException as exc:
@@ -206,7 +232,7 @@ class RegistryV2Client:
                 method=method,
                 url=url,
                 headers=retry_headers,
-                timeout=self.timeout,
+                timeout=request_timeout,
                 **kwargs,
             )
         except requests.RequestException as exc:
@@ -246,6 +272,24 @@ class RegistryV2Client:
         exists, remote_digest, _raw, _media_type = self.get_manifest(digest)
         return bool(exists and remote_digest == digest)
 
+    def wait_blob_exists_after_upload_error(self, digest: str) -> bool:
+        """Un gros PUT peut finir cote registre apres le timeout du client.
+
+        C'est surtout visible sur les TAR de plusieurs Go : premier lancement en
+        erreur, deuxieme lancement OK car le blob avait finalement ete commit.
+        On poll le blob avant de declarer l'import perdu.
+        """
+        deadline = time.monotonic() + self.upload_verify_timeout
+        while True:
+            try:
+                if self.blob_exists(digest):
+                    return True
+            except RegistryV2Error:
+                pass
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(self.upload_verify_interval)
+
     def upload_blob(self, tar: tarfile.TarFile, descriptor: dict, stats: Dict[str, int]) -> None:
         digest = str((descriptor or {}).get("digest") or "").strip()
         if not digest.startswith("sha256:"):
@@ -284,18 +328,30 @@ class RegistryV2Client:
         extracted = tar.extractfile(member)
         if extracted is None:
             raise RegistryV2Error(f"blob illisible dans le TAR : {digest}")
-        response = self.request(
-            "PUT",
-            upload_url,
-            scope=f"repository:{self.repo}:pull,push",
-            params={"digest": digest},
-            data=extracted,
-            headers={
-                "Content-Type": "application/octet-stream",
-                "Content-Length": str(member.size),
-            },
-        )
+        try:
+            response = self.request(
+                "PUT",
+                upload_url,
+                scope=f"repository:{self.repo}:pull,push",
+                params={"digest": digest},
+                data=extracted,
+                timeout=(self.timeout, self.upload_timeout),
+                headers={
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": str(member.size),
+                },
+            )
+        except RegistryV2Error:
+            if self.wait_blob_exists_after_upload_error(digest):
+                stats["blobs_uploaded"] += 1
+                stats["bytes_uploaded"] += member.size
+                return
+            raise
         if response.status_code not in {201, 202}:
+            if self.wait_blob_exists_after_upload_error(digest):
+                stats["blobs_uploaded"] += 1
+                stats["bytes_uploaded"] += member.size
+                return
             raise RegistryV2Error(f"envoi blob refuse (HTTP {response.status_code}) : {digest}")
         returned_digest = response.headers.get("Docker-Content-Digest", "").strip()
         if returned_digest and returned_digest != digest:

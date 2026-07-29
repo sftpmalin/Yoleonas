@@ -337,19 +337,58 @@ def docker_options_page():
 
 
 
-@dockers_bp.route("/docker/compose/ttyd", methods=["GET"])
-def docker_compose_ttyd():
+@dockers_bp.route("/docker/compose/log_json", methods=["GET"])
+def docker_compose_log_json():
+    conf = get_config()
+    log_path = str(conf.get("SYSTEM_LOG_FILE") or DEFAULT_CONFIG.get("SYSTEM_LOG_FILE") or "/var/log/dockers.log")
     try:
-        data = _docker_ttyd_start("compose_logs", "compose")
-        return jsonify({"ok": True, **data})
+        parent = os.path.dirname(log_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        open(log_path, "a", encoding="utf-8").close()
+    except Exception:
+        pass
+    text, truncated, size = docker_read_file_log_tail(log_path)
+    try:
+        status = system_compose_log_status(conf)
+    except Exception as exc:
+        status = {"message": clean_docker_error(exc)}
+    response = jsonify({
+        "ok": True,
+        "title": "Logs Docker Compose",
+        "log_text": text,
+        "log_path": log_path,
+        "truncated": truncated,
+        "size": size,
+        "status": status,
+    })
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@dockers_bp.route("/docker/containers/log_json", methods=["GET"])
+def docker_container_log_json():
+    container = request.args.get("container", "")
+    tail = request.args.get("tail", DOCKER_DIRECT_LOG_LINES)
+    try:
+        data = docker_container_logs_payload(container, int(tail or DOCKER_DIRECT_LOG_LINES))
+        response = jsonify({"ok": True, **data})
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    except NotFound:
+        return jsonify({"ok": False, "message": "Conteneur Docker introuvable."}), 404
     except Exception as exc:
         return jsonify({"ok": False, "message": clean_docker_error(exc)}), 400
 
 
 @dockers_bp.route("/docker/containers/ttyd", methods=["GET"])
 def docker_container_ttyd():
-    kind = request.args.get("kind", "logs")
+    kind = request.args.get("kind", "exec")
     container = request.args.get("container", "")
+    if kind != "exec":
+        return jsonify({"ok": False, "message": "ttyd est réservé au terminal interactif Docker."}), 400
     try:
         data = _docker_ttyd_start(kind, container)
         return jsonify({"ok": True, **data})

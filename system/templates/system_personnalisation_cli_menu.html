@@ -57,7 +57,7 @@
             <header class="cli-demo-header">
                 <div>
                     <strong id="cliDemoTitle">Démo Menu CLI</strong>
-                    <span id="cliDemoHint">../scripts/menu.sh dans ttyd</span>
+                    <span id="cliDemoHint">system/menu.py dans ttyd</span>
                 </div>
                 <div class="cli-demo-actions">
                     <a id="cliDemoExternal" class="yoleo-btn yoleo-btn-muted yoleo-btn-small" href="#" target="_blank" rel="noopener" hidden>Ouvrir onglet</a>
@@ -282,6 +282,11 @@ function cliCompareIndexes(a, b) {
     return cliCleanLabel(cliLabel(cliRows[a])).localeCompare(cliCleanLabel(cliLabel(cliRows[b])), 'fr', {sensitivity: 'base', numeric: true});
 }
 
+function cliIsRootBoundary(row) {
+    row = normalizeCliRow(row);
+    return row.type === 'raw' && !String(row.raw || '').trim();
+}
+
 function cliParentIndex(index) {
     const row = normalizeCliRow(cliRows[index]);
     if (row.type === 'section') return -1;
@@ -289,6 +294,7 @@ function cliParentIndex(index) {
     const depth = Number(row.depth || 0);
     for (let i = index - 1; i >= 0; i--) {
         const cur = normalizeCliRow(cliRows[i]);
+        if (cliIsRootBoundary(cur)) return -1;
         if (cur.type === 'section') return depth === 0 ? i : i;
         if (cur.type === 'submenu' && Number(cur.depth || 1) === depth) return i;
     }
@@ -300,7 +306,8 @@ function cliScopeEndFor(index) {
     if (index < 0) return cliRows.length;
     if (row.type === 'section') {
         for (let i = index + 1; i < cliRows.length; i++) {
-            if (normalizeCliRow(cliRows[i]).type === 'section') return i;
+            const cur = normalizeCliRow(cliRows[i]);
+            if (cliIsRootBoundary(cur) || cur.type === 'section') return i;
         }
         return cliRows.length;
     }
@@ -308,6 +315,7 @@ function cliScopeEndFor(index) {
         const depth = Number(row.depth || 1);
         for (let i = index + 1; i < cliRows.length; i++) {
             const cur = normalizeCliRow(cliRows[i]);
+            if (cliIsRootBoundary(cur)) return i;
             if (cur.type === 'section') return i;
             if (cur.type === 'submenu' && Number(cur.depth || 1) <= depth) return i;
         }
@@ -391,6 +399,7 @@ function cliDirectChildren() {
     // restent au bon niveau au lieu d'être aspirés dans le sous-menu ouvert.
     cliRows.forEach((row, index) => {
         row = normalizeCliRow(row);
+        if (cliIsRootBoundary(row)) return;
         if (row.type === 'separator') {
             if (cliSeparatorBelongsToContext(index, ctx)) pushEntry(index, 'other');
             return;
@@ -526,6 +535,8 @@ function renderCliTile(index, kind) {
                 <div class="cli-tile-actions">
                     <button type="button" class="cli-tile-action" title="Modifier" onclick="startCliEdit(${index})">✎</button>
                     <button type="button" class="cli-tile-action" title="Parcourir" onclick="openCliCommandBrowser(${index})">📂</button>
+                    <button type="button" class="cli-tile-action" title="Monter" onclick="moveCliRow(${index}, -1)">▲</button>
+                    <button type="button" class="cli-tile-action" title="Descendre" onclick="moveCliRow(${index}, 1)">▼</button>
                     <button type="button" class="cli-tile-action" title="Retrait" onclick="indentCliRow(${index}, -1)">←</button>
                     <button type="button" class="cli-tile-action" title="Sous-menu" onclick="indentCliRow(${index}, 1)">→</button>
                     <button type="button" class="cli-tile-action is-danger" title="Supprimer" onclick="deleteCliRow(${index})">×</button>
@@ -602,6 +613,18 @@ function currentInsertIndex() {
     return ctx.end;
 }
 
+function cliNeedsRootBoundaryBefore(index) {
+    if (index <= 0) return false;
+    for (let i = index - 1; i >= 0; i--) {
+        const row = normalizeCliRow(cliRows[i]);
+        const line = formatCliRow(row).trim();
+        if (cliIsRootBoundary(row)) return false;
+        if (!line) continue;
+        return row.type === 'section' || row.type === 'submenu' || row.type === 'command';
+    }
+    return false;
+}
+
 function currentCommandDepth() {
     const ctx = cliCurrentContainer();
     if (ctx.kind === 'root') return 0;
@@ -617,6 +640,7 @@ function currentSubmenuDepth() {
 function addCliRow(type) {
     const row = normalizeCliRow({type});
     let insertAt = currentInsertIndex();
+    const ctx = cliCurrentContainer();
 
     if (type === 'section') {
         row.title = 'Nouveau dossier';
@@ -634,23 +658,67 @@ function addCliRow(type) {
     }
     if (type === 'separator') row.raw = '-';
 
+    if (type === 'command' && ctx.kind === 'root' && cliNeedsRootBoundaryBefore(insertAt)) {
+        cliRows.splice(insertAt, 0, normalizeCliRow({type: 'raw', raw: ''}));
+        insertAt += 1;
+    }
+
     cliRows.splice(insertAt, 0, row);
     cliEditingIndex = insertAt;
     renderCliRows();
     cliAutosave(800);
 }
 
-function moveCliRow(index, direction) {
-    const target = index + direction;
-    if (target < 0 || target >= cliRows.length) return;
-    const [row] = cliRows.splice(index, 1);
-    cliRows.splice(target, 0, row);
-    cliCurrentPath = cliCurrentPath.map(i => {
-        if (i === index) return target;
-        if (direction < 0 && i === target) return target + 1;
-        if (direction > 0 && i === target) return target - 1;
+function cliMoveTargetIndex(index, direction) {
+    for (let i = index + Number(direction || 0); i >= 0 && i < cliRows.length; i += Number(direction || 0)) {
+        const row = normalizeCliRow(cliRows[i]);
+        if (cliIsRootBoundary(row)) continue;
+        if (!formatCliRow(row).trim()) continue;
         return i;
-    });
+    }
+    return -1;
+}
+
+function cliHasRootBoundaryBetween(start, end) {
+    for (let i = Math.max(0, start); i < Math.min(cliRows.length, end); i++) {
+        if (cliIsRootBoundary(cliRows[i])) return true;
+    }
+    return false;
+}
+
+function cliEnsureRootCommandBoundary(index) {
+    const row = normalizeCliRow(cliRows[index]);
+    if (row.type !== 'command' || Number(row.depth || 0) !== 0) return index;
+    const previous = cliPreviousMeaningfulIndex(index);
+    if (previous < 0) return index;
+    if (cliHasRootBoundaryBetween(previous + 1, index)) return index;
+
+    const previousRow = normalizeCliRow(cliRows[previous]);
+    const previousIsRootCommand = previousRow.type === 'command'
+        && Number(previousRow.depth || 0) === 0
+        && cliParentIndex(previous) === -1;
+    if (previousIsRootCommand) return index;
+
+    cliRows.splice(index, 0, normalizeCliRow({type: 'raw', raw: ''}));
+    return index + 1;
+}
+
+function moveCliRow(index, direction) {
+    direction = Number(direction || 0);
+    if (!direction || index < 0 || index >= cliRows.length) return;
+    const target = cliMoveTargetIndex(index, direction);
+    if (target < 0) return;
+
+    const moving = normalizeCliRow(cliRows[index]);
+    const movingWasRootCommand = moving.type === 'command'
+        && Number(moving.depth || 0) === 0
+        && cliParentIndex(index) === -1;
+
+    const [row] = cliRows.splice(index, 1);
+    const insertAt = direction > 0 && target > index ? target : target;
+    cliRows.splice(insertAt, 0, row);
+    const newIndex = movingWasRootCommand ? cliEnsureRootCommandBoundary(insertAt) : insertAt;
+    cliFocusIndex = newIndex;
     cliEditingIndex = -1;
     renderCliRows();
     cliAutosave(200);
@@ -747,7 +815,10 @@ function validateCliRows() {
     let headings = {0: true};
     for (const row of cliRows.map(normalizeCliRow)) {
         const line = formatCliRow(row).trim();
-        if (!line) continue;
+        if (!line) {
+            if (cliIsRootBoundary(row)) headings = {0: true};
+            continue;
+        }
         visible += 1;
         if (row.type === 'section') {
             headings = {0: true};

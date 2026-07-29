@@ -68,13 +68,7 @@
 
     function dockerSetTerminalText(box, text, append = false) {
         if (!box) return;
-        if ('value' in box) {
-            box.value = append ? box.value + text : text;
-            box.scrollTop = box.scrollHeight;
-        } else {
-            box.textContent = append ? box.textContent + text : text;
-            box.scrollTop = box.scrollHeight;
-        }
+        dockerSetScrollableLog(box, text, append);
     }
 
     window.dockerFilterRuns = function () {

@@ -1,4 +1,4 @@
-/* Popup ttyd Docker : logs et docker exec en vrai terminal */
+/* Popup Docker : ttyd pour le terminal interactif, lecture directe pour les logs */
 .docker-state-tools {
     display: inline-flex;
     align-items: center;
@@ -78,6 +78,60 @@
     min-height: 0;
     border: 0;
     background: #000;
+}
+
+.docker-direct-log-modal-box {
+    height: min(840px, 92vh);
+}
+
+.docker-direct-log-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(8, 13, 22, 0.92);
+}
+
+.docker-direct-log-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.docker-direct-log-box {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    border: 0;
+    background: #05080c;
+    color: #bfe8ff;
+    font: 12px/1.55 Consolas, Monaco, "Liberation Mono", monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    scrollbar-gutter: stable;
+}
+
+.docker-direct-log-box::-webkit-scrollbar {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+.docker-direct-log-box::-webkit-scrollbar-thumb {
+    border: 2px solid #05080c;
+    border-radius: 999px;
+    background: rgba(125, 211, 252, 0.45);
+}
+
+.docker-direct-log-box::-webkit-scrollbar-track {
+    background: #05080c;
 }
 
 body.docker-ttyd-modal-open {

@@ -31,7 +31,7 @@
                 <span class="docker-compose-progress-text" data-docker-compose-progress-text>0%</span>
             </div>
         </div>
-        <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-compose-log-open docker-compose-log-open-compact" data-docker-compose-log-open type="button" onclick="dockerOpenComposeTtyd()" title="Ouvrir le vrai log Compose dans ttyd">📜</button>
+        <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-compose-log-open docker-compose-log-open-compact" data-docker-compose-log-open type="button" onclick="dockerOpenComposeLog()" title="Ouvrir le log Compose">📜</button>
     </section>
 
     <section class="yoleo-card docker-section">
@@ -49,7 +49,7 @@
                         <span class="docker-compose-progress-text" id="docker-compose-progress-text" data-docker-compose-progress-text>0%</span>
                     </div>
                 </div>
-                <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-compose-log-open" id="docker-compose-log-open" data-docker-compose-log-open type="button" onclick="dockerOpenComposeTtyd()" title="Ouvrir le vrai log Compose dans ttyd">📜</button>
+                <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-compose-log-open" id="docker-compose-log-open" data-docker-compose-log-open type="button" onclick="dockerOpenComposeLog()" title="Ouvrir le log Compose">📜</button>
             </div>
             <div class="docker-service-inline-zone">
                 <form method="post" action="{{ url_for('dockers_bp.stacks_docker') }}" class="actions-line">
@@ -78,7 +78,7 @@
                         <td>
                             <div class="docker-state-tools">
                                 <span class="status-pill {{ 'ok' if c.state == 'running' else 'bad' }}">{{ c.state }}</span>
-                                <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-ttyd-btn" type="button" title="Logs Docker" onclick='dockerOpenContainerTtyd("logs", {{ c.name|tojson }})'>📜</button>
+                                <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-ttyd-btn" type="button" title="Logs Docker" onclick='dockerOpenContainerLog({{ c.name|tojson }})'>📜</button>
                                 {% if c.state == 'running' %}
                                 <button class="yoleo-btn yoleo-btn-primary yoleo-btn-icon docker-ttyd-btn" type="button" title="Terminal docker exec" onclick='dockerOpenContainerTtyd("exec", {{ c.name|tojson }})'>⌨</button>
                                 {% endif %}
