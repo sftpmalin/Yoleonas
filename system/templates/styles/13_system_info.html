@@ -23,6 +23,38 @@
         overflow: hidden;
     }
 
+    .system-info-certificate-card {
+        grid-column: 1 / -1;
+    }
+
+    .system-info-certificate-card .system-info-card-head {
+        flex-wrap: wrap;
+    }
+
+    .system-info-certificate-body {
+        padding: 12px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--yoleo-muted);
+    }
+
+    .system-info-certificate-body p {
+        margin: 0 0 10px;
+    }
+
+    .system-info-certificate-body p:last-child {
+        margin-bottom: 0;
+    }
+
+    .system-info-certificate-body summary {
+        color: #9fdfff;
+        cursor: pointer;
+    }
+
+    .system-info-certificate-body details[open] summary {
+        margin-bottom: 10px;
+    }
+
     .system-info-wide {
         grid-column: span 2;
     }

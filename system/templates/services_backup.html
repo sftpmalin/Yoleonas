@@ -15,6 +15,7 @@
         {% if s.archive_date_suffix %}<span class="badge badge-yellow">date</span>{% endif %}
         <span class="badge badge-blue">{{ 'par dossier' if s.archive_children else 'source' }}</span>
         <span class="badge {{ 'badge-green' if s.archive_replace_existing else 'badge-gray' }}">{{ 'remplace' if s.archive_replace_existing else 'conserve' }}</span>
+        {% if s.archive_skip_unchanged %}<span class="badge badge-green">skip inchangé</span>{% endif %}
         {% if s.command_start %}<span class="badge badge-yellow">start</span>{% endif %}
         {% if s.command_end %}<span class="badge badge-yellow">stop</span>{% endif %}
         {% if s.excludes %}<span class="badge badge-yellow">exclusions</span>{% endif %}
@@ -54,6 +55,8 @@
                             <button type="button" class="backup-filter-btn" data-backup-filter="backup" aria-pressed="false">Backups</button>
                             <button type="button" class="backup-filter-btn" data-backup-filter="archive" aria-pressed="false">Archives</button>
                             <button type="button" class="backup-filter-btn" data-backup-filter="cache" aria-pressed="false">Cache</button>
+                            <button type="button" class="btn btn-glow" id="backupSelectionLaunch">▶ Lancer</button>
+                            <span class="tiny" id="backupSelectionCount" aria-live="polite"></span>
                         </div>
                     </div>
                     {% if not scripts %}
@@ -63,14 +66,14 @@
                             <table class="backup-normal-mobile-table no-mobile-mosaic mobile-no-mosaic" data-mobile-mosaic="off">
                                 <thead>
                                     <tr>
-                                        <th>Script</th><th>Source</th><th>Cible</th><th>Options</th><th>Dernier état</th><th style="text-align:right;">Actions</th>
+                                        <th><label class="backup-script-choice"><input type="checkbox" id="backupSelectAll" aria-label="Sélectionner tous les scripts de cette catégorie"> Script</label></th><th>Source</th><th>Cible</th><th>Options</th><th>Dernier état</th><th style="text-align:right;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                 {% for s in scripts %}
                                     {% set st = s.status %}
                                     <tr data-backup-script-row data-backup-kind="{{ 'cache' if s.mode == 'cache' else ('archive' if s.mode == 'archive' else 'backup') }}">
-                                        <td><div class="script-title">{{ s.title }}</div><div class="tiny">{{ s.name }}</div></td>
+                                        <td><label class="backup-script-choice"><input type="checkbox" data-backup-select="{{ s.name }}" aria-label="Sélectionner {{ s.title }}"><span><span class="script-title">{{ s.title }}</span><span class="tiny backup-script-filename">{{ s.name }}</span></span></label></td>
                                         <td><div class="code-text">{{ s.source }}</div></td>
                                         <td><div class="code-text">{{ s.target }}</div></td>
                                         <td>
@@ -116,15 +119,38 @@
                         {% for s in scripts %}
                             {% set st = s.status %}
                             <div class="mobile-card" data-backup-script-row data-backup-kind="{{ 'cache' if s.mode == 'cache' else ('archive' if s.mode == 'archive' else 'backup') }}">
-                                <div><div class="script-title">{{ s.title }}</div><div class="tiny">{{ s.name }}</div></div>
-                                <div class="code-text">Source : {{ s.source }}</div>
-                                <div class="code-text">Cible : {{ s.target }}</div>
-                                <div class="backup-mobile-options">{{ backup_option_badges(s) }}</div>
-                                <div data-script-status="{{ s.name }}">
+                                <div class="mobile-card-head">
+                                    <div>
+                                        <label class="backup-script-choice"><input type="checkbox" data-backup-select="{{ s.name }}" aria-label="Sélectionner {{ s.title }}"><span class="script-title">{{ s.title }}</span></label>
+                                        <div class="tiny">{{ s.name }}</div>
+                                    </div>
+                                    <span class="badge {{ 'badge-mode-cache' if s.mode == 'cache' else ('badge-mode-archive' if s.mode == 'archive' else 'badge-mode-backup') }}">
+                                        {{ 'Cache' if s.mode == 'cache' else ('Archive' if s.mode == 'archive' else ('Miroir' if s.mode == 'mirror' else 'Backup')) }}
+                                    </span>
+                                </div>
+                                <div class="mobile-meta-grid">
+                                    <div class="mobile-meta">
+                                        <div class="meta-label">Source</div>
+                                        <div class="meta-value code-text">{{ s.source }}</div>
+                                    </div>
+                                    <div class="mobile-meta">
+                                        <div class="meta-label">Cible</div>
+                                        <div class="meta-value code-text">{{ s.target }}</div>
+                                    </div>
+                                </div>
+                                <div class="backup-mobile-section backup-mobile-options">
+                                    <div class="meta-label">Options</div>
+                                    <div class="backup-mobile-badges">{{ backup_option_badges(s) }}</div>
+                                </div>
+                                <div class="backup-mobile-section backup-mobile-status">
+                                    <div class="meta-label">Dernier état</div>
+                                    <div data-script-status="{{ s.name }}">
                                     {% set pg = st.progress or {} %}
                                     {% if st.running %}
                                         {% if st.result == 'En attente' or st.phase == 'waiting' %}<span class="badge badge-blue">En attente</span>
                                         {% else %}<span class="badge badge-yellow">En cours</span>{% if pg.percent_label %} <span class="badge badge-cyan">{{ pg.percent_label }}</span>{% endif %}{% endif %}
+                                    {% elif st.result == 'Succès' %}<span class="badge badge-green">Succès</span>
+                                    {% elif st.result == 'Erreur' %}<span class="badge badge-red">Erreur</span>
                                     {% else %}<span class="badge badge-gray">{{ st.result }}</span>{% endif %}
                                     {% if pg.percent_label or pg.copied_label %}
                                     <div class="progress-widget">
@@ -133,13 +159,20 @@
                                         <div class="progress-small">{{ pg.speed or '' }}{% if pg.speed and pg.eta %} · {% endif %}{% if pg.eta %}reste {{ pg.eta }}{% endif %}</div>
                                     </div>
                                     {% endif %}
+                                    <div class="tiny">Début : {{ st.started_at or '—' }}</div>
+                                    <div class="tiny">Fin : {{ st.ended_at or '—' }}</div>
                                     <div class="tiny">{{ st.message or '—' }}{% if pg.file_total_label %} - {{ pg.file_total_label }}{% endif %}</div>
+                                    </div>
                                 </div>
-                                <div class="action-row" style="justify-content:flex-start;">
-                                    <a href="{{ url_for('backup_bp.edit_script', filename=s.name) }}" class="btn btn-outline icon-btn">✏️</a>
-                                    <a href="{{ url_for('backup_bp.run_script', filename=s.name) }}" class="btn btn-glow icon-btn" data-backup-launch="1" data-filename="{{ s.name|e }}">▶</a>
-                                    <a href="{{ url_for('backup_bp.stop_script', filename=s.name) }}" class="btn btn-warning icon-btn" data-backup-stop="1" data-filename="{{ s.name|e }}">⛔</a>
-                                    <a href="{{ url_for('backup_bp.home_log', file=s.name) }}" class="btn btn-outline icon-btn">🧾</a>
+                                <div class="action-row backup-mobile-actions">
+                                    <a href="{{ url_for('backup_bp.edit_script', filename=s.name) }}" class="btn btn-outline">✏️ Modifier</a>
+                                    <a href="{{ url_for('backup_bp.run_script', filename=s.name) }}" class="btn btn-glow" data-backup-launch="1" data-filename="{{ s.name|e }}">▶ Lancer</a>
+                                    <a href="{{ url_for('backup_bp.stop_script', filename=s.name) }}" class="btn btn-warning" data-backup-stop="1" data-filename="{{ s.name|e }}">⛔ Stop</a>
+                                    <a href="{{ url_for('backup_bp.home_log', file=s.name) }}" class="btn btn-outline">🧾 Logs</a>
+                                    <form action="{{ url_for('backup_bp.delete_script') }}" method="POST" data-confirm data-confirm-kind="danger" data-confirm-title="Supprimer le script ?" data-confirm-message="Supprimer {{ s.name }} ? Le fichier Python du backup sera effacé." data-confirm-note="Le contenu source et la cible rsync ne sont pas supprimés par cette action." data-confirm-ok="Supprimer">
+                                        <input type="hidden" name="filename" value="{{ s.name }}">
+                                        <button type="submit" class="btn btn-danger">🗑️ Supprimer</button>
+                                    </form>
                                 </div>
                             </div>
                         {% endfor %}
@@ -161,7 +194,7 @@
                         <span>{{ '✏️ Modifier' if is_edit else '➕ Créer' }}</span>
                         <span class="title-meta">Validation = génération d’un script indépendant.</span>
                     </div>
-                    <form method="POST" action="{{ url_for('backup_bp.save_script') }}">
+                    <form method="POST" action="{{ url_for('backup_bp.save_script') }}" id="backupScriptForm">
                         <input type="hidden" name="old_filename" value="{{ edit_file if is_edit else '' }}">
                         <div class="grid-form">
                             <div class="form-group col-2 compact-field">
@@ -280,6 +313,11 @@
                                                 <span class="switch-ui" aria-hidden="true"></span>
                                                 <span class="option-label">Ajouter la date/heure au nom</span>
                                             </label>
+                                            <label class="option-check option-switch backup-inline-switch">
+                                                <input type="checkbox" name="skip_unchanged" value="1" {% if edit_data.SKIP_UNCHANGED != '0' %}checked{% endif %}>
+                                                <span class="switch-ui" aria-hidden="true"></span>
+                                                <span class="option-label">Ignorer les dossiers inchangés (SHA-256)</span>
+                                            </label>
                                         </div>
                                     </div>
 
@@ -305,6 +343,10 @@
                                 <div class="section-title options-title">
                                     <span>Options cache</span>
                                     <span class="title-meta">Le script déplace avec rsync puis nettoie le dossier source vide.</span>
+                                </div>
+                                <div class="cache-physical-mount-warning">
+                                    <strong>🛡️ Protection mergerFS</strong>
+                                    <span>Les chemins mergerFS sont autorisés uniquement si la source et la destination ne partagent aucun disque physique sous-jacent.</span>
                                 </div>
                                 <div class="cache-options-layout">
                                     <div class="cache-option-group">
@@ -569,7 +611,7 @@ function syncModeHelp() {
     if (checkedMode.value === 'mirror') {
         help.textContent = 'Miroir exact : la cible est rendue égale à la source. Le script force --delete et supprime côté cible ce qui n’existe plus côté source. La source n’est pas supprimée.';
     } else if (checkedMode.value === 'archive') {
-        help.textContent = 'Archive : le script crée des fichiers tar, tar.7z ou tar.gz dans la cible. Les commandes début/fin sont du Bash libre.';
+        help.textContent = 'Archive : le script crée des fichiers tar, tar.7z ou tar.gz dans la cible et ignore par défaut les dossiers inchangés. Les commandes début/fin sont du Bash libre.';
     } else if (checkedMode.value === 'cache') {
         help.textContent = 'Cache : rsync déplace les fichiers vers la cible avec --remove-source-files, puis supprime les dossiers source devenus vides.';
     } else {
@@ -626,16 +668,22 @@ function openConfirm(options) {
     const title = document.getElementById('confirmTitle');
     const message = document.getElementById('confirmMessage');
     const note = document.getElementById('confirmNote');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
     const okBtn = document.getElementById('confirmOkBtn');
     if (!modal || !box || !title || !message || !okBtn) return;
 
     const kind = options.kind || 'info';
     box.classList.toggle('modal-box-danger', kind === 'danger');
-    icon.textContent = kind === 'danger' ? '🗑️' : '⚠️';
+    icon.textContent = options.icon || (kind === 'danger' ? '🗑️' : '⚠️');
     title.textContent = options.title || 'Confirmer l’action';
     message.textContent = options.message || 'Confirmer ?';
     okBtn.textContent = options.okText || 'Confirmer';
     okBtn.className = kind === 'danger' ? 'btn btn-danger' : 'btn btn-glow';
+    if (cancelBtn) {
+        cancelBtn.hidden = !!options.hideCancel;
+        cancelBtn.style.display = options.hideCancel ? 'none' : '';
+        cancelBtn.textContent = options.cancelText || 'Annuler';
+    }
 
     if (options.note) {
         note.textContent = options.note;
@@ -649,6 +697,59 @@ function openConfirm(options) {
     modal.classList.add('show');
     modal.setAttribute('aria-hidden', 'false');
     okBtn.focus({preventScroll: true});
+}
+
+function openCacheMountError(error) {
+    error = error || {};
+    openConfirm({
+        kind: 'danger',
+        icon: '🛑',
+        title: error.title || 'Configuration mergerFS dangereuse',
+        message: error.message || 'Ce script Cache ne peut pas être enregistré avec ce chemin.',
+        note: error.note || 'La source et la destination ne doivent partager aucun disque physique via mergerFS.',
+        okText: 'J’ai compris',
+        hideCancel: true
+    });
+}
+
+function bindCacheMountValidation() {
+    const form = document.getElementById('backupScriptForm');
+    if (!form || form.dataset.cacheMountValidationBound === '1') return;
+    form.dataset.cacheMountValidationBound = '1';
+    form.addEventListener('submit', async function (event) {
+        const checkedMode = form.querySelector('input[name="mode"]:checked');
+        if (!checkedMode || checkedMode.value !== 'cache') return;
+
+        event.preventDefault();
+        const submitButton = event.submitter || form.querySelector('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+        try {
+            const response = await fetch('{{ url_for('backup_bp.api_validate_cache_mounts') }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                credentials: 'same-origin',
+                cache: 'no-store',
+                body: JSON.stringify({
+                    mode: 'cache',
+                    source: (form.elements.source && form.elements.source.value) || '',
+                    target: (form.elements.target && form.elements.target.value) || ''
+                })
+            });
+            const data = await response.json().catch(function () { return {}; });
+            if (!response.ok || !data.ok) {
+                openCacheMountError(data.error || {});
+                return;
+            }
+            HTMLFormElement.prototype.submit.call(form);
+        } catch (error) {
+            openCacheMountError({
+                message: 'Validation de sécurité impossible : le script n’a pas été enregistré.',
+                note: 'Réessayez lorsque le serveur peut vérifier les montages physiques.'
+            });
+        } finally {
+            if (submitButton) submitButton.disabled = false;
+        }
+    });
 }
 
 function closeConfirm() {
@@ -809,6 +910,10 @@ function setActionDisabled(link, disabled, title) {
 function syncBackupActionState(filename, status) {
     const safeName = String(filename || '');
     const isRunning = !!(status && status.running);
+    const result = String((status && status.result) || '');
+    // Un statut ambigu peut provenir d'une condition de course de fin. Le Stop
+    // reste alors disponible comme nettoyage de secours (PID/session/locks).
+    const canStop = isRunning || result === 'Inconnu';
     document.querySelectorAll('[data-backup-launch]').forEach(link => {
         if ((link.dataset.filename || '') === safeName) {
             setActionDisabled(link, isRunning, 'Backup déjà actif');
@@ -816,7 +921,7 @@ function syncBackupActionState(filename, status) {
     });
     document.querySelectorAll('[data-backup-stop]').forEach(link => {
         if ((link.dataset.filename || '') === safeName) {
-            setActionDisabled(link, !isRunning, 'Aucun backup actif à arrêter');
+            setActionDisabled(link, !canStop, 'Aucun backup actif à arrêter');
         }
     });
 }
@@ -857,6 +962,9 @@ async function launchBackup(event, link, filename) {
         const data = await resp.json().catch(() => ({}));
         if (data.status) updateBackupStatusCell(safeName, data.status);
         if (!resp.ok || data.ok === false) {
+            if (data.error && ['mergerfs_path_forbidden', 'cache_paths_unverifiable', 'backup_mode_marker_missing'].includes(data.error.code)) {
+                openCacheMountError(data.error);
+            }
             updateBackupStatusCell(safeName, {
                 running: false,
                 result: 'Erreur',
@@ -972,8 +1080,90 @@ function updateSelectedProgress(st) {
     panel.innerHTML = '<div class="tiny" style="text-transform:uppercase; font-weight:900; color:var(--text-muted);">Progression</div>' + html;
 }
 
+
+const backupSelection = new Set();
+let backupQueued = new Set();
+let backupCategory = 'all';
+
+function visibleBackupChoices() {
+    const names = new Set();
+    document.querySelectorAll('[data-backup-select]').forEach(box => {
+        const row = box.closest('[data-backup-script-row]');
+        if (row && (backupCategory === 'all' || row.dataset.backupKind === backupCategory)) names.add(box.dataset.backupSelect);
+    });
+    return [...names];
+}
+
+function syncBackupSelection(queue) {
+    if (queue) {
+        const names = (queue.pending || []).map(item => item.name);
+        if (queue.active) names.push(queue.active.name);
+        const next = new Set(names);
+        backupQueued.forEach(name => { if (!next.has(name)) backupSelection.delete(name); });
+        next.forEach(name => backupSelection.add(name));
+        backupQueued = next;
+    }
+    document.querySelectorAll('[data-backup-select]').forEach(box => {
+        box.checked = backupSelection.has(box.dataset.backupSelect);
+        box.disabled = backupQueued.has(box.dataset.backupSelect);
+    });
+    const visible = visibleBackupChoices();
+    const available = visible.filter(name => !backupQueued.has(name));
+    const checked = available.filter(name => backupSelection.has(name)).length;
+    const all = document.getElementById('backupSelectAll');
+    if (all) {
+        all.disabled = !available.length;
+        all.checked = !!available.length && checked === available.length;
+        all.indeterminate = checked > 0 && checked < available.length;
+    }
+    const count = document.getElementById('backupSelectionCount');
+    const chosen = visible.filter(name => backupSelection.has(name) && !backupQueued.has(name)).length;
+    if (count) count.textContent = chosen + ' sélectionné(s)' + (backupQueued.size ? ' · ' + backupQueued.size + ' en file / en cours' : '');
+}
+
+function initBackupSelection() {
+    document.querySelectorAll('[data-backup-select]').forEach(box => {
+        box.addEventListener('change', () => {
+            if (box.checked) backupSelection.add(box.dataset.backupSelect);
+            else backupSelection.delete(box.dataset.backupSelect);
+            syncBackupSelection();
+        });
+    });
+    const all = document.getElementById('backupSelectAll');
+    if (all) all.addEventListener('change', () => {
+        visibleBackupChoices().filter(name => !backupQueued.has(name)).forEach(name => {
+            if (all.checked) backupSelection.add(name); else backupSelection.delete(name);
+        });
+        syncBackupSelection();
+    });
+    const launch = document.getElementById('backupSelectionLaunch');
+    if (launch) launch.addEventListener('click', async () => {
+        const names = visibleBackupChoices().filter(name => backupSelection.has(name) && !backupQueued.has(name));
+        if (!names.length) {
+            openConfirm({ title: 'Aucune sélection', message: 'Veuillez sélectionner au moins un élément.', okText: 'OK', hideCancel: true });
+            return;
+        }
+        launch.disabled = true;
+        try {
+            const response = await fetch('{{ url_for('backup_bp.enqueue_backup_selection') }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                body: JSON.stringify({filenames: names}), cache: 'no-store'
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) throw new Error(data.message || 'Lancement impossible');
+            names.forEach(name => backupQueued.add(name));
+            syncBackupSelection(data.queue);
+            refreshScriptStatus();
+        } catch (error) {
+            openConfirm({ title: 'Lancement impossible', message: String(error.message || error), okText: 'OK', hideCancel: true });
+        } finally { launch.disabled = false; }
+    });
+    syncBackupSelection();
+}
+
 function applyBackupTableFilter(filterValue) {
     const value = (filterValue || 'all').toLowerCase();
+    backupCategory = value;
     document.querySelectorAll('[data-backup-filter]').forEach(btn => {
         const active = (btn.dataset.backupFilter || 'all') === value;
         btn.classList.toggle('is-active', active);
@@ -983,6 +1173,7 @@ function applyBackupTableFilter(filterValue) {
         const kind = (row.dataset.backupKind || 'backup').toLowerCase();
         row.style.display = (value === 'all' || kind === value) ? '' : 'none';
     });
+    syncBackupSelection();
     try { localStorage.setItem('yoleo_backup_table_filter', value); } catch (err) {}
 }
 
@@ -1007,6 +1198,7 @@ function refreshScriptStatus() {
         .then(r => r.json())
         .then(data => {
             const scripts = data.scripts || [];
+            syncBackupSelection(data.queue);
             const total = document.getElementById('statTotal');
             const running = document.getElementById('statRunning');
             if (total) total.textContent = scripts.length;
@@ -1059,6 +1251,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 780);
     });
     bindModernConfirms();
+    bindCacheMountValidation();
+    const cacheSaveError = {{ save_error|tojson }};
+    if (cacheSaveError === 'cache_mergerfs') {
+        const blockedRole = {{ blocked_cache_role|tojson }} === 'target' ? 'La destination' : 'La source';
+        const blockedPath = {{ blocked_cache_path|tojson }} || '—';
+        const blockedMount = {{ blocked_cache_mount|tojson }} || '—';
+        const blockedFsType = {{ blocked_cache_fstype|tojson }} || 'mergerFS';
+        openCacheMountError({
+            message: 'Configuration mergerFS impossible en mode Cache.',
+            note: blockedRole + ' ' + blockedPath + ' utilise le montage ' + blockedMount + ' (' + blockedFsType + '). La source et la destination ne doivent partager aucun disque physique via mergerFS.'
+        });
+    }
+    initBackupSelection();
     initBackupTableFilters();
     document.querySelectorAll('[data-backup-launch]').forEach(function (link) {
         if (link.dataset.launchBound === '1') return;

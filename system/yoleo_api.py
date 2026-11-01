@@ -27,11 +27,29 @@ from typing import Any, Callable
 
 from flask import Blueprint, current_app, g, jsonify, request, send_file
 
+from monitoring_probes import ProbeCache
+
 
 API_VERSION = "1"
 DEFAULT_TOKEN_DAYS = 365
 MIN_TOKEN_DAYS = 1
 MAX_TOKEN_DAYS = 3650
+
+_MONITORING_DOCKER_PROBES = ProbeCache(max_pending=1)
+
+
+def _monitoring_docker_stacks(dockers_module):
+    def collect():
+        client = dockers_module.get_docker_client()
+        try:
+            return dict(dockers_module.list_stacks(client) or {})
+        finally:
+            client.close()
+
+    result = _MONITORING_DOCKER_PROBES.read('stacks', collect, ttl=3, wait=0.05)
+    if result.value is None:
+        raise RuntimeError("L'inventaire Docker est en cours de lecture.")
+    return result.value
 
 CONTAINER_ACTIONS = {"start", "stop", "restart", "start_all", "stop_all"}
 SERVICE_ACTIONS = {
@@ -663,7 +681,6 @@ def create_yoleo_api_blueprint(
             "stats": {"total": 0, "running": 0, "stopped": 0},
             "containers": [],
         }
-        docker_client = None
         try:
             dockers_module = importlib.import_module("dockers")
             service_status = dict(dockers_module.get_docker_service_status() or {})
@@ -671,8 +688,7 @@ def create_yoleo_api_blueprint(
             docker_data["available"] = service_status.get("active") is not None
 
             if service_status.get("active") is True:
-                docker_client = dockers_module.get_docker_client()
-                stacks = dict(dockers_module.list_stacks(docker_client) or {})
+                stacks = _monitoring_docker_stacks(dockers_module)
                 docker_data["stats"] = dict(dockers_module.get_docker_stats(stacks) or {})
                 containers = []
                 for stack_name, stack_containers in stacks.items():
@@ -696,12 +712,6 @@ def create_yoleo_api_blueprint(
             except Exception:
                 message = "L'état Docker est momentanément indisponible."
             section_error("docker", "docker_unavailable", _clean_text(message, 300))
-        finally:
-            if docker_client is not None:
-                try:
-                    docker_client.close()
-                except Exception:
-                    pass
 
         vm_data: dict[str, Any] = {
             "available": False,

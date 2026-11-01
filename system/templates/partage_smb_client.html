@@ -1,0 +1,375 @@
+{% extends "partage_base.html" %}
+
+{% block title %}Samba client - Yoleo{% endblock %}
+{% block page_title %}Samba (client){% endblock %}
+{% block page_subtitle %}Montages CIFS temporaires depuis un autre serveur, sans fstab ni remontage automatique{% endblock %}
+
+{% block route_content %}
+{% set sc = smb_client|default({}) %}
+{% set general = sc.general|default({}) %}
+{% set mounts = sc.mounts|default([]) %}
+
+<div id="tab-smb-client" class="tab-panel active partage-smb-client-page-v1">
+    <section class="card partage-smb-client-header-v1">
+        <div class="topbar partage-smb-client-topline-v1">
+            <div class="summary-grid partage-smb-client-summary-v1">
+                <div class="summary-card">
+                    <div class="summary-label">Profils enregistrés</div>
+                    <div class="summary-value" id="smbClientManagedCount">{{ sc.managed_count|default(0) }}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Montés maintenant</div>
+                    <div class="summary-value" id="smbClientMountedCount">{{ sc.mounted_count|default(0) }}</div>
+                </div>
+                <div class="summary-card partage-smb-client-wide-v1">
+                    <div class="summary-label">Base locale</div>
+                    <div class="summary-value code-inline">{{ general.host_base|default('/mnt/smb/') }}</div>
+                </div>
+            </div>
+            <div class="toolbar partage-smb-client-header-actions-v1">
+                <form method="POST" action="{{ url_for('partage_bp.smb_client_adopt_all_route') }}" id="smbClientAdoptAllForm" {% if not sc.external_count %}hidden{% endif %}>
+                    <button type="submit" class="yoleo-btn yoleo-btn-green">💾 Enregistrer les montages actifs</button>
+                </form>
+                <button type="button" class="yoleo-btn yoleo-btn-primary" id="smbClientOpenAdd">➕ Ajouter un partage</button>
+            </div>
+        </div>
+        <div class="partage-smb-client-manual-note-v1">
+            <span class="badge badge-info">Manuel</span>
+            Les profils restent dans ce tableau après un redémarrage, mais aucun partage n’est remonté tout seul.
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="topbar">
+            <div class="title-block">
+                <h2>Partages Samba distants</h2>
+                <div class="subtitle">Les montages CIFS déjà actifs sous <code>/mnt/smb</code> sont détectés sans être modifiés. Enregistre-les si tu veux pouvoir les remonter plus tard depuis ce tableau.</div>
+            </div>
+            <div class="tiny" id="smbClientUpdatedAt">Contrôle : {{ sc.updated_at|default('—') }}</div>
+        </div>
+
+        <div class="empty-state" id="smbClientEmpty" {% if mounts %}hidden{% endif %}>Aucun partage Samba client connu ou actuellement monté.</div>
+        <div class="desktop-table-wrap partage-smb-client-table-wrap-v1" id="smbClientTableWrap" {% if not mounts %}hidden{% endif %} data-yoleo-context-zone="smb-client-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Serveur / partage</th>
+                        <th>Point local</th>
+                        <th>Authentification</th>
+                        <th>Mode local</th>
+                        <th>État</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="smbClientRows">
+                {% for mount in mounts %}
+                    <tr data-smb-client-section="{{ mount.section|e }}">
+                        <td>
+                            <div class="code-text">//{{ mount.machine }}/{{ mount.share }}</div>
+                            {% if not mount.managed %}<div class="tiny">Montage actif non encore enregistré</div>{% endif %}
+                        </td>
+                        <td><span class="path-pill"><span>{{ mount.mount_path }}</span></span></td>
+                        <td>
+                            {% if mount.guest %}<span class="badge badge-muted">Invité</span>
+                            {% else %}<span class="badge badge-info">{{ mount.domain ~ '\\' if mount.domain else '' }}{{ mount.username }}</span>{% endif %}
+                        </td>
+                        <td>{% if mount.mode_0777 %}<span class="badge badge-ok">0777</span>{% else %}<span class="badge badge-muted">Serveur</span>{% endif %}</td>
+                        <td>
+                            {% if mount.mounted %}<span class="badge badge-ok">Monté</span>
+                            {% elif mount.conflict %}<span class="badge badge-no">Point occupé</span>
+                            {% else %}<span class="badge badge-no">Non monté</span>{% endif %}
+                        </td>
+                        <td></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="modal-overlay partage-smb-client-modal-v1" id="smbClientAddModal" role="dialog" aria-modal="true" aria-labelledby="smbClientAddTitle">
+    <form class="modal-box partage-smb-client-modal-box-v1" id="smbClientAddForm" method="POST" action="{{ url_for('partage_bp.smb_client_add_route') }}">
+        <div class="partage-smb-client-modal-head-v1">
+            <div>
+                <h2 class="modal-title" id="smbClientAddTitle">Ajouter un partage Samba</h2>
+                <div class="subtitle">Renseigne le serveur et, si nécessaire, ses identifiants. Le mot de passe est conservé dans un fichier root en mode 0600, jamais dans le tableau.</div>
+            </div>
+            <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon" id="smbClientCloseAdd" aria-label="Fermer">✕</button>
+        </div>
+
+        <div class="form-grid partage-smb-client-credentials-v1">
+            <div class="field">
+                <label for="smbClientMachine">Adresse ou nom de machine</label>
+                <input class="text-input" id="smbClientMachine" name="machine" required placeholder="192.168.1.3 ou serveur-backup">
+            </div>
+            <div class="field">
+                <label for="smbClientUsername">Nom d’utilisateur (facultatif)</label>
+                <input class="text-input" id="smbClientUsername" name="username" autocomplete="username" placeholder="Vide = accès invité">
+            </div>
+            <div class="field">
+                <label for="smbClientPassword">Mot de passe</label>
+                <input class="text-input" id="smbClientPassword" name="password" type="password" autocomplete="current-password">
+            </div>
+            <div class="field">
+                <label for="smbClientDomain">Domaine (facultatif)</label>
+                <input class="text-input" id="smbClientDomain" name="domain" placeholder="WORKGROUP">
+            </div>
+        </div>
+
+        <div class="partage-smb-client-browse-line-v1">
+            <label class="check-row partage-smb-client-mode-v1">
+                <input type="checkbox" id="smbClientMode0777" name="mode_0777" value="1" checked>
+                <span>Forcer les droits Linux locaux des fichiers et dossiers en <b>0777</b></span>
+            </label>
+            <button type="button" class="yoleo-btn yoleo-btn-primary" id="smbClientBrowse">🔎 Parcourir les partages</button>
+        </div>
+        <div class="hint partage-smb-client-permissions-hint-v1">Le 0777 évite les refus de droits côté Linux. Il ne donne aucun droit supplémentaire sur le serveur : connecté comme <b>Yoann</b>, les autorisations Samba de Yoann restent appliquées.</div>
+
+        <div class="status-box partage-smb-client-modal-status-v1" id="smbClientBrowseStatus" hidden></div>
+
+        <div class="partage-smb-client-share-panel-v1" id="smbClientSharesPanel" hidden>
+            <div class="field">
+                <label for="smbClientShare">Partage disponible</label>
+                <select class="select-input partage-smb-client-share-select-v1" id="smbClientShare" name="share" required size="6"></select>
+            </div>
+            <div class="field">
+                <label for="smbClientMountPath">Point de montage local</label>
+                <input class="text-input" id="smbClientMountPath" name="mount_path" required value="{{ general.host_base|default('/mnt/smb/') }}" placeholder="/mnt/smb/media/Serie/">
+                <div class="hint">Prérempli sous <code>/mnt/smb/</code>, mais tu peux choisir un sous-dossier plus précis.</div>
+            </div>
+        </div>
+
+        <div class="modal-actions partage-smb-client-modal-actions-v1">
+            <button type="button" class="yoleo-btn yoleo-btn-muted" id="smbClientCancelAdd">Annuler</button>
+            <button type="submit" class="yoleo-btn yoleo-btn-green" id="smbClientAddSubmit" disabled>💾 Enregistrer et monter</button>
+        </div>
+    </form>
+</div>
+
+<dialog class="modal-box partage-smb-client-delete-dialog-v1" id="smbClientDeleteDialog" aria-labelledby="smbClientDeleteTitle" aria-describedby="smbClientDeleteDescription">
+    <div class="partage-smb-client-modal-head-v1">
+        <h2 class="modal-title" id="smbClientDeleteTitle">Supprimer le profil SMB</h2>
+        <button type="button" class="yoleo-btn yoleo-btn-muted yoleo-btn-icon" id="smbClientCloseDelete" aria-label="Fermer">✕</button>
+    </div>
+    <div class="partage-smb-client-delete-details-v1">
+        <div class="code-text" id="smbClientDeleteRemote"></div>
+        <div class="tiny" id="smbClientDeletePath"></div>
+    </div>
+    <p id="smbClientDeleteDescription">Le partage sera démonté s’il est actif. Le profil sera supprimé et son dossier local retiré seulement s’il est vide.</p>
+    <form method="dialog" class="modal-actions">
+        <button type="submit" class="yoleo-btn yoleo-btn-muted" value="cancel" autofocus>Annuler</button>
+        <button type="submit" class="yoleo-btn yoleo-btn-red" value="delete">Supprimer</button>
+    </form>
+</dialog>
+
+<script>
+(function () {
+    const apiUrl = {{ url_for('partage_bp.api_smb_client')|tojson }};
+    const discoverUrl = {{ url_for('partage_bp.smb_client_discover_route')|tojson }};
+    const mountUrl = {{ url_for('partage_bp.smb_client_mount_route')|tojson }};
+    const unmountUrl = {{ url_for('partage_bp.smb_client_unmount_route')|tojson }};
+    const deleteUrl = {{ url_for('partage_bp.smb_client_delete_route')|tojson }};
+    const adoptUrl = {{ url_for('partage_bp.smb_client_adopt_route')|tojson }};
+    const basePath = {{ general.host_base|default('/mnt/smb/')|tojson }};
+    const modal = document.getElementById('smbClientAddModal');
+    const addForm = document.getElementById('smbClientAddForm');
+    const shareSelect = document.getElementById('smbClientShare');
+    const mountPath = document.getElementById('smbClientMountPath');
+    const sharesPanel = document.getElementById('smbClientSharesPanel');
+    const browseStatus = document.getElementById('smbClientBrowseStatus');
+    const addSubmit = document.getElementById('smbClientAddSubmit');
+    const deleteDialog = document.getElementById('smbClientDeleteDialog');
+
+    function confirmProfileDeletion(form) {
+        if (deleteDialog.open) return Promise.resolve(false);
+        const row = form.closest('tr');
+        document.getElementById('smbClientDeleteRemote').textContent = row?.querySelector('.code-text')?.textContent || '';
+        document.getElementById('smbClientDeletePath').textContent = row?.cells[1]?.textContent.trim() || '';
+        deleteDialog.returnValue = 'cancel';
+        const previousOverflow = document.body.style.overflow;
+        return new Promise(resolve => {
+            deleteDialog.addEventListener('close', () => {
+                document.body.style.overflow = previousOverflow;
+                resolve(deleteDialog.returnValue === 'delete');
+            }, {once: true});
+            document.body.style.overflow = 'hidden';
+            deleteDialog.showModal();
+        });
+    }
+
+    document.getElementById('smbClientCloseDelete').addEventListener('click', () => deleteDialog.close('cancel'));
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    }
+
+    function showMessage(message, ok) {
+        const box = document.getElementById('messageBox');
+        if (!box) return;
+        box.style.display = 'block';
+        box.textContent = message || '';
+        box.style.borderColor = ok ? 'rgba(72,213,151,.55)' : 'rgba(255,93,115,.55)';
+        box.style.color = ok ? '#bfffe0' : '#ffd9df';
+    }
+
+    function openModal() {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        window.setTimeout(() => document.getElementById('smbClientMachine').focus(), 30);
+    }
+
+    function closeModal(reset) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        if (reset) {
+            addForm.reset();
+            shareSelect.innerHTML = '';
+            sharesPanel.hidden = true;
+            browseStatus.hidden = true;
+            addSubmit.disabled = true;
+            mountPath.value = basePath;
+        }
+    }
+
+    function suggestedMountPath(share) {
+        const local = String(share || '').toLowerCase().replace(/[^a-z0-9_.-]+/g, '_').replace(/^[._-]+|[._-]+$/g, '') || 'partage';
+        return basePath.replace(/\/+$/, '') + '/' + local + '/';
+    }
+
+    function stateHtml(mount) {
+        const job = mount && mount.job ? mount.job : {};
+        if (job.state === 'queued') return '<span class="badge badge-warn">En attente</span><div class="tiny">' + escapeHtml(job.message || '') + '</div>';
+        if (job.state === 'running') return '<span class="badge badge-warn">Montage…</span><div class="tiny">' + escapeHtml(job.message || '') + '</div>';
+        if (mount.mounted) return '<span class="badge badge-ok">Monté</span>' + (!mount.managed ? '<div class="tiny">Actif, non enregistré</div>' : '');
+        if (mount.conflict) return '<span class="badge badge-no">Point occupé</span>';
+        if (job.state === 'failed') return '<span class="badge badge-no">Échec</span><div class="tiny">' + escapeHtml(job.message || 'Montage impossible') + '</div>';
+        if (!mount.credentials_ready) return '<span class="badge badge-warn">Identifiants manquants</span>';
+        return '<span class="badge badge-no">Non monté</span>';
+    }
+
+    function authHtml(mount) {
+        if (mount.guest) return '<span class="badge badge-muted">Invité</span>';
+        const identity = (mount.domain ? mount.domain + '\\' : '') + (mount.username || 'Utilisateur');
+        return '<span class="badge badge-info">' + escapeHtml(identity) + '</span>';
+    }
+
+    function formHtml(action, section, label, className, confirmText) {
+        return '<form method="POST" action="' + escapeHtml(action) + '"' + (confirmText ? ' data-confirm="' + escapeHtml(confirmText) + '"' : '') + '>' +
+            '<input type="hidden" name="section" value="' + escapeHtml(section) + '">' +
+            '<button class="yoleo-btn yoleo-btn-mini ' + className + '" type="submit"' + (confirmText ? ' aria-label="Supprimer le profil" title="Supprimer le profil"' : '') + '>' + label + '</button></form>';
+    }
+
+    function actionsHtml(mount) {
+        if (!mount.managed) {
+            if (mount.can_adopt) return formHtml(adoptUrl, mount.section, '💾 Enregistrer', 'yoleo-btn-green', '');
+            return '<span class="tiny">Ajoute-le avec ses identifiants pour l’enregistrer.</span>';
+        }
+        const job = mount.job || {};
+        const busy = job.state === 'queued' || job.state === 'running';
+        if (busy) return '<button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted" disabled>En cours…</button>';
+        const main = mount.mounted
+            ? formHtml(unmountUrl, mount.section, '⏏ Démonter', 'yoleo-btn-muted', '')
+            : formHtml(mountUrl, mount.section, '🔌 Monter', 'yoleo-btn-primary', '');
+        return main + formHtml(deleteUrl, mount.section, '🗑', 'yoleo-btn-red', 'Supprimer ce profil Samba client ?');
+    }
+
+    function renderRows(mounts) {
+        const body = document.getElementById('smbClientRows');
+        body.innerHTML = mounts.map(mount => '<tr data-smb-client-section="' + escapeHtml(mount.section) + '">' +
+            '<td><div class="code-text">//' + escapeHtml(mount.machine) + '/' + escapeHtml(mount.share) + '</div>' + (!mount.managed ? '<div class="tiny">Montage actif non encore enregistré</div>' : '') + '</td>' +
+            '<td><span class="path-pill"><span>' + escapeHtml(mount.mount_path) + '</span></span></td>' +
+            '<td>' + authHtml(mount) + '</td>' +
+            '<td>' + (mount.mode_0777 ? '<span class="badge badge-ok">0777</span>' : '<span class="badge badge-muted">Serveur</span>') + '</td>' +
+            '<td>' + stateHtml(mount) + '</td>' +
+            '<td><div class="actions-cell partage-smb-client-row-actions-v1">' + actionsHtml(mount) + '</div></td></tr>').join('');
+        document.getElementById('smbClientEmpty').hidden = mounts.length !== 0;
+        document.getElementById('smbClientTableWrap').hidden = mounts.length === 0;
+    }
+
+    function applyPayload(data) {
+        const mounts = Array.isArray(data.mounts) ? data.mounts : [];
+        renderRows(mounts);
+        document.getElementById('smbClientManagedCount').textContent = String(data.managed_count ?? 0);
+        document.getElementById('smbClientMountedCount').textContent = String(data.mounted_count ?? 0);
+        document.getElementById('smbClientAdoptAllForm').hidden = !(Number(data.external_count || 0) > 0);
+        document.getElementById('smbClientUpdatedAt').textContent = 'Contrôle : ' + (data.updated_at || '—');
+        if (Object.prototype.hasOwnProperty.call(data, 'message')) showMessage(data.message, !!data.ok);
+    }
+
+    function refreshStatus() {
+        fetch(apiUrl + '?_=' + Date.now(), {cache: 'no-store'})
+            .then(response => response.json())
+            .then(applyPayload)
+            .catch(() => {});
+    }
+
+    document.getElementById('smbClientOpenAdd').addEventListener('click', openModal);
+    document.getElementById('smbClientCloseAdd').addEventListener('click', () => closeModal(false));
+    document.getElementById('smbClientCancelAdd').addEventListener('click', () => closeModal(false));
+    modal.addEventListener('click', event => { if (event.target === modal) closeModal(false); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && modal.style.display === 'flex') closeModal(false); });
+
+    document.getElementById('smbClientBrowse').addEventListener('click', function () {
+        const button = this;
+        const data = new FormData();
+        ['machine', 'username', 'password', 'domain'].forEach(name => data.append(name, addForm.elements[name].value));
+        button.disabled = true;
+        browseStatus.hidden = false;
+        browseStatus.textContent = 'Recherche des partages Samba…';
+        fetch(discoverUrl, {method: 'POST', body: data, headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}, cache: 'no-store'})
+            .then(async response => ({ok: response.ok, data: await response.json()}))
+            .then(result => {
+                const data = result.data || {};
+                browseStatus.textContent = data.message || (result.ok ? 'Recherche terminée.' : 'Recherche impossible.');
+                browseStatus.style.borderColor = result.ok ? 'rgba(72,213,151,.55)' : 'rgba(255,93,115,.55)';
+                shareSelect.innerHTML = '';
+                (Array.isArray(data.shares) ? data.shares : []).forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item.name;
+                    option.textContent = item.comment ? item.name + ' — ' + item.comment : item.name;
+                    shareSelect.appendChild(option);
+                });
+                sharesPanel.hidden = shareSelect.options.length === 0;
+                addSubmit.disabled = shareSelect.options.length === 0;
+                if (shareSelect.options.length) {
+                    shareSelect.selectedIndex = 0;
+                    mountPath.value = suggestedMountPath(shareSelect.value);
+                }
+            })
+            .catch(() => {
+                browseStatus.textContent = 'Le serveur ne répond pas ou la recherche a échoué.';
+                browseStatus.style.borderColor = 'rgba(255,93,115,.55)';
+            })
+            .finally(() => { button.disabled = false; });
+    });
+
+    shareSelect.addEventListener('change', () => { mountPath.value = suggestedMountPath(shareSelect.value); });
+
+    document.addEventListener('submit', async function (event) {
+        const form = event.target;
+        if (!form || !form.matches('#tab-smb-client form[method="POST"], #smbClientAddForm')) return;
+        event.preventDefault();
+        const confirmText = form.dataset.confirm || '';
+        if (confirmText && !await confirmProfileDeletion(form)) return;
+        Array.from(form.querySelectorAll('button')).forEach(button => { button.disabled = true; });
+        fetch(form.action, {method: 'POST', body: new FormData(form), headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}, cache: 'no-store'})
+            .then(async response => ({ok: response.ok, data: await response.json()}))
+            .then(result => {
+                applyPayload(result.data || {});
+                if (form === addForm && result.ok) closeModal(true);
+            })
+            .catch(() => showMessage('Action Samba client impossible.', false))
+            .finally(() => {
+                Array.from(form.querySelectorAll('button')).forEach(button => { button.disabled = false; });
+                if (form === addForm && !shareSelect.value) addSubmit.disabled = true;
+                window.setTimeout(refreshStatus, 500);
+            });
+    });
+
+    renderRows({{ mounts|tojson }});
+    refreshStatus();
+    window.setInterval(refreshStatus, 2500);
+})();
+</script>
+{% endblock %}

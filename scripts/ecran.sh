@@ -16,7 +16,7 @@
 #
 # Ce que ça fait :
 #   - crée /etc/default/console-screen-sleep
-#   - crée /usr/local/sbin/console-screen-sleep.sh
+#   - crée /usr/bin/console-screen-sleep.sh
 #   - crée /etc/systemd/system/console-screen-sleep.service
 #   - applique setterm sur /dev/tty1 à /dev/tty6
 #
@@ -30,7 +30,8 @@
 set -euo pipefail
 
 CONF_FILE="/etc/default/console-screen-sleep"
-GENERATOR="/usr/local/sbin/console-screen-sleep.sh"
+GENERATOR="/usr/bin/console-screen-sleep.sh"
+LEGACY_GENERATOR="/usr/local/sbin/console-screen-sleep.sh"
 SERVICE="/etc/systemd/system/console-screen-sleep.service"
 
 need_root() {
@@ -98,13 +99,15 @@ done
 # Réglage kernel global en secondes si disponible.
 # Ce n'est pas toujours modifiable selon le noyau, donc on n'échoue pas.
 if [ -w /sys/module/kernel/parameters/consoleblank ]; then
-    echo "$((BLANK_MINUTES * 60))" > /sys/module/kernel/parameters/consoleblank 2>/dev/null || true
+    value="$((BLANK_MINUTES * 60))"
+    /bin/sh -c 'printf "%s\n" "$1" > /sys/module/kernel/parameters/consoleblank' sh "$value" 2>/dev/null || true
 fi
 
 exit 0
 EOF
 
-    chmod +x "$GENERATOR"
+    chmod 0755 "$GENERATOR"
+    rm -f "$LEGACY_GENERATOR"
     echo "Script système installé : $GENERATOR"
 }
 
@@ -194,6 +197,7 @@ remove_all() {
     systemctl stop console-screen-sleep.service >/dev/null 2>&1 || true
     rm -f "$SERVICE"
     rm -f "$GENERATOR"
+    rm -f "$LEGACY_GENERATOR"
     systemctl daemon-reload
 
     echo "OK : service supprimé."

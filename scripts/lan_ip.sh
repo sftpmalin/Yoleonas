@@ -15,7 +15,7 @@
 #   sudo bash IP.sh -remove
 #
 # Fichiers créés :
-#   /usr/local/sbin/update-issue.sh
+#   /usr/bin/update-issue.sh
 #   /etc/systemd/system/update-issue.service
 #   /etc/issue.backup_IP_YYYYMMDD_HHMMSS
 #
@@ -29,7 +29,8 @@
 set -euo pipefail
 
 SERVICE_FILE="/etc/systemd/system/update-issue.service"
-GENERATOR_FILE="/usr/local/sbin/update-issue.sh"
+GENERATOR_FILE="/usr/bin/update-issue.sh"
+LEGACY_GENERATOR_FILE="/usr/local/sbin/update-issue.sh"
 ISSUE_FILE="/etc/issue"
 
 need_root() {
@@ -143,7 +144,8 @@ fi
 } > "$ISSUE_FILE"
 EOF
 
-    chmod +x "$GENERATOR_FILE"
+    chmod 0755 "$GENERATOR_FILE"
+    rm -f "$LEGACY_GENERATOR_FILE"
     echo "Générateur installé : $GENERATOR_FILE"
 }
 
@@ -213,6 +215,7 @@ remove_all() {
     systemctl stop update-issue.service >/dev/null 2>&1 || true
     rm -f "$SERVICE_FILE"
     rm -f "$GENERATOR_FILE"
+    rm -f "$LEGACY_GENERATOR_FILE"
     systemctl daemon-reload
 
     echo "OK : service et générateur supprimés."

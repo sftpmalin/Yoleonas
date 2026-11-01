@@ -316,11 +316,16 @@ def split_entries_for_avahi(conf: Dict[str, str], entries: List[Dict[str, str]])
     local_ips = local_ipv4_addresses(conf)
     static_entries: List[Dict[str, str]] = []
     alias_entries: List[Dict[str, str]] = []
+    static_ips = set()
     for item in entries:
-        if item.get("ip") in local_ips:
+        ip = item.get("ip")
+        # Une seule entrée statique par IP : Avahi crée aussi son nom inverse.
+        # Les autres noms partagent l'IP via des publications sans reverse (-R).
+        if ip in local_ips or ip in static_ips:
             alias_entries.append(item)
         else:
             static_entries.append(item)
+            static_ips.add(ip)
     return static_entries, alias_entries
 
 
@@ -328,17 +333,17 @@ def format_avahi_hosts(entries: List[Dict[str, str]]) -> str:
     if not entries:
         return "# Aucun nom statique Avahi pour le moment.\n"
 
-    grouped: Dict[str, List[str]] = {}
+    # Avahi accepte un seul nom par ligne, même si plusieurs noms partagent une IP.
+    lines: List[str] = []
+    seen = set()
     for item in entries:
         ip = item["ip"].strip()
         name = item["name"].strip()
-        if not ip or not name:
+        key = (ip, name.lower())
+        if not ip or not name or key in seen:
             continue
-        grouped.setdefault(ip, [])
-        if name not in grouped[ip]:
-            grouped[ip].append(name)
-
-    lines = [f"{ip} {' '.join(names)}" for ip, names in grouped.items() if names]
+        seen.add(key)
+        lines.append(f"{ip} {name}")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -677,20 +682,22 @@ def udp_5353_lines(conf: Dict[str, str]) -> List[str]:
 
 
 def parse_hosts_file_lines(text: str) -> List[Dict[str, str]]:
-    """Lit un fichier au format /etc/avahi/hosts : IP nom.local [alias.local...]."""
+    """Lit le préfixe accepté par Avahi : une paire IP/nom par ligne."""
     entries: List[Dict[str, str]] = []
     for raw_line in (text or "").splitlines():
         clean = raw_line.split("#", 1)[0].strip()
         if not clean:
             continue
         parts = clean.split()
-        if len(parts) < 2:
-            continue
-        ip = parts[0].strip()
-        for name in parts[1:]:
-            name = name.strip()
-            if ip and name:
-                entries.append({"ip": ip, "name": name})
+        # Avahi interrompt toute la lecture dès la première ligne invalide.
+        if len(parts) != 2:
+            break
+        ip, name = parts
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            break
+        entries.append({"ip": ip, "name": name})
     return entries
 
 
@@ -1270,7 +1277,7 @@ def local_start(conf: Dict[str, str]) -> Tuple[int, str]:
             return 400, "Config vide : aucune entrée mDNS à publier."
 
         current = service_summary(conf, len(entries), len(errors))
-        if current.get("service_active") and current.get("static_hosts_ok"):
+        if current.get("service_active") and current.get("static_hosts_ok") and current.get("alias_publishers_ok"):
             return 0, (
                 "mDNS déjà actif : aucun deuxième démarrage lancé.\n"
                 f"Mode détecté : {current.get('mode', 'inconnu')}\n"

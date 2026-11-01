@@ -1,4 +1,9 @@
 ﻿def build_generated_script(data):
+    data = dict(data or {})
+    if str(data.get('MODE') or '').strip().lower() == 'archive':
+        # Compatibilité : les anciens scripts Archive ne possèdent pas encore
+        # cette clé. Toute régénération active le skip intelligent par défaut.
+        data.setdefault('SKIP_UNCHANGED', '1')
     metadata = build_metadata_block(data)
     config_json = json.dumps(data, ensure_ascii=False, indent=2)
     runtime_json = json.dumps(runtime_config(), ensure_ascii=False, indent=2)
@@ -12,6 +17,8 @@
 __METADATA__
 
 import fnmatch
+import glob
+import hashlib
 import json
 import os
 import re
@@ -19,6 +26,7 @@ import shlex
 import shutil
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -87,7 +95,22 @@ def release_lock():
         pass
 
 
+def backup_lock_group():
+    mode = str(CONFIG.get('MODE') or 'backup').strip().lower()
+    if mode == 'mirror':
+        return 'backup'
+    if mode in {'backup', 'archive', 'cache'}:
+        return mode
+    return 'backup'
+
+
 def global_lock_path():
+    status_dir = Path(RUNTIME.get('status_dir') or STANDARD_STATUS_DIR)
+    status_dir.mkdir(parents=True, exist_ok=True)
+    return status_dir / ('.backup_' + backup_lock_group() + '.lock')
+
+
+def legacy_global_lock_path():
     status_dir = Path(RUNTIME.get('status_dir') or STANDARD_STATUS_DIR)
     status_dir.mkdir(parents=True, exist_ok=True)
     return status_dir / '.backup_global.lock'
@@ -107,8 +130,7 @@ def local_pid_alive(pid):
         return False
 
 
-def read_global_lock():
-    path = global_lock_path()
+def read_lock_payload(path):
     try:
         with open(path, 'r', encoding='utf-8', errors='replace') as handle:
             raw = handle.read().strip()
@@ -125,76 +147,101 @@ def read_global_lock():
         return {'pid': raw}
 
 
-def cleanup_stale_global_lock():
-    path = global_lock_path()
-    info = read_global_lock()
+def read_global_lock():
+    return read_lock_payload(global_lock_path())
+
+
+def cleanup_stale_lock_path(path, label):
+    info = read_lock_payload(path)
+    if not info:
+        return False
     pid = info.get('pid')
     if not pid or not local_pid_alive(pid):
         try:
             path.unlink()
             if pid:
-                log(f'[WAIT] Verrou global obsolète nettoyé, ancien PID absent : {pid}')
+                log(f'[WAIT] Verrou {label} obsolète nettoyé, ancien PID absent : {pid}')
             return True
         except FileNotFoundError:
             return False
         except Exception as exc:
-            log('[WARN] Impossible de nettoyer le verrou global obsolète : ' + str(exc))
+            log('[WARN] Impossible de nettoyer le verrou ' + label + ' obsolète : ' + str(exc))
     return False
 
 
+def cleanup_stale_global_lock():
+    cleaned = cleanup_stale_lock_path(global_lock_path(), backup_lock_group())
+    legacy_cleaned = cleanup_stale_lock_path(legacy_global_lock_path(), 'global historique')
+    return cleaned or legacy_cleaned
+
+
 def acquire_global_backup_lock(started_at):
-    """Un seul backup rsync à la fois pour éviter de massacrer les disques mécaniques."""
+    """Une seule tâche par catégorie, avec compatibilité du vieux verrou global."""
     global GLOBAL_LOCK_ACQUIRED
     path = global_lock_path()
+    lock_group = backup_lock_group()
     already_waiting = False
     while True:
         cleanup_stale_global_lock()
+        legacy_info = read_lock_payload(legacy_global_lock_path())
+        legacy_pid = legacy_info.get('pid') if legacy_info else None
+        if legacy_info and legacy_pid and local_pid_alive(legacy_pid):
+            info = legacy_info
+        else:
+            info = None
         try:
-            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            payload = {
-                'pid': os.getpid(),
-                'script': Path(__file__).name,
-                'title': CONFIG.get('TITLE', script_stem()),
-                'acquired_at': now_label(),
-            }
-            with os.fdopen(fd, 'w', encoding='utf-8') as handle:
-                json.dump(payload, handle, ensure_ascii=False, indent=2)
-            GLOBAL_LOCK_ACQUIRED = True
-            if already_waiting:
-                log('[OK] Tour obtenu : démarrage du backup.')
-            write_status(
-                running=True,
-                result='En cours',
-                message='Tour obtenu, préparation du backup',
-                started_at=started_at,
-                ended_at='',
-                pid=os.getpid(),
-                phase='starting',
-            )
-            return True
+            if info is None:
+                fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                payload = {
+                    'pid': os.getpid(),
+                    'script': Path(__file__).name,
+                    'title': CONFIG.get('TITLE', script_stem()),
+                    'mode': CONFIG.get('MODE', 'backup'),
+                    'lock_group': lock_group,
+                    'acquired_at': now_label(),
+                }
+                with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+                    json.dump(payload, handle, ensure_ascii=False, indent=2)
+                GLOBAL_LOCK_ACQUIRED = True
+                if already_waiting:
+                    log('[OK] Tour ' + lock_group + ' obtenu : démarrage de la tâche.')
+                write_status(
+                    running=True,
+                    result='En cours',
+                    message='Tour ' + lock_group + ' obtenu, préparation',
+                    started_at=started_at,
+                    ended_at='',
+                    pid=os.getpid(),
+                    phase='starting',
+                    lock_group=lock_group,
+                )
+                return True
         except FileExistsError:
             info = read_global_lock()
+        except Exception as exc:
+            log('[ERREUR] Impossible de prendre le verrou ' + lock_group + ' : ' + str(exc))
+            return False
+        if info:
             owner = info.get('title') or info.get('script') or 'un autre backup'
             owner_pid = info.get('pid') or '?'
             if not already_waiting:
-                log('[WAIT] Une autre sauvegarde est déjà en cours : ' + str(owner) + ' (PID ' + str(owner_pid) + ').')
-                log('[WAIT] Ce backup reste en attente et démarrera automatiquement quand le verrou sera libéré.')
+                log('[WAIT] Une autre tâche ' + lock_group + ' est déjà en cours : ' + str(owner) + ' (PID ' + str(owner_pid) + ').')
+                log('[WAIT] Cette tâche reste en attente et démarrera automatiquement quand le verrou sera libéré.')
                 already_waiting = True
             write_status(
                 running=True,
                 result='En attente',
-                message='En attente : une autre sauvegarde est en cours',
+                message='En attente : une autre tâche ' + lock_group + ' est en cours',
                 started_at=started_at,
                 ended_at='',
                 pid=os.getpid(),
                 phase='waiting',
                 waiting_for=str(owner),
                 waiting_for_pid=str(owner_pid),
+                lock_group=lock_group,
             )
             time.sleep(2)
-        except Exception as exc:
-            log('[ERREUR] Impossible de prendre le verrou global : ' + str(exc))
-            return False
+            continue
 
 
 def release_global_backup_lock():
@@ -210,7 +257,7 @@ def release_global_backup_lock():
         except FileNotFoundError:
             pass
         except Exception as exc:
-            log('[WARN] Impossible de supprimer le verrou global : ' + str(exc))
+            log('[WARN] Impossible de supprimer le verrou ' + backup_lock_group() + ' : ' + str(exc))
     GLOBAL_LOCK_ACQUIRED = False
 
 
@@ -677,6 +724,221 @@ def cache_realpath_clean(path_value):
     return real.rstrip('/') or '/'
 
 
+def cache_decode_mountinfo_field(value):
+    decoded = str(value or '')
+    for escaped, plain in (
+        ('\\040', ' '),
+        ('\\011', '\t'),
+        ('\\012', '\n'),
+        ('\\134', '\\'),
+    ):
+        decoded = decoded.replace(escaped, plain)
+    return decoded
+
+
+def cache_read_mountinfo_entries():
+    try:
+        with open('/proc/self/mountinfo', 'r', encoding='utf-8', errors='replace') as handle:
+            content = handle.read()
+    except OSError:
+        return []
+    entries = []
+    for raw_line in content.splitlines():
+        fields = raw_line.split()
+        try:
+            separator = fields.index('-')
+        except ValueError:
+            continue
+        if separator < 6 or len(fields) < separator + 4:
+            continue
+        entries.append({
+            'device_id': fields[2],
+            'mount_point': cache_decode_mountinfo_field(fields[4]),
+            'fs_type': cache_decode_mountinfo_field(fields[separator + 1]),
+            'mount_source': cache_decode_mountinfo_field(fields[separator + 2]),
+        })
+    return entries
+
+
+def cache_mount_entry_for_path(path_value):
+    candidate = cache_realpath_clean(path_value)
+    if not candidate.startswith('/'):
+        return None
+    best = None
+    for entry in cache_read_mountinfo_entries():
+        mount_point = os.path.normpath(str(entry.get('mount_point') or ''))
+        if not mount_point.startswith('/'):
+            continue
+        inside = mount_point == '/' or candidate == mount_point or candidate.startswith(mount_point.rstrip('/') + '/')
+        if inside and (best is None or len(mount_point) > len(str(best.get('mount_point') or ''))):
+            best = entry
+    return best
+
+
+def cache_mergerfs_mount_for_path(path_value):
+    entry = cache_mount_entry_for_path(path_value)
+    if not isinstance(entry, dict):
+        return None
+    signature = (str(entry.get('fs_type') or '') + ' ' + str(entry.get('mount_source') or '')).lower()
+    return entry if 'mergerfs' in signature else None
+
+
+def cache_read_fstab_entries(path='/etc/fstab'):
+    try:
+        with open(path, 'r', encoding='utf-8', errors='replace') as handle:
+            content = handle.read()
+    except OSError:
+        return []
+    entries = []
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#'):
+            continue
+        fields = line.split()
+        if len(fields) < 3:
+            continue
+        entries.append({
+            'mount_source': cache_decode_mountinfo_field(fields[0]),
+            'mount_point': cache_decode_mountinfo_field(fields[1]),
+            'fs_type': cache_decode_mountinfo_field(fields[2]),
+        })
+    return entries
+
+
+def cache_mergerfs_branch_paths(entry):
+    if not isinstance(entry, dict):
+        return []
+    signature = (str(entry.get('fs_type') or '') + ' ' + str(entry.get('mount_source') or '')).lower()
+    if 'mergerfs' not in signature:
+        return []
+    mount_point = os.path.normpath(str(entry.get('mount_point') or ''))
+    branch_source = ''
+    for row in cache_read_fstab_entries():
+        row_mount = os.path.normpath(str(row.get('mount_point') or ''))
+        row_signature = (str(row.get('fs_type') or '') + ' ' + str(row.get('mount_source') or '')).lower()
+        if row_mount == mount_point and 'mergerfs' in row_signature:
+            branch_source = str(row.get('mount_source') or '')
+            break
+    if not branch_source:
+        branch_source = str(entry.get('mount_source') or '')
+    raw_branches = [part.strip() for part in branch_source.split(':') if part.strip()]
+    if raw_branches and all(part.isdigit() for part in raw_branches):
+        return []
+    branches = []
+    parent = os.path.dirname(mount_point.rstrip('/')) or '/'
+    for raw_branch in raw_branches:
+        branch = re.sub(r'=(?:RO|RW|NC)$', '', raw_branch, flags=re.IGNORECASE)
+        if not branch.startswith('/'):
+            branch = os.path.join(parent, branch)
+        expanded = glob.glob(branch) if glob.has_magic(branch) else [branch]
+        if not expanded:
+            expanded = [branch]
+        for candidate in expanded:
+            normalized = cache_realpath_clean(candidate)
+            if normalized not in branches:
+                branches.append(normalized)
+    return branches
+
+
+def cache_same_physical_mount(left_entry, right_entry):
+    if not isinstance(left_entry, dict) or not isinstance(right_entry, dict):
+        return False
+    left_mount = os.path.normpath(str(left_entry.get('mount_point') or ''))
+    right_mount = os.path.normpath(str(right_entry.get('mount_point') or ''))
+    if left_mount and left_mount == right_mount:
+        return True
+    left_device = str(left_entry.get('device_id') or '')
+    right_device = str(right_entry.get('device_id') or '')
+    if left_device and right_device and left_device == right_device:
+        return True
+    left_source = str(left_entry.get('mount_source') or '')
+    right_source = str(right_entry.get('mount_source') or '')
+    return bool(
+        left_source.startswith('/dev/')
+        and right_source.startswith('/dev/')
+        and os.path.realpath(left_source) == os.path.realpath(right_source)
+    )
+
+
+def cache_mergerfs_target_source_membership(source_entry, target_entry):
+    if not isinstance(source_entry, dict):
+        return False, False, [], []
+    entries = cache_read_mountinfo_entries()
+    branches = cache_mergerfs_branch_paths(target_entry)
+    if not branches:
+        return False, False, [], []
+    matching = []
+    for branch in branches:
+        branch_entry = None
+        best_length = -1
+        branch_path = cache_realpath_clean(branch)
+        for entry in entries:
+            mount_point = os.path.normpath(str(entry.get('mount_point') or ''))
+            inside = mount_point == '/' or branch_path == mount_point or branch_path.startswith(mount_point.rstrip('/') + '/')
+            if inside and len(mount_point) > best_length:
+                branch_entry = entry
+                best_length = len(mount_point)
+        if branch_entry is None:
+            return False, False, branches, matching
+        if cache_same_physical_mount(source_entry, branch_entry):
+            matching.append(branch)
+    return True, bool(matching), branches, matching
+
+
+def cache_mergerfs_endpoint_physical_mounts(entry, entries=None):
+    if not isinstance(entry, dict):
+        return False, [], []
+    signature = (str(entry.get('fs_type') or '') + ' ' + str(entry.get('mount_source') or '')).lower()
+    if 'mergerfs' not in signature:
+        mount_point = os.path.normpath(str(entry.get('mount_point') or ''))
+        return True, [{'branch': mount_point, 'entry': entry}], [mount_point]
+    entries = entries if entries is not None else cache_read_mountinfo_entries()
+    branches = cache_mergerfs_branch_paths(entry)
+    if not branches:
+        return False, [], []
+    resolved = []
+    for branch in branches:
+        branch_entry = None
+        best_length = -1
+        branch_path = cache_realpath_clean(branch)
+        for candidate in entries:
+            mount_point = os.path.normpath(str(candidate.get('mount_point') or ''))
+            inside = mount_point == '/' or branch_path == mount_point or branch_path.startswith(mount_point.rstrip('/') + '/')
+            if inside and len(mount_point) > best_length:
+                branch_entry = candidate
+                best_length = len(mount_point)
+        branch_signature = (
+            str((branch_entry or {}).get('fs_type') or '')
+            + ' '
+            + str((branch_entry or {}).get('mount_source') or '')
+        ).lower()
+        if branch_entry is None or 'mergerfs' in branch_signature:
+            return False, resolved, branches
+        resolved.append({'branch': branch, 'entry': branch_entry})
+    return True, resolved, branches
+
+
+def cache_mergerfs_endpoints_overlap(source_entry, target_entry):
+    entries = cache_read_mountinfo_entries()
+    source_verified, source_mounts, source_branches = cache_mergerfs_endpoint_physical_mounts(source_entry, entries)
+    target_verified, target_mounts, target_branches = cache_mergerfs_endpoint_physical_mounts(target_entry, entries)
+    if not source_verified or not target_verified:
+        return False, False, source_branches, target_branches, []
+    overlaps = []
+    for source_mount in source_mounts:
+        for target_mount in target_mounts:
+            if not cache_same_physical_mount(source_mount.get('entry'), target_mount.get('entry')):
+                continue
+            overlap = {
+                'source_branch': source_mount.get('branch') or '',
+                'target_branch': target_mount.get('branch') or '',
+                'physical_mount': str((source_mount.get('entry') or {}).get('mount_point') or ''),
+            }
+            if overlap not in overlaps:
+                overlaps.append(overlap)
+    return True, bool(overlaps), source_branches, target_branches, overlaps
+
+
 def cache_is_dangerous_endpoint(path_value):
     return cache_realpath_clean(path_value) in {'', '/', '/mnt'}
 
@@ -802,6 +1064,34 @@ def cache_prerequisites_ok():
     except Exception as exc:
         log('[ERREUR] ' + str(exc))
         return False
+    source_entry = cache_mount_entry_for_path(source)
+    target_entry = cache_mount_entry_for_path(target)
+    source_mergerfs = cache_mergerfs_mount_for_path(source)
+    target_mergerfs = cache_mergerfs_mount_for_path(target)
+    if source_mergerfs or target_mergerfs:
+        verified, overlaps, source_branches, target_branches, matching = cache_mergerfs_endpoints_overlap(
+            source_entry,
+            target_entry,
+        )
+        if not verified:
+            log('[ERREUR] Composition mergerFS impossible à vérifier pour ce déplacement Cache.')
+            log('[ERREUR] Lancement refusé par sécurité.')
+            return False
+        if overlaps:
+            log('[ERREUR] La source et la cible partagent un disque physique via mergerFS.')
+            for overlap in matching:
+                log(
+                    '[ERREUR] Chevauchement dangereux : source='
+                    + str(overlap.get('source_branch') or '—')
+                    + ' cible=' + str(overlap.get('target_branch') or '—')
+                    + ' montage=' + str(overlap.get('physical_mount') or '—')
+                )
+            return False
+        log('[OK] Configuration mergerFS autorisée : aucun disque physique partagé.')
+        if source_mergerfs:
+            log('[INFO] Branches source : ' + ', '.join(source_branches))
+        if target_mergerfs:
+            log('[INFO] Branches cible : ' + ', '.join(target_branches))
     if not target_mount_ok():
         return False
     return True
@@ -810,7 +1100,7 @@ def cache_prerequisites_ok():
 def run_cache_mode(started_at):
     source = Path(cache_realpath_clean(CONFIG.get('SOURCE', '')))
     target = Path(cache_realpath_clean(CONFIG.get('TARGET', '')))
-    dry_run = parse_config_bool('DRY_RUN')
+    pre_analyze = parse_config_bool('DRY_RUN')
     return_code = 1
     command_start_done = False
     status_extra = {}
@@ -828,9 +1118,14 @@ def run_cache_mode(started_at):
 
     if not cache_has_payload(source):
         log('[SKIP] Aucun fichier a deplacer : ' + str(source))
-        cache_cleanup_empty_dirs(source, dry_run=dry_run)
+        cache_cleanup_empty_dirs(source, dry_run=False)
         write_status(running=False, result='Succès', message='Rien a deplacer', started_at=started_at, ended_at=now_label(), pid=os.getpid(), phase='done', progress={'percent': 100, 'percent_label': '100%'}, progress_text='100%')
         return 0
+
+    total_bytes = None
+    total_label = ''
+    total_files = None
+    total_files_label = ''
 
     try:
         if not run_config_command(CONFIG.get('COMMAND_START', ''), 'COMMANDE DEBUT CACHE', started_at=started_at, phase='command_start'):
@@ -847,59 +1142,112 @@ def run_cache_mode(started_at):
             log('============================================================================')
             log('Source      : ' + str(source) + '/')
             log('Destination : ' + str(target) + '/')
-            cache_prepare_destination(source, target, dry_run=dry_run)
+            analysis_ok = True
 
-            cmd = cache_build_rsync_command(dry_run=dry_run)
-            log('')
-            log('============================================================================')
-            log('DEPLACEMENT RSYNC CACHE')
-            log('============================================================================')
-            log('$ ' + shlex.join(cmd))
-            log('')
-            write_status(
-                running=True,
-                result='En cours',
-                message='Deplacement cache',
-                started_at=started_at,
-                ended_at='',
-                pid=os.getpid(),
-                phase='cache',
-            )
-            live_status = {
-                'running': True,
-                'result': 'En cours',
-                'message': 'Deplacement cache',
-                'started_at': started_at,
-                'ended_at': '',
-                'pid': os.getpid(),
-                'phase': 'cache',
-            }
-            return_code, _unused_output = run_rsync_command(cmd, live_status=live_status)
-            try:
-                with open(status_path(), 'r', encoding='utf-8') as handle:
-                    current_status = json.load(handle)
-                if isinstance(current_status.get('progress'), dict):
-                    status_extra['progress'] = current_status.get('progress')
-                    if current_status.get('progress_text'):
-                        status_extra['progress_text'] = current_status.get('progress_text')
-            except Exception:
-                pass
-            if return_code == 0:
-                cache_cleanup_empty_dirs(source, dry_run=dry_run)
-                progress = status_extra.get('progress') if isinstance(status_extra.get('progress'), dict) else {}
-                progress = dict(progress)
-                progress['percent'] = 100
-                progress['percent_label'] = '100%'
-                status_extra['progress'] = progress
-                status_extra['progress_text'] = status_extra.get('progress_text') or '100%'
+            if pre_analyze:
+                dry_cmd = cache_build_rsync_command(dry_run=True)
                 log('')
-                log('[OK] Cache deplace avec succes')
-                final_message = 'Cache deplace'
-                final_phase = 'done'
-            else:
-                final_message = 'Rsync cache a retourne le code ' + str(return_code)
+                log('============================================================================')
+                log('SIMULATION RSYNC CACHE : calcul du volume a deplacer')
+                log('============================================================================')
+                log('$ ' + shlex.join(dry_cmd))
+                write_status(
+                    running=True,
+                    result='En cours',
+                    message='Simulation cache : calcul du volume a deplacer',
+                    started_at=started_at,
+                    ended_at='',
+                    pid=os.getpid(),
+                    phase='simulation',
+                    progress_total_bytes=0,
+                    progress_total_label='',
+                )
+                dry_code, dry_output = run_rsync_command(dry_cmd, capture_output=True)
+                if dry_code != 0:
+                    return_code = dry_code
+                    final_message = 'Simulation cache impossible, code ' + str(dry_code)
+                    final_phase = 'simulation'
+                    analysis_ok = False
+                    log('')
+                    log('[ERREUR] ' + final_message)
+                else:
+                    total_bytes = parse_dry_run_total_bytes(dry_output)
+                    if total_bytes is not None:
+                        total_label = human_size(total_bytes)
+                        log('')
+                        log('[INFO] Volume cache prevu par la simulation : ' + total_label)
+                    else:
+                        log('')
+                        log('[WARN] Volume cache prevu non trouve dans le resume rsync --stats. Le deplacement continue avec total non calcule.')
+
+                    total_files = parse_dry_run_total_files(dry_output)
+                    if total_files is not None:
+                        total_files_label = str(total_files) + ' fichier' + ('' if total_files == 1 else 's')
+                        log('[INFO] Fichiers cache prevus par la simulation : ' + total_files_label)
+
+            if analysis_ok:
+                cache_prepare_destination(source, target, dry_run=False)
+
+                cmd = cache_build_rsync_command(dry_run=False)
                 log('')
-                log('[ERREUR] ' + final_message)
+                log('============================================================================')
+                log('DEPLACEMENT RSYNC CACHE')
+                log('============================================================================')
+                log('$ ' + shlex.join(cmd))
+                log('')
+                if total_bytes is not None:
+                    status_extra.update({'progress_total_bytes': total_bytes, 'progress_total_label': total_label})
+                if total_files is not None:
+                    status_extra.update({'progress_total_files': total_files, 'progress_total_files_label': total_files_label})
+                write_status(
+                    running=True,
+                    result='En cours',
+                    message='Deplacement cache',
+                    started_at=started_at,
+                    ended_at='',
+                    pid=os.getpid(),
+                    phase='cache',
+                    **status_extra,
+                )
+                live_status = {
+                    'running': True,
+                    'result': 'En cours',
+                    'message': 'Deplacement cache',
+                    'started_at': started_at,
+                    'ended_at': '',
+                    'pid': os.getpid(),
+                    'phase': 'cache',
+                }
+                live_status.update(status_extra)
+                return_code, _unused_output = run_rsync_command(cmd, live_status=live_status)
+                try:
+                    with open(status_path(), 'r', encoding='utf-8') as handle:
+                        current_status = json.load(handle)
+                    if isinstance(current_status.get('progress'), dict):
+                        status_extra['progress'] = current_status.get('progress')
+                        if current_status.get('progress_text'):
+                            status_extra['progress_text'] = current_status.get('progress_text')
+                except Exception:
+                    pass
+                if return_code == 0:
+                    cache_cleanup_empty_dirs(source, dry_run=False)
+                    progress = status_extra.get('progress') if isinstance(status_extra.get('progress'), dict) else {}
+                    progress = dict(progress)
+                    progress['percent'] = 100
+                    progress['percent_label'] = '100%'
+                    if total_bytes is not None:
+                        progress['total_bytes'] = total_bytes
+                        progress['total_label'] = total_label
+                    status_extra['progress'] = progress
+                    status_extra['progress_text'] = status_extra.get('progress_text') or '100%'
+                    log('')
+                    log('[OK] Cache deplace avec succes')
+                    final_message = 'Cache deplace'
+                    final_phase = 'done'
+                else:
+                    final_message = 'Rsync cache a retourne le code ' + str(return_code)
+                    log('')
+                    log('[ERREUR] ' + final_message)
     finally:
         if command_start_done and CONFIG.get('COMMAND_END', '').strip():
             if not run_config_command(CONFIG.get('COMMAND_END', ''), 'COMMANDE FIN CACHE', started_at=started_at, phase='command_end') and return_code == 0:
@@ -944,7 +1292,7 @@ def run_config_command(command, label, started_at=None, phase='command'):
     log('============================================================================')
     log(command)
     write_status(running=True, result='En cours', message=label, started_at=started_at or now_label(), ended_at='', pid=os.getpid(), phase=phase)
-    if parse_config_bool('DRY_RUN'):
+    if parse_config_bool('DRY_RUN') and str(CONFIG.get('MODE') or '').strip().lower() != 'cache':
         log('DRY-RUN : commande ignorée')
         log(expand_config_command(command))
         write_status(running=True, result='En cours', message=label + ' OK (dry-run)', started_at=started_at or now_label(), ended_at='', pid=os.getpid(), phase=phase)
@@ -1010,6 +1358,160 @@ def archive_should_exclude(path, source):
             if fnmatch.fnmatch(cand, clean) or fnmatch.fnmatch(cand.strip('/'), clean_no):
                 return True
     return False
+
+
+ARCHIVE_SIGNATURE_VERSION = 1
+
+
+def archive_signature_update(digest, payload):
+    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    digest.update(len(encoded).to_bytes(8, byteorder='big'))
+    digest.update(encoded)
+
+
+def archive_walk_error(exc):
+    raise exc
+
+
+def archive_source_signature(item, whole_source=False):
+    """Empreinte rapide du contenu logique, sans relire les octets de chaque fichier.
+
+    Les chemins, types, tailles, dates nanoseconde, permissions, propriétaires et
+    cibles de liens sont inclus. Une modification ordinaire change donc l'empreinte,
+    même sur un très gros dossier comme appdata, sans rescanner 143 Go de données.
+    """
+    root = Path(item)
+    digest = hashlib.sha256()
+    archive_signature_update(digest, {
+        'signature_version': ARCHIVE_SIGNATURE_VERSION,
+        'format': str(CONFIG.get('ARCHIVE_FORMAT') or 'tar.7z').lower(),
+        'compression_level': str(CONFIG.get('COMPRESSION_LEVEL') or '7'),
+        'whole_source': bool(whole_source),
+    })
+
+    def add_path(path, relative_name):
+        info = os.lstat(path)
+        link_target = os.readlink(path) if stat.S_ISLNK(info.st_mode) else ''
+        archive_signature_update(digest, {
+            'path': str(relative_name).replace('\\', '/'),
+            'mode': int(info.st_mode),
+            'uid': int(info.st_uid),
+            'gid': int(info.st_gid),
+            'size': int(info.st_size),
+            'mtime_ns': int(info.st_mtime_ns),
+            'ctime_ns': int(info.st_ctime_ns),
+            'link_target': link_target,
+        })
+        return info
+
+    root_info = add_path(root, '.')
+    if stat.S_ISDIR(root_info.st_mode) and not stat.S_ISLNK(root_info.st_mode):
+        for current_root, dir_names, file_names in os.walk(
+            root,
+            topdown=True,
+            followlinks=False,
+            onerror=archive_walk_error,
+        ):
+            dir_names.sort()
+            file_names.sort()
+            for name in dir_names + file_names:
+                path = Path(current_root) / name
+                add_path(path, os.path.relpath(path, root))
+    return digest.hexdigest()
+
+
+def archive_state_path(target):
+    safe_stem = re.sub(r'[^A-Za-z0-9_.-]+', '_', script_stem()).strip('._') or 'archive'
+    return Path(target) / ('.yoleo_archive_' + safe_stem + '_state.json')
+
+
+def archive_load_state(target):
+    path = archive_state_path(target)
+    try:
+        with open(path, 'r', encoding='utf-8') as handle:
+            state = json.load(handle)
+        if not isinstance(state, dict) or not isinstance(state.get('items'), dict):
+            raise ValueError('format invalide')
+        return state
+    except FileNotFoundError:
+        return {'version': ARCHIVE_SIGNATURE_VERSION, 'items': {}}
+    except Exception as exc:
+        log('[WARN] État SHA-256 archive illisible, nouvelle base créée : ' + str(exc))
+        return {'version': ARCHIVE_SIGNATURE_VERSION, 'items': {}}
+
+
+def archive_save_state(target, state):
+    path = archive_state_path(target)
+    tmp = path.with_name(path.name + '.tmp')
+    payload = dict(state or {})
+    payload['version'] = ARCHIVE_SIGNATURE_VERSION
+    payload['updated_at'] = now_label()
+    payload.setdefault('items', {})
+    with open(tmp, 'w', encoding='utf-8') as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        handle.write('\n')
+    os.replace(tmp, path)
+
+
+def archive_state_key(item, source, whole_source=False):
+    payload = {
+        'source': os.path.abspath(str(source)),
+        'item': os.path.abspath(str(item)),
+        'whole_source': bool(whole_source),
+        'format': str(CONFIG.get('ARCHIVE_FORMAT') or 'tar.7z').lower(),
+        'compression_level': str(CONFIG.get('COMPRESSION_LEVEL') or '7'),
+    }
+    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def archive_checksum_path(outfile):
+    return outfile.with_name(outfile.name + '.sha256')
+
+
+def archive_file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as handle:
+        while True:
+            chunk = handle.read(8 * 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def archive_write_checksum(outfile):
+    checksum = archive_file_sha256(outfile)
+    sidecar = archive_checksum_path(outfile)
+    tmp = sidecar.with_name(sidecar.name + '.tmp')
+    with open(tmp, 'w', encoding='utf-8') as handle:
+        handle.write(checksum + '  ' + outfile.name + '\n')
+    os.replace(tmp, sidecar)
+    return checksum
+
+
+def archive_record_is_valid(record, source_signature, target):
+    if not isinstance(record, dict) or record.get('source_signature') != source_signature:
+        return False
+    archive_name = str(record.get('archive_name') or '')
+    if not archive_name or os.path.basename(archive_name) != archive_name:
+        return False
+    outfile = Path(target) / archive_name
+    sidecar = archive_checksum_path(outfile)
+    try:
+        info = outfile.stat()
+        sidecar_text = sidecar.read_text(encoding='utf-8', errors='replace').strip()
+    except Exception:
+        return False
+    expected_hash = str(record.get('archive_sha256') or '').lower()
+    sidecar_hash = sidecar_text.split(None, 1)[0].lower() if sidecar_text else ''
+    return bool(
+        expected_hash
+        and sidecar_hash == expected_hash
+        and int(record.get('archive_size') or -1) == int(info.st_size)
+        and int(record.get('archive_mtime_ns') or -1) == int(info.st_mtime_ns)
+        and int(record.get('archive_ctime_ns') or -1) == int(info.st_ctime_ns)
+    )
 
 
 def archive_output_path(item, source, target, whole_source):
@@ -1130,11 +1632,30 @@ def archive_item_tar_7z(item, outfile):
     return True
 
 
-def archive_one_item(item, source, target, whole_source=False):
+def archive_one_item(item, source, target, state, whole_source=False):
+    skip_unchanged = parse_config_bool('SKIP_UNCHANGED', True)
+    state_key = archive_state_key(item, source, whole_source)
+    source_signature = None
+    if skip_unchanged:
+        try:
+            log('  Empreinte source SHA-256 : analyse de ' + str(item))
+            source_signature = archive_source_signature(item, whole_source)
+        except Exception as exc:
+            # En cas de doute, on archive : une erreur de signature ne doit jamais
+            # faire perdre une sauvegarde potentiellement nécessaire.
+            log('[WARN] Empreinte source impossible, archive forcée : ' + str(exc))
+        record = (state.get('items') or {}).get(state_key)
+        if source_signature and archive_record_is_valid(record, source_signature, target):
+            archive_name = str(record.get('archive_name') or '')
+            log('[SKIP] Dossier inchangé depuis la dernière archive : ' + str(item))
+            log('       Archive conservée : ' + str(Path(target) / archive_name))
+            log('       SHA-256 source    : ' + source_signature)
+            return 'unchanged'
+
     outfile = archive_output_path(item, source, target, whole_source)
     if outfile.exists() and not parse_config_bool('REPLACE_EXISTING', True):
-        log('Archive déjà présente, ignorée : ' + str(outfile))
-        return True
+        log('[SKIP] Archive déjà présente et remplacement désactivé : ' + str(outfile))
+        return 'existing'
     Path(target).mkdir(parents=True, exist_ok=True)
     log('')
     log('→ Archive : ' + str(item))
@@ -1147,7 +1668,45 @@ def archive_one_item(item, source, target, whole_source=False):
     else:
         ok = archive_item_tar_7z(item, outfile)
     log(('✅ OK → ' if ok else '❌ Échec archive → ') + str(outfile))
-    return ok
+    if not ok:
+        return 'error'
+    if parse_config_bool('DRY_RUN'):
+        return 'dry-run'
+
+    try:
+        archive_sha256 = archive_write_checksum(outfile)
+        log('  SHA-256 archive       : ' + archive_sha256)
+        log('  Fichier de contrôle   : ' + str(archive_checksum_path(outfile)))
+    except Exception as exc:
+        log('[ERREUR] Calcul/écriture du SHA-256 de l\'archive impossible : ' + str(exc))
+        return 'error'
+
+    if skip_unchanged and source_signature:
+        try:
+            final_signature = archive_source_signature(item, whole_source)
+        except Exception as exc:
+            final_signature = None
+            log('[WARN] Contrôle final de la source impossible : ' + str(exc))
+        if final_signature == source_signature:
+            info = outfile.stat()
+            state.setdefault('items', {})[state_key] = {
+                'item': os.path.abspath(str(item)),
+                'source_signature': source_signature,
+                'archive_name': outfile.name,
+                'archive_sha256': archive_sha256,
+                'archive_size': int(info.st_size),
+                'archive_mtime_ns': int(info.st_mtime_ns),
+                'archive_ctime_ns': int(info.st_ctime_ns),
+                'archived_at': now_label(),
+            }
+            try:
+                archive_save_state(target, state)
+            except Exception as exc:
+                log('[ERREUR] Enregistrement de l\'empreinte source impossible : ' + str(exc))
+                return 'error'
+        else:
+            log('[WARN] La source a changé pendant la création : elle sera réarchivée au prochain lancement.')
+    return 'created'
 
 
 def archive_prerequisites_ok():
@@ -1176,6 +1735,7 @@ def run_archive_mode(started_at):
     source = Path(str(CONFIG.get('SOURCE') or '').rstrip('/'))
     target = Path(str(CONFIG.get('TARGET') or '').rstrip('/'))
     return_code = 1
+    archive_counts = {'created': 0, 'unchanged': 0, 'existing': 0, 'dry-run': 0, 'error': 0}
     write_status(running=True, result='En cours', message='Préparation archive', started_at=started_at, ended_at='', pid=os.getpid(), phase='archive')
     if not archive_prerequisites_ok():
         write_status(running=False, result='Erreur', message='Prérequis archive invalides', started_at=started_at, ended_at=now_label(), pid=os.getpid(), phase='archive')
@@ -1194,6 +1754,8 @@ def run_archive_mode(started_at):
         log('Destination : ' + str(target))
         log('Format      : ' + str(CONFIG.get('ARCHIVE_FORMAT') or 'tar.7z'))
         log('Children    : ' + str(CONFIG.get('ARCHIVE_CHILDREN') or '1'))
+        log('Skip ident. : ' + ('oui (empreinte SHA-256)' if parse_config_bool('SKIP_UNCHANGED', True) else 'non'))
+        state = archive_load_state(target)
         ok = True
         if parse_config_bool('ARCHIVE_CHILDREN', True):
             items = sorted([p for p in source.iterdir() if not archive_should_exclude(p, source)], key=lambda p: p.name.lower())
@@ -1202,14 +1764,18 @@ def run_archive_mode(started_at):
                 log('Source vide : aucune archive à créer.')
             for idx, item in enumerate(items, start=1):
                 pct = int(round(((idx - 1) * 100.0) / total))
-                write_status(running=True, result='En cours', message=f'Archive {idx}/{total} : {item.name}', started_at=started_at, ended_at='', pid=os.getpid(), phase='archive', progress={'percent': pct, 'percent_label': f'{pct}%'}, progress_text=f'{pct}% · Archive {idx}/{total}')
-                if not archive_one_item(item, source, target, whole_source=False):
+                write_status(running=True, result='En cours', message=f'Analyse/Archive {idx}/{total} : {item.name}', started_at=started_at, ended_at='', pid=os.getpid(), phase='archive', progress={'percent': pct, 'percent_label': f'{pct}%'}, progress_text=f'{pct}% · Analyse {idx}/{total}')
+                outcome = archive_one_item(item, source, target, state, whole_source=False)
+                archive_counts[outcome] = archive_counts.get(outcome, 0) + 1
+                if outcome == 'error':
                     ok = False
             pct = 100
             write_status(running=True, result='En cours', message='Finalisation archive', started_at=started_at, ended_at='', pid=os.getpid(), phase='archive', progress={'percent': pct, 'percent_label': '100%'}, progress_text='100%')
         else:
-            write_status(running=True, result='En cours', message='Archive source complète', started_at=started_at, ended_at='', pid=os.getpid(), phase='archive', progress={'percent': 0, 'percent_label': '0%'}, progress_text='0%')
-            ok = archive_one_item(source, source, target, whole_source=True)
+            write_status(running=True, result='En cours', message='Analyse de la source complète', started_at=started_at, ended_at='', pid=os.getpid(), phase='archive', progress={'percent': 0, 'percent_label': '0%'}, progress_text='0%')
+            outcome = archive_one_item(source, source, target, state, whole_source=True)
+            archive_counts[outcome] = archive_counts.get(outcome, 0) + 1
+            ok = outcome != 'error'
         return_code = 0 if ok else 1
         return return_code
     finally:
@@ -1218,8 +1784,25 @@ def run_archive_mode(started_at):
             end_ok = run_config_command(CONFIG.get('COMMAND_END', ''), 'COMMANDE FIN', started_at=started_at, phase='command_end')
         ended_at = now_label()
         if return_code == 0 and end_ok:
-            log('[OK] Archive terminée avec succès')
-            write_status(running=False, result='Succès', message='Archive terminée', started_at=started_at, ended_at=ended_at, pid=os.getpid(), phase='done', progress={'percent': 100, 'percent_label': '100%'}, progress_text='100%')
+            created_count = archive_counts.get('created', 0)
+            unchanged_count = archive_counts.get('unchanged', 0)
+            existing_count = archive_counts.get('existing', 0)
+            dry_count = archive_counts.get('dry-run', 0)
+            if unchanged_count and not created_count and not existing_count and not dry_count:
+                summary = 'Skip : aucun changement (' + str(unchanged_count) + ' élément(s))'
+            else:
+                parts = []
+                if created_count:
+                    parts.append(str(created_count) + ' créée(s)')
+                if unchanged_count:
+                    parts.append(str(unchanged_count) + ' inchangée(s)')
+                if existing_count:
+                    parts.append(str(existing_count) + ' déjà présente(s)')
+                if dry_count:
+                    parts.append(str(dry_count) + ' simulation(s)')
+                summary = 'Archive terminée' + (': ' + ', '.join(parts) if parts else '')
+            log('[OK] ' + summary)
+            write_status(running=False, result='Succès', message=summary, started_at=started_at, ended_at=ended_at, pid=os.getpid(), phase='done', progress={'percent': 100, 'percent_label': '100%'}, progress_text='100%')
         else:
             msg = 'Archive terminée avec erreur' if end_ok else 'Commande de fin échouée'
             log('[ERREUR] ' + msg)
@@ -1252,7 +1835,15 @@ def main():
             log('[WARN] --delete-excluded actif : les exclusions peuvent aussi être supprimées côté cible.')
 
         if not acquire_global_backup_lock(started_at):
-            write_status(running=False, result='Erreur', message='Verrou global impossible', started_at=started_at, ended_at=now_label(), pid=os.getpid())
+            write_status(
+                running=False,
+                result='Erreur',
+                message='Verrou ' + backup_lock_group() + ' impossible',
+                started_at=started_at,
+                ended_at=now_label(),
+                pid=os.getpid(),
+                lock_group=backup_lock_group(),
+            )
             return 1
 
         if CONFIG.get('MODE') == 'archive':

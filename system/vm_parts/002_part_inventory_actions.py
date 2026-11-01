@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 # PART 002 - Inventaire VM, lecture XML, actions simples et export XML
 
+from vm_firmware import configured_secure_boot, saved_profile
+
 
 
 def _expand_cpu_cpuset(cpuset: str) -> List[int]:
@@ -226,10 +228,7 @@ def parse_domain_xml(conf: Dict[str, str], xml_text: str) -> Dict[str, object]:
                 pinned_seen.add(cpu_id)
                 pinned_host_cpus.append(cpu_id)
 
-    secure_boot_feature = root.find("./os/firmware/feature[@name='secure-boot']")
-    secure_boot_enabled = node_attr(secure_boot_feature, "enabled", "").lower() in {"yes", "on", "true", "1"}
-    if not secure_boot_enabled:
-        secure_boot_enabled = node_attr(root.find("./os/loader"), "secure", "").lower() in {"yes", "on", "true", "1"}
+    secure_boot_enabled = configured_secure_boot(root)
 
     cpu_mode = node_attr(cpu_node, "mode", "").strip()
     cpu_mode_l = cpu_mode.lower()
@@ -290,8 +289,10 @@ def parse_domain_xml(conf: Dict[str, str], xml_text: str) -> Dict[str, object]:
         "emulator": first_text(root, "./devices/emulator"),
         "firmware": node_attr(os_node, "firmware", ""),
         "secure_boot_enabled": secure_boot_enabled,
+        "firmware_profile": saved_profile(root),
         "loader": first_text(root, "./os/loader"),
         "nvram": first_text(root, "./os/nvram"),
+        "nvram_template": node_attr(root.find("./os/nvram"), "template", ""),
         "boot_devs": boot_devs,
         "vcpu": (vcpu_node.text or "").strip() if vcpu_node is not None and vcpu_node.text else "",
         "vcpu_current": node_attr(vcpu_node, "current", ""),

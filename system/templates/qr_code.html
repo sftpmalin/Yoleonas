@@ -1,0 +1,63 @@
+{% extends "menu.html" %}
+
+{% block title %}QR code - Yoleo{% endblock %}
+{% block page_title %}QR code{% endblock %}
+{% block page_subtitle %}Texte, liens ou numéros · création et téléchargement{% endblock %}
+{% block head_extra %}
+<script src="{{ url_for('static', filename='yoleo-qr-code.js', v='2') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div class="qr-code-page" id="qrCodePage" data-generate-url="{{ url_for('qr_code_bp.generate') }}" data-import-url="{{ url_for('qr_code_bp.import_file') }}" data-browser-url="{{ url_for('browser.browser_file') }}" data-max-file-bytes="{{ max_file_bytes }}">
+    <section class="yoleo-card qr-code-card">
+        <form id="qrCodeForm" action="{{ url_for('qr_code_bp.generate') }}" method="post">
+            <label class="qr-code-label" for="qrCodeText">Texte à encoder</label>
+            <p class="qr-code-help" id="qrCodeTextHelp">Écris ou colle ton contenu. Les retours à la ligne et les zéros en début de numéro sont conservés.</p>
+            <textarea id="qrCodeText" name="text" class="yoleo-input" rows="6" required maxlength="7089" spellcheck="false" autocomplete="off" aria-describedby="qrCodeTextHelp" placeholder="Je t’aime&#10;000123456789&#10;https://exemple.fr"></textarea>
+            <div class="qr-code-form-bottom">
+                <div class="qr-code-correction">
+                    <label class="qr-code-label" for="qrCodeCorrection">Correction d’erreur</label>
+                    <select id="qrCodeCorrection" name="correction" class="yoleo-input">
+                        <option value="L">L — Faible</option>
+                        <option value="M" selected>M — Standard</option>
+                        <option value="Q">Q — Élevée</option>
+                        <option value="H">H — Maximale</option>
+                    </select>
+                </div>
+                <div class="qr-code-actions">
+                    <button type="submit" id="qrCodeGenerate" class="yoleo-btn yoleo-btn-primary">Générer</button>
+                    <button type="button" id="qrCodeServer" class="yoleo-btn">Parcourir serveur</button>
+                    <button type="button" id="qrCodeClient" class="yoleo-btn">Parcourir client</button>
+                    <input type="file" id="qrCodeClientFile" accept="text/*,.txt,.csv,.json,.md,.log" hidden>
+                </div>
+            </div>
+            <p class="qr-code-help">Une correction élevée aide à lire un code abîmé, mais rend le QR code plus dense.</p>
+        </form>
+    </section>
+
+    <section class="yoleo-card qr-code-card qr-code-result" aria-label="Aperçu et téléchargement">
+        <div class="qr-code-preview" id="qrCodePreview">
+            <div class="qr-code-placeholder" id="qrCodePlaceholder">
+                <img src="{{ url_for('static', filename='icone_menu/qr_code.svg') }}" width="48" height="48" alt="">
+                <span>Ton QR code apparaîtra ici</span>
+            </div>
+            <img id="qrCodeImage" width="320" height="320" alt="QR code généré à partir de ton texte" hidden>
+        </div>
+        <div class="qr-code-export">
+            <h2>Télécharger le QR code</h2>
+            <p class="qr-code-help">L’aperçu garde la même taille. Choisis les dimensions du fichier à enregistrer sur ton appareil.</p>
+            <label class="qr-code-label" for="qrCodeSize">Taille d’export</label>
+            <select id="qrCodeSize" class="yoleo-input">
+                {% for size in export_sizes %}<option value="{{ size }}"{% if size == 512 %} selected{% endif %}>{{ size }} × {{ size }} px</option>{% endfor %}
+            </select>
+            <div class="qr-code-downloads">
+                <button type="button" class="yoleo-btn" id="qrCodePng" disabled>Télécharger PNG</button>
+                <button type="button" class="yoleo-btn yoleo-btn-primary" id="qrCodeSvg" disabled>Télécharger SVG</button>
+            </div>
+            <p class="qr-code-help">Le SVG reste net à toutes les tailles. Pour un texte long en PNG, privilégie 1024 px.</p>
+            <p class="qr-code-status" id="qrCodeStatus" role="status" aria-live="polite">Prêt à générer.</p>
+            <p class="qr-code-error" id="qrCodeError" role="alert" hidden></p>
+        </div>
+    </section>
+</div>
+{% endblock %}

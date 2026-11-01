@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+if [ "${1:-}" = prereqs ]; then
+    exit 0
+fi
+
+. /usr/share/initramfs-tools/hook-functions
+assets=/yoleo/system/pci_boot
+config=${YOLEO_PCI_CONFIG:-/yoleo/conf/pci_exclusions.conf}
+
+mkdir -p "${DESTDIR}/scripts/init-top" "${DESTDIR}/etc/yoleo"
+cp -p /usr/share/initramfs-tools/scripts/init-top/udev "${DESTDIR}/scripts/yoleo-original-udev"
+cp -p "${assets}/init-top-udev" "${DESTDIR}/scripts/init-top/udev"
+cp -p "${assets}/reserve-pci" "${DESTDIR}/scripts/yoleo-pci-reserve"
+if [ -f "${config}" ]; then
+    cp "${config}" "${DESTDIR}/etc/yoleo/pci-exclusions.conf"
+else
+    : >"${DESTDIR}/etc/yoleo/pci-exclusions.conf"
+fi
+
+if grep -q '^[[:space:]]*[0-9a-fA-F]' "${DESTDIR}/etc/yoleo/pci-exclusions.conf"; then
+    manual_add_modules vfio_pci
+    manual_add_modules vfio_iommu_type1
+fi

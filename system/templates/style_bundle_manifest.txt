@@ -50,6 +50,7 @@ styles/46_services_minidlna_general_actions.html
 styles/47_services_minidlna_action_spinner.html
 styles/48_disk_raid.html
 styles/49_partage_nfs_client.html
+styles/50_partage_smb_client.html
 styles/50_system_nftables.html
 styles/51_services_backup.html
 styles/52_partage_logs.html

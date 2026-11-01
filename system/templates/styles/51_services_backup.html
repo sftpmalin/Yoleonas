@@ -127,6 +127,21 @@
     .backup-page .folder-item:hover { background:#2f3b4f; color:var(--accent); }
     .backup-page .mobile-cards { display:none; gap:12px; }
     .backup-page .mobile-card { background:linear-gradient(180deg,var(--bg-soft) 0%,var(--bg-soft-2) 100%); border:1px solid var(--border); border-radius:16px; padding:14px; display:grid; gap:12px; }
+    .backup-page .mobile-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .backup-page .mobile-card-head > :first-child { min-width:0; }
+    .backup-page .mobile-card-head > .badge { flex:0 0 auto; }
+    .backup-page .mobile-meta-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .backup-page .mobile-meta,
+    .backup-page .backup-mobile-section { background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:10px; min-width:0; }
+    .backup-page .meta-label { color:var(--text-muted); font-size:10px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; font-weight:900; }
+    .backup-page .meta-value { color:var(--text-main); font-size:12px; line-height:1.45; overflow-wrap:anywhere; word-break:break-word; }
+    .backup-page .backup-mobile-badges { display:flex; flex-wrap:wrap; gap:5px; }
+    .backup-page .backup-mobile-status [data-script-status] { min-width:0; }
+    .backup-page .backup-mobile-status .progress-widget { width:100%; min-width:0; }
+    .backup-page .backup-mobile-status .tiny { margin-top:5px; overflow-wrap:anywhere; }
+    .backup-page .backup-mobile-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; justify-content:stretch; }
+    .backup-page .backup-mobile-actions .btn { width:100%; }
+    .backup-page .backup-mobile-actions > form { display:flex !important; width:100%; margin:0 !important; }
     .backup-page .nfs-preview { margin-top:8px; padding:10px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.06); border-radius:10px; max-height:120px; overflow:auto; }
     .backup-page .nfs-preview div { font-family:Consolas, Monaco, monospace; font-size:11px; color:var(--text-muted); line-height:1.45; }
     @media (max-width: 1200px) { .backup-page .stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .backup-page .split-two { grid-template-columns:1fr; } }
@@ -263,11 +278,7 @@
 }
 
 
-/* ==========================================================
-   Mobile Backup : pas de mosaïque.
-   On garde le tableau normal, mais on le laisse passer à la
-   ligne comme le gestionnaire de tâches.
-   ========================================================== */
+/* Mobile Backup : cartes lisibles comme dans le gestionnaire de tâches. */
 @media (max-width: 900px) {
     body.yoleo-mobile-mosaic-ready .backup-page .yoleo-mobile-table-grid,
     body.yoleo-mobile-mosaic-ready .backup-page .backup-wrap-table + .yoleo-mobile-table-grid,
@@ -276,80 +287,59 @@
         display: none !important;
     }
 
+    body.yoleo-mobile-mosaic-ready .backup-page .mobile-cards,
     .backup-page .mobile-cards {
-        display: none !important;
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
     }
 
     body.yoleo-mobile-mosaic-ready .backup-page .backup-wrap-table,
+    .backup-page .backup-wrap-table {
+        display: none !important;
+    }
+
     body.yoleo-mobile-mosaic-ready .backup-page .backup-lexique-wrap,
-    .backup-page .backup-wrap-table,
     .backup-page .backup-lexique-wrap {
         display: block !important;
         width: 100% !important;
         max-width: 100% !important;
-        overflow-x: visible !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
         border: 1px solid #26364b !important;
         background: #0c131e !important;
     }
 
-    .backup-page .backup-normal-mobile-table,
     .backup-page .backup-lexique-table {
         display: table !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        table-layout: fixed !important;
+        width: max-content !important;
+        min-width: 760px !important;
+        table-layout: auto !important;
         border-collapse: collapse !important;
     }
 
-    .backup-page .backup-normal-mobile-table thead,
-    .backup-page .backup-lexique-table thead {
-        display: table-header-group !important;
-    }
-
-    .backup-page .backup-normal-mobile-table tbody,
-    .backup-page .backup-lexique-table tbody {
-        display: table-row-group !important;
-    }
-
-    .backup-page .backup-normal-mobile-table tr,
-    .backup-page .backup-lexique-table tr {
-        display: table-row !important;
-    }
-
-    .backup-page .backup-normal-mobile-table th,
-    .backup-page .backup-normal-mobile-table td,
     .backup-page .backup-lexique-table th,
     .backup-page .backup-lexique-table td {
         display: table-cell !important;
-        min-width: 0 !important;
-        max-width: none !important;
         white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
         overflow-wrap: anywhere !important;
-        word-break: break-word !important;
         vertical-align: top !important;
         padding: 9px 7px !important;
         font-size: 11px !important;
         line-height: 1.32 !important;
     }
 
-    .backup-page .backup-normal-mobile-table th,
     .backup-page .backup-lexique-table th {
         font-size: 9px !important;
         line-height: 1.15 !important;
     }
 
-    .backup-page .backup-normal-mobile-table .script-title,
-    .backup-page .backup-normal-mobile-table .code-text,
-    .backup-page .backup-normal-mobile-table .tiny,
     .backup-page .backup-lexique-table code {
         white-space: normal !important;
         overflow-wrap: anywhere !important;
         word-break: break-word !important;
     }
 
-    .backup-page .backup-normal-mobile-table .badge,
     .backup-page .backup-lexique-table .badge,
     .backup-page .backup-lexique-table code {
         display: inline-block !important;
@@ -360,26 +350,24 @@
         line-height: 1.22 !important;
     }
 
-    .backup-page .backup-normal-mobile-table .action-row {
-        justify-content: flex-start !important;
-        gap: 5px !important;
+    .backup-page .mobile-card {
+        width:100%;
+        max-width:100%;
+        overflow:hidden;
     }
 
-    .backup-page .backup-normal-mobile-table .icon-btn {
-        width: 34px !important;
-        min-width: 34px !important;
-        height: 34px !important;
-        padding: 0 !important;
+    .backup-page .mobile-card .code-text {
+        overflow-wrap:anywhere;
+        word-break:break-word;
     }
+}
 
-    .backup-page .backup-normal-mobile-table .progress-widget {
-        min-width: 0 !important;
-        width: 100% !important;
-    }
-
-    .backup-page .backup-normal-mobile-table .progress-head {
-        display: block !important;
-    }
+@media (max-width: 560px) {
+    .backup-page .mobile-meta-grid,
+    .backup-page .backup-mobile-actions { grid-template-columns:1fr; }
+    .backup-page .mobile-card-head { align-items:flex-start; }
+    .backup-page .mobile-card-head > .badge { max-width:42%; white-space:normal; text-align:center; }
+    .backup-page .backup-mobile-status .progress-head { align-items:flex-start; flex-direction:column; }
 }
 
 
@@ -495,6 +483,7 @@
   border: 1px solid rgba(255,255,255,.07);
   border-radius: 10px;
   margin-bottom: 14px;
+  white-space: pre-line;
 }
 #confirmModal.backup-confirm-modal .action-row {
   display: flex;
@@ -1259,6 +1248,24 @@
   grid-template-columns: 1fr;
   gap: 16px;
 }
+.backup-page .cache-physical-mount-warning {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  align-items: start;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(248,81,73,.45);
+  border-radius: 12px;
+  background: rgba(248,81,73,.08);
+  color: #dce8f6;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.backup-page .cache-physical-mount-warning strong {
+  color: #ff938a;
+  white-space: nowrap;
+}
 .backup-page .cache-option-group {
   min-width: 0;
   padding: 13px;
@@ -1383,3 +1390,8 @@
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
+
+    .backup-page .backup-script-choice { display:inline-flex; align-items:center; gap:10px; cursor:pointer; }
+    .backup-page .backup-script-choice input { width:17px; height:17px; margin:0; accent-color:var(--accent); flex-shrink:0; }
+    .backup-page .backup-script-filename { display:block; }
+    .backup-page .backup-table-filters { flex-wrap:wrap; }

@@ -43,7 +43,7 @@ def builds_browse_list_dirs(path: str) -> Tuple[bool, Dict[str, object], int]:
                     if not entry.is_dir(follow_symlinks=False):
                         continue
                     name = entry.name
-                    if name in {".", ".."}:
+                    if name in {".", "..", ".update-common"}:
                         continue
                     dirs.append({"name": name, "path": os.path.join(path, name)})
                 except OSError:
@@ -217,8 +217,19 @@ def normalize_item_name(name: Optional[str]) -> str:
     return name
 
 
+# Dossier partagé des update.sh : il vit à côté des projets, mais ce n'est pas
+# un Docker. Il faut le sauter au moment du listdir, sinon le scan le réinjecte
+# dans le cache à la fin de la boucle, même si la lecture du cache l'avait filtré.
+IGNORED_BUILD_DIRS = {".update-common"}
+
+
+def is_ignored_build_dir(name: Optional[str]) -> bool:
+    return normalize_item_name(name or "") in IGNORED_BUILD_DIRS
+
+
 def is_valid_name(name: Optional[str]) -> bool:
-    return bool(name and VALID_NAME_RE.fullmatch(name))
+    # Utilitaires partagés des update.sh, jamais un projet ni une image Docker.
+    return bool(name and not is_ignored_build_dir(name) and VALID_NAME_RE.fullmatch(name))
 
 
 def same_item_key(left: str, right: str) -> bool:
@@ -397,6 +408,8 @@ def list_project_names(builds_dir: str) -> List[str]:
     names: List[str] = []
     if os.path.isdir(builds_dir):
         for name in sorted(os.listdir(builds_dir), key=str.lower):
+            if name in IGNORED_BUILD_DIRS or is_ignored_build_dir(name):
+                continue
             path = os.path.join(builds_dir, name)
             if os.path.isdir(path) and is_valid_name(name):
                 names.append(name)
@@ -572,6 +585,9 @@ def build_inventory_sources(conf: Dict[str, str]) -> Tuple[Dict[str, str], Dict[
             names.append(key)
             used.add(key)
     names.extend(sorted((name for name in all_names if name not in used), key=str.lower))
+    # Dernier filet : un dossier ignoré présent sur le disque ou dans une
+    # mini-base ne doit pas revenir ici, après la boucle du registre.
+    names = [name for name in names if not is_ignored_build_dir(name)]
     return registry, platforms, modes, names
 
 
@@ -787,7 +803,10 @@ def build_cache_info(conf: Dict[str, str]) -> Dict[str, object]:
             info["updated_at"] = str(data.get("updated_at") or "")
             info["updated_at_label"] = str(data.get("updated_at") or "vide")
             info["source"] = str(data.get("source") or "")
-            info["total"] = int((data.get("summary") or {}).get("total") or 0)
+            info["total"] = sum(
+                1 for item in (data.get("builds") or [])
+                if isinstance(item, dict) and is_valid_name(item.get("name"))
+            )
     except Exception:
         if info["exists"]:
             info["updated_at_label"] = "illisible"
@@ -847,8 +866,12 @@ def read_build_inventory_cache(conf: Dict[str, str]) -> Tuple[Optional[List[Dict
     if not isinstance(data, dict) or not isinstance(data.get("builds"), list):
         return None, empty_build_summary(conf), f"Cache Build invalide : {path}. Relance Mise à jour du cache.", meta
 
-    builds = data.get("builds") or []
+    cached_builds = data.get("builds") or []
+    # Filtrer aussi les anciens build.jdom, sans rescanner les gros contextes.
+    builds = [item for item in cached_builds if isinstance(item, dict) and is_valid_name(item.get("name"))]
     summary = data.get("summary") if isinstance(data.get("summary"), dict) else summarize_build_inventory(conf, builds)
+    if len(builds) != len(cached_builds):
+        summary.update(summarize_build_inventory(conf, builds))
     for key, value in empty_build_summary(conf).items():
         summary.setdefault(key, value)
     warning = data.get("warning") if data.get("warning") else None
@@ -1073,6 +1096,8 @@ def tar_matches_platforms(tar_file: str, platforms: str) -> bool:
 
 CHECK_UPDATES_MARKER_RE = re.compile(r"^\s*#\s*yoleo:check-updates\b", re.IGNORECASE)
 FROM_LINE_RE = re.compile(r"^\s*FROM(?:\s+--platform=\S+)?\s+([^\s]+)(?:\s+AS\s+([A-Za-z0-9._-]+))?", re.IGNORECASE)
+ARG_LINE_RE = re.compile(r"^\s*ARG\s+([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?\s*$", re.IGNORECASE)
+FROM_ARG_RE = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 
 
 def dockerfile_has_check_updates_marker(dockerfile: str) -> bool:
@@ -1087,9 +1112,20 @@ def dockerfile_has_check_updates_marker(dockerfile: str) -> bool:
     return False
 
 
+def resolve_dockerfile_from_args(image: str, args: Dict[str, str]) -> str:
+    """Résout les ARG simples utilisés dans FROM (ARG IMAGE=repo/image:tag)."""
+    def replace(match: re.Match) -> str:
+        name = match.group(1) or match.group(2) or ""
+        return args.get(name, match.group(0))
+
+    return FROM_ARG_RE.sub(replace, image)
+
+
 def dockerfile_external_from_images(dockerfile: str) -> List[str]:
+    """Liste les images parentes, y compris les FROM alimentés par un ARG."""
     images: List[str] = []
     stages = set()
+    args: Dict[str, str] = {}
     try:
         with open(dockerfile, "r", encoding="utf-8-sig", errors="replace") as handle:
             lines = list(handle)
@@ -1097,10 +1133,17 @@ def dockerfile_external_from_images(dockerfile: str) -> List[str]:
         return images
 
     for raw_line in lines:
+        arg_match = ARG_LINE_RE.match(raw_line)
+        if arg_match:
+            arg_name = arg_match.group(1)
+            arg_value = arg_match.group(2)
+            if arg_value is not None:
+                args[arg_name] = strip_quotes(arg_value.strip())
+            continue
         match = FROM_LINE_RE.match(raw_line)
         if not match:
             continue
-        image = match.group(1).strip()
+        image = resolve_dockerfile_from_args(match.group(1).strip(), args)
         alias = (match.group(2) or "").strip().lower()
         image_key = image.lower()
         if image_key != "scratch" and image_key not in stages and "$" not in image and image not in images:
@@ -1108,6 +1151,36 @@ def dockerfile_external_from_images(dockerfile: str) -> List[str]:
         if alias:
             stages.add(alias)
     return images
+
+
+def normalized_from_reference(value: str) -> str:
+    """Normalise une référence afin de la rapprocher d'une cible registre.conf."""
+    image = strip_quotes(str(value or "")).strip().rstrip("/")
+    image = re.sub(r"^https?://", "", image, flags=re.IGNORECASE)
+    if not image:
+        return ""
+    if "@" not in image:
+        last_slash = image.rfind("/")
+        last_colon = image.rfind(":")
+        if last_colon <= last_slash:
+            image += ":latest"
+    return image.lower()
+
+
+def configured_registry_from_image(conf: Dict[str, str], image: str) -> Optional[Tuple[str, str]]:
+    """Retourne (nom, cible) si FROM correspond à une entrée de registre.conf."""
+    wanted = normalized_from_reference(image)
+    if not wanted:
+        return None
+    registry = parse_kv(local_read_text(conf["DOCKER_REGISTRY_FILE"]))
+    for raw_name, raw_target in registry.items():
+        if raw_name == "_default":
+            continue
+        name = normalize_item_name(raw_name)
+        target = strip_quotes(raw_target).strip()
+        if is_valid_name(name) and target and normalized_from_reference(target) == wanted:
+            return name, target
+    return None
 
 
 def docker_manifest_timeout(conf: Dict[str, str]) -> int:
@@ -1166,6 +1239,18 @@ def dockerfile_remote_from_fingerprint(conf: Dict[str, str], dockerfile: str) ->
     parts: List[str] = []
     lines: List[str] = []
     for image in images:
+        registered = configured_registry_from_image(conf, image)
+        if registered:
+            name, target = registered
+            exists, digest, _payload, error = registry_v2_manifest_status(conf, name, target)
+            if not exists or not digest:
+                detail = error or "tag absent du registre"
+                lines.append(f"FROM registre impossible : {image} (API Registry V2) {detail}")
+                return False, "", lines
+            parts.append(f"{image}={digest}")
+            lines.append(f"FROM registre OK : {image} via API Registry V2 -> {digest}")
+            continue
+
         rc, payload, method = _docker_manifest_payload(conf, image)
         if rc != 0 or not payload.strip():
             short = " ".join((payload or "").strip().split())[:220]

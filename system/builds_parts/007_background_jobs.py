@@ -547,9 +547,9 @@ def stream_cache_refresh_action(conf: Dict[str, str]) -> Iterator[str]:
     finally:
         logger.close()
 
-def build_background_generator(conf: Dict[str, str], action: str, name: str, mode: str) -> Iterator[str]:
+def build_background_generator(conf: Dict[str, str], action: str, name: str, mode: str, selected_names: Optional[List[str]] = None) -> Iterator[str]:
     if action in {"build_registry_one", "build_registry_all"}:
-        return stream_build_registry_action(conf, action, name, mode)
+        return stream_build_registry_action(conf, action, name, mode, selected_names=selected_names)
     if action in {"build_one", "build_all"}:
         return stream_build_action(conf, action, name, mode)
     if action in {"registry_one", "registry_all", "dry_registry_one", "dry_registry_all"}:
@@ -720,7 +720,7 @@ def run_build_background_job(conf: Dict[str, str], initial_state: Dict) -> None:
     name = state.get("name", "")
     mode = state.get("mode", "normal")
     try:
-        generator = build_background_generator(conf, action, name, mode)
+        generator = build_background_generator(conf, action, name, mode, selected_names=state.get("selected_names"))
         for chunk in generator:
             state["updated_at"] = build_background_now()
             update_build_background_from_text(state, str(chunk or ""))
@@ -757,7 +757,7 @@ def run_build_background_job(conf: Dict[str, str], initial_state: Dict) -> None:
         write_build_background_state(conf, state)
 
 
-def start_build_background_job(conf: Dict[str, str], action: str, name: str, mode: str) -> Dict:
+def start_build_background_job(conf: Dict[str, str], action: str, name: str, mode: str, selected_names: Optional[List[str]] = None) -> Dict:
     current = read_build_background_state(conf)
     if current.get("running"):
         current["already_running"] = True
@@ -771,6 +771,7 @@ def start_build_background_job(conf: Dict[str, str], action: str, name: str, mod
         "action": action,
         "name": name,
         "mode": mode,
+        "selected_names": selected_names if action == "build_registry_all" else None,
         "log_path": build_background_default_log_path(conf, action),
         "log_tail": "",
         "progress": 0,

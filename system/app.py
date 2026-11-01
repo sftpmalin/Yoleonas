@@ -10,7 +10,7 @@ import time
 from datetime import timedelta
 from urllib.parse import urlsplit
 
-from flask import Flask, jsonify, make_response, redirect, render_template, request, Response, session, url_for
+from flask import Flask, redirect, render_template, request, Response, session, url_for
 
 # On crée l'application principale
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -28,6 +28,9 @@ os.environ.setdefault("NAS_CONF_DIR", NAS_CONF_DIR)
 
 def nas_conf_file(name: str) -> str:
     return os.path.join(NAS_CONF_DIR, name)
+
+
+from pwa import mobile_conf_read
 
 
 # ==========================================================
@@ -184,7 +187,7 @@ def inject_yoleo_style_bundle_url():
 # chargé et l'interface démarre sans menu.
 APP_CONF = nas_conf_file('app.conf')
 
-APP_DEFAULT_CONF_TEXT = 'system=system\nidex=index\nbrowser=browser\nbuilds=builds\nfile=file\nvm=vm\ndisk=disk\ndockers=dockers\nusers=users\npartage=partage\nservices=services\nbackup=backup\ntask=task\nscripts=scripts\nmeteo=meteo\nterminal=terminal\n'
+APP_DEFAULT_CONF_TEXT = 'system=system\nidex=index\nbrowser=browser\nbuilds=builds\nfile=file\nvm=vm\ndisk=disk\ndockers=dockers\nusers=users\npartage=partage\nservices=services\nbackup=backup\ntask=task\nscripts=scripts\nmeteo=meteo\nqr_code=qr_code\nspeedtest=speedtest\nterminal=terminal\npwa=pwa\n'
 
 
 def ensure_app_conf_file(path: str = "") -> bool:
@@ -265,6 +268,13 @@ def ensure_app_conf_core_modules(path: str = "") -> list[str]:
         lines.append("# Module Météo : page météo + affichage optionnel dans le bandeau haut")
         lines.append("meteo=meteo")
         added.append("meteo")
+
+    if "pwa" not in loaded_modules:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.append("# Module PWA : manifest, service worker et page hors ligne")
+        lines.append("pwa=pwa")
+        added.append("pwa")
 
     if added:
         with open(target, "w", encoding="utf-8") as handle:
@@ -664,7 +674,7 @@ def require_login():
     # La sonde de reprise est strictement en lecture seule ({"ok": true}).
     # Elle doit rester joignable après un reboot, même si la session navigateur
     # a expiré, afin que la popup puisse détecter le retour de l'interface.
-    if endpoint in {"login", "logout", "static", "manifest", "sw", "yoleo_style_bundle", "index_bp.index_dev_availability", "terminal_bp.terminal_ttyd_auth"}:
+    if endpoint in {"login", "logout", "static", "pwa_bp.manifest", "pwa_bp.sw", "pwa_bp.offline", "task_bp.sw", "yoleo_style_bundle", "index_bp.index_dev_availability", "terminal_bp.terminal_ttyd_auth"}:
         return None
     if request.path.startswith("/static/"):
         return None
@@ -815,189 +825,12 @@ _start_samba_wsdd_registration()
 
 
 # ==========================================================
-# 📱 CONFIGURATION MOBILE / PWA
-# ==========================================================
-MOBILE_CONF = nas_conf_file('mobile.conf')
-
-MOBILE_DEFAULT_CONF = {
-    "SHORT_NAME": "Yoleo",
-    "NAME": "Yoleo Nas OS",
-    "DESCRIPTION": "Interface NAS Debian",
-    "START_URL": "/index",
-    "DISPLAY": "standalone",
-    "BACKGROUND_COLOR": "#000000",
-    "THEME_COLOR": "#000000",
-    "ICON_SRC": "/static/logo.png",
-}
-
-
-def _mobile_clean_value(value: str, default: str = "") -> str:
-    value = str(value if value is not None else "").strip().replace("\r", " ").replace("\n", " ")
-    return value or default
-
-
-def _mobile_clean_color(value: str, default: str = "#000000") -> str:
-    value = _mobile_clean_value(value, default)
-    if len(value) == 7 and value.startswith("#"):
-        allowed = "0123456789abcdefABCDEF"
-        if all(ch in allowed for ch in value[1:]):
-            return value.upper()
-    return default
-
-
-def _mobile_clean_static_icon(value: str, default: str = "/static/logo.png") -> str:
-    value = _mobile_clean_value(value, default).replace("\\", "/")
-    if value.startswith("static/"):
-        value = "/" + value
-    if not value.startswith("/static/"):
-        return default
-    lower = value.lower()
-    if not lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico")):
-        return default
-    return value
-
-
-def mobile_conf_normalize(data: dict | None = None) -> dict:
-    raw = dict(MOBILE_DEFAULT_CONF)
-    if data:
-        for key, value in data.items():
-            clean_key = str(key or "").strip().upper()
-            if clean_key in raw:
-                raw[clean_key] = str(value).strip()
-    raw["SHORT_NAME"] = _mobile_clean_value(raw.get("SHORT_NAME"), MOBILE_DEFAULT_CONF["SHORT_NAME"])
-    raw["NAME"] = _mobile_clean_value(raw.get("NAME"), MOBILE_DEFAULT_CONF["NAME"])
-    raw["DESCRIPTION"] = _mobile_clean_value(raw.get("DESCRIPTION"), MOBILE_DEFAULT_CONF["DESCRIPTION"])
-    raw["START_URL"] = _mobile_clean_value(raw.get("START_URL"), MOBILE_DEFAULT_CONF["START_URL"])
-    if not raw["START_URL"].startswith("/"):
-        raw["START_URL"] = MOBILE_DEFAULT_CONF["START_URL"]
-    raw["DISPLAY"] = raw.get("DISPLAY", MOBILE_DEFAULT_CONF["DISPLAY"]).strip().lower()
-    if raw["DISPLAY"] not in {"standalone", "fullscreen", "minimal-ui", "browser"}:
-        raw["DISPLAY"] = MOBILE_DEFAULT_CONF["DISPLAY"]
-    raw["BACKGROUND_COLOR"] = _mobile_clean_color(raw.get("BACKGROUND_COLOR"), MOBILE_DEFAULT_CONF["BACKGROUND_COLOR"])
-    raw["THEME_COLOR"] = _mobile_clean_color(raw.get("THEME_COLOR"), MOBILE_DEFAULT_CONF["THEME_COLOR"])
-    raw["ICON_SRC"] = _mobile_clean_static_icon(raw.get("ICON_SRC"), MOBILE_DEFAULT_CONF["ICON_SRC"])
-    return raw
-
-
-def mobile_conf_read(path: str = "") -> dict:
-    target = os.path.abspath(os.path.expanduser(os.path.expandvars(str(path or MOBILE_CONF).strip())))
-    data = {}
-    if os.path.exists(target):
-        try:
-            with open(target, "r", encoding="utf-8", errors="replace") as handle:
-                for raw_line in handle:
-                    line = raw_line.strip()
-                    if not line or line.startswith("#") or line.startswith(";") or "=" not in line:
-                        continue
-                    key, value = line.split("=", 1)
-                    data[key.strip().upper()] = value.strip()
-        except Exception as exc:
-            print(f"⚠️ Lecture mobile.conf impossible : {exc}")
-    return mobile_conf_normalize(data)
-
-
-def mobile_conf_write(config: dict, path: str = "") -> str:
-    target = os.path.abspath(os.path.expanduser(os.path.expandvars(str(path or MOBILE_CONF).strip())))
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    clean = mobile_conf_normalize(config)
-    lines = [
-        "# ============================================================\n",
-        "# Configuration mobile / PWA - manifest.json\n",
-        "# Fichier créé automatiquement par app.py si absent.\n",
-        "# Modifiable depuis Système > Personnalisation > Mobile.\n",
-        "# ============================================================\n",
-        "\n",
-    ]
-    for key in ["SHORT_NAME", "NAME", "DESCRIPTION", "START_URL", "DISPLAY", "BACKGROUND_COLOR", "THEME_COLOR", "ICON_SRC"]:
-        lines.append(f"{key}={clean[key]}\n")
-    with open(target, "w", encoding="utf-8") as handle:
-        handle.writelines(lines)
-    try:
-        os.chmod(target, 0o644)
-    except OSError:
-        pass
-    return target
-
-
-def ensure_mobile_conf_file(path: str = "") -> bool:
-    target = os.path.abspath(os.path.expanduser(os.path.expandvars(str(path or MOBILE_CONF).strip())))
-    if os.path.exists(target):
-        return False
-    mobile_conf_write(MOBILE_DEFAULT_CONF, target)
-    return True
-
-
-try:
-    if ensure_mobile_conf_file(MOBILE_CONF):
-        print(f"✅ mobile.conf créé automatiquement : {MOBILE_CONF}")
-    else:
-        print(f"✅ mobile.conf déjà présent : {MOBILE_CONF}")
-except Exception as exc:
-    print(f"⚠️ Préparation mobile.conf impossible : {exc}")
-
-# ==========================================================
-# 1. LE MANIFEST
-# ==========================================================
-@app.route('/manifest.json')
-def manifest():
-    cfg = mobile_conf_read()
-    data = {
-        "short_name": cfg["SHORT_NAME"],
-        "name": cfg["NAME"],
-        "description": cfg["DESCRIPTION"],
-        "start_url": cfg["START_URL"],
-        "display": cfg["DISPLAY"],
-        "background_color": cfg["BACKGROUND_COLOR"],
-        "theme_color": cfg["THEME_COLOR"],
-        "icons": [
-            {
-                "src": cfg["ICON_SRC"],
-                "sizes": "192x192",
-                "type": "image/png",
-                "purpose": "any maskable"
-            },
-            {
-                "src": cfg["ICON_SRC"],
-                "sizes": "512x512",
-                "type": "image/png",
-                "purpose": "any maskable"
-            }
-        ]
-    }
-    resp = make_response(jsonify(data))
-    resp.headers['Content-Type'] = 'application/manifest+json'
-    return resp
-
-# ==========================================================
-# 2. LE SERVICE WORKER
-# ==========================================================
-@app.route('/sw.js')
-def sw():
-    script = "self.addEventListener('fetch', (e) => {});"
-    resp = make_response(script)
-    resp.headers['Content-Type'] = 'application/javascript'
-    return resp
-
-# ==========================================================
-# 3. LA PORTE D'ENTRÉE
+# ACCUEIL DE LA PWA
 # ==========================================================
 @app.route('/')
 def home():
-    cfg = mobile_conf_read()
-    icon_src = cfg["ICON_SRC"]
-    theme_color = cfg["THEME_COLOR"]
-    return f"""
-    <!DOCTYPE html>
-    <html style="background: {theme_color};">
-    <head>
-        <link rel="manifest" href="/manifest.json">
-        <link rel="icon" href="{icon_src}">
-        <meta name="theme-color" content="{theme_color}">
-        <meta http-equiv="refresh" content="0; url=/index">
-    </head>
-    <body></body>
-    </html>
-    """
+    return redirect(mobile_conf_read()["START_URL"])
+
 
 
 # === AUTO DEBUG ROUTES FLASK SYSTEM ===

@@ -83,7 +83,8 @@ def manifest():
 @task_bp.route('/system/task/sw.js')
 def sw():
     script = r"""
-self.addEventListener('fetch', (event) => {});
+// Même secours hors ligne que YoLéo ; les notifications Task restent actives.
+importScripts('/sw.js');
 
 self.addEventListener('push', (event) => {
     let data = {};

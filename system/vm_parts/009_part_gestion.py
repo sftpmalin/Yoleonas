@@ -338,6 +338,8 @@ def _render_vm_gestion(mode: str = "main", name: str = ""):
             abort(404, f"VM introuvable : {clean_name}")
     devices = build_gestion_device_menu(current_vm)
     extra = collect_vm_extra(conf)
+    if current_vm:
+        extra['firmware_profiles'] = profile_choices(str(current_vm.get('arch') or 'x86_64'))
     nvme_virtual_disk = virtual_nvme_disk_status(conf)
     return render_template(
         "vm_gestion.html",

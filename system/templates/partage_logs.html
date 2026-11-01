@@ -2,7 +2,7 @@
 
 {% block title %}Logs Samba / NFS - Yoleo{% endblock %}
 {% block page_title %}Logs Samba / NFS{% endblock %}
-{% block page_subtitle %}Logs Partage : Samba, NFS serveur, NFS client, console des opérations et éditions brutes techniques.{% endblock %}
+{% block page_subtitle %}Logs Partage : Samba serveur et client, NFS serveur et client, console des opérations et éditions brutes techniques.{% endblock %}
 
 {% block route_content %}
 <div id="tab-logs" class="tab-panel active partage-logs-page-v4">
@@ -11,6 +11,7 @@
                         <select class="select-input" id="logKind">
                             <option value="all">Tout</option>
                             <option value="samba">Samba</option>
+                            <option value="smb_client">Samba client</option>
                             <option value="nfs">NFS</option>
                             <option value="nfs_client">NFS client</option>
                         </select>

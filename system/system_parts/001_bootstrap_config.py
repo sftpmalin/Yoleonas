@@ -74,6 +74,8 @@ SYSTEM_APP_CONF_REQUIRED_MODULES = [
     "services=services",
     "backup=backup",
     "scripts=scripts",
+    "qr_code=qr_code",
+    "speedtest=speedtest",
     "terminal=terminal",
 ]
 

@@ -756,7 +756,7 @@ def stream_build_action(conf: Dict[str, str], action: str, name: str, mode: str)
 
 
 
-def stream_build_registry_action(conf: Dict[str, str], action: str, name: str, mode: str) -> Iterator[str]:
+def stream_build_registry_action(conf: Dict[str, str], action: str, name: str, mode: str, selected_names: Optional[List[str]] = None) -> Iterator[str]:
     """Workflow principal Build : build TAR puis envoi registre.
 
     Cette fonction est volontairement séparée de stream_build_action et
@@ -792,10 +792,15 @@ def stream_build_registry_action(conf: Dict[str, str], action: str, name: str, m
                 or os.path.isfile(os.path.join(conf["DOCKER_BUILDS_DIR"], p, "dockerfile"))
             ]
             projects = order_build_projects_like_registry(conf, projects)
+            if selected_names is not None:
+                # Le serveur valide la sélection au lancement. On recoupe une
+                # dernière fois à l'exécution (job tmux détaché).
+                selected = set(selected_names)
+                projects = [p for p in projects if p in selected]
 
         total = len(projects)
         if total == 0:
-            yield logger.line("❌ Aucun Docker à builder.")
+            yield logger.line("❌ Aucun Docker à builder dans la sélection.")
             return
 
         yield logger.line("=" * 76)

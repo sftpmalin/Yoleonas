@@ -1,0 +1,13 @@
+{% extends "menu.html" %}
+{% block title %}Speed Test - Yoleo{% endblock %}
+{% block page_title %}Speed Test{% endblock %}
+{% block page_subtitle %}Débit descendant, débit montant, latence et gigue{% endblock %}
+{% block content %}
+<section class="yoleo-card speedtest-card">
+    <iframe class="speedtest-frame" scrolling="no" src="{{ url_for('speedtest_bp.interface') }}" title="OpenSpeedTest — mesure du débit vers YoLeo"></iframe>
+    <div class="speedtest-explanation">
+        <p>Mesure la connexion entre <strong>cet appareil et ton NAS YoLeo</strong>. Clique sur le bouton de démarrage pour lancer le test.</p>
+        <p>Depuis le réseau local, tu testes ton Wi-Fi ou ton Ethernet. Depuis ton domaine public, tu testes le trajet jusqu’au NAS à travers Internet.</p>
+    </div>
+</section>
+{% endblock %}

@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Connexion - Yoleo</title>
-    <link rel="icon" href="/static/logo.png">
+    <title>Connexion - {{ pwa_config.SHORT_NAME }}</title>
+    {% include "pwa_head.html" %}
+    <link rel="icon" href="{{ pwa_config.ICON_SRC }}">
     <style>
         :root {
             color-scheme: dark;

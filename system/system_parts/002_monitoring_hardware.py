@@ -1,3 +1,5 @@
+import threading as _intel_gpu_threading
+
 def _is_app_log_path(value: str) -> bool:
     raw = str(value or "").strip()
     if not raw:
@@ -27,6 +29,8 @@ last_net = {"time": 0, "bytes_sent": 0, "bytes_recv": 0}
 public_ip_cache = {"ip": "Chargement...", "time": 0}
 remote_gpu_cache = {"time": 0, "stats": None, "raw_smi": None}
 intel_gpu_cache = {"time": 0, "stats": None, "text": "", "raw": ""}
+_intel_gpu_top_lock = _intel_gpu_threading.Lock()
+_intel_gpu_top_stalled = None
 
 def get_conf_int(key, default):
     try:
@@ -167,6 +171,14 @@ def get_remote_nvidia_smi_raw():
 # --------------------------------------------------
 # NVIDIA locale
 # --------------------------------------------------
+def normalize_gpu_pci_address(value):
+    """nvidia-smi uses an eight-digit domain; sysfs uses four digits."""
+    match = re.fullmatch(r"([0-9a-f]{4}|[0-9a-f]{8}):([0-9a-f]{2}):([01][0-9a-f])\.([0-7])", str(value or "").strip().lower())
+    if not match or int(match[1], 16) > 0xffff:
+        return ""
+    return f"{int(match[1], 16):04x}:{match[2]}:{match[3]}.{match[4]}"
+
+
 def get_local_nvidia_stats():
     """Lit les NVIDIA présentes sur l'hôte local, sans SSH.
 
@@ -180,7 +192,7 @@ def get_local_nvidia_stats():
 
     cmd = [
         nvidia_smi,
-        "--query-gpu=name,utilization.gpu,utilization.memory,temperature.gpu,power.draw,fan.speed",
+        "--query-gpu=name,utilization.gpu,utilization.memory,temperature.gpu,power.draw,fan.speed,pci.bus_id",
         "--format=csv,noheader,nounits",
     ]
     rc, out = run_cmd(cmd, timeout=4)
@@ -199,6 +211,7 @@ def get_local_nvidia_stats():
             "source": "local",
             "label": "NVIDIA GPU (local)",
             "name": parts[0],
+            "pci_address": normalize_gpu_pci_address(parts[6]) if len(parts) > 6 else "",
             "load": parts[1],
             "mem": parts[2],
             "temp": parts[3],
@@ -397,17 +410,29 @@ def _to_float(val, default=0.0):
         except Exception:
             return default
 
+def _find_intel_drm_node(pattern):
+    # Do not assume card0 belongs to Intel, or limit discovery to two GPUs.
+    for path in sorted(glob.glob("/sys/class/drm/" + pattern)):
+        node = "/dev/dri/" + os.path.basename(path)
+        if _read_file(os.path.join(path, "device/vendor"), "").lower() == "0x8086" and os.path.exists(node):
+            return node
+    return ""
+
+
 def _find_intel_render_node():
-    for p in ["/dev/dri/renderD128", "/dev/dri/renderD129"]:
-        if os.path.exists(p):
-            return p
-    return "/dev/dri/renderD128"
+    return _find_intel_drm_node("renderD[0-9]*")
+
 
 def _find_intel_monitor_node():
-    for p in ["/dev/dri/card0", "/dev/dri/card1", "/dev/dri/renderD128", "/dev/dri/renderD129"]:
-        if os.path.exists(p):
-            return p
-    return "/dev/dri/card0"
+    return _find_intel_drm_node("card[0-9]*") or _find_intel_render_node()
+
+
+def get_intel_pci_address():
+    node = _find_intel_monitor_node()
+    if not node:
+        return ""
+    return normalize_gpu_pci_address(os.path.basename(os.path.realpath("/sys/class/drm/" + os.path.basename(node) + "/device")))
+
 
 def _extract_json_objects(stream_text):
     objs = []
@@ -455,42 +480,69 @@ def _read_intel_power_watts():
     return 0.0
 
 def _run_intel_gpu_top_json():
-    monitor_node = _find_intel_monitor_node()
-    cmd = ["intel_gpu_top", "-J", "-d", f"drm:{monitor_node}"]
+    global _intel_gpu_top_stalled
 
+    # A hung sampler must neither consume every web thread nor be spawned again
+    # on each refresh. Each worker keeps at most one outstanding sampler.
+    if not _intel_gpu_top_lock.acquire(blocking=False):
+        raise RuntimeError("Un relevé Intel GPU est déjà en cours")
     try:
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise RuntimeError("intel_gpu_top introuvable dans le conteneur")
-    except Exception as e:
-        raise RuntimeError(f"Impossible de lancer intel_gpu_top : {e}")
+        if _intel_gpu_top_stalled is not None:
+            if _intel_gpu_top_stalled.poll() is None:
+                raise RuntimeError("Intel GPU indisponible : le précédent relevé ne répond plus")
+            _intel_gpu_top_stalled = None
 
-    out = ""
-    try:
-        out, _ = proc.communicate(timeout=1.8)
-    except subprocess.TimeoutExpired:
+        monitor_node = _find_intel_monitor_node()
+        cmd = ["intel_gpu_top", "-J", "-d", f"drm:{monitor_node}"]
+
         try:
-            proc.terminate()
-        except Exception:
-            pass
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        except FileNotFoundError:
+            raise RuntimeError("intel_gpu_top introuvable dans le conteneur")
+        except Exception as e:
+            raise RuntimeError(f"Impossible de lancer intel_gpu_top : {e}")
+
+        out = ""
         try:
-            out, _ = proc.communicate(timeout=0.7)
+            out, _ = proc.communicate(timeout=1.8)
         except subprocess.TimeoutExpired:
             try:
-                proc.kill()
+                proc.terminate()
             except Exception:
                 pass
-            out, _ = proc.communicate()
+            try:
+                out, _ = proc.communicate(timeout=0.7)
+            except subprocess.TimeoutExpired:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+                try:
+                    out, _ = proc.communicate(timeout=0.3)
+                except subprocess.TimeoutExpired:
+                    # SIGKILL cannot finish a process stuck in kernel I/O (D).
+                    # Stop waiting for its pipes; retry only once it has exited.
+                    _intel_gpu_top_stalled = proc
+                    for stream in (proc.stdout, proc.stderr):
+                        if stream is not None:
+                            try:
+                                stream.close()
+                            except Exception:
+                                pass
+                    raise RuntimeError("Délai dépassé pour le relevé Intel GPU") from None
 
-    out = _to_text(out).strip()
-    if not out:
-        raise RuntimeError("Aucune sortie renvoyée par intel_gpu_top")
-    return out
+        out = _to_text(out).strip()
+        if not out:
+            raise RuntimeError("Aucune sortie renvoyée par intel_gpu_top")
+        return out
+    finally:
+        _intel_gpu_top_lock.release()
+
 
 def _parse_all_intel_snapshots(raw_text):
     snapshots = []
@@ -599,7 +651,7 @@ def _compute_intel_stats_from_snapshot(snapshot):
 
     if load_3d <= 0:
         try:
-            with open("/sys/class/drm/card0/device/gpu_busy_percent", "r") as f:
+            with open("/sys/class/drm/" + os.path.basename(_find_intel_monitor_node()) + "/device/gpu_busy_percent", "r") as f:
                 load_3d = round(_to_float(f.read().strip(), 0.0), 1)
         except Exception:
             pass
@@ -721,7 +773,7 @@ def collect_mobile_hardware_stats():
         except Exception:
             pass
 
-    if os.path.exists("/dev/dri/renderD128") or os.path.exists("/dev/dri/card0"):
+    if _find_intel_monitor_node():
         try:
             intel, _text = get_intel_stats_and_text()
             gpus.append({
@@ -729,6 +781,7 @@ def collect_mobile_hardware_stats():
                 "source": "local",
                 "label": "Intel GPU",
                 "name": intel.get("name") or "Intel iGPU",
+                "pci_address": get_intel_pci_address(),
                 "load": intel.get("load", "0"),
                 "mem": intel.get("mem", "0"),
                 "temp": intel.get("temp", "-"),

@@ -236,6 +236,7 @@ function pendingActionLabel(action){
         suspend: 'commande pause envoyée',
         shutdown: 'commande arrêt propre envoyée',
         destroy: 'commande arrêt forcé envoyée',
+        reset: 'reset forcé demandé',
         delete: 'suppression en cours',
     })[action] || 'commande envoyée';
 }
@@ -391,14 +392,16 @@ function renderGeneral(){
         const running = vmState === 'running', stopped = vmState === 'stopped', paused = vmState === 'paused';
         const pendingAction = vmPendingActions.get(vm.name) || '';
         const pending = Boolean(pendingAction);
-        const startAction = paused ? 'resume' : 'start';
-        const startTitle = paused ? 'Reprendre la VM' : 'Démarrer la VM';
+        const startAction = running ? 'reset' : (paused ? 'resume' : 'start');
+        const startTitle = running ? 'Reset forcé de la VM' : (paused ? 'Reprendre la VM' : 'Démarrer la VM');
+        const startIcon = running ? '<span class="vm-reset-icon">↻</span>' : '▶';
+        const startClass = running ? 'yoleo-btn-orange vm-reset-btn' : 'yoleo-btn-green';
         return `<tr tabindex="0" data-vm-name="${esc(vm.name)}" data-mobile-state="${esc(vmState)}" onclick="selectVm(${jsArg(vm.name)})" class="vm-mobile-state-${esc(vmState)} ${vm.name===selectedVm?'selected-row':''}">
             <td><span class="badge ${badgeClassState(vmState)}">${esc(vm.state||vm.state_class||'unknown')}</span>${pending?`<div class="name-sub">${esc(pendingActionLabel(pendingAction))}</div>`:''}</td>
             <td><div class="name-main">${esc(vm.name)}</div></td>
             <td><span class="badge badge-info">CPU ${esc(vm.vcpu_current||vm.vcpu||'—')}</span> <span class="badge badge-muted">RAM ${esc(vmRamLabel(vm))}</span></td>
             <td><div class="actions-cell" onclick="event.stopPropagation()">
-                <button class="yoleo-btn yoleo-btn-mini yoleo-btn-green vm-icon-btn" title="${esc(startTitle)}" aria-label="${esc(startTitle)}" ${(running||pending)?'disabled':''} onclick="vmAction(${jsArg(vm.name)},'${startAction}',this)">▶</button>
+                <button class="yoleo-btn yoleo-btn-mini ${startClass} vm-icon-btn" title="${esc(startTitle)}" aria-label="${esc(startTitle)}" ${pending?'disabled':''} onclick="vmAction(${jsArg(vm.name)},'${startAction}',this)">${startIcon}</button>
                 <button class="yoleo-btn yoleo-btn-mini yoleo-btn-primary vm-icon-btn" title="Mettre en pause" aria-label="Mettre en pause" ${(running&&!pending)?'':'disabled'} onclick="vmAction(${jsArg(vm.name)},'suspend',this)">⏸</button>
                 <button class="yoleo-btn yoleo-btn-mini yoleo-btn-muted vm-icon-btn" title="Arrêt propre" aria-label="Arrêt propre" ${((running||paused)&&!pending)?'':'disabled'} onclick="vmAction(${jsArg(vm.name)},'shutdown',this)">⏹</button>
                 <button class="yoleo-btn yoleo-btn-mini yoleo-btn-red vm-icon-btn" title="Arrêt kill" aria-label="Arrêt kill" ${((running||paused)&&!pending)?'':'disabled'} onclick="confirmVmAction(${jsArg(vm.name)},'destroy')">✖</button>
@@ -598,6 +601,7 @@ async function refreshOneVmState(name){
 function expectedStateForAction(action){
     action = String(action || '').toLowerCase();
     if(action === 'start' || action === 'resume') return 'running';
+    if(action === 'reset') return 'running';
     if(action === 'suspend') return 'paused';
     if(action === 'shutdown' || action === 'destroy') return 'stopped';
     return '';
@@ -606,6 +610,7 @@ function expectedStateForAction(action){
 function watchDurationForAction(action){
     action = String(action || '').toLowerCase();
     if(action === 'start' || action === 'resume') return 65000;
+    if(action === 'reset') return 35000;
     if(action === 'shutdown') return 45000;
     if(action === 'destroy' || action === 'suspend') return 25000;
     return 20000;

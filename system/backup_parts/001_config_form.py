@@ -333,6 +333,348 @@ def browse_response_path(path_value):
     return ensure_folder_slash(path_value)
 
 
+def decode_mountinfo_field(value):
+    """Décode les échappements octaux employés par /proc/*/mountinfo."""
+    decoded = str(value or '')
+    # Le backslash est traité en dernier pour éviter un double décodage.
+    for escaped, plain in (
+        ('\\040', ' '),
+        ('\\011', '\t'),
+        ('\\012', '\n'),
+        ('\\134', '\\'),
+    ):
+        decoded = decoded.replace(escaped, plain)
+    return decoded
+
+
+def parse_mountinfo(content):
+    """Retourne les montages Linux décrits par /proc/self/mountinfo."""
+    entries = []
+    for raw_line in str(content or '').splitlines():
+        fields = raw_line.split()
+        try:
+            separator = fields.index('-')
+        except ValueError:
+            continue
+        if separator < 6 or len(fields) < separator + 4:
+            continue
+        entries.append({
+            'device_id': fields[2],
+            'root': decode_mountinfo_field(fields[3]),
+            'mount_point': decode_mountinfo_field(fields[4]),
+            'mount_options': fields[5],
+            'optional_fields': fields[6:separator],
+            'fs_type': decode_mountinfo_field(fields[separator + 1]),
+            'mount_source': decode_mountinfo_field(fields[separator + 2]),
+            'super_options': fields[separator + 3],
+        })
+    return entries
+
+
+def read_mountinfo_entries(path='/proc/self/mountinfo'):
+    try:
+        with open(path, 'r', encoding='utf-8', errors='replace') as handle:
+            return parse_mountinfo(handle.read())
+    except OSError:
+        return []
+
+
+def mount_entry_for_path(path_value, mount_entries=None):
+    """Trouve le montage le plus spécifique contenant un chemin local."""
+    value = str(path_value or '').strip()
+    if not value.startswith('/'):
+        return None
+    candidate = os.path.normpath(os.path.realpath(value))
+    best = None
+    for entry in mount_entries if mount_entries is not None else read_mountinfo_entries():
+        mount_point = os.path.normpath(str(entry.get('mount_point') or ''))
+        if not mount_point.startswith('/'):
+            continue
+        inside = mount_point == '/' or candidate == mount_point or candidate.startswith(mount_point.rstrip('/') + '/')
+        if inside and (best is None or len(mount_point) > len(str(best.get('mount_point') or ''))):
+            best = entry
+    return best
+
+
+def is_mergerfs_mount(entry):
+    if not isinstance(entry, dict):
+        return False
+    signature = ' '.join((
+        str(entry.get('fs_type') or ''),
+        str(entry.get('mount_source') or ''),
+    )).lower()
+    return 'mergerfs' in signature
+
+
+def parse_fstab_entries(content):
+    entries = []
+    for raw_line in str(content or '').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#'):
+            continue
+        fields = line.split()
+        if len(fields) < 3:
+            continue
+        entries.append({
+            'mount_source': decode_mountinfo_field(fields[0]),
+            'mount_point': decode_mountinfo_field(fields[1]),
+            'fs_type': decode_mountinfo_field(fields[2]),
+            'mount_options': fields[3] if len(fields) > 3 else '',
+        })
+    return entries
+
+
+def read_fstab_entries(path='/etc/fstab'):
+    try:
+        with open(path, 'r', encoding='utf-8', errors='replace') as handle:
+            return parse_fstab_entries(handle.read())
+    except OSError:
+        return []
+
+
+def mergerfs_branch_paths(entry, fstab_entries=None):
+    """Retourne les branches physiques d'un montage mergerFS.
+
+    mergerFS expose parfois seulement une source numérique (par ex. 1:2:3)
+    dans mountinfo. Dans ce cas, /etc/fstab fournit la composition réelle.
+    """
+    if not is_mergerfs_mount(entry):
+        return []
+    mount_point = os.path.normpath(str(entry.get('mount_point') or ''))
+    branch_source = ''
+    rows = fstab_entries if fstab_entries is not None else read_fstab_entries()
+    for row in rows:
+        if os.path.normpath(str(row.get('mount_point') or '')) == mount_point and is_mergerfs_mount(row):
+            branch_source = str(row.get('mount_source') or '')
+            break
+    if not branch_source:
+        branch_source = str(entry.get('mount_source') or '')
+
+    raw_branches = [part.strip() for part in branch_source.split(':') if part.strip()]
+    if raw_branches and all(part.isdigit() for part in raw_branches):
+        return []
+
+    branches = []
+    parent = os.path.dirname(mount_point.rstrip('/')) or '/'
+    for raw_branch in raw_branches:
+        branch = re.sub(r'=(?:RO|RW|NC)$', '', raw_branch, flags=re.IGNORECASE)
+        if not branch.startswith('/'):
+            branch = os.path.join(parent, branch)
+        expanded = glob.glob(branch) if glob.has_magic(branch) else [branch]
+        if not expanded:
+            expanded = [branch]
+        for candidate in expanded:
+            normalized = os.path.normpath(os.path.realpath(candidate))
+            if normalized not in branches:
+                branches.append(normalized)
+    return branches
+
+
+def same_physical_mount(left_entry, right_entry):
+    if not isinstance(left_entry, dict) or not isinstance(right_entry, dict):
+        return False
+    left_mount = os.path.normpath(str(left_entry.get('mount_point') or ''))
+    right_mount = os.path.normpath(str(right_entry.get('mount_point') or ''))
+    if left_mount and left_mount == right_mount:
+        return True
+    left_device = str(left_entry.get('device_id') or '')
+    right_device = str(right_entry.get('device_id') or '')
+    if left_device and right_device and left_device == right_device:
+        return True
+    left_source = str(left_entry.get('mount_source') or '')
+    right_source = str(right_entry.get('mount_source') or '')
+    return bool(
+        left_source.startswith('/dev/')
+        and right_source.startswith('/dev/')
+        and os.path.realpath(left_source) == os.path.realpath(right_source)
+    )
+
+
+def mergerfs_target_source_membership(source_entry, target_entry, mount_entries=None, fstab_entries=None):
+    """Retourne (vérifiable, incluse, branches, branches_correspondantes)."""
+    if not isinstance(source_entry, dict):
+        return False, False, [], []
+    entries = mount_entries if mount_entries is not None else read_mountinfo_entries()
+    branches = mergerfs_branch_paths(target_entry, fstab_entries=fstab_entries)
+    if not branches:
+        return False, False, [], []
+    matching = []
+    for branch in branches:
+        branch_entry = mount_entry_for_path(branch, mount_entries=entries)
+        if branch_entry is None:
+            return False, False, branches, matching
+        if same_physical_mount(source_entry, branch_entry):
+            matching.append(branch)
+    return True, bool(matching), branches, matching
+
+
+def mergerfs_endpoint_physical_mounts(entry, mount_entries=None, fstab_entries=None):
+    """Résout un point d'entrée en montages physiques sous-jacents."""
+    if not isinstance(entry, dict):
+        return False, [], []
+    if not is_mergerfs_mount(entry):
+        mount_point = os.path.normpath(str(entry.get('mount_point') or ''))
+        return True, [{'branch': mount_point, 'entry': entry}], [mount_point]
+
+    entries = mount_entries if mount_entries is not None else read_mountinfo_entries()
+    branches = mergerfs_branch_paths(entry, fstab_entries=fstab_entries)
+    if not branches:
+        return False, [], []
+    resolved = []
+    for branch in branches:
+        branch_entry = mount_entry_for_path(branch, mount_entries=entries)
+        # Un mergerFS imbriqué ou une branche inconnue doit être explicitement
+        # résolu avant d'autoriser un déplacement destructif.
+        if branch_entry is None or is_mergerfs_mount(branch_entry):
+            return False, resolved, branches
+        resolved.append({'branch': branch, 'entry': branch_entry})
+    return True, resolved, branches
+
+
+def cache_mergerfs_mount_issues(source, target, mount_entries=None, fstab_entries=None):
+    """Refuse uniquement le partage d'un disque physique via mergerFS."""
+    entries = mount_entries if mount_entries is not None else read_mountinfo_entries()
+    source_entry = mount_entry_for_path(source, mount_entries=entries)
+    target_entry = mount_entry_for_path(target, mount_entries=entries)
+    source_virtual = is_mergerfs_mount(source_entry)
+    target_virtual = is_mergerfs_mount(target_entry)
+    if not source_virtual and not target_virtual:
+        return []
+
+    source_verified, source_mounts, source_branches = mergerfs_endpoint_physical_mounts(
+        source_entry,
+        mount_entries=entries,
+        fstab_entries=fstab_entries,
+    )
+    target_verified, target_mounts, target_branches = mergerfs_endpoint_physical_mounts(
+        target_entry,
+        mount_entries=entries,
+        fstab_entries=fstab_entries,
+    )
+    if not source_verified or not target_verified:
+        return [{
+            'code': 'mergerfs_composition_unverifiable',
+            'role': 'target' if target_virtual else 'source',
+            'label': 'La destination' if target_virtual else 'La source',
+            'path': str(target if target_virtual else source or '').strip(),
+            'mount_point': str((target_entry if target_virtual else source_entry or {}).get('mount_point') or ''),
+            'fs_type': str((target_entry if target_virtual else source_entry or {}).get('fs_type') or ''),
+            'source_branches': source_branches,
+            'target_branches': target_branches,
+        }]
+
+    overlaps = []
+    for source_mount in source_mounts:
+        for target_mount in target_mounts:
+            if not same_physical_mount(source_mount.get('entry'), target_mount.get('entry')):
+                continue
+            overlap = {
+                'source_branch': source_mount.get('branch') or '',
+                'target_branch': target_mount.get('branch') or '',
+                'physical_mount': str((source_mount.get('entry') or {}).get('mount_point') or ''),
+                'device': str((source_mount.get('entry') or {}).get('mount_source') or ''),
+            }
+            if overlap not in overlaps:
+                overlaps.append(overlap)
+    if not overlaps:
+        return []
+
+    if target_virtual and not source_virtual:
+        code = 'mergerfs_target_contains_source'
+    elif source_virtual and not target_virtual:
+        code = 'mergerfs_source_contains_target'
+    else:
+        code = 'mergerfs_endpoints_overlap'
+    return [{
+            'code': code,
+            'role': 'target',
+            'label': 'La destination',
+            'path': str(target or '').strip(),
+            'mount_point': str((target_entry or {}).get('mount_point') or ''),
+            'fs_type': str((target_entry or {}).get('fs_type') or ''),
+            'source_mount_point': str((source_entry or {}).get('mount_point') or ''),
+            'source_branches': source_branches,
+            'target_branches': target_branches,
+            'overlaps': overlaps,
+            'matching_branches': [item.get('target_branch') or item.get('source_branch') for item in overlaps],
+        }]
+
+
+def cache_mergerfs_error_payload(issues):
+    details = list(issues or [])
+    descriptions = []
+    for item in details:
+        if item.get('code') == 'mergerfs_target_contains_source':
+            descriptions.append(
+                f"La destination virtuelle {item.get('mount_point') or '—'} contient le disque physique de la source "
+                f"({', '.join(item.get('matching_branches') or []) or '—'})."
+            )
+        elif item.get('code') == 'mergerfs_source_contains_target':
+            descriptions.append(
+                f"La source virtuelle {item.get('source_mount_point') or '—'} contient le disque physique de la destination "
+                f"({', '.join(item.get('matching_branches') or []) or '—'})."
+            )
+        elif item.get('code') == 'mergerfs_endpoints_overlap':
+            descriptions.append(
+                "La source et la destination mergerFS partagent au moins un même disque physique."
+            )
+        else:
+            descriptions.append(
+                f"La composition du montage virtuel {item.get('mount_point') or '—'} ne peut pas être vérifiée."
+            )
+    return {
+        'code': 'mergerfs_path_forbidden',
+        'title': 'Configuration mergerFS dangereuse',
+        'message': 'Configuration mergerFS impossible en mode Cache.',
+        'note': ' '.join(descriptions) + ' Le déplacement est autorisé uniquement si les deux côtés ne partagent aucun disque physique via mergerFS.',
+        'details': details,
+    }
+
+
+def cache_script_launch_safety_error(script_path, mount_entries=None, fstab_entries=None):
+    """Valide MODE puis contrôle mergerFS uniquement pour le mode cache."""
+    content = read_text(script_path, '')
+    data = extract_script_metadata(content)
+    mode = str(data.get('MODE') or '').strip().lower()
+    allowed_modes = {'backup', 'mirror', 'archive', 'cache'}
+    if mode not in allowed_modes:
+        message = (
+            f'Désolé, l’étiquette MODE est inconnue ({mode}) : lancement refusé.'
+            if mode
+            else 'Désolé, l’étiquette MODE du script est introuvable : lancement refusé.'
+        )
+        return {
+            'code': 'backup_mode_marker_missing',
+            'title': 'Étiquette MODE introuvable',
+            'message': message,
+            'note': 'Veuillez ouvrir puis réenregistrer le script pour le refaire avec une étiquette MODE reconnue : backup, mirror, archive ou cache.',
+            'details': [],
+        }
+
+    # Les montages virtuels sont dangereux uniquement pour Cache, car ce mode
+    # déplace puis supprime les fichiers source avec --remove-source-files.
+    if mode != 'cache':
+        return None
+
+    source = str(data.get('SOURCE') or '').strip()
+    target = str(data.get('TARGET') or '').strip()
+    if not source or not target:
+        return {
+            'code': 'cache_paths_unverifiable',
+            'title': 'Chemins Cache introuvables',
+            'message': 'Ancien script Cache impossible à vérifier : lancement refusé.',
+            'note': 'Ouvrez puis réenregistrez ce script dans le module Backup afin d’intégrer les protections actuelles.',
+            'details': [],
+        }
+    issues = cache_mergerfs_mount_issues(
+        source,
+        target,
+        mount_entries=mount_entries,
+        fstab_entries=fstab_entries,
+    )
+    return cache_mergerfs_error_payload(issues) if issues else None
+
+
 RSYNC_MODE_KEYS = (
     'ARCHIVE',
     'VERBOSE',
@@ -363,6 +705,7 @@ ARCHIVE_MODE_DEFAULTS = {
     'COMPRESSION_LEVEL': '7',
     'REPLACE_EXISTING': '1',
     'DATE_SUFFIX': '0',
+    'SKIP_UNCHANGED': '1',
     'COMMAND_START': '',
     'COMMAND_END': '',
 }
@@ -375,7 +718,10 @@ CACHE_MODE_RSYNC_DEFAULTS = {
     'PROGRESS': '1',
     'DELETE': '0',
     'DELETE_EXCLUDED': '0',
-    'DRY_RUN': '0',
+    # En mode cache, DRY_RUN désigne la pré-analyse rsync qui calcule le
+    # volume à déplacer avant le transfert réel. L'option n'est pas affichée
+    # dans le formulaire cache : elle doit donc être forcée ici.
+    'DRY_RUN': '1',
     'COMPRESS': '0',
     'CHECKSUM': '0',
     'HARD_LINKS': '1',
@@ -446,6 +792,7 @@ def normalize_form(form):
         'COMPRESSION_LEVEL': (form.get('compression_level') or '7').strip(),
         'REPLACE_EXISTING': '1' if form.get('replace_existing') else '0',
         'DATE_SUFFIX': '1' if form.get('date_suffix') else '0',
+        'SKIP_UNCHANGED': '1' if form.get('skip_unchanged') else '0',
         'COMMAND_START': (form.get('command_start') or '').strip(),
         'COMMAND_END': (form.get('command_end') or '').strip(),
     }
@@ -511,6 +858,7 @@ def default_form_data():
         'COMPRESSION_LEVEL': '7',
         'REPLACE_EXISTING': '1',
         'DATE_SUFFIX': '0',
+        'SKIP_UNCHANGED': '1',
         'COMMAND_START': '',
         'COMMAND_END': '',
     }

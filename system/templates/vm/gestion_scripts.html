@@ -21,6 +21,9 @@ const vmgState = {
     usb_devices: {{ usb_devices|default([])|tojson }},
     isos: {{ isos|default([])|tojson }},
     firmware_options: {{ firmware_options|default([])|tojson }},
+    firmware_profiles: {{ firmware_profiles|default([])|tojson }},
+    selectedFirmwareProfile: '',
+    firmwareSelectionMode: '',
     nvme_virtual_disk: {{ nvme_virtual_disk|default({})|tojson }},
     modal: { type: '', mode: 'add', old: null },
     pendingRemove: null
@@ -375,7 +378,7 @@ function vmgFirmwareRows(){
 function vmgFirmwareIsSecure(row){
     if(!row) return false;
     if(row.secure_boot === true || row.secure_boot === 'true' || row.secure_boot === 1) return true;
-    return /secboot|secure boot|ms keys|windows|\.ms\.fd/i.test(`${row.label || ''} ${row.loader || ''} ${row.nvram || ''}`);
+    return /secure boot|ms keys|windows|snakeoil|\.ms\.fd/i.test(`${row.label || ''} ${row.nvram || ''}`);
 }
 function vmgFirmwareIsBios(row){
     return String(row?.mode || row?.id || '').toLowerCase() === 'bios';
@@ -419,12 +422,29 @@ function vmgApplySecureBootChoice(){
     const variant = vmgFindSecureBootVariant(row, box.checked);
     if(variant) select.value = variant.id || select.value;
 }
+function vmgSelectFirmwareProfile(id){
+    const profile = (vmgState.firmware_profiles || []).find(row => row.id === id && row.available);
+    if(!profile) return;
+    vmgState.selectedFirmwareProfile = id;
+    vmgState.firmwareSelectionMode = 'profile';
+    const match = vmgFirmwareRows().find(row => row.loader === profile.loader && row.nvram === profile.nvram);
+    if(match && vmg$('vmgFirmwareSelect')) vmg$('vmgFirmwareSelect').value = match.id;
+    if(vmg$('vmgSecureBoot')) vmg$('vmgSecureBoot').checked = profile.secure_boot;
+    document.querySelectorAll('input[name="vmgFirmwareProfile"]').forEach(input => input.checked = input.value === id);
+    vmg$('vmgFirmwareProfileSummary').textContent = profile.label + ' : firmware et clés sélectionnés automatiquement.';
+}
+function vmgUseAdvancedFirmware(){
+    vmgState.selectedFirmwareProfile = '';
+    vmgState.firmwareSelectionMode = 'advanced';
+    document.querySelectorAll('input[name="vmgFirmwareProfile"]').forEach(input => input.checked = false);
+    vmg$('vmgFirmwareProfileSummary').textContent = 'Firmware personnalisé sélectionné dans les options avancées.';
+}
 function vmgInitFirmwareForm(){
     const select = vmg$('vmgFirmwareSelect');
     if(!select) return;
     const rows = vmgFirmwareRows();
     const currentLoader = String(vmgState.currentVm?.loader || '');
-    const currentNvram = String(vmgState.currentVm?.nvram || '');
+    const currentNvram = String(vmgState.currentVm?.nvram_template || '');
     const currentRow = rows.find(row => String(row.loader || '') === currentLoader && (!row.nvram || !currentNvram || String(row.nvram || '') === currentNvram))
         || rows.find(row => currentLoader && String(row.loader || '') === currentLoader);
     const current = currentLoader ? (currentRow?.id || (String(vmgState.currentVm?.firmware || '').toLowerCase() === 'efi' ? 'uefi' : 'bios')) : (String(vmgState.currentVm?.firmware || '').toLowerCase() === 'efi' ? 'uefi' : 'bios');
@@ -433,12 +453,34 @@ function vmgInitFirmwareForm(){
         return `<option value="${vmgEsc(row.id || '')}" title="${vmgEsc(row.loader || row.id || '')}"${vmgOptionSelected(row.id,current)}>${vmgEsc(label)}</option>`;
     }).join('');
     if(!select.value && rows.length) select.value = rows[0].id || '';
-    select.addEventListener('change', () => vmgSyncSecureBootControl(false));
+    select.addEventListener('change', () => { vmgUseAdvancedFirmware(); vmgSyncSecureBootControl(false); });
     const secureBox = vmg$('vmgSecureBoot');
-    if(secureBox) secureBox.addEventListener('change', vmgApplySecureBootChoice);
+    if(secureBox) secureBox.addEventListener('change', () => { vmgUseAdvancedFirmware(); vmgApplySecureBootChoice(); });
     vmgSyncSecureBootControl(true);
+    const profiles = vmgState.firmware_profiles || [];
+    const choices = vmg$('vmgFirmwareProfiles');
+    choices.innerHTML = profiles.map(profile => `<label class="vmg-firmware-profile"><input type="radio" name="vmgFirmwareProfile" value="${vmgEsc(profile.id)}" ${profile.available ? '' : 'disabled'}><span><b>${vmgEsc(profile.label)}</b><small>${vmgEsc(profile.available ? profile.description : profile.reason)}</small></span></label>`).join('');
+    choices.addEventListener('change', event => {
+        if(event.target.name === 'vmgFirmwareProfile') vmgSelectFirmwareProfile(event.target.value);
+    });
+    const saved = vmgState.currentVm?.firmware_profile || '';
+    if(saved && profiles.some(profile => profile.id === saved && profile.available)) vmgSelectFirmwareProfile(saved);
+    else vmg$('vmgFirmwareProfileSummary').textContent = 'Choisis un profil pour sélectionner automatiquement le firmware adapté.';
+    const running = ['running', 'paused', 'pmsuspended'].includes(String(vmgState.currentVm?.state_class || '').toLowerCase());
+    if(vmg$('vmgSaveFirmwareButton')) vmg$('vmgSaveFirmwareButton').disabled = running;
 }
 async function vmgSaveFirmware(btn=null){
+    if(vmgState.selectedFirmwareProfile){
+        try{
+            await vmgApiPost(vmgUrls.update, {name: vmgState.currentVm?.name || '', firmware_profile: vmgState.selectedFirmwareProfile}, btn);
+            setTimeout(()=>window.location.reload(), 700);
+        } catch(e){ vmgStatus(e.message || e, 'error'); }
+        return;
+    }
+    if(vmgState.firmwareSelectionMode !== 'advanced'){
+        vmgStatus('Choisis un profil UEFI, ou un firmware dans les options avancées.', 'error');
+        return;
+    }
     vmgApplySecureBootChoice();
     const id = vmg$('vmgFirmwareSelect')?.value || '';
     const fw = vmgFirmwareById(id);

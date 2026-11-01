@@ -59,6 +59,7 @@
 
 <div id="ctx-menu" aria-label="Menu contextuel">
     <button type="button" class="ctx-item" id="ctx-open" onclick="ctxAction('open')"><span>📂</span> Ouvrir / Éditer</button>
+    <button type="button" class="ctx-item" id="ctx-download" onclick="ctxAction('download')"><span>⬇️</span> Télécharger</button>
     <button type="button" class="ctx-item" id="ctx-execute" onclick="ctxAction('execute')"><span>▶️</span> Exécuter script</button>
     <button type="button" class="ctx-item" id="ctx-prepare-command" onclick="ctxAction('prepare-command')"><span>⌨️</span> Préparer avec paramètres</button>
     <div class="ctx-sep"></div>
@@ -192,8 +193,6 @@
     function openEntry(side, path, type, name, isExecScript=false) {
         if (type === 'dir') {
             loadDir(side, path);
-        } else if (isExecScript && isScriptName(name || path)) {
-            confirmExecuteScript(path, name || path.split('/').pop());
         } else {
             tryOpen(path, name || path.split('/').pop());
         }
@@ -629,6 +628,7 @@
         }
 
         document.getElementById('ctx-open').style.display = hasTarget ? 'flex' : 'none';
+        document.getElementById('ctx-download').style.display = hasTarget && ctxTarget && ctxTarget.type === 'file' ? 'flex' : 'none';
         const execBtn = document.getElementById('ctx-execute');
         const prepareBtn = document.getElementById('ctx-prepare-command');
         execBtn.style.display = hasTarget ? 'flex' : 'none';
@@ -706,6 +706,10 @@
             if (!ctxTarget) return;
             openEntry(activePanel, ctxTarget.path, ctxTarget.type, ctxTarget.name, ctxTarget.isExecScript);
         }
+        else if (action === 'download') {
+            if (!ctxTarget || ctxTarget.type !== 'file') return;
+            downloadFile(ctxTarget.path);
+        }
         else if (action === 'execute') {
             if (!ctxTarget || !ctxTarget.isExecScript) return showDialog("Info", "Ce fichier n'est pas un script exécutable .sh ou .py.");
             confirmExecuteScript(ctxTarget.path, ctxTarget.name);
@@ -735,9 +739,17 @@
     }
 
     // --- EDITEUR & CORE ---
+    function downloadFile(path) {
+        window.location.href = '/api/files/download?path=' + encodeURIComponent(path);
+    }
+
     async function tryOpen(path, name) {
-        let ext = name.includes('.') ? name.split('.').pop().toLowerCase() : 'txt';
-        if (!TEXT_EXTS.includes(ext)) return showDialog("Info", "Fichier non éditable.");
+        const ext = getFileExt(name);
+        if (!TEXT_EXTS.includes(ext)) {
+            showDialog("Télécharger", `Télécharger le fichier <b>${escapeHtml(name)}</b> sur cet appareil ?`, () => downloadFile(path));
+            document.getElementById('um-btn-ok').innerText = 'Télécharger';
+            return;
+        }
         try {
             const r = await fetch('/api/files/read', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:path})});
             const d = await r.json();
@@ -1067,7 +1079,7 @@
         if (!info) return showDialog("Export", "Sélection introuvable.");
         if (info.type !== 'file') return showDialog("Export", "Export direct possible uniquement sur un fichier.");
 
-        window.location.href = '/api/files/download?path=' + encodeURIComponent(info.path);
+        downloadFile(info.path);
     }
 
     // TOOLBAR ACTIONS

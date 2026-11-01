@@ -247,44 +247,36 @@ def ensure_websockify(conf: Dict[str, str], vnc_port: str) -> Tuple[int, str]:
     return 0, f"websockify lancÃ© mais le port {ws_port} ne rÃ©pond pas encore. Voir {log_path}"
 
 def build_console_url_server(conf: Dict[str, str], vm: Dict[str, object]) -> Tuple[str, str]:
-    gfx, vnc_port, ws_port, error = console_ports_from_vm(vm)
-    if error:
-        return "", error
-
     if not vm_looks_running_for_console(conf, vm):
-        # Si libvirt donne dÃ©jÃ  un port console rÃ©el, on laisse quand mÃªme tenter
-        # noVNC : c'est plus utile que de bloquer Ã  tort sur un Ã©tat mal traduit.
-        if (ws_port and ws_port != "-1") or (vnc_port and vnc_port != "-1"):
-            pass
-        else:
-            state = str(vm.get("state", "") or vm.get("state_class", "") or "unknown")
-            return "", f"La console vidÃ©o est disponible seulement quand la VM est dÃ©marrÃ©e. Ã‰tat dÃ©tectÃ© : {state}"
+        state = str(vm.get("state", "") or vm.get("state_class", "") or "unknown")
+        return "", f"La VM est arrêtée. Démarre-la avant d'ouvrir sa console vidéo. État détecté : {state}"
 
+    gfx, vnc_port, ws_port, error = console_ports_from_vm(vm)
     if error:
         return "", error
 
     mode = str(conf.get("CONSOLE_MODE", "flask_proxy") or "flask_proxy").strip().lower()
 
-    # Mode recommandÃ© host Debian : websockify transforme le VNC TCP brut
-    # en WebSocket noVNC. Flask sert seulement les fichiers noVNC.
+    # Websockify convertit le VNC TCP ; le navigateur reste sur l'origine Yoléo.
+    # Le proxy HTTPS existant protège aussi le WebSocket, sans exposer :6080
+    # (qui n'a pas de TLS) au navigateur.
     if mode in {"websockify", "websockify_proxy", "external_websockify"}:
-        web_host, _flask_web_port = request_novnc_host_port()
+        web_host, web_port = request_novnc_host_port()
         proxy_port, proxy_error = ensure_websockify(conf, vnc_port or ws_port)
         if proxy_error:
             return "", proxy_error
-        browser_host = websockify_browser_host(conf, web_host)
         values = {
             "base": "",
-            "host": browser_host,
-            "web_port": proxy_port,
+            "host": web_host,
+            "web_port": web_port,
             "port": proxy_port,
             "wsport": proxy_port,
             "vnc_port": vnc_port,
             "name": vm.get("name", ""),
             "ts": int(time.time()),
         }
-        local_template = "/vm/novnc/vnc.html?v={ts}&resize=scale&autoconnect=true&host={host:raw}&port={web_port}&path=/"
-        console_log(conf, f"Console URL websockify VM={vm.get('name','')} novnc={browser_host}:{proxy_port} vnc=127.0.0.1:{vnc_port}")
+        local_template = "/vm/novnc/vnc.html?v={ts}&resize=scale&autoconnect=true&host={host:raw}&port={web_port}&path=vm/wsproxy/{wsport}/"
+        console_log(conf, f"Console websockify même origine VM={vm.get('name','')} web={web_host}:{web_port} proxy={proxy_port} vnc=127.0.0.1:{vnc_port}")
         return apply_url_template(local_template, values), ""
 
     # Ancien mode : le navigateur reste sur System Manager, puis le websocket
@@ -524,6 +516,15 @@ def websocket_proxy_error(message: str, status: int = 500) -> Response:
     return console_error_page("Proxy websocket VM", message, status)
 
 
+class VmWebSocketResponse(Response):
+    def __call__(self, environ, start_response):
+        # simple-websocket a déjà envoyé le handshake et géré cette socket.
+        # Gunicorn ne doit pas écrire une seconde réponse HTTP à sa fermeture.
+        if "gunicorn.socket" in environ:
+            raise StopIteration()
+        return super().__call__(environ, start_response)
+
+
 def console_log(conf: Dict[str, str], message: str) -> None:
     path = resolve_module_path(str(conf.get("CONSOLE_LOG_FILE", "") or DEFAULT_CONFIG["CONSOLE_LOG_FILE"]), DEFAULT_CONFIG["CONSOLE_LOG_FILE"])
     if not path:
@@ -554,6 +555,9 @@ def connect_backend_ws(targets: List[str], timeout: int = 8, preferred_subprotoc
                 if protocols:
                     kwargs["subprotocols"] = protocols
                 ws = ws_client_lib.create_connection(target, **kwargs)
+                # Le délai ne limite que la connexion initiale. Un écran fixe
+                # ne produit aucune nouvelle trame VNC pendant des minutes.
+                ws.settimeout(None)
                 return ws, target, label, tried
             except Exception as exc:
                 tried.append(f"{target} [{label}] -> {exc}")
@@ -621,6 +625,10 @@ def novnc_debug():
 @vm_bp.route("/wsproxy/<int:port>")
 @vm_bp.route("/vm/wsproxy/<int:port>/")
 @vm_bp.route("/vm/wsproxy/<int:port>")
+@vm_bp.route("/wsproxy/<int:port>/", websocket=True)
+@vm_bp.route("/wsproxy/<int:port>", websocket=True)
+@vm_bp.route("/vm/wsproxy/<int:port>/", websocket=True)
+@vm_bp.route("/vm/wsproxy/<int:port>", websocket=True)
 def vm_wsproxy(port: int):
     """Proxy WebSocket noVNC.
 
@@ -713,7 +721,7 @@ def vm_wsproxy(port: int):
             t2.start()
             while not stop.is_set():
                 time.sleep(0.1)
-            return Response("", status=101)
+            return VmWebSocketResponse("", status=101)
 
         except Exception as ws_exc:
             console_log(conf, f"Backend websocket KO, fallback TCP brut VNC: {ws_exc}")
@@ -764,10 +772,12 @@ def vm_wsproxy(port: int):
         while not stop.is_set():
             time.sleep(0.1)
 
-        return Response("", status=101)
+        return VmWebSocketResponse("", status=101)
 
     except Exception as exc:
         console_log(conf, f"WS proxy erreur port={port}: {exc}")
+        if client_ws is not None:
+            return VmWebSocketResponse("", status=101)
         return websocket_proxy_error(str(exc), 500)
 
     finally:

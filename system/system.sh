@@ -1,6 +1,9 @@
 #!/bin/bash
 set -Eeuo pipefail
 
+# YOLEO_SCRIPT_VERSION=2.0.3
+# YOLEO_SCRIPT_DATE=2026-10-28
+
 # ============================================================
 # System Flask / Gunicorn - mode hôte Debian
 #
@@ -58,7 +61,7 @@ INTEGRITY_MANIFEST="${INTEGRITY_MANIFEST:-${INIT_DIR}/system.sha256}"
 INTEGRITY_ARCHIVE="${INTEGRITY_ARCHIVE:-${INIT_DIR}/system.tar.gz}"
 INTEGRITY_ENABLED="${INTEGRITY_ENABLED:-1}"
 INTEGRITY_ROOT_DIR="${INTEGRITY_ROOT_DIR:-${DOCKERS_DIR}}"
-INTEGRITY_INCLUDE_DIRS="${INTEGRITY_INCLUDE_DIRS:-system scripts offline bin}"
+INTEGRITY_INCLUDE_DIRS="${INTEGRITY_INCLUDE_DIRS:-system scripts bin}"
 
 CONF_DIR="${CONF_DIR:-../conf}"
 ENV_FILE="${ENV_FILE:-${CONF_DIR}/.env}"
@@ -468,6 +471,14 @@ integrity_check_and_restore() {
         fi
 
         archive_rel="$rel_path"
+        case "$rel_path" in
+            system/*|scripts/*|offline/*|bin/*)
+                if ! integrity_rel_in_scope "$rel_path"; then
+                    log "Catalogue ancien hors nouveau périmètre, entrée ignorée : $rel_path"
+                    continue
+                fi
+                ;;
+        esac
         if ! active_rel="$(integrity_active_rel_from_catalog "$rel_path")"; then
             log "Catalogue integrite hors scope, chemin refuse : $rel_path"
             failed=1
@@ -557,6 +568,7 @@ archive = Path(os.environ["INTEGRITY_ARCHIVE"]).resolve()
 archive_sha = archive.with_name(archive.name + ".sha256")
 include_dirs = [part for part in os.environ["INTEGRITY_INCLUDE_DIRS"].split() if part]
 include_names = set(include_dirs)
+known_top_dirs = {"system", "scripts", "offline", "bin"}
 
 excluded_dirs = {".git", ".venv", "__pycache__", ".pytest_cache", "node_modules", "backups"}
 excluded_files = {".DS_Store", "gunicorn.ctl"}
@@ -592,6 +604,8 @@ def manifest_rel_to_active(raw):
         die(f"chemin catalogue refuse : {raw}")
     if rel.parts[0] in include_names:
         return rel.as_posix(), False
+    if rel.parts[0] in known_top_dirs:
+        return None, False
     return (Path("system") / rel).as_posix(), True
 
 
@@ -618,6 +632,7 @@ def file_sig(path):
 def read_manifest():
     records = {}
     legacy = False
+    scope_changed = False
     if not manifest.exists():
         return records, legacy
     for line in manifest.read_text(encoding="utf-8").splitlines():
@@ -628,12 +643,15 @@ def read_manifest():
             die(f"ligne catalogue invalide : {line}")
         sha, size, rel = parts
         active_rel, was_legacy = manifest_rel_to_active(rel)
+        if active_rel is None:
+            scope_changed = True
+            continue
         legacy = legacy or was_legacy
         records[active_rel] = (int(size), sha)
-    return records, legacy
+    return records, legacy, scope_changed
 
 
-manifest_records, legacy_manifest = read_manifest()
+manifest_records, legacy_manifest, scope_changed = read_manifest()
 source_files = {}
 for include_dir in include_dirs:
     include_root = root_dir / include_dir
@@ -657,7 +675,9 @@ for rel in sorted(all_rels):
         changed_rels.add(rel)
 
 if legacy_manifest:
-    changes.append("upgrade catalogue : system/scripts/offline/bin")
+    changes.append("upgrade catalogue : system/scripts/bin")
+if scope_changed:
+    changes.append("mise a jour du perimetre protege : system/scripts/bin")
 
 if args:
     if not manifest.exists():
@@ -665,7 +685,7 @@ if args:
     targets = {normalize_rel(raw).as_posix() for raw in args}
     forbidden = sorted(changed_rels - targets)
     if legacy_manifest:
-        die("ancien catalogue detecte : lance -add sans argument pour convertir vers system/scripts/offline/bin")
+        die("ancien catalogue detecte : lance -add sans argument pour convertir vers system/scripts/bin")
     if forbidden:
         print("Changements non valides car non demandes :", file=sys.stderr)
         for rel in forbidden[:30]:
@@ -719,7 +739,7 @@ manifest.parent.mkdir(parents=True, exist_ok=True)
 with manifest.open("w", encoding="utf-8", newline="\n") as fh:
     fh.write("# YoLeo system integrity catalog v2\n")
     fh.write("# Format: sha256<TAB>size_bytes<TAB>relative_path\n")
-    fh.write("# Root: dockers ; protected dirs: system scripts offline bin\n")
+    fh.write(f"# Root: dockers ; protected dirs: {' '.join(include_dirs)}\n")
     fh.write("# Archive: system.tar.gz\n")
     for sha, size, rel_text in records:
         fh.write(f"{sha}\t{size}\t{rel_text}\n")
@@ -1007,6 +1027,25 @@ refresh_runtime_paths() {
     fi
 }
 
+normalize_integrity_include_dirs() {
+    local include_dir normalized=""
+
+    for include_dir in $INTEGRITY_INCLUDE_DIRS; do
+        [ "$include_dir" = "offline" ] && continue
+        if [ -z "$normalized" ]; then
+            normalized="$include_dir"
+        else
+            normalized="$normalized $include_dir"
+        fi
+    done
+
+    [ -n "$normalized" ] || normalized="system scripts bin"
+    if [ "$normalized" != "$INTEGRITY_INCLUDE_DIRS" ]; then
+        log "Migration du perimetre integrite : $INTEGRITY_INCLUDE_DIRS -> $normalized"
+        INTEGRITY_INCLUDE_DIRS="$normalized"
+    fi
+}
+
 systemctl_cmd() {
     "$SYSTEMCTL_BIN" "$@"
 }
@@ -1017,6 +1056,20 @@ build_gunicorn_bind_args() {
     else
         BIND_ARGS=(--bind "$HOST:$PORT")
     fi
+}
+
+ensure_https_certificate() {
+    local tls_dir="${CONF_DIR}/https"
+    local cert_file="${tls_dir}/yoleo.crt" key_file="${tls_dir}/yoleo.key"
+
+    # setup.sh et chaque démarrage utilisent le même gestionnaire : l'autorité
+    # installée sur les PC est conservée, seul le certificat serveur se renouvelle.
+    if ! "$PY_BIN" "$APP_DIR/https_certificate.py" \
+        --directory "$tls_dir" --addresses "$(hostname -I 2>/dev/null || true)" \
+        2>&1 | tee -a "$LOG_FILE"; then
+        die "preparation du certificat HTTPS local impossible"
+    fi
+    HTTPS_ARGS=(--certfile "$cert_file" --keyfile "$key_file")
 }
 
 load_env_file() {
@@ -1036,64 +1089,29 @@ load_env_file() {
             INTEGRITY_ROOT_DIR="$DOCKERS_DIR"
         fi
         if [ "$env_has_integrity_dirs" -eq 0 ]; then
-            INTEGRITY_INCLUDE_DIRS="system scripts offline bin"
+            INTEGRITY_INCLUDE_DIRS="system scripts bin"
         fi
+        normalize_integrity_include_dirs
 
         refresh_runtime_paths
         ensure_dirs
     fi
 }
 
-make_requirements_if_missing() {
-    if [ ! -f "$REQ_FILE" ]; then
-        log "requirements.txt absent, création : $REQ_FILE"
-        cat > "$REQ_FILE" <<'REQEOF'
-PyYAML==6.0.3
-Flask==3.1.3
-gunicorn==25.1.0
-docker==7.1.0
-requests==2.32.5
-psutil==7.2.2
-paramiko==4.0.0
-simple-websocket
-websocket-client
-REQEOF
-    else
-        log "requirements.txt présent, vérification des dépendances obligatoires : $REQ_FILE"
-        ensure_requirement "simple-websocket" "simple-websocket"
-        ensure_requirement "websocket-client" "websocket-client"
+validate_requirements_file() {
+    [ -f "$REQ_FILE" ] || die "requirements.txt introuvable : $REQ_FILE"
+    [ -s "$REQ_FILE" ] || die "requirements.txt vide : $REQ_FILE"
+
+    if ! grep -Eq '^[[:space:]]*[^#[:space:]]' "$REQ_FILE"; then
+        die "requirements.txt ne contient aucune dépendance : $REQ_FILE"
     fi
+
+    log "requirements.txt utilisé comme source unique des dépendances Python : $REQ_FILE"
 }
 
-ensure_requirement() {
-    local package="$1"
-    local line="$2"
-
-    touch "$REQ_FILE"
-    if grep -Eiq "^[[:space:]]*${package}([=<>!~[:space:]]|$)" "$REQ_FILE"; then
-        log "OK dépendance Python déjà déclarée : ${package}"
-    else
-        log "Ajout dépendance Python manquante : ${line}"
-        printf '
-%s
-' "$line" >> "$REQ_FILE"
-    fi
-}
-
-verify_python_modules() {
-    log "Vérification imports Python critiques dans le venv..."
-    "$PY_BIN" - <<'PYVERIFY' 2>&1 | tee -a "$LOG_FILE"
-import importlib
-modules = [
-    ("flask", "Flask"),
-    ("gunicorn", "gunicorn"),
-    ("simple_websocket", "simple-websocket"),
-    ("websocket", "websocket-client"),
-]
-for module, package in modules:
-    obj = importlib.import_module(module)
-    print(f"OK {package}: {getattr(obj, '__file__', 'built-in')}")
-PYVERIFY
+verify_python_environment() {
+    log "Vérification de la cohérence des dépendances installées depuis requirements.txt..."
+    "$PY_BIN" -m pip check 2>&1 | tee -a "$LOG_FILE"
 }
 
 pip_use_wheelhouse() {
@@ -1155,29 +1173,18 @@ configure_offline_apt_source() {
     log "APT offline : source locale activee : $repo_list"
 }
 
+validate_apt_manifests() {
+    [ -f "$OFFLINE_APT_REQUESTED" ] || die "manifeste APT introuvable : $OFFLINE_APT_REQUESTED"
+    [ -s "$OFFLINE_APT_REQUESTED" ] || die "manifeste APT vide : $OFFLINE_APT_REQUESTED"
+
+    if [ -f "$OFFLINE_APT_MISSING" ] && grep -Eq '^[[:space:]]*[^#[:space:]]' "$OFFLINE_APT_MISSING"; then
+        log "Paquets APT manquants declares dans : $OFFLINE_APT_MISSING"
+        sed -E '/^[[:space:]]*($|#)/d; s/^/  - /' "$OFFLINE_APT_MISSING" | tee -a "$LOG_FILE"
+        die "depot APT offline incomplet : relance update_pip.sh avec les depots Debian accessibles"
+    fi
+}
+
 build_apt_package_list() {
-    local fallback package missing_expr
-
-    fallback="python3-full python3-venv python3-pip iproute2 novnc websockify openssh-client putty-tools"
-
-    if [ ! -f "$OFFLINE_APT_REQUESTED" ]; then
-        printf '%s\n' $fallback
-        return 0
-    fi
-
-    missing_expr='^$'
-    if [ -f "$OFFLINE_APT_MISSING" ]; then
-        missing_expr="$(awk '
-            /^[[:space:]]*($|#)/ { next }
-            {
-                gsub(/[][(){}.*+?|^$\\]/, "\\\\&")
-                if (out != "") out = out "|"
-                out = out "^" $0 "$"
-            }
-            END { print out ? out : "^$" }
-        ' "$OFFLINE_APT_MISSING")"
-    fi
-
     awk '
         /^[[:space:]]*($|#)/ { next }
         {
@@ -1185,23 +1192,25 @@ build_apt_package_list() {
             gsub(/^[[:space:]]+|[[:space:]]+$/, "")
             if ($0 != "") print $0
         }
-    ' "$OFFLINE_APT_REQUESTED" |
-        grep -Ev "$missing_expr" |
-        awk '!seen[$0]++'
+    ' "$OFFLINE_APT_REQUESTED" | awk '!seen[$0]++'
 }
 
 install_apt_deps() {
     local apt_sources_tmp=""
     local repo_dir=""
-    local -a apt_options=()
+    local post_file=""
+    local package status
+    local -a apt_options=(-o "APT::Install-Recommends=true")
     local -a packages=()
+    local -a requested_missing=()
 
     if ! command -v apt-get >/dev/null 2>&1; then
         log "apt-get absent, étape paquets Debian ignorée"
         return 0
     fi
 
-    log "Installation des paquets Debian nécessaires..."
+    log "Installation des paquets Debian demandes par le manifeste unique..."
+    validate_apt_manifests
     configure_offline_apt_source
 
     if apt_offline_only_enabled; then
@@ -1209,10 +1218,12 @@ install_apt_deps() {
         [ -d "$repo_dir" ] || die "APT offline : dossier .deb introuvable : $repo_dir"
         apt_sources_tmp="$(mktemp -d "${TMPDIR:-/tmp}/yoleo-apt.XXXXXX")"
         printf 'deb [trusted=yes] file:%s ./\n' "$repo_dir" > "${apt_sources_tmp}/sources.list"
-        apt_options=(
+        apt_options+=(
             -o "Dir::Etc::sourcelist=${apt_sources_tmp}/sources.list"
             -o "Dir::Etc::sourceparts=-"
             -o "APT::Get::List-Cleanup=0"
+            -o "APT::Sandbox::User=root"
+            -o "Acquire::Retries=0"
         )
         log "APT offline : mode strict, source locale unique : $repo_dir"
     fi
@@ -1222,7 +1233,36 @@ install_apt_deps() {
     log "APT : ${#packages[@]} paquet(s) demandé(s)"
 
     DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" update 2>&1 | tee -a "$LOG_FILE"
-    DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" install --no-install-recommends -y "${packages[@]}" 2>&1 | tee -a "$LOG_FILE"
+    DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" install -y "${packages[@]}" 2>&1 | tee -a "$LOG_FILE"
+    DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" check 2>&1 | tee -a "$LOG_FILE"
+
+    # Une seconde simulation doit etre vide. Avec Install-Recommends=true,
+    # les recommandations Debian font partie de l'installation universelle.
+    post_file="$(mktemp "${TMPDIR:-/tmp}/yoleo-apt-post.XXXXXX")"
+    if ! DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" -s install -y \
+        "${packages[@]}" > "$post_file" 2>&1; then
+        cat "$post_file" | tee -a "$LOG_FILE" >&2
+        rm -f -- "$post_file"
+        die "verification APT finale impossible"
+    fi
+    if grep -q '^Inst ' "$post_file"; then
+        log "Paquets encore non installes apres la passe APT :"
+        grep '^Inst ' "$post_file" | sed 's/^/  /' | tee -a "$LOG_FILE"
+        rm -f -- "$post_file"
+        die "installation APT incomplete"
+    fi
+    rm -f -- "$post_file"
+
+    for package in "${packages[@]}"; do
+        status="$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)"
+        [ "$status" = "install ok installed" ] || requested_missing+=("$package")
+    done
+    if [ "${#requested_missing[@]}" -gt 0 ]; then
+        log "Paquets demandes mais non installes :"
+        printf '  - %s\n' "${requested_missing[@]}" | tee -a "$LOG_FILE"
+        die "installation APT incomplete par rapport a apt-requested.txt"
+    fi
+    log "APT : manifeste complet, dependances et recommandations installees."
 
     if [ -n "$apt_sources_tmp" ]; then
         rm -rf -- "$apt_sources_tmp"
@@ -1237,7 +1277,7 @@ prepare_app() {
     integrity_check_and_restore
     [ -f "$APP_FILE" ] || die "app.py introuvable : $APP_FILE"
 
-    make_requirements_if_missing
+    validate_requirements_file
 
     if [ ! -d "$VENV_DIR" ]; then
         log "Création du venv : $VENV_DIR"
@@ -1247,13 +1287,10 @@ prepare_app() {
     [ -x "$PY_BIN" ] || die "python du venv introuvable : $PY_BIN"
     [ -x "$PIP_BIN" ] || die "pip du venv introuvable : $PIP_BIN"
 
-    log "Mise à jour pip/setuptools/wheel dans le venv..."
-    pip_install --upgrade pip setuptools wheel 2>&1 | tee -a "$LOG_FILE"
+    log "Installation des dépendances Python définies uniquement dans : $REQ_FILE"
+    pip_install --upgrade --upgrade-strategy eager -r "$REQ_FILE" 2>&1 | tee -a "$LOG_FILE"
 
-    log "Installation des dépendances Python depuis : $REQ_FILE"
-    pip_install -r "$REQ_FILE" 2>&1 | tee -a "$LOG_FILE"
-
-    verify_python_modules
+    verify_python_environment
     ensure_secret_key
 }
 
@@ -1375,6 +1412,14 @@ PY
     ) 2>&1 | tee -a "$LOG_FILE"
 }
 
+install_pci_boot_support() {
+    # setup.sh délègue ici lors de l'installation ; -run répare aussi les liens
+    # après une restauration ISO. Ne change ni les choix ni les pilotes actifs.
+    log "Vérification des hooks de réservation PCI pour le prochain démarrage"
+    NAS_CONF_DIR="${NAS_CONF_DIR:-$(cd "$CONF_DIR" && pwd -P)}" \
+        "$PY_BIN" "$APP_DIR/pci_reservations.py" --install 2>&1 | tee -a "$LOG_FILE"
+}
+
 run_foreground() {
     load_env_file
 
@@ -1384,12 +1429,14 @@ run_foreground() {
 
     [ -x "$PY_BIN" ] || die "venv absent : $PY_BIN"
     [ -f "$APP_FILE" ] || die "app.py absent : $APP_FILE"
+    ensure_https_certificate
+    install_pci_boot_support
 
     cd "$APP_DIR" || die "impossible d'entrer dans $APP_DIR"
     build_gunicorn_bind_args
 
-    log "Démarrage Gunicorn en mode systemd foreground"
-    log "Commande : $PY_BIN -m gunicorn --worker-class $WORKER_CLASS --workers $WORKERS --threads $THREADS --timeout $TIMEOUT ${BIND_ARGS[*]} $APP_MODULE"
+    log "Demarrage Gunicorn HTTPS sur le port $PORT"
+    log "Commande : $PY_BIN -m gunicorn --worker-class $WORKER_CLASS --workers $WORKERS --threads $THREADS --timeout $TIMEOUT ${BIND_ARGS[*]} ${HTTPS_ARGS[*]} $APP_MODULE"
 
     exec "$PY_BIN" -m gunicorn \
         --worker-class "$WORKER_CLASS" \
@@ -1397,6 +1444,7 @@ run_foreground() {
         --threads "$THREADS" \
         --timeout "$TIMEOUT" \
         "${BIND_ARGS[@]}" \
+        "${HTTPS_ARGS[@]}" \
         --pid "$PID_FILE" \
         --access-logfile "$ACCESS_LOG" \
         --error-logfile "-" \
@@ -1405,6 +1453,7 @@ run_foreground() {
 
 install_service() {
     need_root
+    normalize_integrity_include_dirs
     log "=================================================="
     log "INSTALL SYSTEM FLASK MODE HÔTE"
     log "SCRIPT_PATH=$SCRIPT_PATH"
@@ -1421,6 +1470,8 @@ install_service() {
     install_apt_deps
     write_env_file
     prepare_app
+    ensure_https_certificate
+    install_pci_boot_support
     show_routes
     write_service_file
 
@@ -1487,6 +1538,7 @@ status_app() {
     echo "ROOT        : $INTEGRITY_ROOT_DIR"
     echo "DIRS        : $INTEGRITY_INCLUDE_DIRS"
     echo "PORT        : $PORT"
+    echo "HTTPS       : https://yoleo.local:${PORT}"
     echo "LOG_FILE    : $LOG_FILE"
     echo
 
@@ -1523,8 +1575,8 @@ Usage : bash ./system.sh {-install|-start|-stop|-restart|-status|-logs|-routes|-
 
 Commandes :
   -install   installe les paquets Debian, recrée le env avec les chemins actuels,
-             crée le venv, complète requirements.txt si besoin,
-             installe les dépendances Python, crée le service systemd,
+             exige requirements.txt comme source unique, puis crée le venv,
+             installe les dépendances Python, crée les certificats HTTPS locaux et le service systemd,
              enable + démarre le service
   -start     démarre le service systemd
   -stop      arrête le service systemd
@@ -1532,13 +1584,13 @@ Commandes :
   -status    affiche l'état systemd + le port $PORT
   -logs      affiche les logs systemd + le log fichier
   -routes    teste l'import Flask et affiche les routes
-  -integrity verifie/restaure system/scripts/offline/bin depuis init sans lancer Gunicorn
+  -integrity verifie/restaure system/scripts/bin depuis init sans lancer Gunicorn
   -diff      affiche les fichiers modifies/absents/hors catalogue sans rien modifier
              compare aussi le contenu de system.tar.gz avec le catalogue
-  -add       valide les changements de system/scripts/offline/bin dans init + catalogue + archive
+  -add       valide les changements de system/scripts/bin dans init + catalogue + archive
              sans argument : analyse tout ; avec chemin(s) : seulement ces fichiers
   -aa        alias court de -add
-  -backup    cree une archive datee de system/scripts/offline/bin dans init/backups
+  -backup    cree une archive datee de system/scripts/bin dans init/backups
   -restaure  affiche les backups numerotes, restaure le choix,
              puis reconstruit init + catalogue + archive
 EOFUSAGE

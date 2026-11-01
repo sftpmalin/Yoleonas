@@ -1401,6 +1401,28 @@ def _vm_define_root(conf: Dict[str, str], root: ET.Element, prefix: str) -> Tupl
         except OSError:
             pass
 
+def do_vm_firmware_profile(conf: Dict[str, str], name: str, profile_id: str) -> Tuple[Dict[str, object], int]:
+    from vm_firmware import apply_profile, resolve_profile
+    ok_stop, message = require_vm_stopped(conf, name)
+    if not ok_stop:
+        return {"ok": False, "message": "Arrête la VM avant de changer son profil UEFI. " + message}, 409
+    root = domain_xml_root(conf, name)
+    try:
+        profile = resolve_profile(profile_id, node_attr(root.find('./os/type'), 'arch', 'x86_64'))
+    except ValueError as exc:
+        return {"ok": False, "message": str(exc)}, 400
+    except FileNotFoundError as exc:
+        return {"ok": False, "message": str(exc)}, 422
+    backup = backup_domain_xml(conf, name, 'firmware-profile')
+    result = apply_profile(root, profile)
+    rc, output = _vm_define_root(conf, root, 'vm-firmware-profile-')
+    if rc:
+        return {"ok": False, "message": output.strip() or "Le profil UEFI n'a pas pu être enregistré.", "backup": backup}, 500
+    vm_log(conf, f"VM {name}: firmware_profile={profile_id} previous_nvram={result['previous_nvram']} backup={backup}")
+    return {"ok": True, "message": profile['label'] + " enregistré. Il sera utilisé au prochain démarrage de la VM.",
+            "firmware_profile": profile_id, "backup": backup, **result}, 200
+
+
 def do_vm_update(conf: Dict[str, str], payload: Dict[str, object]) -> Tuple[Dict[str, object], int]:
     name = clean_vm_name(str(payload.get("name", "") or ""))
     names, err = list_vm_names(conf)
@@ -1408,6 +1430,12 @@ def do_vm_update(conf: Dict[str, str], payload: Dict[str, object]) -> Tuple[Dict
         return {"ok": False, "message": err}, 500
     if name not in names:
         return {"ok": False, "message": f"VM introuvable : {name}"}, 404
+    if 'firmware_profile' in payload:
+        return do_vm_firmware_profile(conf, name, str(payload.get('firmware_profile') or '').strip())
+    if any(payload.get(key) for key in ('firmware_id', 'firmware_mode', 'firmware_loader')):
+        ok_stop, stop_msg = require_vm_stopped(conf, name)
+        if not ok_stop:
+            return {"ok": False, "message": "Arrête la VM avant de changer son firmware. " + stop_msg}, 409
     backup = backup_domain_xml(conf, name, "resources")
     messages: List[str] = [f"Backup XML : {backup}"]
 
@@ -1558,6 +1586,9 @@ def do_vm_update(conf: Dict[str, str], payload: Dict[str, object]) -> Tuple[Dict
                 return {"ok": False, "message": "\n".join(messages)}, 500
 
     if firmware_id or firmware_mode or firmware_loader:
+        ok_stop, stop_msg = require_vm_stopped(conf, name)
+        if not ok_stop:
+            return {"ok": False, "message": "Arrête la VM avant de changer son firmware. " + stop_msg, "backup": backup}, 409
         if firmware_id.startswith("loader:") and not firmware_loader:
             raw = firmware_id[len("loader:"):]
             parts = raw.split("|vars:", 1)
@@ -1579,6 +1610,8 @@ def do_vm_update(conf: Dict[str, str], payload: Dict[str, object]) -> Tuple[Dict
             firmware_nvram_template = non_secure_ovmf_path(firmware_nvram_template)
 
         root = domain_xml_root(conf, name)
+        from vm_firmware import clear_profile
+        clear_profile(root)
         os_node = root.find("os")
         if os_node is None:
             os_node = ET.SubElement(root, "os")

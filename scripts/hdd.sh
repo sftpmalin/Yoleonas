@@ -35,6 +35,7 @@ hd_idle_defaults="/etc/default/hd-idle"
 hd_idle_bin="/usr/sbin/hd-idle"
 
 self_path="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+runtime_path="${RUNTIME_SCRIPT_PATH:-/usr/bin/hdd-veille.sh}"
 
 say() {
   echo "[$(date '+%F %T')] $*"
@@ -55,6 +56,15 @@ have_cmd() {
 safe_systemctl() {
   if have_cmd systemctl; then
     systemctl "$@" 2>/dev/null || true
+  fi
+}
+
+install_runtime_script() {
+  need_root
+  if [ "$self_path" != "$runtime_path" ]; then
+    install -m 0755 "$self_path" "$runtime_path"
+  else
+    chmod 0755 "$runtime_path"
   fi
 }
 
@@ -185,7 +195,7 @@ HDD_STANDBY_MODE=hd-idle
 HDD_STANDBY_MINUTES=$minutes
 HDD_STANDBY_SECONDS=$seconds
 HD_IDLE_OPTS="$opts"
-SCRIPT_PATH=$self_path
+SCRIPT_PATH=$runtime_path
 EOF
   chmod 0644 "$defaults_file"
 }
@@ -323,8 +333,8 @@ show_status() {
   fi
 
   echo
-  echo "script utilisé par le service au prochain réglage :"
-  echo "  $self_path"
+  echo "script système utilisé par le service :"
+  echo "  $runtime_path"
 }
 
 apply_timer_value() {
@@ -380,17 +390,18 @@ stop_now() {
 }
 
 write_service() {
+  install_runtime_script
   cat > "$service_file" <<EOF
 [Unit]
 Description=Configure HDD standby timers with hdparm
 Documentation=man:hdparm(8)
 After=multi-user.target
-ConditionPathExists=${self_path}
+ConditionPathExists=${runtime_path}
 
 [Service]
 Type=oneshot
 EnvironmentFile=${defaults_file}
-ExecStart=${self_path} -apply
+ExecStart=${runtime_path} -apply
 RemainAfterExit=no
 TimeoutStartSec=60
 
@@ -415,9 +426,10 @@ configure_sleep_minutes() {
 # généré par hdd.sh
 HDD_STANDBY_MODE=off
 HDD_STANDBY_MINUTES=0
-SCRIPT_PATH=$self_path
+SCRIPT_PATH=$runtime_path
 EOF
     chmod 0644 "$defaults_file"
+    rm -f "$runtime_path"
     apply_timer_value 0
     say "ok: veille automatique désactivée."
     return 0
@@ -467,7 +479,7 @@ apply_from_defaults() {
 
 remove_service() {
   safe_systemctl disable --now "$service_name"
-  rm -f "$service_file" "$defaults_file"
+  rm -f "$service_file" "$defaults_file" "$runtime_path"
   safe_systemctl daemon-reload
   safe_systemctl reset-failed "$service_name"
   say "ok: service ${service_name} supprimé."

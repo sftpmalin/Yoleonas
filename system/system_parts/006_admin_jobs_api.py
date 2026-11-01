@@ -92,9 +92,8 @@ esac
 
 def _admin_docker_host_install_cmd() -> str:
     return _admin_script_cmd(
-        "scripts/system/lan_docker_host.sh",
+        "scripts/lan_docker_host.sh",
         "install-systemd",
-        env={"SCRIPT_PATH": f"{_admin_project_root().replace(os.sep, '/')}/scripts/system/lan_docker_host.sh"},
     ) + '''
 systemctl start yoleo-macvlan-host.service
 systemctl status yoleo-macvlan-host.service --no-pager -l | sed -n '1,18p' || true
@@ -102,9 +101,16 @@ systemctl status yoleo-macvlan-host.service --no-pager -l | sed -n '1,18p' || tr
 
 
 def _admin_docker_host_remove_cmd() -> str:
-    return _admin_script_cmd("scripts/system/lan_docker_host.sh", "down") + '''
+    return '''
+set -Euo pipefail
+if [ -x /usr/bin/lan-253.sh ]; then
+  /usr/bin/lan-253.sh down || true
+elif [ -f /yoleo/scripts/lan_docker_host.sh ]; then
+  bash /yoleo/scripts/lan_docker_host.sh down || true
+fi
 systemctl disable --now yoleo-macvlan-host.service 2>/dev/null || true
 rm -f /etc/systemd/system/yoleo-macvlan-host.service
+rm -f /usr/bin/lan-253.sh
 systemctl daemon-reload
 echo "OK: Docker LAN host supprime."
 '''
@@ -309,7 +315,7 @@ case "${1:-help}" in
 esac
 EOF
 chmod 0755 /usr/local/sbin/disk_spy.sh
-cat > /usr/local/sbin/hdd_sleep.sh <<'EOF'
+cat > /usr/bin/hdd-veille.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 ACTION="${1:-help}"; DEFAULTS=/etc/default/hdd-veille; SERVICE=/etc/systemd/system/hdd-veille.service
@@ -328,15 +334,16 @@ After=multi-user.target
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/default/hdd-veille
-ExecStart=/usr/local/sbin/hdd_sleep.sh -apply
+ExecStart=/usr/bin/hdd-veille.sh -apply
 [Install]
 WantedBy=multi-user.target
 EOS
 systemctl daemon-reload; systemctl enable --now hdd-veille.service; apply_value "$v" ;;
-  *) echo "Usage: hdd_sleep.sh -status|-apply|-30|-60|-off|-remove" ;;
+  *) echo "Usage: hdd-veille.sh -status|-apply|-30|-60|-off|-remove" ;;
 esac
 EOF
-chmod 0755 /usr/local/sbin/hdd_sleep.sh
+chmod 0755 /usr/bin/hdd-veille.sh
+rm -f /usr/local/sbin/hdd_sleep.sh
 echo "OK: base Debian NAS installée / contrôlée."
 '''
 
@@ -462,7 +469,7 @@ BLANK_MINUTES=1
 POWERDOWN_MINUTES=1
 TTY_LIST="1 2 3 4 5 6"
 EOF
-cat > /usr/local/sbin/console-screen-sleep.sh <<'EOF'
+cat > /usr/bin/console-screen-sleep.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 CONF_FILE=/etc/default/console-screen-sleep
@@ -473,9 +480,12 @@ for n in $TTY_LIST; do
   TERM=linux setterm --blank "$BLANK_MINUTES" --powerdown "$POWERDOWN_MINUTES" < "$tty" > "$tty" 2>/dev/null || true
   TERM=linux setterm --powersave powerdown < "$tty" > "$tty" 2>/dev/null || true
 done
-[ -w /sys/module/kernel/parameters/consoleblank ] && echo "$((BLANK_MINUTES * 60))" > /sys/module/kernel/parameters/consoleblank 2>/dev/null || true
+if [ -w /sys/module/kernel/parameters/consoleblank ]; then
+  value="$((BLANK_MINUTES * 60))"
+  /bin/sh -c 'printf "%s\n" "$1" > /sys/module/kernel/parameters/consoleblank' sh "$value" 2>/dev/null || true
+fi
 EOF
-chmod 0755 /usr/local/sbin/console-screen-sleep.sh
+chmod 0755 /usr/bin/console-screen-sleep.sh
 cat > /etc/systemd/system/console-screen-sleep.service <<'EOF'
 [Unit]
 Description=Mettre en veille l'ecran console apres inactivite
@@ -483,11 +493,12 @@ After=multi-user.target getty.target
 Wants=getty.target
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/console-screen-sleep.sh
+ExecStart=/usr/bin/console-screen-sleep.sh
 RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 EOF
+rm -f /usr/local/sbin/console-screen-sleep.sh
 systemctl daemon-reload
 systemctl enable --now console-screen-sleep.service
 echo "OK: veille écran console installée."
@@ -517,7 +528,7 @@ echo "OK: couleur session root installée."
 ISSUE_INSTALL_CMD = r'''
 set -Euo pipefail
 [ -f /etc/issue ] && cp -a /etc/issue "/etc/issue.bak-flask-system-$(date +%Y%m%d-%H%M%S)" || true
-cat > /usr/local/sbin/update-issue.sh <<'EOF'
+cat > /usr/bin/update-issue.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 ISSUE_FILE=/etc/issue
@@ -551,7 +562,7 @@ main_ip="$(awk '$1=="*" {print $3; exit}' "$tmp" 2>/dev/null || true)"; [ -n "$m
  echo "Login sur \\l :"; echo
 } > "$ISSUE_FILE"
 EOF
-chmod 0755 /usr/local/sbin/update-issue.sh
+chmod 0755 /usr/bin/update-issue.sh
 cat > /etc/systemd/system/update-issue.service <<'EOF'
 [Unit]
 Description=Mettre a jour la banniere console /etc/issue avec les IP
@@ -559,11 +570,12 @@ Wants=network-online.target
 After=network-online.target
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/update-issue.sh
+ExecStart=/usr/bin/update-issue.sh
 ExecStartPost=/bin/systemctl try-restart getty@tty1.service
 [Install]
 WantedBy=multi-user.target
 EOF
+rm -f /usr/local/sbin/update-issue.sh
 systemctl daemon-reload
 systemctl enable --now update-issue.service
 echo "OK: bannière IP installée."
@@ -840,10 +852,10 @@ def _admin_features() -> List[Dict[str, Any]]:
         {"id": "nvidia_docker", "category": "GPU", "title": "Installer outils NVIDIA Docker", "description": "nvidia-container-toolkit + nvidia-ctk runtime Docker.", "status_cmd": "dpkg -s nvidia-container-toolkit >/dev/null 2>&1 || command -v nvidia-ctk >/dev/null", "install_cmd": NVIDIA_TOOLS_INSTALL_CMD, "remove_cmd": "apt-get purge -y nvidia-container-toolkit nvidia-container-toolkit-base libnvidia-container-tools libnvidia-container1; rm -f /etc/apt/sources.list.d/nvidia-container-toolkit.list /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg; systemctl restart docker 2>/dev/null || true", "timeout": 1800},
         {"id": "intel_gpu", "category": "GPU", "title": "Installer pilotes/outils Intel GPU", "description": "Script Intel UHD 770 / i7-13700 : firmware Intel, VAAPI, intel-gpu-tools, /dev/dri.", "status_cmd": "dpkg -s intel-gpu-tools intel-media-va-driver-non-free firmware-intel-graphics >/dev/null 2>&1 && [ -e /dev/dri/renderD128 ] && echo 'Intel GPU OK: /dev/dri/renderD128'", "install_cmd": _admin_script_cmd("scripts/system/intel_gpu.sh"), "remove_cmd": "apt-get purge -y intel-gpu-tools libva-utils vainfo intel-media-va-driver-non-free firmware-intel-graphics; apt-get autoremove -y", "timeout": 2400},
         {"id": "root_ssh", "category": "Accès", "title": "Autoriser root SSH", "description": "Drop-in sshd_config.d : PermitRootLogin yes + PasswordAuthentication yes.", "status_cmd": "test -f /etc/ssh/sshd_config.d/99-root-aimable.conf && grep -Eiq '^PermitRootLogin[[:space:]]+yes' /etc/ssh/sshd_config.d/99-root-aimable.conf && systemctl is-active ssh --no-pager", "install_cmd": ROOT_SSH_INSTALL_CMD, "remove_cmd": ROOT_SSH_REMOVE_CMD, "timeout": 900, "danger": True},
-        {"id": "screen_sleep", "category": "Console", "title": "Veille écran console", "description": "setterm tty1-tty6 via console-screen-sleep.service.", "status_cmd": "test -x /usr/local/sbin/console-screen-sleep.sh && test -f /etc/systemd/system/console-screen-sleep.service", "install_cmd": SCREEN_SLEEP_INSTALL_CMD, "remove_cmd": "systemctl disable --now console-screen-sleep.service 2>/dev/null || true; rm -f /etc/systemd/system/console-screen-sleep.service /usr/local/sbin/console-screen-sleep.sh; systemctl daemon-reload", "timeout": 600},
+        {"id": "screen_sleep", "category": "Console", "title": "Veille écran console", "description": "setterm tty1-tty6 via console-screen-sleep.service.", "status_cmd": "test -x /usr/bin/console-screen-sleep.sh && test -f /etc/systemd/system/console-screen-sleep.service", "install_cmd": SCREEN_SLEEP_INSTALL_CMD, "remove_cmd": "systemctl disable --now console-screen-sleep.service 2>/dev/null || true; rm -f /etc/systemd/system/console-screen-sleep.service /usr/bin/console-screen-sleep.sh /usr/local/sbin/console-screen-sleep.sh; systemctl daemon-reload", "timeout": 600},
         {"id": "root_color", "category": "Console", "title": "Couleur session root", "description": "Prompt cyan, alias menu, couleurs fichiers dans /root/.bashrc.", "status_cmd": "grep -q \"alias menu='/dockers/system/.venv/bin/python /dockers/system/menu.py'\" /root/.bashrc && grep -q '1;36m' /root/.bashrc", "install_cmd": ROOT_COLOR_INSTALL_CMD, "remove_cmd": "cp -a /root/.bashrc /root/.bashrc.bak-flask-system-$(date +%Y%m%d-%H%M%S) 2>/dev/null || true; printf \"alias ls='ls --color=auto'\\nalias ll='ls -lah --color=auto'\\n\" > /root/.bashrc", "timeout": 300},
         {"id": "chmod_scripts", "category": "Maintenance", "title": "Rendre scripts exécutables", "description": "chmod +x sur scripts, bin et system autour du projet.", "status_cmd": f"for d in {root}/scripts {root}/bin {root}/system; do [ -d \"$d\" ] && find \"$d\" -type f \\( -name '*.sh' -o -name '*.py' \\) ! -perm -111 -print -quit; done | grep -q . && exit 1 || exit 0", "install_cmd": f"for d in {root}/scripts {root}/bin {root}/system; do [ -d \"$d\" ] && chmod -R +x \"$d\" && echo OK chmod +x \"$d\" || echo SKIP \"$d\"; done", "remove_cmd": "", "timeout": 600, "cache_status": True},
-        {"id": "issue_ip", "category": "Console", "title": "Bannière IP avant login", "description": "Génère /etc/issue avec IP, gateway et accès utiles.", "status_cmd": "test -x /usr/local/sbin/update-issue.sh && test -f /etc/systemd/system/update-issue.service", "install_cmd": ISSUE_INSTALL_CMD, "remove_cmd": "systemctl disable --now update-issue.service 2>/dev/null || true; rm -f /etc/systemd/system/update-issue.service /usr/local/sbin/update-issue.sh; systemctl daemon-reload", "timeout": 600},
+        {"id": "issue_ip", "category": "Console", "title": "Bannière IP avant login", "description": "Génère /etc/issue avec IP, gateway et accès utiles.", "status_cmd": "test -x /usr/bin/update-issue.sh && test -f /etc/systemd/system/update-issue.service", "install_cmd": ISSUE_INSTALL_CMD, "remove_cmd": "systemctl disable --now update-issue.service 2>/dev/null || true; rm -f /etc/systemd/system/update-issue.service /usr/bin/update-issue.sh /usr/local/sbin/update-issue.sh; systemctl daemon-reload", "timeout": 600},
         {"id": "linux_br0", "category": "Réseau", "title": "Installer bridge Linux br0", "description": "Utilise scripts/system/lan_bro.sh : carte physique en port, br0 avec IP/MAC, sauvegarde et reboot.", "status_cmd": "ip link show br0 && ip -br -4 addr show br0 || test -f /root/.BR0/state.conf", "install_cmd": _admin_script_cmd("scripts/system/lan_bro.sh", "-install"), "remove_cmd": _admin_script_cmd("scripts/system/lan_bro.sh", "-remove"), "timeout": 900, "danger": True},
         {"id": "docker_br0", "category": "Réseau", "title": "Installer Docker br0 ipvlan", "description": "Utilise scripts/system/lan_docker.sh : cree le reseau Docker br0 en ipvlan L2.", "status_cmd": "docker network inspect br0 --format 'Nom={{.Name}} Driver={{.Driver}} Parent={{index .Options \"parent\"}} Mode={{index .Options \"ipvlan_mode\"}}'", "install_cmd": _admin_script_cmd("scripts/system/lan_docker.sh", "install"), "remove_cmd": _admin_script_cmd("scripts/system/lan_docker.sh", "remove"), "timeout": 600, "danger": True},
         {"id": "docker_lan_host", "category": "Réseau", "title": "Installer Docker LAN host", "description": "Ajoute la patte hote Docker macvlan/host pour communiquer hote <-> conteneurs LAN.", "status_cmd": "systemctl is-enabled yoleo-macvlan-host.service --quiet && systemctl is-active yoleo-macvlan-host.service --quiet && ip -br addr show mv-host", "install_cmd": _admin_docker_host_install_cmd(), "remove_cmd": _admin_docker_host_remove_cmd(), "timeout": 600, "danger": True},
@@ -1659,13 +1671,8 @@ def sys_stats():
     except Exception:
         pass
 
-    dk = {"total": 0, "on": 0}
-    if docker is not None:
-        try:
-            c = docker.from_env().containers.list(all=True)
-            dk = {"total": len(c), "on": len([x for x in c if x.status == "running"])}
-        except Exception:
-            pass
+    docker_info = docker_counts(docker)
+    dk = {"total": docker_info["total"], "on": docker_info["running"]}
 
     net_speed, ips, network_direct = get_direct_network_stats()
 
@@ -1690,12 +1697,13 @@ def sys_stats():
         except Exception as e:
             print(f"[ERREUR GPU SSH] {e}")
 
-    if want_intel_gpu and (os.path.exists("/dev/dri/renderD128") or os.path.exists("/dev/dri/card0")):
+    if want_intel_gpu and _find_intel_monitor_node():
         try:
             intel_stats, _intel_text = get_intel_stats_and_text()
             gpus.append({
                 "type": "intel",
                 "name": intel_stats["name"],
+                "pci_address": get_intel_pci_address(),
                 "load": intel_stats["load"],
                 "mem": intel_stats["mem"],
                 "temp": intel_stats["temp"],
@@ -1706,7 +1714,7 @@ def sys_stats():
             print(f"[ERREUR INTEL GPU] {e}")
             i_load = "0.0"
             try:
-                with open("/sys/class/drm/card0/device/gpu_busy_percent", "r", encoding="utf-8", errors="replace") as f:
+                with open("/sys/class/drm/" + os.path.basename(_find_intel_monitor_node()) + "/device/gpu_busy_percent", "r", encoding="utf-8", errors="replace") as f:
                     i_load = f.read().strip()
             except Exception:
                 pass
@@ -1715,6 +1723,7 @@ def sys_stats():
             gpus.append({
                 "type": "intel",
                 "name": "Intel iGPU",
+                "pci_address": get_intel_pci_address(),
                 "load": i_load,
                 "mem": "0.0",
                 "temp": "-",

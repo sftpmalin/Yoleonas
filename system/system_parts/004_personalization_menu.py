@@ -1,3 +1,5 @@
+from monitoring_probes import standard_directory_paths, mount_path_state
+
 import copy
 import threading
 
@@ -9,7 +11,7 @@ PERSONALIZATION_DEFAULT_CONFIG = {
     'base_dir': '../tabs',
     'titre_tab': 'System Manager',
     'titre_logo': 'System Manager',
-    'nav_icons': '/static/logo.png',
+    'nav_icons': '/static/icone_menu/logo.png',
 }
 
 PERSONALIZATION_CONFIG_CANONICAL_KEYS = {
@@ -2742,32 +2744,21 @@ def disk_top_collect_candidates() -> Dict[str, Any]:
         if target.startswith(("/mnt", "/srv", "/media")):
             paths.add(target)
 
-    # Dossiers NAS classiques, même non montés : utile pour détecter /mnt/cache devenu simple dossier.
-    for base in ("/mnt", "/media", "/srv"):
-        if os.path.isdir(base):
-            try:
-                for name in sorted(os.listdir(base)):
-                    child = os.path.join(base, name)
-                    if os.path.isdir(child):
-                        paths.add(os.path.abspath(child))
-            except Exception:
-                pass
-    for common in ("/mnt/cache", "/mnt/user", "/mnt/disk1", "/mnt/disk2", "/mnt/disk3", "/mnt/disk4"):
-        if os.path.exists(common) or common in selected:
-            paths.add(common)
+    paths.update(standard_directory_paths(findmnt))
 
     rows = []
     for path in sorted(paths):
         info = findmnt.get(path) or {}
-        exists = os.path.exists(path)
-        is_mount = bool(info) or os.path.ismount(path)
-        try:
-            has_local_entries = exists and os.path.isdir(path) and (not is_mount) and bool(os.listdir(path))
-        except Exception:
-            has_local_entries = False
+        path_state = mount_path_state(path, findmnt)
+        exists = path_state["exists"]
+        is_mount = path_state["is_mount"]
+        has_local_entries = path_state["has_local_entries"]
         if is_mount:
             status = "ok"
             label = "OK"
+        elif exists is None:
+            status = "pending"
+            label = "Contrôle en cours"
         elif exists:
             status = "folder_with_data" if has_local_entries else "folder"
             label = "Dossier local" if has_local_entries else "Dossier"

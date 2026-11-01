@@ -230,20 +230,25 @@
                 <div class="vmg-info-card"><b>NVRAM</b><span>{{ current_vm.nvram or '-' }}</span></div>
             </div>
             <div class="vmg-form-section">
-                <div class="vmg-section-title">Firmware</div>
-                <div class="vmg-form-grid">
+                <div class="vmg-section-title">Choisir un profil de démarrage</div>
+                <div id="vmgFirmwareProfiles" class="vmg-firmware-profiles" role="radiogroup" aria-label="Profil UEFI"></div>
+                <p id="vmgFirmwareProfileSummary" class="vmg-muted" aria-live="polite"></p>
+                <details id="vmgFirmwareAdvanced" class="vmg-firmware-advanced">
+                    <summary>BIOS classique / firmware personnalisé</summary>
+                    <div class="vmg-form-grid">
                     <label class="vmg-field vmg-field-wide">BIOS / UEFI
                         <select id="vmgFirmwareSelect" class="select-input"></select>
-                        <small>Arrete la VM avant de changer le firmware. Pour un firmware specifique, choisis une entree OVMF/loader dans la liste.</small>
+                        <small>Choix avancé. Les profils ci-dessus sélectionnent automatiquement le firmware et les bonnes clés.</small>
                     </label>
                     <label class="vmg-field vmg-field-check vmg-field-wide vmg-secure-boot-field">Secure Boot
                         <span class="vmg-check-line"><input id="vmgSecureBoot" type="checkbox"> <span>activer Secure Boot</span></span>
                     </label>
-                </div>
+                    </div>
+                </details>
                 <div class="vmg-actions-row">
-                    <button type="button" class="yoleo-btn yoleo-btn-primary" onclick="vmgSaveFirmware(this)">Enregistrer BIOS</button>
+                    <button id="vmgSaveFirmwareButton" type="button" class="yoleo-btn yoleo-btn-primary" onclick="vmgSaveFirmware(this)">Enregistrer BIOS</button>
                 </div>
-                <div class="vmg-muted">BIOS / UEFI se choisit maintenant à la création de la VM. Cette page affiche seulement l'état actuel pour éviter les conversions XML bancales après coup.</div>
+                <p class="vmg-muted">Une seule sélection à la fois. Arrête la VM avant d'enregistrer son profil ; il sera appliqué au prochain démarrage.</p>
             </div>
         </section>
 

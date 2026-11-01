@@ -58,6 +58,9 @@ def logs_for(kind: str, lines: int = 200) -> str:
     if kind in {"nfs_client", "nfs-client", "client"}:
         text = tail_file(NFS_CLIENT_LOG_FILE, lines)
         return f"===== {NFS_CLIENT_LOG_FILE} =====\n" + (text or "Aucun log NFS client pour le moment.")
+    if kind in {"smb_client", "smb-client", "samba_client", "samba-client"}:
+        text = tail_file(SMB_CLIENT_LOG_FILE, lines)
+        return f"===== {SMB_CLIENT_LOG_FILE} =====\n" + (text or "Aucun log Samba client pour le moment.")
 
     if kind == "samba":
         units = [*SAMBA_SERVICES, *DISTRO_WSDD_SERVICES, SAMBA_APPLY_SERVICE]
@@ -82,6 +85,9 @@ def logs_for(kind: str, lines: int = 200) -> str:
         client_log = tail_file(NFS_CLIENT_LOG_FILE, lines)
         if client_log:
             chunks.append(f"===== {NFS_CLIENT_LOG_FILE} =====\n" + client_log)
+        smb_client_log = tail_file(SMB_CLIENT_LOG_FILE, lines)
+        if smb_client_log:
+            chunks.append(f"===== {SMB_CLIENT_LOG_FILE} =====\n" + smb_client_log)
 
     # Fallback fichiers Samba classiques.
     if not chunks:
@@ -111,7 +117,7 @@ def make_stream_response(generator: Iterator[str]) -> Response:
 
 
 def render_partage_page(section: str = "samba", samba_tab: str = "main"):
-    allowed = {"samba", "nfs", "nfs_client", "logs"}
+    allowed = {"samba", "smb_client", "nfs", "nfs_client", "logs"}
     allowed_samba_tabs = {"main", "user", "shares", "settings", "info"}
     section = section if section in allowed else "samba"
     samba_tab = samba_tab if samba_tab in allowed_samba_tabs else "main"
@@ -125,6 +131,7 @@ def render_partage_page(section: str = "samba", samba_tab: str = "main"):
         }.get(samba_tab, "partage_samba_main.html")
     else:
         template_name = {
+            "smb_client": "partage_smb_client.html",
             "nfs": "partage_nfs.html",
             "nfs_client": "partage_nfs_client.html",
             "logs": "partage_logs.html",
@@ -145,6 +152,7 @@ def render_partage_page(section: str = "samba", samba_tab: str = "main"):
         nfs_client=nfs_client_payload() if section == "nfs_client" else {},
         nfs_client_exports=[],
         nfs_client_machine=(request.values.get("machine") or "").strip(),
+        smb_client=smb_client_payload() if section == "smb_client" else {},
     )
 
 
@@ -195,6 +203,11 @@ def show_samba_log():
 @partage_bp.route("/partage/nfs")
 def show_nfs():
     return render_partage_page("nfs")
+
+
+@partage_bp.route("/partage/samba-client")
+def show_smb_client():
+    return render_partage_page("smb_client")
 
 
 @partage_bp.route("/partage/nfs-client")
@@ -354,6 +367,95 @@ def api_nfs_client():
     return jsonify(nfs_client_payload())
 
 
+def smb_client_action_response(ok: bool, message: str, status: int = 200):
+    payload = smb_client_payload()
+    payload.update({"ok": bool(ok), "message": str(message)})
+    return jsonify(payload), status
+
+
+@partage_bp.route("/partage/samba-client/discover", methods=["POST"])
+def smb_client_discover_route():
+    data = request.get_json(silent=True) or request.form
+    try:
+        result = smb_client_discover_shares(
+            data.get("machine", ""),
+            data.get("username", ""),
+            data.get("password", ""),
+            data.get("domain", ""),
+        )
+        return jsonify(result), 200 if result.get("ok") else 400
+    except ValueError as exc:
+        return jsonify({"ok": False, "shares": [], "message": str(exc)}), 400
+    except Exception as exc:
+        append_smb_client_log(f"[PARCOURIR][ERREUR] {exc}")
+        return jsonify({"ok": False, "shares": [], "message": str(exc)}), 500
+
+
+@partage_bp.route("/partage/samba-client/add", methods=["POST"])
+def smb_client_add_route():
+    try:
+        section = save_smb_client_profile(
+            request.form.get("machine", ""),
+            request.form.get("share", ""),
+            request.form.get("mount_path", ""),
+            request.form.get("username", ""),
+            request.form.get("password", ""),
+            request.form.get("domain", ""),
+            mode_0777=bool(request.form.get("mode_0777")),
+        )
+        started = start_smb_client_mount(section)
+        message = "Profil enregistre, montage lance en arriere-plan." if started else "Profil enregistre. Un autre montage est deja en cours."
+        return smb_client_action_response(started, message, 202 if started else 409)
+    except ValueError as exc:
+        return smb_client_action_response(False, str(exc), 400)
+    except Exception as exc:
+        append_smb_client_log(f"[AJOUT][ERREUR] {exc}")
+        return smb_client_action_response(False, str(exc), 500)
+
+
+@partage_bp.route("/partage/samba-client/mount", methods=["POST"])
+def smb_client_mount_route():
+    section = (request.form.get("section") or "").strip()
+    parser = ensure_smb_client_conf()
+    if not section.startswith("SMB:") or not parser.has_section(section):
+        return smb_client_action_response(False, "Profil Samba client inconnu.", 404)
+    started = start_smb_client_mount(section)
+    return smb_client_action_response(
+        started,
+        "Montage lance en arriere-plan." if started else "Un autre montage est deja en cours.",
+        202 if started else 409,
+    )
+
+
+@partage_bp.route("/partage/samba-client/unmount", methods=["POST"])
+def smb_client_unmount_route():
+    ok, message = unmount_smb_client_section((request.form.get("section") or "").strip())
+    return smb_client_action_response(ok, message, 200 if ok else 400)
+
+
+@partage_bp.route("/partage/samba-client/delete", methods=["POST"])
+def smb_client_delete_route():
+    ok, message = delete_smb_client_profile((request.form.get("section") or "").strip())
+    return smb_client_action_response(ok, message, 200 if ok else 400)
+
+
+@partage_bp.route("/partage/samba-client/adopt", methods=["POST"])
+def smb_client_adopt_route():
+    ok, message = adopt_live_smb_client_mount((request.form.get("section") or "").strip())
+    return smb_client_action_response(ok, message, 200 if ok else 400)
+
+
+@partage_bp.route("/partage/samba-client/adopt-all", methods=["POST"])
+def smb_client_adopt_all_route():
+    ok, message = adopt_all_live_smb_client_mounts()
+    return smb_client_action_response(ok, message, 200 if ok else 400)
+
+
+@partage_bp.route("/partage/api/smb-client")
+def api_smb_client():
+    return jsonify(smb_client_payload())
+
+
 @partage_bp.route("/partage/api/state")
 def api_state():
     return jsonify(state_payload())
@@ -394,6 +496,7 @@ def api_settings_save():
 def api_samba_save():
     payload = request.get_json(silent=True) or {}
     cfg = samba_config_from_payload(payload)
+    removed_users = remove_missing_samba_share_users(cfg)
     errors = validate_samba_config(cfg)
     if errors:
         return jsonify({"ok": False, "message": "\n".join(errors)}), 400
@@ -402,7 +505,12 @@ def api_samba_save():
         backup = backup_file(cfg.conf_path, "save") if cfg.conf_path.exists() else None
         cfg.conf_path.write_text(render_samba_source_conf(cfg), encoding="utf-8")
         cfg.conf_path.chmod(0o600)
-        return jsonify({"ok": True, "message": f"samba.conf enregistré : {cfg.conf_path}" + (f"\nBackup : {backup}" if backup else "")})
+        return jsonify({
+            "ok": True,
+            "message": f"samba.conf enregistré : {cfg.conf_path}" + (f"\nBackup : {backup}" if backup else ""),
+            "samba": to_samba_dict(cfg),
+            "removed_users": removed_users,
+        })
     except Exception as exc:
         return jsonify({"ok": False, "message": str(exc)}), 500
 

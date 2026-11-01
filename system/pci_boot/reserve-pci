@@ -1,0 +1,67 @@
+#!/bin/sh
+# Only executed inside the next initramfs, before udev loads native PCI drivers.
+# The alternate root is used solely by tests with an artificial sysfs tree.
+set -u
+root=${YOLEO_PCI_TEST_ROOT:-}
+config="${root}/etc/yoleo/pci-exclusions.conf"
+devices="${root}/sys/bus/pci/devices"
+runtime="${root}/run/yoleo-pci"
+mkdir -p "${runtime}"
+: >"${runtime}/applied.conf"
+[ -r "${config}" ] || exit 0
+
+log() {
+    if [ -n "${root}" ]; then
+        printf '%s\n' "$*" >>"${runtime}/boot.log"
+    else
+        printf '<6>Yoleo PCI: %s\n' "$*" >/dev/kmsg
+    fi
+}
+
+read_id() {
+    value=$(cat "$1" 2>/dev/null) || return 1
+    printf '%s' "${value#0x}"
+}
+
+# Set every override before loading vfio-pci (which itself probes devices).
+while read -r address vendor device subvendor subdevice extra; do
+    case "${address}" in ''|\#*) continue ;; esac
+    case "${address}" in
+        [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-1][0-9a-f].[0-7]) ;;
+        *) log "adresse invalide ignoree"; continue ;;
+    esac
+    path="${devices}/${address}"
+    [ -e "${path}/driver_override" ] || { log "${address}: carte absente"; continue; }
+    if [ "$(read_id "${path}/vendor")" != "${vendor}" ] ||
+       [ "$(read_id "${path}/device")" != "${device}" ] ||
+       [ "$(read_id "${path}/subsystem_vendor")" != "${subvendor}" ] ||
+       [ "$(read_id "${path}/subsystem_device")" != "${subdevice}" ] || [ -n "${extra:-}" ]; then
+        log "${address}: materiel different, exclusion ignoree"
+        continue
+    fi
+    if ! printf '%s\n' vfio-pci >"${path}/driver_override"; then
+        log "${address}: impossible de reserver la carte"
+        continue
+    fi
+    # A built-in driver might already have attached before userspace started.
+    if [ -L "${path}/driver" ] && [ "$(basename "$(readlink "${path}/driver")")" != vfio-pci ]; then
+        if ! printf '%s\n' "${address}" >"${path}/driver/unbind"; then
+            printf '\n' >"${path}/driver_override"
+            log "${address}: pilote deja attache, exclusion refusee"
+            continue
+        fi
+    fi
+    printf '%s %s %s %s %s\n' "${address}" "${vendor}" "${device}" "${subvendor}" "${subdevice}" >>"${runtime}/applied.conf"
+done <"${config}"
+
+[ -s "${runtime}/applied.conf" ] || exit 0
+if ! modprobe vfio-pci; then
+    log 'VFIO indisponible : les cartes selectionnees restent reservees sans pilote natif'
+    exit 0
+fi
+while read -r address rest; do
+    if [ ! -L "${devices}/${address}/driver" ]; then
+        printf '%s\n' "${address}" >"${root}/sys/bus/pci/drivers_probe" || log "${address}: VFIO non attache"
+    fi
+    log "${address}: reservee pour une VM"
+done <"${runtime}/applied.conf"

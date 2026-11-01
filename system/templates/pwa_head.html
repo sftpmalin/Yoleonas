@@ -1,0 +1,7 @@
+<link rel="manifest" href="{{ url_for('pwa_bp.manifest') }}" crossorigin="use-credentials">
+<meta name="theme-color" content="{{ pwa_config.THEME_COLOR }}">
+<meta name="application-name" content="{{ pwa_config.SHORT_NAME }}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="{{ pwa_config.SHORT_NAME }}">
+<link rel="apple-touch-icon" href="{{ pwa_icon_src }}">
+<script src="{{ url_for('static', filename='pwa.js') }}" defer></script>

@@ -462,9 +462,10 @@
             if (detailEl) detailEl.textContent = detail || 'Progression globale Build → Registre';
         }
 
-        function resetMainOverallProgress(action = '', name = '', total = 0) {
+        function resetMainOverallProgress(action = '', name = '', total = 0, selectedNames = null) {
             if (!isBuildMainPage() || !isMainBuildWorkflowAction(String(action || ''))) return;
-            const names = name ? [cleanDockerName(name)] : mainRegistryNames();
+            const names = Array.isArray(selectedNames) && selectedNames.length
+                ? selectedNames : (name ? [cleanDockerName(name)] : mainRegistryNames());
             const count = Number(total || names.length || 0);
             mainBuildRowMemory.overall = {
                 active: true,
@@ -625,13 +626,14 @@
             mainBuildRowMemory.stateByName.set(cleanName, { state, label: text, title: title || text, at: Date.now() });
         }
 
-        function clearMainBuildRowsForRun(action, name = '') {
+        function clearMainBuildRowsForRun(action, name = '', selectedNames = null) {
             if (!isBuildMainPage() || String(action || '').indexOf('build_registry_') !== 0) return;
             mainBuildRowMemory.lastFailed = 0;
             mainBuildRowMemory.stateByName.clear();
             mainBuildRowMemory.registryByName.clear();
-            resetMainOverallProgress(action, name);
-            const names = name ? [cleanDockerName(name)] : Array.from(document.querySelectorAll('#buildTable tr[data-build-name]')).map(row => cleanDockerName(row.dataset.buildName || ''));
+            resetMainOverallProgress(action, name, 0, selectedNames);
+            const names = Array.isArray(selectedNames) && selectedNames.length
+                ? selectedNames : (name ? [cleanDockerName(name)] : mainRegistryNames());
             names.forEach(item => {
                 const row = mainBuildRow(item);
                 if (!row) return;
@@ -869,12 +871,24 @@
             if (isBuildMainPage() && kind === 'build') reconcileMainBuildButton(cleanNameForMain);
         }
 
+        const pendingStatusRequests = { build: new Map(), registry: new Map() };
+
         async function fetchStatusPayload(kind, name) {
-            const params = new URLSearchParams({ kind, name });
-            const response = await fetch(`${statusJsonUrl}?${params.toString()}`, { credentials: 'same-origin', cache: 'no-store' });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
-            return payload;
+            const pending = pendingStatusRequests[kind];
+            if (pending.has(name)) return pending.get(name);
+            const request = (async () => {
+                const params = new URLSearchParams({ kind, name });
+                const response = await fetch(`${statusJsonUrl}?${params.toString()}`, { credentials: 'same-origin', cache: 'no-store' });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+                return payload;
+            })();
+            pending.set(name, request);
+            try {
+                return await request;
+            } finally {
+                if (pending.get(name) === request) pending.delete(name);
+            }
         }
 
         async function refreshStatusForName(kind, name) {
@@ -977,6 +991,15 @@
         }
 
         function invalidateStatus(kind, name = '') {
+            // Build Main affiche des badges registre sans boutons registry : vider
+            // aussi leur cache pour que la sélection ne réutilise pas un ancien état.
+            if (name) {
+                statusCache[kind].delete(cleanDockerName(name));
+                pendingStatusRequests[kind].delete(cleanDockerName(name));
+            } else {
+                statusCache[kind].clear();
+                pendingStatusRequests[kind].clear();
+            }
             const targets = statusButtons(kind).filter(button => !name || statusName(button) === cleanDockerName(name));
             targets.forEach(button => {
                 button.dataset.statusChecked = '0';
@@ -1349,6 +1372,8 @@
             if (!kind || button.dataset.statusKind !== kind) return false;
             const buttonName = statusName(button);
             if (jobIsBulk(job.action)) {
+                if (Array.isArray(job.selected_names) && job.selected_names.length
+                    && !job.selected_names.includes(buttonName)) return false;
                 if (isBulkJobNameCompleted(kind, buttonName)) return false;
                 const cached = statusCache[kind] ? statusCache[kind].get(buttonName) : null;
                 if (payloadIsCurrent(cached)) {
@@ -1681,14 +1706,14 @@
 
         */
 
-        async function runTask(action, name = '', mode = 'normal', useModal = false, button = null, quiet = false) {
+        async function runTask(action, name = '', mode = 'normal', useModal = false, button = null, quiet = false, selectedNames = null) {
             if (useModal) openProgressModal(taskModalTitle(action, name), taskProgressTitle(action));
             else if (!quiet) switchTab('logs');
 
             lastRunFailedCount = 0;
             runHadError = false;
             stopBackgroundPolling();
-            clearMainBuildRowsForRun(action, name);
+            clearMainBuildRowsForRun(action, name, selectedNames);
             setButtonRunning(button);
             clearLog();
             setStatus('Demarrage : ' + [action, name, mode !== 'normal' ? mode : ''].filter(Boolean).join(' / '));
@@ -1700,7 +1725,8 @@
                     credentials: 'same-origin',
                     cache: 'no-store',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action, name, mode })
+                    body: JSON.stringify({ action, name, mode,
+                        ...(Array.isArray(selectedNames) ? {selected_names: selectedNames} : {}) })
                 });
                 const payload = await response.json().catch(() => ({}));
                 if (!response.ok || !payload.ok) {

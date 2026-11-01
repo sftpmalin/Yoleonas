@@ -699,7 +699,23 @@ def run_start():
     if error:
         return jsonify({"ok": False, "message": error}), 400
 
-    state = start_build_background_job(conf, action, name, mode)
+    selected_names = None
+    if "selected_names" in payload:
+        supplied = payload.get("selected_names")
+        if action != "build_registry_all" or not isinstance(supplied, list) or not supplied:
+            return jsonify({"ok": False, "message": "Sélection Build invalide ou vide."}), 400
+        if len(supplied) > 500 or any(not isinstance(n, str) or not is_valid_name(n) for n in supplied):
+            return jsonify({"ok": False, "message": "La sélection contient un nom Docker invalide."}), 400
+        selected_names = list(dict.fromkeys(supplied))
+        eligible = {
+            p for p in list_project_names(conf["DOCKER_BUILDS_DIR"])
+            if os.path.isfile(os.path.join(conf["DOCKER_BUILDS_DIR"], p, "Dockerfile"))
+            or os.path.isfile(os.path.join(conf["DOCKER_BUILDS_DIR"], p, "dockerfile"))
+        }
+        if any(n not in eligible for n in selected_names):
+            return jsonify({"ok": False, "message": "Un Docker sélectionné n'existe plus ou n'a pas de Dockerfile."}), 400
+
+    state = start_build_background_job(conf, action, name, mode, selected_names=selected_names)
     response = jsonify({"ok": True, "job": state})
     response.headers["Cache-Control"] = "no-store"
     return response

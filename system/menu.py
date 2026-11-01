@@ -11,14 +11,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import gzip
 import os
-import pwd
 import re
 import shlex
-import shutil
 import signal
-import subprocess
 import sys
 import tempfile
 import time
@@ -40,8 +36,6 @@ BASE_DIR = SCRIPT_DIR.parent
 DEFAULT_CONF_DIR = BASE_DIR / "conf"
 DEFAULT_MENU_CONF = DEFAULT_CONF_DIR / "menu.conf"
 DEFAULT_PYTHON = str(SCRIPT_DIR / ".venv" / "bin" / "python")
-OFFLINE_DEB_DIR = BASE_DIR / "offline" / "debs"
-SETUP_CONF = DEFAULT_CONF_DIR / "setup.conf"
 
 
 @dataclass
@@ -65,12 +59,11 @@ class MenuModel:
     def children(self, menu_id: int) -> list[MenuItem]:
         return [item for item in self.items if item.parent == menu_id]
 
-    def selectable_ids(self, menu_id: int, visible=None) -> list[int | str]:
+    def selectable_ids(self, menu_id: int) -> list[int | str]:
         ids: list[int | str] = [
             item.item_id
             for item in self.children(menu_id)
             if item.item_type in {"entry", "submenu"}
-            and (visible is None or visible(item))
         ]
         ids.append("__quit__" if menu_id == -1 else "__back__")
         return ids
@@ -178,44 +171,7 @@ class CommandSpec:
     cwd: str = ""
 
 
-def internal_action_parts(cmdline: str) -> list[str]:
-    text = trim(cmdline)
-    if not text.startswith("internal:"):
-        return []
-    payload = trim(text[len("internal:"):])
-    if not payload:
-        return []
-    try:
-        return shlex.split(payload, posix=True)
-    except ValueError:
-        return [payload]
-
-
-def is_midnight_commander_installed() -> bool:
-    if shutil.which("mc"):
-        return True
-    try:
-        return subprocess.run(
-            ["dpkg", "-s", "mc"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        ).returncode == 0
-    except Exception:
-        return False
-
-
 def resolve_command(cmdline: str, *, script_dir: Path, python_bin: str, cwd: str) -> CommandSpec:
-    internal_parts = internal_action_parts(cmdline)
-    if internal_parts:
-        menu_py = script_dir / "menu.py"
-        return CommandSpec(
-            display=f"{python_bin} {shlex.quote(str(menu_py))} --internal-run "
-            + " ".join(shlex.quote(part) for part in internal_parts),
-            argv=[python_bin, str(menu_py), "--internal-run", *internal_parts],
-            cwd=str(BASE_DIR),
-        )
-
     try:
         parts = shlex.split(cmdline, posix=True)
     except ValueError:
@@ -247,10 +203,6 @@ def resolve_command(cmdline: str, *, script_dir: Path, python_bin: str, cwd: str
 
 
 def is_interactive_app_command(cmdline: str) -> bool:
-    internal_parts = internal_action_parts(cmdline)
-    if internal_parts and internal_parts[0] in {"file-manager"}:
-        return True
-
     try:
         parts = shlex.split(cmdline, posix=True)
     except ValueError:
@@ -258,534 +210,6 @@ def is_interactive_app_command(cmdline: str) -> bool:
     if not parts:
         return False
     return Path(parts[0]).name in {"vm_cli.py", "lan_cli.py", "storage_cli.py", "menu_list.py"}
-
-
-def run_capture(argv: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        argv,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=False,
-    )
-
-
-def command_exists(name: str) -> bool:
-    return shutil.which(name) is not None
-
-
-def dpkg_installed(package: str) -> bool:
-    if not command_exists("dpkg-query"):
-        return False
-    try:
-        result = run_capture(["dpkg-query", "-W", "-f=${Status}", package])
-    except Exception:
-        return False
-    return result.returncode == 0 and "install ok installed" in result.stdout
-
-
-def service_active(service: str) -> bool:
-    if not command_exists("systemctl"):
-        return False
-    try:
-        return run_capture(["systemctl", "is-active", "--quiet", service]).returncode == 0
-    except Exception:
-        return False
-
-
-def docker_network_exists(name: str) -> bool:
-    if not command_exists("docker"):
-        return False
-    try:
-        return run_capture(["docker", "network", "inspect", name]).returncode == 0
-    except Exception:
-        return False
-
-
-def offline_package_names() -> set[str]:
-    names: set[str] = set()
-    packages = OFFLINE_DEB_DIR / "Packages"
-    packages_gz = OFFLINE_DEB_DIR / "Packages.gz"
-
-    try:
-        if packages.is_file():
-            lines = packages.read_text(encoding="utf-8", errors="replace").splitlines()
-        elif packages_gz.is_file():
-            with gzip.open(packages_gz, "rt", encoding="utf-8", errors="replace") as handle:
-                lines = handle.read().splitlines()
-        else:
-            return names
-    except Exception:
-        return names
-
-    for line in lines:
-        if line.startswith("Package: "):
-            name = line.split(":", 1)[1].strip()
-            if name:
-                names.add(name)
-    return names
-
-
-def build_offline_apt_env(tmp_path: Path, extra_env: Optional[dict[str, str]] = None) -> dict[str, str]:
-    repo_dir = OFFLINE_DEB_DIR.resolve()
-    sources_list = tmp_path / "sources.list"
-    empty_conf = tmp_path / "empty.conf"
-    apt_conf = tmp_path / "apt.conf"
-
-    sources_list.write_text(f"deb [trusted=yes] file:{repo_dir} ./\n", encoding="utf-8")
-    empty_conf.write_text("", encoding="utf-8")
-    apt_conf.write_text(
-        "\n".join(
-            [
-                f'Dir::Etc::sourcelist "{sources_list}";',
-                'Dir::Etc::sourceparts "-";',
-                f'Dir::Etc::main "{empty_conf}";',
-                'APT::Get::List-Cleanup "0";',
-                'APT::Get::AllowUnauthenticated "true";',
-                'Acquire::AllowInsecureRepositories "true";',
-                'Acquire::Languages "none";',
-                'Acquire::Retries "0";',
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    env = os.environ.copy()
-    env["APT_CONFIG"] = str(apt_conf)
-    env["DEBIAN_FRONTEND"] = "noninteractive"
-    env["APT_OFFLINE_ONLY"] = "1"
-    env["PIP_OFFLINE"] = "1"
-    if extra_env:
-        env.update(extra_env)
-    return env
-
-
-def print_command(argv: list[str]) -> None:
-    print(">>> " + " ".join(shlex.quote(part) for part in argv), flush=True)
-
-
-def run_live(
-    argv: list[str],
-    *,
-    env: Optional[dict[str, str]] = None,
-    cwd: Optional[Path] = None,
-) -> int:
-    print_command(argv)
-    try:
-        return subprocess.call(argv, env=env, cwd=str(cwd) if cwd else None)
-    except FileNotFoundError:
-        print(f"ERREUR : commande introuvable : {argv[0]}", flush=True)
-        return 127
-    except KeyboardInterrupt:
-        return 130
-
-
-def run_live_offline_apt(
-    argv: list[str],
-    *,
-    extra_env: Optional[dict[str, str]] = None,
-    cwd: Optional[Path] = None,
-) -> int:
-    with tempfile.TemporaryDirectory(prefix="yoleo-apt.") as tmp:
-        env = build_offline_apt_env(Path(tmp), extra_env)
-        return run_live(argv, env=env, cwd=cwd)
-
-
-def ensure_root(action_label: str) -> bool:
-    if os.geteuid() == 0:
-        return True
-    print(f"ERREUR : {action_label} doit être lancé en root.", flush=True)
-    return False
-
-
-def ensure_file(path: Path) -> bool:
-    if path.is_file():
-        return True
-    print(f"ERREUR : fichier introuvable : {path}", flush=True)
-    return False
-
-
-def offline_apt_install(packages: list[str], *, install_recommends: bool = False) -> int:
-    if not ensure_root("l'installation offline APT"):
-        return 1
-    if not OFFLINE_DEB_DIR.is_dir():
-        print(f"ERREUR : dossier offline absent : {OFFLINE_DEB_DIR}", flush=True)
-        return 1
-
-    wanted = [package for package in packages if not dpkg_installed(package)]
-    if not wanted:
-        print("OK : les paquets demandés sont déjà installés.", flush=True)
-        return 0
-
-    available = offline_package_names()
-    missing = [package for package in wanted if package not in available]
-    if missing:
-        print("ERREUR : paquet(s) absent(s) du dépôt offline :", flush=True)
-        for package in missing:
-            print(f"  - {package}", flush=True)
-        print(f"Dépôt utilisé : {OFFLINE_DEB_DIR}", flush=True)
-        return 1
-
-    with tempfile.TemporaryDirectory(prefix="yoleo-apt.") as tmp:
-        env = build_offline_apt_env(Path(tmp))
-        rc = run_live(["apt-get", "update"], env=env)
-        if rc:
-            return rc
-        command = ["apt-get", "install", "-y"]
-        if not install_recommends:
-            command.append("--no-install-recommends")
-        command.extend(wanted)
-        return run_live(command, env=env)
-
-
-def offline_apt_purge(packages: list[str]) -> int:
-    if not ensure_root("la désinstallation APT"):
-        return 1
-    rc = run_live(["apt-get", "purge", "-y", *packages])
-    if rc:
-        return rc
-    return run_live(["apt-get", "autoremove", "-y"])
-
-
-def setup_cache_set(key: str, value: str) -> None:
-    DEFAULT_CONF_DIR.mkdir(parents=True, exist_ok=True)
-    rows: list[str] = []
-    if SETUP_CONF.is_file():
-        rows = SETUP_CONF.read_text(encoding="utf-8", errors="replace").splitlines()
-    prefix = f"{key}="
-    rows = [row for row in rows if not row.startswith(prefix)]
-    rows.append(f"{key}={value}")
-    SETUP_CONF.write_text("\n".join(rows) + "\n", encoding="utf-8")
-
-
-def first_normal_user() -> str:
-    for key in ("SUDO_USER", "LOGNAME", "USER"):
-        user = os.environ.get(key, "").strip()
-        if user and user != "root":
-            return user
-
-    try:
-        candidates = [
-            entry.pw_name
-            for entry in pwd.getpwall()
-            if 1000 <= entry.pw_uid < 60000
-            and entry.pw_name != "nobody"
-            and not entry.pw_shell.endswith(("nologin", "false"))
-        ]
-    except Exception:
-        candidates = []
-    return candidates[0] if candidates else ""
-
-
-def group_exists(group: str) -> bool:
-    if not command_exists("getent"):
-        return False
-    return run_capture(["getent", "group", group]).returncode == 0
-
-
-def add_normal_user_to_groups(groups: list[str]) -> None:
-    user = first_normal_user()
-    real_groups = [group for group in groups if group_exists(group)]
-    if not user or not real_groups:
-        return
-    run_live(["usermod", "-aG", ",".join(real_groups), user])
-
-
-def run_systemctl(args: list[str]) -> int:
-    if not command_exists("systemctl"):
-        print("INFO : systemctl introuvable, étape service ignorée.", flush=True)
-        return 0
-    return run_live(["systemctl", *args])
-
-
-def run_file_manager() -> int:
-    if not is_midnight_commander_installed():
-        print("Midnight Commander n'est pas installé. Lance d'abord : Setup > Installer le gestionnaire de fichiers", flush=True)
-        return 1
-    os.execvp("mc", ["mc"])
-    return 0
-
-
-def run_setup_status() -> int:
-    checks = [
-        ("Gestionnaire de fichiers", is_midnight_commander_installed()),
-        ("WebAdmin / Webmin", dpkg_installed("webmin") or service_active("webmin.service")),
-        ("Cockpit + KVM", dpkg_installed("cockpit") and dpkg_installed("cockpit-machines")),
-        ("NVIDIA Docker", dpkg_installed("nvidia-container-toolkit") or command_exists("nvidia-ctk")),
-        ("Bridge Linux br0", (Path("/sys/class/net/br0") / "bridge").exists()),
-        ("Réseau Docker br0", docker_network_exists("br0")),
-        ("Accès hôte vers Docker LAN", service_active("yoleo-macvlan-host.service") or Path("/sys/class/net/mv-host").exists()),
-        ("SSH root", Path("/etc/ssh/sshd_config.d/99-root-aimable.conf").is_file()),
-    ]
-
-    print("État Setup YoLeo")
-    print("================")
-    for label, ok in checks:
-        print(f"{'OK' if ok else '--'}  {label}")
-    print()
-    print(f"Dépôt offline : {OFFLINE_DEB_DIR}")
-    print(f"Paquets indexés : {len(offline_package_names())}")
-    return 0
-
-
-def run_install_file_manager() -> int:
-    rc = offline_apt_install(["mc", "mc-data"])
-    if rc == 0:
-        setup_cache_set("file_manager", "installed")
-        print("OK : Midnight Commander installé. L'entrée apparaîtra au-dessus de Setup.", flush=True)
-    return rc
-
-
-def run_install_webmin() -> int:
-    rc = offline_apt_install(["webmin"])
-    if rc:
-        print("Webmin n'est pas encore disponible dans l'archive offline actuelle.", flush=True)
-        print("Ajoute le paquet webmin dans /yoleo/offline/debs puis régénère l'index Packages.", flush=True)
-        return rc
-    run_systemctl(["enable", "--now", "webmin.service"])
-    print("OK : WebAdmin / Webmin prêt sur le port 10000.", flush=True)
-    return 0
-
-
-def run_install_cockpit() -> int:
-    packages = [
-        "cockpit",
-        "cockpit-machines",
-        "cockpit-bridge",
-        "cockpit-ws",
-        "cockpit-system",
-        "libvirt-daemon-system",
-        "libvirt-clients",
-        "libvirt-dbus",
-        "qemu-system-x86",
-        "qemu-system-gui",
-        "qemu-utils",
-        "virtinst",
-        "novnc",
-        "websockify",
-        "bridge-utils",
-        "ovmf",
-        "swtpm",
-        "swtpm-tools",
-        "dnsmasq-base",
-    ]
-    rc = offline_apt_install(packages)
-    if rc:
-        return rc
-    add_normal_user_to_groups(["libvirt", "kvm"])
-    run_systemctl(["enable", "--now", "cockpit.socket"])
-    run_systemctl(["enable", "--now", "libvirtd"])
-    run_systemctl(["enable", "--now", "virtlogd"])
-    print("OK : Cockpit + KVM installé. Accès Cockpit : https://IP_DU_SERVEUR:9090", flush=True)
-    return 0
-
-
-def run_install_nvidia_docker() -> int:
-    packages = [
-        "libnvidia-container1",
-        "libnvidia-container-tools",
-        "nvidia-container-toolkit-base",
-        "nvidia-container-toolkit",
-    ]
-    rc = offline_apt_install(packages)
-    if rc:
-        return rc
-    if command_exists("nvidia-ctk"):
-        rc = run_live(["nvidia-ctk", "runtime", "configure", "--runtime=docker"])
-        if rc:
-            return rc
-    else:
-        print("ATTENTION : nvidia-ctk introuvable après installation.", flush=True)
-    run_systemctl(["restart", "docker"])
-    print("OK : outils NVIDIA Docker installés/configurés.", flush=True)
-    return 0
-
-
-def find_intel_gpu_script() -> Optional[Path]:
-    candidates = [
-        BASE_DIR / "pilote" / "intel" / "install_intel_gpu.sh",
-        BASE_DIR / "pilote" / "intel" / "intel_gpu.sh",
-        BASE_DIR / "pilote" / "intel_gpu" / "install_intel_gpu.sh",
-        BASE_DIR / "pilote" / "intel_gpu.sh",
-    ]
-    for path in candidates:
-        if path.is_file():
-            return path
-    return None
-
-
-def run_install_intel_gpu() -> int:
-    script = find_intel_gpu_script()
-    if script is not None:
-        print(f"Script Intel détecté : {script}", flush=True)
-        return run_script_action(script, [], offline_apt=True)
-
-    wanted = [
-        "pciutils",
-        "firmware-misc-nonfree",
-        "intel-microcode",
-        "intel-gpu-tools",
-        "intel-media-va-driver",
-        "intel-media-va-driver-non-free",
-        "i965-va-driver",
-        "i965-va-driver-shaders",
-        "mesa-va-drivers",
-        "mesa-vulkan-drivers",
-        "libvulkan1",
-        "libva2",
-        "libva-drm2",
-        "libva-x11-2",
-        "vainfo",
-    ]
-    available = offline_package_names()
-    packages = [package for package in wanted if package in available or dpkg_installed(package)]
-    missing = [package for package in wanted if package not in available and not dpkg_installed(package)]
-    if missing:
-        print("INFO : paquet(s) Intel absent(s) de l'offline actuel, ignoré(s) :", flush=True)
-        for package in missing:
-            print(f"  - {package}", flush=True)
-    rc = offline_apt_install(packages)
-    if rc:
-        return rc
-    add_normal_user_to_groups(["render", "video"])
-    run_live(["modprobe", "i915"])
-    run_live(["lspci", "-nn"])
-    run_live(["ls", "-l", "/dev/dri"])
-    if Path("/dev/dri/renderD128").exists() and command_exists("vainfo"):
-        run_live(["vainfo", "--display", "drm", "--device", "/dev/dri/renderD128"])
-    print("OK : outils Intel GPU installés. Un reboot peut être nécessaire.", flush=True)
-    return 0
-
-
-def run_chmod_yoleo() -> int:
-    if not ensure_root("la mise en exécutable des dossiers YoLeo"):
-        return 1
-    targets = [BASE_DIR / "scripts", BASE_DIR / "bin", BASE_DIR / "system"]
-    changed = 0
-    for directory in targets:
-        if not directory.is_dir():
-            print(f"SKIP : dossier introuvable : {directory}", flush=True)
-            continue
-        for path in directory.rglob("*"):
-            if not path.is_file() or path.is_symlink():
-                continue
-            if directory.name != "bin" and path.suffix.lower() not in {".sh", ".py"}:
-                continue
-            try:
-                mode = path.stat().st_mode
-                path.chmod(mode | 0o111)
-                changed += 1
-            except Exception as exc:
-                print(f"ERREUR : chmod impossible sur {path} : {exc}", flush=True)
-                return 1
-    print(f"OK : {changed} fichier(s) rendus exécutables dans scripts/bin/system.", flush=True)
-    return 0
-
-
-def run_script_action(
-    path: Path,
-    script_args: list[str],
-    *,
-    offline_apt: bool = False,
-    extra_env: Optional[dict[str, str]] = None,
-) -> int:
-    if not ensure_file(path):
-        return 1
-    argv = ["bash", str(path), *script_args]
-    if offline_apt:
-        return run_live_offline_apt(argv, extra_env=extra_env, cwd=path.parent)
-    env = os.environ.copy()
-    if extra_env:
-        env.update(extra_env)
-    return run_live(argv, env=env, cwd=path.parent)
-
-
-def run_nvidia_secureboot(version: str) -> int:
-    nvidia_dir = BASE_DIR / "pilote" / "nvidia"
-    script = nvidia_dir / f"install_nvidia_secureboot_{version}.sh"
-    driver = nvidia_dir / f"NVIDIA-Linux-x86_64-{version}.run"
-    return run_script_action(
-        script,
-        [],
-        offline_apt=True,
-        extra_env={"NVIDIA_DIR": str(nvidia_dir), "DRIVER": str(driver)},
-    )
-
-
-def run_nvidia_classic(version: str) -> int:
-    nvidia_dir = BASE_DIR / "pilote" / "nvidia"
-    script = nvidia_dir / "install_nvidia.sh"
-    driver = nvidia_dir / f"NVIDIA-Linux-x86_64-{version}.run"
-    return run_script_action(script, ["--file", str(driver)], offline_apt=True)
-
-
-def run_internal_action(args: list[str]) -> int:
-    action = args[0] if args else ""
-    scripts = BASE_DIR / "scripts"
-
-    simple_actions: dict[str, tuple[Path, list[str], bool, dict[str, str]]] = {
-        "setup-install-base": (SCRIPT_DIR / "setup.sh", ["-install"], True, {}),
-        "setup-fix-docker-nvidia": (scripts / "bug_docker_nvidia.sh", [], False, {}),
-        "setup-root-ssh-install": (scripts / "debian_root.sh", ["-install"], True, {}),
-        "setup-root-ssh-remove": (scripts / "debian_root.sh", ["-remove"], True, {}),
-        "setup-screen-sleep-install": (scripts / "ecran.sh", ["-install"], False, {}),
-        "setup-root-color-install": (scripts / "couleur.sh", [], False, {}),
-        "setup-lan-ip-install": (scripts / "lan_ip.sh", ["-install"], False, {}),
-        "setup-linux-br0-install": (scripts / "lan_bro.sh", ["-install"], True, {}),
-        "setup-lan-vm-install": (scripts / "lan_vw.sh", ["install"], False, {}),
-        "setup-docker-br0-install": (scripts / "lan_docker.sh", ["install"], False, {}),
-        "setup-docker-lan-host-install": (
-            scripts / "lan_docker_host.sh",
-            ["install-systemd"],
-            False,
-            {"SCRIPT_PATH": str(scripts / "lan_docker_host.sh")},
-        ),
-    }
-
-    if action == "file-manager":
-        return run_file_manager()
-    if action == "setup-status":
-        return run_setup_status()
-    if action == "setup-install-file-manager":
-        return run_install_file_manager()
-    if action == "setup-install-webmin":
-        return run_install_webmin()
-    if action == "setup-remove-webmin":
-        return offline_apt_purge(["webmin"])
-    if action == "setup-install-cockpit":
-        return run_install_cockpit()
-    if action == "setup-remove-cockpit":
-        return offline_apt_purge(["cockpit", "cockpit-machines", "cockpit-bridge", "cockpit-ws", "cockpit-system"])
-    if action == "setup-install-nvidia-docker":
-        return run_install_nvidia_docker()
-    if action == "setup-remove-nvidia-docker":
-        return offline_apt_purge(
-            [
-                "nvidia-container-toolkit",
-                "nvidia-container-toolkit-base",
-                "libnvidia-container-tools",
-                "libnvidia-container1",
-            ]
-        )
-    if action == "setup-install-intel-gpu":
-        return run_install_intel_gpu()
-    if action == "setup-chmod-yoleo":
-        return run_chmod_yoleo()
-    if action == "setup-install-nvidia-secureboot-595":
-        return run_nvidia_secureboot("595.84")
-    if action == "setup-install-nvidia-secureboot-580":
-        return run_nvidia_secureboot("580.95.05")
-    if action == "setup-install-nvidia-classic-595":
-        return run_nvidia_classic("595.84")
-    if action == "setup-install-nvidia-classic-580":
-        return run_nvidia_classic("580.95.05")
-    if action in simple_actions:
-        path, script_args, offline_apt, extra_env = simple_actions[action]
-        return run_script_action(path, script_args, offline_apt=offline_apt, extra_env=extra_env)
-
-    print(f"Commande interne inconnue : {action or '(vide)'}", flush=True)
-    return 2
 
 
 from menu_progress import (  # noqa: E402
@@ -1015,12 +439,6 @@ class YoleoMenuApp(App[int]):
         names.reverse()
         return " / ".join(["Accueil", *names])
 
-    def is_item_visible(self, item: MenuItem) -> bool:
-        internal_parts = internal_action_parts(item.command)
-        if internal_parts and internal_parts[0] == "file-manager":
-            return is_midnight_commander_installed()
-        return True
-
     def render_topbar(self) -> None:
         if self.in_operation:
             subtitle = self.state.category
@@ -1060,7 +478,7 @@ class YoleoMenuApp(App[int]):
         options = self.query_one("#menu_options", OptionList)
         options.clear_options()
         self.option_to_target = {}
-        self.selectable_ids = self.model.selectable_ids(self.current_menu_id, self.is_item_visible)
+        self.selectable_ids = self.model.selectable_ids(self.current_menu_id)
         selectable_numbers: dict[int | str, int] = {}
         for number, target in enumerate(self.selectable_ids, start=1):
             selectable_numbers[target] = number
@@ -1069,8 +487,6 @@ class YoleoMenuApp(App[int]):
             options.add_option(Option(Text(f"Menu vide : {self.menu_conf}", style="red"), disabled=True))
 
         for item in self.model.children(self.current_menu_id):
-            if not self.is_item_visible(item):
-                continue
             if item.item_type == "blank":
                 options.add_option(Option(Text(""), disabled=True))
                 continue
@@ -1818,7 +1234,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dump-menu", action="store_true", help="Affiche le menu parsé puis quitte.")
     parser.add_argument("--self-test", action="store_true", help="Lance les tests Textual headless.")
-    parser.add_argument("--internal-run", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     return parser
 
 
@@ -1828,8 +1243,6 @@ def main(argv: list[str]) -> int:
     menu_conf = Path(args.menu_conf).expanduser().resolve()
     python_bin = str(Path(args.python_bin).expanduser())
 
-    if args.internal_run is not None:
-        return run_internal_action(args.internal_run)
     if args.dump_menu:
         return dump_menu(menu_conf)
     if args.self_test:

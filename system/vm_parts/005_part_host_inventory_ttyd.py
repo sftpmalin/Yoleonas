@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 # PART 005 - Inventaire hôte, pools, réseaux, ISO, firmware et ttyd série
 
+from vm_firmware import profile_choices, template_has_keys
+
 
 
 def byid_preference_score(name: str) -> Tuple[int, str]:
@@ -582,9 +584,9 @@ def list_firmware_options(conf: Dict[str, str]) -> List[Dict[str, str]]:
                 path = os.path.join(base, fn)
                 arch = firmware_arch_label(path)
                 nvram = firmware_nvram_template(path)
-                secure = "secboot" in low or "secure" in low or ".ms." in low
+                secure = "secboot" in low or "secure" in low or ".ms." in low or 'snakeoil' in low
                 variants: List[Tuple[str, str]] = [(nvram, "")]
-                if "ovmf" in path.lower():
+                if "ovmf" in path.lower() and secure:
                     for vars_path, vars_label in (
                         ("/usr/share/OVMF/OVMF_VARS_4M.ms.fd", "MS keys / Windows"),
                         ("/usr/share/OVMF/OVMF_VARS_4M.snakeoil.fd", "snakeoil test keys"),
@@ -592,7 +594,7 @@ def list_firmware_options(conf: Dict[str, str]) -> List[Dict[str, str]]:
                         if os.path.exists(vars_path):
                             variants.append((vars_path, vars_label))
                 for variant_nvram, variant_label in variants:
-                    variant_secure = secure or ".ms." in os.path.basename(variant_nvram).lower()
+                    variant_secure = template_has_keys(variant_nvram)
                     label_bits = [fn]
                     if variant_nvram:
                         label_bits.append(os.path.basename(variant_nvram))
@@ -801,6 +803,7 @@ def collect_vm_extra(conf: Dict[str, str]) -> Dict[str, object]:
         "render_nodes": list_render_nodes(conf),
         "isos": list_iso_files(conf, pools),
         "firmware_options": list_firmware_options(conf),
+        "firmware_profiles": profile_choices(),
     }
 
 

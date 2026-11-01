@@ -87,6 +87,17 @@
     height: 34px;
     font-size: 17px;
 }
+.vm-page .vm-reset-btn:not(:disabled) {
+    box-shadow: 0 0 0 1px rgba(255,181,92,.18), 0 0 14px rgba(255,181,92,.16);
+}
+.vm-page .vm-reset-icon {
+    display: inline-block;
+    transform-origin: 50% 50%;
+}
+.vm-page .vm-reset-btn:not(:disabled):hover .vm-reset-icon,
+.vm-page .vm-reset-btn:not(:disabled):focus-visible .vm-reset-icon {
+    animation: vm-reset-spin .55s linear infinite;
+}
 .vm-page .card {
     background: linear-gradient(180deg, #131d2b 0%, #101722 100%);
     border: 1px solid #26364b;
@@ -531,6 +542,7 @@
     animation: vmSpin .75s linear infinite;
 }
 @keyframes vmSpin { to { transform: rotate(360deg); } }
+@keyframes vm-reset-spin { to { transform: rotate(360deg); } }
 @media (max-width: 820px) {
     .vm-page { padding: 8px; }
     .vm-page .topbar,

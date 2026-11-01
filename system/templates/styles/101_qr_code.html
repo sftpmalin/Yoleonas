@@ -1,0 +1,131 @@
+.qr-code-page {
+    display: grid;
+    gap: 18px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+.qr-code-page [hidden] { display: none !important; }
+.qr-code-page .qr-code-card {
+    padding: 24px;
+    background: var(--yoleo-panel);
+    border: 1px solid var(--yoleo-border);
+    border-radius: var(--yoleo-radius);
+}
+.qr-code-page .qr-code-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--yoleo-text);
+    font-size: 14px;
+    font-weight: 700;
+}
+.qr-code-page .qr-code-help {
+    margin: 0 0 12px;
+    color: var(--yoleo-muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+.qr-code-page .yoleo-input {
+    width: 100%;
+    min-height: 44px;
+    padding: 11px 12px;
+    background: var(--yoleo-panel-soft);
+    color: var(--yoleo-text);
+    border: 1px solid var(--yoleo-border);
+    border-radius: 10px;
+    font: inherit;
+}
+.qr-code-page textarea.yoleo-input {
+    display: block;
+    min-height: 170px;
+    line-height: 1.6;
+    resize: vertical;
+}
+.qr-code-page .yoleo-input:focus-visible,
+.qr-code-page .yoleo-btn:focus-visible {
+    outline: 2px solid var(--yoleo-accent-2);
+    outline-offset: 3px;
+}
+.qr-code-page .qr-code-form-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 18px 0 12px;
+}
+.qr-code-page .qr-code-correction { width: min(280px, 100%); }
+.qr-code-page .qr-code-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.qr-code-page .yoleo-btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 44px;
+    padding: 11px 18px;
+    background: var(--yoleo-panel-soft);
+    color: var(--yoleo-text);
+    border: 1px solid var(--yoleo-border);
+    border-radius: 10px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.qr-code-page .yoleo-btn:not(:disabled):hover {
+    border-color: var(--yoleo-accent);
+    filter: brightness(1.1);
+}
+.qr-code-page .yoleo-btn-primary {
+    background: var(--yoleo-accent);
+    border-color: var(--yoleo-accent);
+    color: #fff;
+}
+.qr-code-page .yoleo-btn:disabled { opacity: .45; cursor: not-allowed; }
+.qr-code-page #qrCodeGenerate { min-width: 150px; }
+.qr-code-page .qr-code-result {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    align-items: center;
+    gap: 32px;
+}
+.qr-code-page .qr-code-preview {
+    display: grid;
+    place-items: center;
+    width: min(320px, 100%);
+    aspect-ratio: 1;
+    padding: 12px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid var(--yoleo-border);
+    border-radius: 12px;
+}
+.qr-code-page #qrCodeImage { display: block; width: 100%; height: 100%; object-fit: contain; }
+.qr-code-page .qr-code-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    color: #64748b;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.qr-code-page .qr-code-placeholder img { opacity: .6; filter: grayscale(1); }
+.qr-code-page .qr-code-export { min-width: 0; }
+.qr-code-page .qr-code-export h2 { margin: 0 0 12px; font-size: 19px; }
+.qr-code-page #qrCodeSize { max-width: 280px; }
+.qr-code-page .qr-code-downloads { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 12px; }
+.qr-code-page .qr-code-status { margin: 16px 0 0; color: var(--yoleo-success); font-size: 13px; }
+.qr-code-page .qr-code-error { margin: 12px 0 0; color: var(--yoleo-danger); font-size: 14px; line-height: 1.6; }
+@media (max-width: 760px) {
+    .qr-code-page .qr-code-card { padding: 18px; }
+    .qr-code-page .qr-code-result { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .qr-code-page .qr-code-preview { margin: 0 auto; }
+}
+@media (max-width: 420px) {
+    .qr-code-page .qr-code-form-bottom { align-items: stretch; }
+    .qr-code-page .qr-code-correction,
+    .qr-code-page .qr-code-actions,
+    .qr-code-page .qr-code-actions .yoleo-btn,
+    .qr-code-page .qr-code-downloads .yoleo-btn { width: 100%; }
+}

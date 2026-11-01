@@ -632,11 +632,10 @@
         const tr = button.closest('tr');
         if (tr && !validateSambaShareRow(tr, { strict: true })) return false;
         if (tr) syncSambaPublicShareControls(tr);
-        const values = tr ? shareRowValues(tr) : {};
         const ok = await saveAndApplySambaShares(button, 'Partage enregistre et configuration Samba appliquee.');
         if (ok && tr) {
             tr.dataset.shareStatus = 'ok';
-            renderReadonlySambaShareRow(tr, values);
+            renderReadonlySambaShareRow(tr, shareRowValues(tr));
         }
         return ok;
     }
@@ -1167,11 +1166,28 @@
         });
     }
 
+    function syncSavedSambaAccess(samba) {
+        if (!samba || !Array.isArray(samba.shares)) return;
+        Object.assign(SAMBA_BASE, samba);
+        document.querySelectorAll('#sambaSharesTable tbody tr').forEach(tr => {
+            const current = shareRowValues(tr);
+            const saved = samba.shares.find(share => share.name === current.name && share.path === current.path);
+            if (!saved) return;
+            ['read_users', 'write_users', 'type'].forEach(key => {
+                const input = tr.querySelector('[data-share="' + key + '"]');
+                if (input) input.value = key === 'type' ? (saved.type || 'normal') : normalizeSambaUserCsv(saved[key]);
+            });
+            if (tr.dataset.originalShare) tr.dataset.originalShare = JSON.stringify(shareRowValues(tr));
+        });
+        refreshAllSambaAccessSummaries();
+    }
+
     async function saveSamba(button, successMessage = 'Enregistrement terminé.', options = {}) {
         if (!validateSambaSharesBeforeSave()) return false;
         setButtonLoading(button, 'Enregistrement…');
         try {
-            await postJson(URLS.saveSamba, collectSamba());
+            const data = await postJson(URLS.saveSamba, collectSamba());
+            syncSavedSambaAccess(data.samba);
             if (!options.silentSuccess) showMessage(successMessage, true);
             return true;
         } catch (e) {

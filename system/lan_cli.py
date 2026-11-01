@@ -48,6 +48,8 @@ SHIM_IF = os.environ.get("SHIM_IF", "mv-host")
 SHIM_IP_CIDR = os.environ.get("SHIM_IP_CIDR", "192.168.1.253/32")
 MACVLAN_MODE = os.environ.get("MACVLAN_MODE", "bridge")
 SERVICE_NAME = os.environ.get("SERVICE_NAME", "yoleo-macvlan-host.service")
+DOCKER_HOST_SOURCE_SCRIPT = Path(os.environ.get("DOCKER_HOST_SOURCE_SCRIPT", str(SCRIPT_DIR.parent / "scripts" / "lan_docker_host.sh")))
+DOCKER_HOST_RUNTIME_SCRIPT = Path(os.environ.get("DOCKER_HOST_RUNTIME_SCRIPT", "/usr/bin/lan-253.sh"))
 DOCKER_LAN_STATE_FILE = Path(os.environ.get("DOCKER_LAN_STATE_FILE", str(SCRIPT_DIR.parent / "conf" / "docker_lan.json")))
 
 
@@ -797,6 +799,12 @@ def docker_host_down_action() -> str:
 def docker_host_install_systemd_action() -> str:
     need_root()
     need_cmd("systemctl", "systemd")
+    source_script = DOCKER_HOST_SOURCE_SCRIPT if DOCKER_HOST_SOURCE_SCRIPT.exists() else DOCKER_HOST_RUNTIME_SCRIPT
+    if not source_script.exists():
+        raise LanError(f"Script Docker LAN host introuvable : {DOCKER_HOST_SOURCE_SCRIPT}")
+    if source_script.resolve() != DOCKER_HOST_RUNTIME_SCRIPT.resolve():
+        shutil.copy2(source_script, DOCKER_HOST_RUNTIME_SCRIPT)
+    DOCKER_HOST_RUNTIME_SCRIPT.chmod(0o755)
     service_path = Path("/etc/systemd/system") / SERVICE_NAME
     service_path.write_text(
         f"""[Unit]
@@ -813,8 +821,8 @@ Environment=SHIM_IF={SHIM_IF}
 Environment=SHIM_IP_CIDR={SHIM_IP_CIDR}
 Environment=MACVLAN_MODE={MACVLAN_MODE}
 Environment=SERVICE_NAME={SERVICE_NAME}
-ExecStart={SERVICE_PYTHON} {SCRIPT_PATH} --action docker-host-up
-ExecStop={SERVICE_PYTHON} {SCRIPT_PATH} --action docker-host-down
+ExecStart={DOCKER_HOST_RUNTIME_SCRIPT} up
+ExecStop={DOCKER_HOST_RUNTIME_SCRIPT} down
 
 [Install]
 WantedBy=multi-user.target
@@ -822,6 +830,7 @@ WantedBy=multi-user.target
         encoding="utf-8",
     )
     outputs = [
+        f"Script installé : {DOCKER_HOST_RUNTIME_SCRIPT}",
         f"Service écrit : {service_path}",
         checked(["systemctl", "daemon-reload"], timeout=60),
         checked(["systemctl", "enable", SERVICE_NAME], timeout=60),

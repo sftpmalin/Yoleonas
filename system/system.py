@@ -31,6 +31,8 @@ SYSTEM_APP_CONF_REQUIRED_MODULES = [
     "task=task",
     "scripts=scripts",
     "meteo=meteo",
+    "qr_code=qr_code",
+    "speedtest=speedtest",
     "terminal=terminal",
 ]
 

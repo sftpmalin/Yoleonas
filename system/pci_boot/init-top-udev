@@ -1,0 +1,11 @@
+#!/bin/sh
+# Preserve Debian's udev startup, reserving selected PCI functions just before it.
+if [ "${1:-}" = prereqs ]; then
+    if [ -x /usr/share/initramfs-tools/scripts/init-top/udev ]; then
+        exec /usr/share/initramfs-tools/scripts/init-top/udev prereqs
+    fi
+    exit 0
+fi
+
+/scripts/yoleo-pci-reserve || echo 'Yoleo PCI: reservation incomplete' >/dev/kmsg
+exec /scripts/yoleo-original-udev "$@"

@@ -1,0 +1,172 @@
+/* Partage / Samba client : profils CIFS manuels */
+.partage-smb-client-page-v1 {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.partage-smb-client-topline-v1 {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
+}
+
+.partage-smb-client-summary-v1 {
+    grid-template-columns: minmax(150px, .7fr) minmax(150px, .7fr) minmax(300px, 1.5fr) !important;
+    margin: 0 !important;
+}
+
+.partage-smb-client-wide-v1 {
+    min-width: min(100%, 300px);
+}
+
+.partage-smb-client-page-v1 .code-inline {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: .86rem;
+}
+
+.partage-smb-client-manual-note-v1 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #b8c7d9;
+    font-size: 12px;
+}
+
+.partage-smb-client-table-wrap-v1 table {
+    min-width: 1080px;
+}
+
+.partage-smb-client-table-wrap-v1 table th:nth-child(3),
+.partage-smb-client-table-wrap-v1 table td:nth-child(3),
+.partage-smb-client-table-wrap-v1 table th:nth-child(4),
+.partage-smb-client-table-wrap-v1 table td:nth-child(4),
+.partage-smb-client-table-wrap-v1 table th:nth-child(5),
+.partage-smb-client-table-wrap-v1 table td:nth-child(5) {
+    width: 140px;
+}
+
+.partage-smb-client-table-wrap-v1 table th:last-child,
+.partage-smb-client-table-wrap-v1 table td:last-child {
+    width: 190px;
+}
+
+.partage-smb-client-row-actions-v1 {
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+}
+
+.partage-smb-client-row-actions-v1 form {
+    margin: 0;
+}
+
+.partage-smb-client-modal-box-v1 {
+    max-height: min(92vh, 850px);
+    overflow: auto;
+}
+
+.partage-smb-client-modal-head-v1 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.partage-smb-client-credentials-v1 {
+    grid-template-columns: repeat(2, minmax(220px, 1fr)) !important;
+}
+
+.partage-smb-client-browse-line-v1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.partage-smb-client-mode-v1 {
+    min-height: 40px;
+    align-items: center;
+}
+
+.partage-smb-client-permissions-hint-v1 {
+    margin-top: 4px !important;
+}
+
+.partage-smb-client-modal-status-v1 {
+    margin-top: 14px;
+    margin-bottom: 0 !important;
+}
+
+.partage-smb-client-share-panel-v1 {
+    display: grid;
+    grid-template-columns: minmax(260px, .85fr) minmax(320px, 1.15fr);
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.partage-smb-client-share-panel-v1[hidden] {
+    display: none;
+}
+
+.partage-smb-client-share-select-v1 {
+    min-height: 150px;
+}
+
+.partage-smb-client-modal-actions-v1 {
+    margin-top: 18px;
+}
+
+.partage-page .partage-smb-client-delete-dialog-v1 {
+    box-sizing: border-box;
+    width: min(540px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+    margin: auto;
+    color: #eaf2ff;
+}
+
+.partage-page .partage-smb-client-delete-dialog-v1:not([open]) {
+    display: none;
+}
+
+.partage-smb-client-delete-dialog-v1::backdrop {
+    background: rgba(0, 0, 0, .72);
+    backdrop-filter: blur(4px);
+}
+
+.partage-smb-client-delete-details-v1 {
+    padding: 12px;
+    border: 1px solid #30435b;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, .18);
+    overflow-wrap: anywhere;
+}
+
+.partage-smb-client-delete-dialog-v1 p {
+    color: #b8c7d9;
+    line-height: 1.6;
+    margin: 16px 0;
+}
+
+@media (max-width: 900px) {
+    .partage-smb-client-topline-v1,
+    .partage-smb-client-credentials-v1,
+    .partage-smb-client-share-panel-v1 {
+        grid-template-columns: 1fr !important;
+    }
+
+    .partage-smb-client-summary-v1 {
+        grid-template-columns: 1fr !important;
+    }
+
+    .partage-smb-client-header-actions-v1 .yoleo-btn {
+        width: 100%;
+    }
+
+    .partage-smb-client-browse-line-v1 {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

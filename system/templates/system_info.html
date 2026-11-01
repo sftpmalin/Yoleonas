@@ -24,14 +24,25 @@
         white-space: normal;
     }
 
-    .system-info-gpu-card .system-info-table th:nth-child(2),
-    .system-info-gpu-card .system-info-table td:nth-child(2),
+    .system-info-gpu-card .system-info-table th:nth-child(3),
+    .system-info-gpu-card .system-info-table td:nth-child(3),
     .system-info-inventory-card .system-info-table th:nth-child(3),
     .system-info-inventory-card .system-info-table td:nth-child(3),
     .system-info-usb-table th:nth-child(4),
     .system-info-usb-table td:nth-child(4) {
         min-width: 220px;
     }
+
+    .system-info-pci-table th:first-child,
+    .system-info-pci-table td:first-child,
+    .system-info-gpu-card th:first-child,
+    .system-info-gpu-card td:first-child { width: 76px; text-align: center; }
+    .pci-exclusion-check { width: 19px; height: 19px; accent-color: #a855f7; cursor: pointer; }
+    .pci-exclusion-check:disabled { cursor: default; opacity: .45; }
+    .pci-exclusion-help { padding: 0 14px 10px; color: var(--muted, #aab6c8); font-size: 12px; }
+    .pci-exclusion-status { margin: 0 14px 12px; padding: 10px 12px; border: 1px solid #2ecc7166; border-radius: 9px; background: #2ecc7114; color: #a8efbf; }
+    .pci-exclusion-status.error { color: #ffd4d4; border-color: #e74c3c88; background: #e74c3c14; }
+    .pci-exclusion-driver { display: block; font-size: 11px; color: var(--muted, #aab6c8); margin-top: 4px; }
 
     @media (max-width: 980px) {
         .system-info-card.system-info-gpu-card,
@@ -47,6 +58,22 @@
 </style>
 <section class="system-info-page">
     <div class="system-info-grid">
+        <article class="system-info-card system-info-certificate-card" aria-labelledby="https-local-title">
+            <div class="system-info-card-head">
+                <h2 id="https-local-title">HTTPS local</h2>
+                <a class="yoleo-btn yoleo-btn-primary" href="{{ url_for('system_bp.system_https_certificate') }}" download="YoLeo-local.crt">📥 Télécharger le certificat HTTPS</a>
+            </div>
+            <div class="system-info-certificate-body">
+                <p>Installe ce certificat de confiance une seule fois sur ton PC pour ouvrir YoLeo en HTTPS local sans avertissement du navigateur.</p>
+                <details>
+                    <summary>Comment installer le certificat ?</summary>
+                    <p><strong>Windows :</strong> ouvre <strong>YoLeo-local.crt</strong>, clique sur <strong>Installer le certificat…</strong>, puis choisis <strong>Ordinateur local</strong>. Sélectionne <strong>Placer tous les certificats dans le magasin suivant</strong> et <strong>Autorités de certification racines de confiance</strong>. Termine l’installation, puis ferme et rouvre ton navigateur.</p>
+                    <p><strong>Firefox, si nécessaire :</strong> dans <strong>Paramètres → Vie privée et sécurité → Certificats → Afficher les certificats → Autorités → Importer</strong>, sélectionne le fichier CRT et autorise cette autorité à identifier des sites web.</p>
+                    <p>Utilise ensuite <strong>https://yoleo.local:12345</strong> ou l’adresse IP locale du NAS en HTTPS.</p>
+                </details>
+            </div>
+        </article>
+
         {% if home_config.show_host|default('1')|int or home_config.show_uptime|default('1')|int %}
         <article class="system-info-card system-info-wide">
             <div class="system-info-card-head">
@@ -184,12 +211,14 @@
         <article class="system-info-card system-info-wide system-info-gpu-card">
             <div class="system-info-card-head">
                 <h2>GPU</h2>
-                <span>NVIDIA locale + Intel local / SSH optionnel</span>
+                <span>Cartes locales · sélection indépendante par adresse PCI</span>
             </div>
+            <p class="pci-exclusion-help">Coche les GPU à réserver aux VM au prochain démarrage. Chaque carte se sélectionne séparément ; les GPU distants en SSH ne sont pas concernés.</p>
             <div class="system-table-wrap">
                 <table class="system-info-table">
                     <thead>
                         <tr>
+                            <th>Exclure</th>
                             <th>Type</th>
                             <th>Nom</th>
                             <th>Charge</th>
@@ -200,7 +229,7 @@
                         </tr>
                     </thead>
                     <tbody id="info-gpu-rows">
-                        <tr><td colspan="7">Chargement des informations GPU...</td></tr>
+                        <tr><td colspan="8">Chargement des informations GPU...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -209,13 +238,16 @@
 
         <article class="system-info-card system-info-wide system-info-inventory-card">
             <div class="system-info-card-head">
-                <h2>Autres cartes PCI</h2>
+                <h2>Cartes PCI</h2>
                 <span id="info-pci-summary">lspci</span>
             </div>
+            <p class="pci-exclusion-help">Coche une carte pour la réserver à une VM au prochain démarrage. Enregistrement automatique. Pour une carte multifonction, sélectionne aussi ses fonctions associées (audio, USB…).</p>
+            <p id="info-pci-status" class="pci-exclusion-status" role="status" aria-live="polite" hidden></p>
             <div class="system-table-wrap">
                 <table class="system-info-table system-info-pci-table">
                     <thead>
                         <tr>
+                            <th>Exclure</th>
                             <th>Adresse</th>
                             <th>Classe</th>
                             <th>Identification</th>
@@ -223,7 +255,7 @@
                         </tr>
                     </thead>
                     <tbody id="info-pci-rows">
-                        <tr><td colspan="4">Chargement des cartes PCI...</td></tr>
+                        <tr><td colspan="5">Chargement des cartes PCI...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -303,19 +335,35 @@
     }
 
     function renderGpuRows(gpus) {
+        if (Array.isArray(gpus)) gpuStats = gpus;
         const tbody = document.getElementById('info-gpu-rows');
-        if (!tbody) return;
-        const list = Array.isArray(gpus) ? gpus.filter(gpu => {
+        if (!tbody || pciPending.size) return;
+        const metrics = gpuStats.filter(gpu => {
             const type = String(gpu.type || '').toLowerCase().replace(/-/g, '_');
             const source = String(gpu.source || '').toLowerCase();
             if (type === 'intel') return Boolean(INFO_ENABLED.intelGpu);
             if (type === 'nvidia_ssh' || (type === 'nvidia' && source === 'ssh')) return Boolean(INFO_ENABLED.nvidiaSsh);
             if (type === 'nvidia_local' || (type === 'nvidia' && source !== 'ssh')) return Boolean(INFO_ENABLED.nvidiaLocal);
             return false;
-        }) : [];
+        });
+        const names = new Map(inventoryRows(pciInventory).map(row => [row.slot, row.name]));
+        const localMetrics = new Map(metrics.filter(gpu => gpu.source !== 'ssh' && gpu.type !== 'nvidia_ssh' && gpu.pci_address).map(gpu => [gpu.pci_address, gpu]));
+        // L'inventaire PCI reste complet même lorsque le GPU appartient à vfio-pci
+        // et n'apparaît plus dans les mesures de son ancien pilote.
+        const list = Object.values(pciState.devices || {}).filter(device => String(device.class || '').toLowerCase().startsWith('0x03')).map(device => {
+            const metric = localMetrics.get(device.address) || {};
+            const vendor = {8086: 'intel', '10de': 'nvidia_local', '1002': 'amd'}[device.vendor] || 'GPU';
+            return {...metric, type: vendor, source: 'local', pci_address: device.address,
+                name: names.get(device.address) || metric.name || `GPU ${device.vendor}:${device.device}`};
+        });
+        const addresses = new Set(list.map(gpu => gpu.pci_address));
+        // Les mesures distantes restent visibles sans aucune case locale.
+        metrics.forEach(gpu => {
+            if (gpu.source === 'ssh' || gpu.type === 'nvidia_ssh' || !addresses.has(gpu.pci_address)) list.push(gpu);
+        });
 
         if (!list.length) {
-            tbody.innerHTML = '<tr><td colspan="7">Aucune donnée GPU active ou détectée.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8">Aucun GPU détecté.</td></tr>';
             return;
         }
 
@@ -324,10 +372,12 @@
             const isIntel = rawType === 'intel';
             const isRemote = gpu.source === 'ssh' || rawType === 'nvidia_ssh';
             const type = isIntel ? 'INTEL' : (rawType.startsWith('nvidia') ? 'NVIDIA' : String(gpu.type || 'GPU').toUpperCase());
-            const source = isRemote ? 'SSH' : (isIntel ? 'Intel local' : 'NVIDIA local');
+            const source = isRemote ? 'SSH' : (isIntel ? 'Intel local' : (rawType.startsWith('nvidia') ? 'NVIDIA local' : 'Local'));
+            const address = !isRemote ? gpu.pci_address : '';
             return `<tr>
+                <td>${address ? `<input type="checkbox" class="pci-exclusion-check" data-pci-address="${esc(address)}" aria-label="Exclure le GPU ${esc(gpu.name || 'GPU')} (${esc(address)}) au démarrage" disabled>` : '—'}</td>
                 <td>${esc(type)}</td>
-                <td>${esc(gpu.name || gpu.label || '—')}</td>
+                <td>${esc(gpu.name || gpu.label || '—')}${address ? `<span class="pci-exclusion-driver">${esc(address)}</span><span class="pci-exclusion-driver" data-pci-driver="${esc(address)}"></span>` : ''}</td>
                 <td>${esc(formatGpuValue(gpu.load, '%'))}</td>
                 <td>${esc(formatGpuValue(gpu.mem, '%'))}</td>
                 <td>${esc(formatGpuValue(gpu.temp, '°C'))}</td>
@@ -335,6 +385,7 @@
                 <td>${esc(source)}</td>
             </tr>`;
         }).join('');
+        syncPciControls();
     }
 
 
@@ -355,20 +406,123 @@
 
     function renderPciRows(payload) {
         const tbody = document.getElementById('info-pci-rows');
-        if (!tbody) return;
+        if (!tbody || pciPending.size) return;
         updateInventorySummary('info-pci-summary', payload, 'lspci');
-        const rows = inventoryRows(payload);
+        const rows = inventoryRows(payload).slice();
+        const present = new Set(rows.map(row => row.slot));
+        Object.values(pciState.devices || {}).forEach(device => {
+            if (device.excluded && !present.has(device.address)) {
+                rows.push({slot: device.address, class: 'Carte absente', name: 'Exclusion enregistrée pour une carte absente', id: `${device.vendor}:${device.device}`});
+            }
+        });
         if (!rows.length) {
-            tbody.innerHTML = '<tr><td colspan="4">Aucune autre carte PCI détectée.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5">Aucune carte PCI détectée.</td></tr>';
             return;
         }
         tbody.innerHTML = rows.map(row => `<tr>
+            <td><input type="checkbox" class="pci-exclusion-check" data-pci-address="${esc(row.slot)}" aria-label="Exclure ${esc(row.name || row.slot)} au démarrage" disabled></td>
             <td>${esc(row.slot || '—')}</td>
             <td>${esc(row.class || '—')}</td>
-            <td>${esc(row.name || '—')}</td>
+            <td>${esc(row.name || '—')}<span class="pci-exclusion-driver" data-pci-driver="${esc(row.slot)}"></span></td>
             <td>${esc(row.id || '—')}</td>
         </tr>`).join('');
+        syncPciControls();
     }
+
+    let pciState = {devices: {}};
+    let pciInventory = {};
+    let gpuStats = [];
+    const pciPending = new Map();
+    let pciReadSequence = 0;
+    let pciSaveSequence = 0;
+
+    function pciFlash(message, error = false) {
+        const stack = document.createElement('div');
+        stack.className = 'flash-stack yoleo-page-flash';
+        const item = document.createElement('div');
+        item.className = 'flash-msg ' + (error ? 'error' : 'success');
+        item.textContent = message;
+        stack.appendChild(item);
+        document.querySelector('.system-info-page').appendChild(stack);
+    }
+
+    function syncPciControls() {
+        document.querySelectorAll('[data-pci-address]').forEach(input => {
+            const address = input.dataset.pciAddress;
+            const device = (pciState.devices || {})[address];
+            input.checked = pciPending.has(address) ? pciPending.get(address) : Boolean(device && device.excluded);
+            const protectedReason = device && !device.excluded ? device.protected_reason : '';
+            input.disabled = pciPending.has(address) || !pciState.supported || !device || Boolean(protectedReason);
+            input.title = protectedReason || (device && !device.identity_matches ? 'La carte a été remplacée. Décoche cette ancienne exclusion.' : 'Réserver cette fonction PCI à une VM au prochain démarrage');
+            const label = input.closest('tr').querySelector('[data-pci-driver]');
+            if (label && device) {
+                const parts = [];
+                if (device.driver) parts.push('Pilote actuel : ' + device.driver);
+                if (device.iommu_group) parts.push('Groupe IOMMU : ' + device.iommu_group);
+                if (protectedReason) parts.push(protectedReason);
+                label.textContent = parts.join(' · ');
+            }
+        });
+        const notice = document.getElementById('info-pci-status');
+        notice.textContent = pciState.message || '';
+        notice.hidden = !pciState.message;
+        notice.classList.toggle('error', pciState.phase === 'error');
+    }
+
+    function acceptPciState(data, announce = false) {
+        if (Number(data.revision || 0) < Number(pciState.revision || 0)) return;
+        const completed = ['queued', 'running'].includes(pciState.phase) && !['queued', 'running'].includes(data.phase);
+        pciState = data;
+        renderGpuRows();
+        syncPciControls();
+        if (data.message && (announce || completed)) pciFlash(data.message, data.phase === 'error');
+    }
+
+    async function loadPciState() {
+        const sequence = ++pciReadSequence;
+        const saves = pciSaveSequence;
+        try {
+            const response = await fetch('/system/api/pci-exclusions', {cache: 'no-store'});
+            const data = await response.json();
+            if (!response.ok || !data.ok) throw new Error(data.message || 'HTTP ' + response.status);
+            if (sequence !== pciReadSequence || saves !== pciSaveSequence || pciPending.size) return;
+            acceptPciState(data);
+        } catch (error) {
+            if (!pciPending.size) {
+                pciState = {...pciState, phase: 'error', message: 'Exclusions PCI : ' + (error.message || error)};
+                syncPciControls();
+            }
+        }
+    }
+
+    document.querySelector('.system-info-page').addEventListener('change', async event => {
+        const input = event.target.closest('[data-pci-address]');
+        if (!input) return;
+        const address = input.dataset.pciAddress;
+        const excluded = input.checked;
+        if (pciPending.has(address)) return;
+        pciPending.set(address, excluded);
+        ++pciSaveSequence;
+        syncPciControls();
+        try {
+            const response = await fetch('/system/api/pci-exclusions', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({address, excluded})
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) throw new Error(data.message || 'HTTP ' + response.status);
+            acceptPciState(data, true);
+        } catch (error) {
+            input.checked = !excluded;
+            pciFlash(error.message || String(error), true);
+        } finally {
+            pciPending.delete(address);
+            ++pciSaveSequence;
+            syncPciControls();
+            renderGpuRows();
+            loadPciState();
+        }
+    });
 
     function renderUsbRows(payload) {
         const tbody = document.getElementById('info-usb-rows');
@@ -410,7 +564,9 @@
         setText('info-ip-gateway', host.default_gateway);
         setText('info-net-status', host.iface_state);
         setText('info-net-link', host.iface_speed);
-        renderPciRows(host.pci_devices || {});
+        pciInventory = host.pci_devices || {};
+        renderPciRows(pciInventory);
+        renderGpuRows();
         renderUsbRows(host.usb_devices || {});
     }
 
@@ -555,8 +711,10 @@
     };
 
     window.systemInfoRefresh();
+    loadPciState();
     loadAdminSummary(true);
     setInterval(window.systemInfoRefresh, 5000);
+    setInterval(loadPciState, 2000);
     setInterval(() => loadAdminSummary(true), 60000);
 })();
 </script>

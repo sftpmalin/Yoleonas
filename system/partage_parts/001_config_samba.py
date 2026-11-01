@@ -1176,6 +1176,39 @@ def load_samba_config(conf_path: Path | None = None) -> SambaConfig:
     return sync_samba_users_from_linux(cfg)
 
 
+def remove_missing_samba_share_users(cfg: SambaConfig) -> list[dict]:
+    """Revalide les accès à l'enregistrement, sans modifier la simple lecture.
+
+    Un ancien compte peut encore figurer dans la base Samba après sa suppression
+    Linux. Il ne doit ni bloquer tous les partages ni être recréé automatiquement.
+    """
+    existing: dict[str, bool] = {}
+    removed: list[dict] = []
+
+    def exists(name: str) -> bool:
+        if name not in existing:
+            existing[name] = user_exists(name)
+        return existing[name]
+
+    for share in cfg.shares:
+        read_users = normalize_samba_user_list(share.read_users)
+        write_users = normalize_samba_user_list(share.write_users)
+        referenced = normalize_samba_user_list([*read_users, *write_users, share.owner])
+        missing = [name for name in referenced if not exists(name)]
+        if not missing:
+            continue
+        share.read_users = [name for name in read_users if exists(name)]
+        share.write_users = [name for name in write_users if exists(name)]
+        if share.owner in missing:
+            remaining = share.write_users or share.read_users
+            share.owner = remaining[0] if remaining else ""
+        share.writable = "yes" if share.access_mode != "public" and share.write_users else "no"
+        if share.share_type == "root" and not samba_share_allows_root(share):
+            share.share_type = "normal"
+        removed.append({"share": share.name, "users": missing})
+    return removed
+
+
 def validate_samba_config(cfg: SambaConfig) -> list[str]:
     errors: list[str] = []
     for label, value in (

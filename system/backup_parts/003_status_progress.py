@@ -63,13 +63,37 @@ def clear_stale_lock(filename):
     return False
 
 
-def global_lock_file():
+def normalized_backup_lock_group(mode):
+    value = str(mode or 'backup').strip().lower()
+    if value == 'mirror':
+        return 'backup'
+    if value in {'backup', 'archive', 'cache'}:
+        return value
+    return 'backup'
+
+
+def script_backup_lock_group(filename):
+    try:
+        path = safe_script_path(filename)
+        metadata = extract_script_metadata(read_text(path, ''))
+        return normalized_backup_lock_group(metadata.get('MODE'))
+    except Exception:
+        return 'backup'
+
+
+def mode_lock_file(lock_group):
+    settings = ensure_layout()
+    group = normalized_backup_lock_group(lock_group)
+    return os.path.join(settings['STATUS_DIR'], f'.backup_{group}.lock')
+
+
+def legacy_global_lock_file():
     settings = ensure_layout()
     return os.path.join(settings['STATUS_DIR'], '.backup_global.lock')
 
 
-def read_global_lock_file():
-    raw = read_text(global_lock_file(), '').strip()
+def read_lock_payload_file(path):
+    raw = read_text(path, '').strip()
     if not raw:
         return {}
     try:
@@ -78,50 +102,63 @@ def read_global_lock_file():
         return {'pid': raw}
 
 
+def read_global_lock_file(filename=None):
+    lock_group = script_backup_lock_group(filename) if filename else 'backup'
+    current = read_lock_payload_file(mode_lock_file(lock_group))
+    if current:
+        return current
+    return read_lock_payload_file(legacy_global_lock_file())
+
+
 def cleanup_stale_global_lock_file():
-    info = read_global_lock_file()
-    if not info:
-        return False
-    pid = info.get('pid')
-    if not pid or not pid_alive(pid):
-        try:
-            os.remove(global_lock_file())
-            return True
-        except FileNotFoundError:
-            return False
-        except Exception:
-            return False
-    return False
+    removed = False
+    paths = [mode_lock_file(group) for group in ('backup', 'archive', 'cache')]
+    paths.append(legacy_global_lock_file())
+    for path in paths:
+        info = read_lock_payload_file(path)
+        if not info:
+            continue
+        pid = info.get('pid')
+        if not pid or not pid_alive(pid):
+            try:
+                os.remove(path)
+                removed = True
+            except FileNotFoundError:
+                pass
+            except Exception:
+                pass
+    return removed
 
 
 def remove_global_lock_for_script(filename, pid=None):
     """Nettoyage de secours côté Flask.
-    Le script enfant nettoie normalement le verrou global lui-même. Mais si Flask
-    force un arrêt ou si le signal arrive au mauvais moment, on enlève le verrou
-    uniquement s'il appartient au script/PID arrêté, ou s'il est déjà obsolète.
+    Le script enfant nettoie normalement son verrou de catégorie lui-même. Mais si
+    Flask force un arrêt ou si le signal arrive au mauvais moment, on enlève un
+    verrou uniquement s'il appartient au script/PID arrêté, ou s'il est obsolète.
     """
-    info = read_global_lock_file()
-    if not info:
-        return False
-
     safe_name = os.path.basename(slugify_filename(filename))
-    lock_pid = str(info.get('pid') or '')
     wanted_pid = str(pid or '')
-    lock_script = str(info.get('script') or '')
-
-    owned_by_pid = bool(wanted_pid and lock_pid == wanted_pid)
-    owned_by_script = bool(lock_script and lock_script == safe_name)
-    stale = bool(lock_pid and not pid_alive(lock_pid)) or not lock_pid
-
-    if owned_by_pid or owned_by_script or stale:
-        try:
-            os.remove(global_lock_file())
-            return True
-        except FileNotFoundError:
-            return False
-        except Exception:
-            return False
-    return False
+    removed = False
+    paths = [mode_lock_file(group) for group in ('backup', 'archive', 'cache')]
+    paths.append(legacy_global_lock_file())
+    for path in paths:
+        info = read_lock_payload_file(path)
+        if not info:
+            continue
+        lock_pid = str(info.get('pid') or '')
+        lock_script = os.path.basename(str(info.get('script') or ''))
+        owned_by_pid = bool(wanted_pid and lock_pid == wanted_pid)
+        owned_by_script = bool(lock_script and lock_script == safe_name)
+        stale = bool(lock_pid and not pid_alive(lock_pid)) or not lock_pid
+        if owned_by_pid or owned_by_script or stale:
+            try:
+                os.remove(path)
+                removed = True
+            except FileNotFoundError:
+                pass
+            except Exception:
+                pass
+    return removed
 
 
 def parse_rsync_size_to_bytes(value):
@@ -454,6 +491,9 @@ def infer_finished_status_from_log(filename, data=None):
     success_markers = (
         '[OK] Terminé avec succès',
         'Terminé avec succès',
+        '[OK] Archive terminée',
+        '[OK] Skip : aucun changement',
+        '[OK] Cache deplace avec succes',
     )
     error_markers = (
         '[ERREUR]',
@@ -468,10 +508,21 @@ def infer_finished_status_from_log(filename, data=None):
     )
 
     if any(marker in normalized for marker in success_markers):
+        final_message = 'Terminé avec succès'
+        for line in reversed(normalized.splitlines()):
+            clean_line = line.strip()
+            if any(clean_line.startswith(marker) for marker in (
+                '[OK] Terminé avec succès',
+                '[OK] Archive terminée',
+                '[OK] Skip : aucun changement',
+                '[OK] Cache deplace avec succes',
+            )):
+                final_message = clean_line[5:].strip() or final_message
+                break
         current.update({
             'running': False,
             'result': 'Succès',
-            'message': 'Terminé avec succès',
+            'message': final_message,
             'started_at': started_at,
             'ended_at': ended_at,
             'pid': pid,
@@ -544,6 +595,13 @@ def relaunch_waiting_backup(filename, data):
         script_path = safe_script_path(safe_name)
         if not os.path.exists(script_path):
             raise FileNotFoundError('Script introuvable : ' + safe_name)
+        safety_error = cache_script_launch_safety_error(script_path)
+        if safety_error:
+            raise RuntimeError(
+                (safety_error.get('message') or 'Lancement Cache refusé')
+                + ' '
+                + (safety_error.get('note') or '')
+            )
         python_bin = settings.get('PYTHON_BIN') or '/usr/local/bin/python3'
         log_path = log_file_for(safe_name)
         launch_time = now_label()
@@ -599,6 +657,18 @@ def read_status(filename):
     if data.get('running') and data.get('result') == 'En attente' and not data.get('phase'):
         data['phase'] = 'waiting'
 
+    # Répare aussi les statuts "Inconnu" déjà écrits par une ancienne
+    # condition de course : le dernier marqueur final du lancement courant dans
+    # le log reste la source de vérité.
+    if not data.get('running') and data.get('result') == 'Inconnu':
+        inferred = infer_finished_status_from_log(filename, data)
+        if inferred:
+            data = inferred
+            try:
+                write_status_file(filename, **data)
+            except Exception:
+                pass
+
     lock_path = lock_file_for(filename)
     lock_pid = read_text(lock_path, '').strip() if os.path.exists(lock_path) else ''
     status_pid = data.get('pid')
@@ -606,16 +676,16 @@ def read_status(filename):
 
     if data.get('running') and str(data.get('phase') or '').lower() == 'waiting':
         # Une sauvegarde en attente doit rester vivante jusqu'à obtenir le verrou
-        # global. Si son PID/session tmux disparaît, on ne la transforme pas en
+        # de sa catégorie. Si son PID/session tmux disparaît, on ne la transforme pas en
         # "Arrêté" depuis un vieux log : on relance uniquement cette attente.
         #
         # Bug corrigé : quand plusieurs backups sont lancés ensemble, le second
-        # peut obtenir le verrou global et commencer réellement à copier, mais
+        # peut obtenir le verrou de sa catégorie et commencer réellement à copier, mais
         # l'interface peut encore lire un dernier status.json marqué "waiting".
-        # Le verrou global est la source fiable : s'il appartient maintenant à
+        # Le verrou de catégorie est la source fiable : s'il appartient maintenant à
         # ce script/PID, on force l'affichage "En cours" au lieu de rester en
         # badge bleu "En attente" jusqu'à la fin.
-        global_owner = read_global_lock_file()
+        global_owner = read_global_lock_file(filename)
         global_pid = str(global_owner.get('pid') or '')
         global_script = os.path.basename(str(global_owner.get('script') or ''))
         safe_filename = os.path.basename(slugify_filename(filename))
@@ -742,6 +812,7 @@ def build_list_entry(path):
         'archive_children': meta.get('ARCHIVE_CHILDREN', '1') == '1',
         'archive_date_suffix': meta.get('DATE_SUFFIX') == '1',
         'archive_replace_existing': meta.get('REPLACE_EXISTING', '1') == '1',
+        'archive_skip_unchanged': meta.get('SKIP_UNCHANGED', '1') == '1',
         'command_start': bool(str(meta.get('COMMAND_START', '')).strip()),
         'command_end': bool(str(meta.get('COMMAND_END', '')).strip()),
         'cache_delete_source': mode == 'cache',

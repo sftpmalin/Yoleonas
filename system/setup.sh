@@ -1,9 +1,18 @@
 #!/bin/bash
 set -Eeuo pipefail
 
+# YOLEO_SCRIPT_VERSION=2.0.3
+# YOLEO_SCRIPT_DATE=2026-10-28
+
 # First boot installer for the YOLEO system service.
 # It creates the integrity archive from the installed YOLEO payload when needed,
 # then delegates the service installation to system.sh.
+# system.sh -install also installs the PCI initramfs hooks from the payload;
+# its -run action checks them again at every service start / ISO restoration.
+# It also creates a persistent local HTTPS authority under conf/https and a
+# separate server certificate. The authority is downloadable in System / Info host;
+# service restarts renew the server certificate without changing PC trust.
+# HTTPS keeps the same port (12345 by default).
 
 SERVICE_NAME="${SERVICE_NAME:-flask-system.service}"
 HOST="${HOST:-0.0.0.0}"
@@ -29,7 +38,7 @@ INTEGRITY_MANIFEST="${INTEGRITY_MANIFEST:-${INIT_DIR}/system.sha256}"
 INTEGRITY_ARCHIVE="${INTEGRITY_ARCHIVE:-${INIT_DIR}/system.tar.gz}"
 INTEGRITY_ARCHIVE_SHA="${INTEGRITY_ARCHIVE}.sha256"
 INTEGRITY_ROOT_DIR="${INTEGRITY_ROOT_DIR:-${YOLEO_DIR}}"
-INTEGRITY_INCLUDE_DIRS="${INTEGRITY_INCLUDE_DIRS:-system scripts offline bin}"
+INTEGRITY_INCLUDE_DIRS="${INTEGRITY_INCLUDE_DIRS:-system scripts bin}"
 
 APP_DIR="${APP_DIR:-${SCRIPT_DIR}}"
 APP_FILE="${APP_FILE:-${APP_DIR}/app.py}"
@@ -187,7 +196,7 @@ install_system() {
     export INIT_DIR INTEGRITY_MANIFEST INTEGRITY_ARCHIVE INTEGRITY_ROOT_DIR INTEGRITY_INCLUDE_DIRS
     export DOCKERS_DIR="$YOLEO_DIR"
 
-    log "Lancement de system.sh -install sur le port ${PORT}."
+    log "Lancement de system.sh -install en HTTPS sur le port ${PORT}."
     exec bash "$SYSTEM_SH" -install
 }
 

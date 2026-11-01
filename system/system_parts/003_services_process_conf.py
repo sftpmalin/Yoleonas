@@ -1,3 +1,5 @@
+from monitoring_probes import docker_counts, filesystem_usage, mount_path_state
+
 import copy
 import threading
 
@@ -573,7 +575,7 @@ def collect_hardware_inventory(force_reload: bool = False) -> Dict[str, Any]:
 
     data = {
         "generated_at": now_label(),
-        "pci": collect_pci_devices(),
+        "pci": collect_pci_devices(include_display=True),
         "usb": collect_usb_devices(),
     }
     HARDWARE_INVENTORY_CACHE = copy.deepcopy(data)
@@ -706,8 +708,9 @@ def disk_top_label(path: str) -> str:
 
 def disk_top_usage_row(path: str, mounted: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
     info = mounted.get(path) or {}
-    exists = os.path.exists(path)
-    is_mount = bool(info) or os.path.ismount(path)
+    state = mount_path_state(path, mounted)
+    exists = state["exists"]
+    is_mount = state["is_mount"]
     row: Dict[str, Any] = {
         "path": path,
         "label": disk_top_label(path),
@@ -724,20 +727,21 @@ def disk_top_usage_row(path: str, mounted: Dict[str, Dict[str, str]]) -> Dict[st
         "status_label": "Absent",
     }
     if not is_mount:
-        if exists:
-            row["status"] = "folder"
-            row["status_label"] = "Non monte"
+        if exists is None:
+            row.update(status="pending", status_label="Contrôle en cours")
+        elif exists:
+            row.update(status="folder", status_label="Non monte")
         return row
-    try:
-        usage = psutil.disk_usage(path)
-    except Exception as exc:
-        row["status"] = "error"
-        row["status_label"] = str(exc)[:80] or "Erreur"
+    result = filesystem_usage(path, mounted)
+    usage = result.value
+    if usage is None:
+        row["status"] = "error" if result.error else "pending"
+        row["status_label"] = "Indisponible" if result.error else "Lecture en cours"
         return row
     row.update({
-        "ok": True,
-        "status": "ok",
-        "status_label": "OK",
+        "ok": not bool(result.error),
+        "status": "stale" if result.error else "ok",
+        "status_label": "Dernier relevé" if result.error else "OK",
         "percent": usage.percent,
         "used": get_size_str(usage.used),
         "free": get_size_str(usage.free),
@@ -758,16 +762,18 @@ def collect_disk_top_status() -> Dict[str, Any]:
     fail_count = 0
     for path in configured:
         info = mounted.get(path) or {}
-        exists = os.path.exists(path)
-        is_mount = bool(info) or os.path.ismount(path)
-        try:
-            has_local_entries = exists and os.path.isdir(path) and (not is_mount) and bool(os.listdir(path))
-        except Exception:
-            has_local_entries = False
+        path_state = mount_path_state(path, mounted)
+        exists = path_state["exists"]
+        is_mount = path_state["is_mount"]
+        has_local_entries = path_state["has_local_entries"]
         if is_mount:
             status = "ok"
             label = "OK"
             ok_count += 1
+        elif exists is None:
+            status = "pending"
+            label = "Contrôle en cours"
+            warn_count += 1
         elif exists:
             status = "folder_with_data" if has_local_entries else "folder"
             label = "Dossier local" if has_local_entries else "Dossier"
@@ -1106,17 +1112,7 @@ def _collect_overview_static_parts() -> Dict[str, Any]:
     route_info = get_default_route_info()
     iface = route_info.get("iface") or "-"
 
-    docker_info = {"total": 0, "running": 0, "available": docker is not None}
-    if docker is not None:
-        try:
-            containers = docker.from_env().containers.list(all=True)
-            docker_info = {
-                "total": len(containers),
-                "running": len([x for x in containers if x.status == "running"]),
-                "available": True,
-            }
-        except Exception:
-            docker_info["available"] = False
+    docker_info = docker_counts(docker)
 
     services = collect_services()
     service_summary = services.get("summary") or {}
@@ -1200,16 +1196,12 @@ def collect_overview() -> Dict[str, Any]:
     except Exception:
         pass
 
-    root_usage = None
-    try:
-        root_usage = psutil.disk_usage("/")
-    except Exception:
-        root_usage = None
-
-    preferred_mount = "/mnt/user" if os.path.exists("/mnt/user") else "/"
-    try:
-        main_disk = psutil.disk_usage(preferred_mount)
-    except Exception:
+    mounted = disk_top_findmnt_map()
+    root_usage = filesystem_usage("/", mounted).value
+    user_state = mount_path_state("/mnt/user", mounted)
+    preferred_mount = "/mnt/user" if user_state["exists"] else "/"
+    main_disk = filesystem_usage(preferred_mount, mounted).value
+    if main_disk is None:
         main_disk = root_usage
         preferred_mount = "/"
 

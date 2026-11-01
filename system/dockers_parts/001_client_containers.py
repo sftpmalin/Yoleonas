@@ -633,6 +633,10 @@ def build_container_data(container):
 
     mounts = attrs.get('Mounts', []) or []
 
+    compose_project = str(labels.get('com.docker.compose.project', '') or '').strip()
+    compose_service = str(labels.get('com.docker.compose.service', '') or '').strip()
+    compose_config_files = str(labels.get('com.docker.compose.project.config_files', '') or '').strip()
+
     c_data = {
         'id': container.id,
         'name': container.name.lstrip('/'),
@@ -643,7 +647,10 @@ def build_container_data(container):
         'icon': icon_url,
         'webui': final_weblink,
         'mounts': mounts,
-        'vols_mobile': [f"{m.get('Source', '?')} -> {m.get('Destination', '?')}" for m in mounts]
+        'vols_mobile': [f"{m.get('Source', '?')} -> {m.get('Destination', '?')}" for m in mounts],
+        # Les actions Compose individuelles nécessitent ces trois labels standards.
+        # On n'expose pas leurs chemins dans le HTML : seulement leur disponibilité.
+        'compose_managed': bool(compose_project and compose_service and compose_config_files),
     }
 
     return stack_name, c_data
@@ -819,6 +826,145 @@ def do_bulk_action(client, action):
     return {"status": "success", "message": msg}, 200
 
 
+def _docker_compose_container_context(container):
+    """Retourne le projet, le service et les YAML Compose du conteneur."""
+    attrs = container.attrs or {}
+    labels = (attrs.get('Config', {}) or {}).get('Labels', {}) or {}
+
+    project = str(labels.get('com.docker.compose.project', '') or '').strip()
+    service = str(labels.get('com.docker.compose.service', '') or '').strip()
+    working_dir = str(labels.get('com.docker.compose.project.working_dir', '') or '').strip()
+    raw_files = str(labels.get('com.docker.compose.project.config_files', '') or '').strip()
+
+    files = []
+    for raw_path in raw_files.split(','):
+        raw_path = raw_path.strip()
+        if not raw_path:
+            continue
+        path = Path(raw_path).expanduser()
+        if not path.is_absolute() and working_dir:
+            path = Path(working_dir) / path
+        try:
+            path = path.resolve()
+        except Exception:
+            path = Path(os.path.abspath(str(path)))
+        if path not in files:
+            files.append(path)
+
+    if not project or not service or not files:
+        raise ValueError(
+            "Ce conteneur ne contient pas assez de labels Docker Compose pour une action individuelle."
+        )
+
+    missing = [str(path) for path in files if not path.is_file()]
+    if missing:
+        raise FileNotFoundError("YAML Compose introuvable : " + ", ".join(missing))
+
+    cwd = Path(working_dir).expanduser() if working_dir else files[0].parent
+    try:
+        cwd = cwd.resolve()
+    except Exception:
+        cwd = Path(os.path.abspath(str(cwd)))
+    if not cwd.is_dir():
+        cwd = files[0].parent
+
+    detect_compose = globals().get('system_detect_compose_command')
+    compose_cmd = detect_compose() if callable(detect_compose) else []
+    if not compose_cmd:
+        for candidate in (['docker', 'compose'], ['docker-compose']):
+            try:
+                probe = subprocess.run(
+                    candidate + ['version'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=8,
+                )
+            except Exception:
+                continue
+            if probe.returncode == 0:
+                compose_cmd = list(candidate)
+                break
+    if not compose_cmd:
+        raise RuntimeError("Docker Compose est introuvable sur l'hôte.")
+
+    base_cmd = list(compose_cmd) + ['-p', project]
+    for path in files:
+        base_cmd += ['-f', str(path)]
+
+    return {
+        'project': project,
+        'service': service,
+        'files': files,
+        'cwd': cwd,
+        'base_cmd': base_cmd,
+    }
+
+
+def _docker_run_compose_command(cmd, cwd, timeout=900):
+    """Exécute Compose et retourne une sortie courte mais exploitable par l'UI."""
+    result = subprocess.run(
+        cmd,
+        cwd=str(cwd),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=timeout,
+        env=os.environ.copy(),
+    )
+    output = (result.stdout or '').strip()
+    if len(output) > 12000:
+        output = '[sortie tronquée : fin de commande]\n' + output[-12000:]
+    if result.returncode != 0:
+        raise RuntimeError(output or f"Commande Compose échouée (code {result.returncode}).")
+    return output
+
+
+def _docker_compose_individual_action(container, action):
+    context = _docker_compose_container_context(container)
+    base_cmd = context['base_cmd']
+    service = context['service']
+    cwd = context['cwd']
+    outputs = []
+
+    if action == 'compose_update':
+        pull_output = _docker_run_compose_command(base_cmd + ['pull', service], cwd)
+        if pull_output:
+            outputs.append(pull_output)
+        up_output = _docker_run_compose_command(
+            base_cmd + ['up', '-d', '--no-deps', '--force-recreate', service],
+            cwd,
+        )
+        if up_output:
+            outputs.append(up_output)
+        title = "Image tirée et conteneur recréé"
+
+    elif action == 'compose_apply':
+        up_output = _docker_run_compose_command(
+            base_cmd + ['up', '-d', '--no-deps', service],
+            cwd,
+        )
+        if up_output:
+            outputs.append(up_output)
+        title = "YAML réappliqué sans Pull All"
+
+    elif action == 'force_recreate':
+        up_output = _docker_run_compose_command(
+            base_cmd + ['up', '-d', '--no-deps', '--force-recreate', service],
+            cwd,
+        )
+        if up_output:
+            outputs.append(up_output)
+        title = "Force recreate terminé"
+
+    else:
+        raise ValueError(f"Action Compose individuelle inconnue : {action}")
+
+    message = f"{title} : {container.name.lstrip('/')} ({context['project']} / {service})."
+    if outputs:
+        message += "\n\n" + "\n".join(outputs)
+    return {"status": "success", "message": message}, 200
+
+
 def do_action(client, c_id, action):
     if action in {'start_all', 'stop_all'}:
         return do_bulk_action(client, action)
@@ -826,13 +972,20 @@ def do_action(client, c_id, action):
     if not c_id:
         return {"status": "error", "message": "ID conteneur manquant."}, 400
 
-    if action not in {'start', 'stop', 'restart', 'rm', 'rmi'}:
+    allowed_actions = {
+        'start', 'stop', 'restart', 'rm', 'rmi',
+        'compose_update', 'compose_apply', 'force_recreate',
+    }
+    if action not in allowed_actions:
         return {"status": "error", "message": f"Action invalide : {action}"}, 400
 
     try:
         container = client.containers.get(c_id)
         container.reload()
         current_state = container.status
+
+        if action in {'compose_update', 'compose_apply', 'force_recreate'}:
+            return _docker_compose_individual_action(container, action)
 
         if action == 'start':
             if current_state != 'running':

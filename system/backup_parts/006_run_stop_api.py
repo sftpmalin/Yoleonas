@@ -1,4 +1,4 @@
-﻿@backup_bp.route('/run/<path:filename>', methods=['GET', 'POST'])
+@backup_bp.route('/run/<path:filename>', methods=['GET', 'POST'])
 def run_script(filename):
     ajax = (
         request.args.get('ajax') == '1'
@@ -28,6 +28,25 @@ def run_script(filename):
     if status.get('running'):
         return finish({'ok': True, 'already_running': True, 'message': 'Backup déjà en cours', 'status': status})
 
+    safety_error = cache_script_launch_safety_error(path)
+    if safety_error:
+        blocked_status = write_status_file(
+            safe_name,
+            running=False,
+            result='Erreur',
+            message=safety_error.get('message') or 'Lancement Cache refusé par la sécurité des montages',
+            started_at='',
+            ended_at=now_label(),
+            pid='',
+            phase='safety_block',
+        )
+        return finish({
+            'ok': False,
+            'message': safety_error.get('message') or 'Lancement Cache refusé',
+            'error': safety_error,
+            'status': blocked_status,
+        }, 409)
+
     log_path = log_file_for(safe_name)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     python_bin = settings.get('PYTHON_BIN') or '/usr/local/bin/python3'
@@ -43,6 +62,7 @@ def run_script(filename):
         'ended_at': '',
         'pid': '',
         'phase': 'starting',
+        'lock_group': script_backup_lock_group(safe_name),
         'queue_relaunch_count': 0,
     }
 
@@ -105,6 +125,12 @@ def stop_script(filename):
         # Secours sans JavaScript : on revient au tableau, jamais aux logs.
         return backup_tab_redirect('scripts')
 
+    if selection_queue_cancel(safe_name):
+        status = write_status_file(safe_name, running=False, result='Arrêté',
+                                   phase='cancelled', ended_at=now_label(),
+                                   message='Retiré de la file de lancement')
+        return finish({'ok': True, 'status': status})
+
     status = read_status(safe_name)
     pid = status.get('pid')
     killed = False
@@ -162,7 +188,7 @@ def stop_script(filename):
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     with open(log_path, 'a', encoding='utf-8') as handle:
         if removed_global_lock:
-            handle.write('\n[STOP] Stop forcé depuis Flask : processus arrêté, lock script et lock global supprimés.\n')
+            handle.write('\n[STOP] Stop forcé depuis Flask : processus arrêté, lock script et lock de catégorie supprimés.\n')
         else:
             handle.write('\n[STOP] Stop forcé depuis Flask : processus arrêté et lock script supprimé.\n')
 
@@ -246,7 +272,17 @@ def api_log(filename):
 
 @backup_bp.route('/api/status')
 def api_status():
-    return jsonify({'scripts': list_scripts(), 'updated_at': now_label()})
+    scripts = list_scripts()
+    queue = selection_queue_snapshot()
+    waiting = {item['name'] for item in queue['pending']}
+    if queue.get('active') and not queue['active'].get('launched'):
+        waiting.add(queue['active']['name'])
+    for script in scripts:
+        if script['name'] in waiting and not script['status'].get('running'):
+            script['status'] = dict(script['status'], running=True, result='En attente',
+                                    phase='waiting', progress={}, selection_queued=True,
+                                    message='Dans la file de lancement')
+    return jsonify({'scripts': scripts, 'queue': queue, 'updated_at': now_label()})
 
 
 # Route réseau retirée : fonctionnalité déplacée dans Partage / NFS client.

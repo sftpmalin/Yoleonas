@@ -712,6 +712,11 @@ def system_info_route():
     return render_system_tab_template("monitor")
 
 
+from https_certificate import register_certificate_download
+
+register_certificate_download(system_bp, NAS_CONF_DIR)
+
+
 @system_bp.route("/system/services")
 def system_services_route():
     return render_system_tab_template("services")

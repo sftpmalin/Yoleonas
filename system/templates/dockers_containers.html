@@ -102,7 +102,45 @@
                                 <button class="yoleo-btn yoleo-btn-green yoleo-btn-icon" name="action" value="start" title="Démarrer">▶</button>
                                 {% endif %}
                                 <button class="yoleo-btn yoleo-btn-red yoleo-btn-icon" name="action" value="rm" title="Supprimer conteneur">✕</button>
-                                <button class="yoleo-btn yoleo-btn-red yoleo-btn-icon" name="action" value="rmi" title="Supprimer image">🗑</button>
+                                <div class="docker-row-menu">
+                                    <button class="yoleo-btn yoleo-btn-muted yoleo-btn-icon docker-row-menu-trigger"
+                                            type="button"
+                                            title="Options individuelles"
+                                            aria-label="Options individuelles pour {{ c.name }}"
+                                            aria-haspopup="menu"
+                                            aria-expanded="false"
+                                            onclick="dockerToggleContainerMenu(event, this)">⋮</button>
+                                    <div class="docker-row-menu-panel" role="menu" hidden>
+                                        <button type="submit" name="action" value="compose_update"
+                                                data-docker-row-menu-action data-available="{{ '1' if c.compose_managed else '0' }}"
+                                                disabled role="menuitem"
+                                                title="Pull uniquement l'image de ce service puis recrée son conteneur">
+                                            <span>🔄</span><span>Pull + recréer</span>
+                                        </button>
+                                        <button type="submit" name="action" value="compose_apply"
+                                                data-docker-row-menu-action data-available="{{ '1' if c.compose_managed else '0' }}"
+                                                disabled role="menuitem"
+                                                title="Réapplique le YAML de ce service sans Pull All">
+                                            <span>📄</span><span>Réappliquer le YAML</span>
+                                        </button>
+                                        <button type="submit" name="action" value="force_recreate"
+                                                data-docker-row-menu-action data-available="{{ '1' if c.compose_managed else '0' }}"
+                                                disabled role="menuitem"
+                                                title="Force la recréation de ce seul conteneur sans ses dépendances">
+                                            <span>♻</span><span>Force recreate</span>
+                                        </button>
+                                        {% if not c.compose_managed %}
+                                        <div class="docker-row-menu-note">Actions Compose indisponibles : labels YAML absents.</div>
+                                        {% endif %}
+                                        <div class="docker-row-menu-separator" aria-hidden="true"></div>
+                                        <button class="docker-row-menu-danger" type="submit" name="action" value="rmi"
+                                                data-docker-row-menu-action data-available="1"
+                                                disabled role="menuitem"
+                                                title="Supprimer le conteneur et son image Docker">
+                                            <span>🗑</span><span>Supprimer l’image</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </form>
                         </td>
                     </tr>
@@ -118,6 +156,71 @@
 (function () {
     'use strict';
     const fallbackDelayMs = 2500;
+
+    function closeDockerContainerMenus(exceptPanel) {
+        document.querySelectorAll('.docker-row-menu-panel').forEach(function (panel) {
+            if (panel === exceptPanel) return;
+            panel.hidden = true;
+            panel.style.left = '';
+            panel.style.top = '';
+            panel.querySelectorAll('[data-docker-row-menu-action]').forEach(function (item) {
+                item.disabled = true;
+            });
+            const trigger = panel.parentElement && panel.parentElement.querySelector('.docker-row-menu-trigger');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    function positionDockerContainerMenu(button, panel) {
+        panel.style.visibility = 'hidden';
+        panel.hidden = false;
+        const rect = button.getBoundingClientRect();
+        const margin = 8;
+        const width = panel.offsetWidth;
+        const height = panel.offsetHeight;
+        let left = Math.min(rect.right - width, window.innerWidth - width - margin);
+        left = Math.max(margin, left);
+        let top = rect.bottom + 5;
+        if (top + height > window.innerHeight - margin) {
+            top = Math.max(margin, rect.top - height - 5);
+        }
+        panel.style.left = Math.round(left) + 'px';
+        panel.style.top = Math.round(top) + 'px';
+        panel.style.visibility = 'visible';
+    }
+
+    window.dockerToggleContainerMenu = function (event, button) {
+        event.preventDefault();
+        event.stopPropagation();
+        const panel = button.closest('.docker-row-menu')?.querySelector('.docker-row-menu-panel');
+        if (!panel) return;
+        const willOpen = panel.hidden;
+        closeDockerContainerMenus(willOpen ? panel : null);
+        if (!willOpen) {
+            panel.hidden = true;
+            button.setAttribute('aria-expanded', 'false');
+            return;
+        }
+        panel.querySelectorAll('[data-docker-row-menu-action]').forEach(function (item) {
+            item.disabled = item.dataset.available !== '1';
+        });
+        positionDockerContainerMenu(button, panel);
+        button.setAttribute('aria-expanded', 'true');
+    };
+
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest('.docker-row-menu-panel')) closeDockerContainerMenus(null);
+    });
+    document.addEventListener('submit', function (event) {
+        if (event.submitter?.matches('[data-docker-row-menu-action]')) {
+            window.setTimeout(function () { closeDockerContainerMenus(null); }, 0);
+        }
+    }, true);
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closeDockerContainerMenus(null);
+    });
+    window.addEventListener('resize', function () { closeDockerContainerMenus(null); });
+    document.addEventListener('scroll', function () { closeDockerContainerMenus(null); }, true);
 
     function useFallback(img) {
         if (!img || img.dataset.dockerIconFallbackApplied === '1') return;
@@ -146,6 +249,79 @@
 })();
 </script>
 <style>
+.docker-row-menu {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+}
+
+.docker-row-menu-panel {
+    position: fixed;
+    z-index: 5000;
+    min-width: 232px;
+    padding: 6px;
+    border: 1px solid rgba(81, 118, 159, .58);
+    border-radius: 10px;
+    background: #0d1724;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .48);
+}
+
+.docker-row-menu-panel[hidden] {
+    display: none !important;
+}
+
+.docker-row-menu-panel button {
+    width: 100%;
+    min-height: 34px;
+    display: grid;
+    grid-template-columns: 25px minmax(0, 1fr);
+    align-items: center;
+    gap: 7px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #eef6ff;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.docker-row-menu-panel button:hover:not(:disabled),
+.docker-row-menu-panel button:focus-visible:not(:disabled) {
+    background: rgba(37, 122, 204, .24);
+    outline: 1px solid rgba(54, 174, 255, .45);
+}
+
+.docker-row-menu-panel button:disabled {
+    opacity: .42;
+    cursor: not-allowed;
+}
+
+.docker-row-menu-panel .docker-row-menu-danger {
+    color: #ff9ca7;
+}
+
+.docker-row-menu-panel .docker-row-menu-danger:hover:not(:disabled),
+.docker-row-menu-panel .docker-row-menu-danger:focus-visible:not(:disabled) {
+    background: rgba(180, 30, 52, .22);
+    outline-color: rgba(255, 78, 103, .5);
+}
+
+.docker-row-menu-separator {
+    height: 1px;
+    margin: 5px 4px;
+    background: rgba(130, 158, 188, .25);
+}
+
+.docker-row-menu-note {
+    max-width: 220px;
+    padding: 5px 9px 7px;
+    color: #96a9bd;
+    font-size: 10px;
+    line-height: 1.25;
+}
+
 /* Docker > Conteneurs : quand la roue crantée est active, les boutons passent dans le menu haut.
    Sans roue crantée, l'ancien affichage reste intact en fallback. */
 .docker-compose-progress-compact,

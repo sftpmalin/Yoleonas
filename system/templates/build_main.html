@@ -53,7 +53,25 @@
                                         <th style="width:16%;">Plateformes</th>
                                         <th style="width:18%;">TAR actuel</th>
                                         <th style="width:17%;">Registre</th>
-                                        <th style="width:10%; text-align:right;">Action</th>
+                                        <th style="width:10%; text-align:right;">
+                                            <div class="build-batch-heading">
+                                                <span>Action</span>
+                                                <div class="build-batch-heading-controls" role="group" aria-label="Sélection groupée des Dockers">
+                                                    <button type="button" class="build-batch-bulk-action"
+                                                            title="Tout sélectionner : cocher tous les Dockers buildables"
+                                                            aria-label="Tout sélectionner"
+                                                            onclick="setMainBuildAllSelected(true)">☑</button>
+                                                    <button type="button" class="build-batch-bulk-action"
+                                                            title="Tout désélectionner : décocher tous les Dockers"
+                                                            aria-label="Tout désélectionner"
+                                                            onclick="setMainBuildAllSelected(false)">☐</button>
+                                                    <button type="button" class="build-batch-bulk-action build-batch-needed-action"
+                                                            title="Sélectionner les Dockers à traiter selon les états affichés : Build ou Envoyer (ignorer À jour)"
+                                                            aria-label="Sélectionner les Dockers non à jour (Build ou Envoyer)"
+                                                            onclick="setMainBuildNeededSelected(this)">☑</button>
+                                                </div>
+                                            </div>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -116,6 +134,23 @@
                                                         data-mode="{{ b.mode_value or '0' }}"
                                                         onclick="openBuildDbOptionModalFromButton(this)">⚙</button>
                                                 <button type="button" class="yoleo-btn yoleo-btn-mini yoleo-btn-green smart-action-button" onclick='runMainBuildOne({{ b.name|tojson }}, this)' data-status-kind="build" data-status-name="{{ b.name }}" data-base-disabled="{{ '0' if (b.can_build or b.can_import) else '1' }}" data-main-action="1" data-action-label="Build" data-current-label="À jour" data-running-text="Build…" {{ '' if (b.can_build or b.can_import) else 'disabled' }}>{% if b.build_current and b.can_import %}Envoyer{% elif b.build_current and b.registry_current %}À jour{% else %}Build{% endif %}</button>
+                                                <label class="build-batch-check-wrap" title="Sélectionner {{ b.name }} pour le build groupé">
+                                                    <input type="checkbox" class="build-batch-check" value="{{ b.name }}"
+                                                           aria-label="Sélectionner {{ b.name }}"
+                                                           {{ '' if (b.has_context and b.dockerfile) else 'disabled' }}
+                                                           onchange="updateMainBuildSelection(this)">
+                                                </label>
+                                                <button type="button"
+                                                        class="yoleo-btn yoleo-btn-mini yoleo-btn-muted yoleo-btn-icon build-row-more-trigger"
+                                                        title="Plus d’actions"
+                                                        aria-label="Plus d’actions pour {{ b.name }}"
+                                                        aria-haspopup="menu"
+                                                        aria-expanded="false"
+                                                        data-build-row-name="{{ b.name }}"
+                                                        data-can-build="{{ '1' if (b.has_context and b.dockerfile) else '0' }}"
+                                                        data-can-send="{{ '1' if (b.tar_exists and b.registry) else '0' }}"
+                                                        data-has-registry="{{ '1' if b.registry else '0' }}"
+                                                        onclick="toggleBuildRowMoreMenu(event, this)">⋮</button>
                                                 <span class="badge badge-muted smart-status is-hidden" data-status-kind="build" data-status-name="{{ b.name }}"></span>
                                             </div>
                                         </td>
@@ -640,7 +675,174 @@ body.yoleo-has-page-settings .builds-page #tab-builds_tar .table-wrap {
     }
 }
 
+/* Deux actions compactes dans l'en-tête ACTION, sans toucher à la recherche. */
+.build-batch-heading {
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:8px;
+    white-space:nowrap;
+}
+.build-batch-heading-controls {
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+}
+.build-batch-bulk-action {
+    display:inline-flex;
+    width:25px;
+    height:26px;
+    padding:0;
+    justify-content:center;
+    align-items:center;
+    color:#7ad8ff;
+    font-size:20px;
+    line-height:1;
+    background:rgba(80, 202, 255, .06);
+    border:1px solid rgba(80, 202, 255, .24);
+    border-radius:5px;
+    cursor:pointer;
+}
+.build-batch-bulk-action:hover {
+    background:rgba(80, 202, 255, .19);
+    border-color:rgba(80, 202, 255, .7);
+}
+.build-batch-bulk-action:focus-visible {
+    outline:2px solid #7ad8ff;
+    outline-offset:2px;
+}
+/* Troisième case : même taille, couleur distincte, sans toucher à la recherche. */
+.build-batch-bulk-action.build-batch-needed-action {
+    color:#ffc56b;
+    background:rgba(255, 190, 85, .08);
+    border-color:rgba(255, 190, 85, .42);
+}
+.build-batch-bulk-action.build-batch-needed-action:hover:not(:disabled) {
+    background:rgba(255, 190, 85, .21);
+    border-color:#ffc56b;
+}
+.build-batch-bulk-action.build-batch-needed-action:focus-visible {
+    outline-color:#ffc56b;
+}
+.build-batch-bulk-action.build-batch-needed-action:disabled { opacity:.65; cursor:progress; }
+
+/* Sélection multiple : case discrète à côté des trois points, sans modifier la recherche. */
+.build-batch-check-wrap {
+    display:inline-flex;
+    flex:0 0 22px;
+    width:22px;
+    min-height:30px;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+}
+.build-batch-check {
+    width:17px;
+    height:17px;
+    margin:0;
+    accent-color:#50caff;
+    cursor:pointer;
+}
+.build-batch-check:disabled { opacity:.35; cursor:not-allowed; }
+#buildTable tr.build-batch-selected > td:first-child { box-shadow:inset 3px 0 0 #50caff; }
+
+/* Menu individuel d'une ligne Build : le bouton principal reste entièrement dynamique.
+   Les trois points donnent accès aux actions manuelles et au log Build. */
+.build-row-more-trigger {
+    flex:0 0 30px;
+    width:30px;
+    min-width:30px;
+    height:30px;
+    padding:0 !important;
+    font-size:20px;
+    font-weight:900;
+    line-height:1;
+    letter-spacing:0;
+}
+.build-row-more-trigger[aria-expanded="true"] {
+    border-color:#66d9ff;
+    background:rgba(20, 118, 170, .34);
+    box-shadow:0 0 0 2px rgba(56, 189, 248, .16);
+}
+.build-row-more-menu {
+    position:fixed;
+    z-index:12000;
+    min-width:184px;
+    padding:6px;
+    border:1px solid rgba(91, 196, 255, .38);
+    border-radius:11px;
+    background:rgba(7, 16, 29, .98);
+    box-shadow:0 16px 42px rgba(0, 0, 0, .58), inset 0 0 0 1px rgba(255, 255, 255, .025);
+    backdrop-filter:blur(10px);
+}
+.build-row-more-menu[hidden] {
+    display:none !important;
+}
+.build-row-more-menu button {
+    display:flex;
+    align-items:center;
+    gap:9px;
+    width:100%;
+    min-height:36px;
+    padding:8px 10px;
+    border:0;
+    border-radius:8px;
+    background:transparent;
+    color:#e8f5ff;
+    font:inherit;
+    font-size:12px;
+    font-weight:800;
+    text-align:left;
+    cursor:pointer;
+}
+.build-row-more-menu button:hover:not(:disabled),
+.build-row-more-menu button:focus-visible:not(:disabled) {
+    outline:none;
+    background:rgba(49, 126, 188, .24);
+    color:#fff;
+}
+.build-row-more-menu button[data-menu-action="force"] {
+    color:#ffd07a;
+}
+.build-row-more-menu button[data-menu-action="send"] {
+    color:#75f3bf;
+}
+.build-row-more-menu button:disabled {
+    opacity:.38;
+    cursor:not-allowed;
+}
+.build-row-more-menu .build-row-more-icon {
+    display:inline-flex;
+    width:20px;
+    justify-content:center;
+    font-size:15px;
+}
+@media (max-width: 900px) {
+    .builds-page[data-active-build-section="main"] #tab-builds_tar .build-row-actions .build-row-more-trigger {
+        flex:0 0 38px !important;
+        width:38px !important;
+        min-width:38px !important;
+        padding:0 !important;
+        font-size:20px !important;
+    }
+}
+
 </style>
+
+    <div class="build-row-more-menu" id="buildRowMoreMenu" role="menu" hidden>
+        <button type="button" role="menuitem" data-menu-action="build" onclick="runBuildRowMoreAction('build')">
+            <span class="build-row-more-icon">🧱</span><span>Build</span>
+        </button>
+        <button type="button" role="menuitem" data-menu-action="force" onclick="runBuildRowMoreAction('force')">
+            <span class="build-row-more-icon">♻</span><span>Force Build</span>
+        </button>
+        <button type="button" role="menuitem" data-menu-action="send" onclick="runBuildRowMoreAction('send')">
+            <span class="build-row-more-icon">📦</span><span>Envoyer TAR</span>
+        </button>
+        <button type="button" role="menuitem" data-menu-action="log" onclick="closeBuildRowMoreMenu(); openBuildMainLog()">
+            <span class="build-row-more-icon">📜</span><span>Log</span>
+        </button>
+    </div>
 
     <div class="docker-ttyd-modal" id="buildMainLogModal" hidden aria-hidden="true">
         <div class="docker-ttyd-modal-backdrop" onclick="closeBuildMainLog()"></div>
@@ -659,6 +861,285 @@ body.yoleo-has-page-settings .builds-page #tab-builds_tar .table-wrap {
 
     <input id="clientImportInput" type="file" webkitdirectory directory mozdirectory multiple style="display:none;">
     <script>
+    // Case cochée = un vrai choix utilisateur ; le filtre de recherche ne change pas le lot.
+    function mainBuildSelectedNames() {
+        return Array.from(document.querySelectorAll('#buildTable .build-batch-check:checked:not(:disabled)'))
+            .map(box => box.value);
+    }
+    // Évite qu'un scan en cours n'écrase une sélection manuelle ou « tout ».
+    let mainBuildSelectionEpoch = 0;
+    let mainBuildNeededBusy = false;
+    function updateMainBuildSelection(box) {
+        const row = box && box.closest('tr');
+        if (row) row.classList.toggle('build-batch-selected', box.checked);
+        mainBuildSelectionEpoch++;
+    }
+    function setMainBuildAllSelected(checked) {
+        // Toutes les lignes, y compris celles masquées par la recherche.
+        mainBuildSelectionEpoch++;
+        document.querySelectorAll('#buildTable tbody .build-batch-check').forEach(box => {
+            box.checked = Boolean(checked) && !box.disabled;
+            updateMainBuildSelection(box);
+        });
+    }
+    async function setMainBuildNeededSelected(control) {
+        if (mainBuildNeededBusy) return;
+        const boxes = Array.from(document.querySelectorAll('#buildTable tbody .build-batch-check:not(:disabled)'));
+        const epoch = mainBuildSelectionEpoch;
+        mainBuildNeededBusy = true;
+        const originalTitle = control ? control.title : '';
+        if (control) {
+            control.disabled = true;
+            control.setAttribute('aria-busy', 'true');
+            control.title = 'Vérification des TAR et du registre en cours…';
+        }
+        try {
+            // Les scans de la page et les fins de tâche actualisent déjà ces états.
+            // Ne pas relire tous les contextes et le registre à chaque sélection.
+            // Seuls les états absents/en erreur attendent une vérification, partagée
+            // avec le scan en cours. Quatre lignes max sont traitées en parallèle.
+            const selectionStatus = async (kind, name) => {
+                const cached = statusCache[kind].get(name);
+                if (!pendingStatusRequests[kind].has(name) && cached && cached.ok !== false &&
+                    ['current', 'needed', 'disabled'].includes(cached.state)) {
+                    return cached;
+                }
+                return fetchStatusPayload(kind, name);
+            };
+            const isRunning = button => button &&
+                (button.dataset.jobRunning === '1' || button.classList.contains('is-running'));
+            const results = new Map();
+            let next = 0;
+            const worker = async () => {
+                while (next < boxes.length && epoch === mainBuildSelectionEpoch) {
+                    const box = boxes[next++];
+                    const row = box.closest('tr');
+                    const button = row && row.querySelector('.smart-action-button[data-status-kind="build"]');
+                    // Ne jamais marquer automatiquement une tâche déjà en cours.
+                    if (!button || isRunning(button)) {
+                        results.set(box.value, false);
+                        continue;
+                    }
+                    try {
+                        const payload = await selectionStatus('build', box.value);
+                        if (epoch !== mainBuildSelectionEpoch) return;
+                        if (isRunning(button)) { results.set(box.value, false); continue; }
+                        if (!payload || payload.ok === false || !['current', 'needed', 'disabled'].includes(payload.state)) {
+                            throw new Error(payload && payload.message || 'État du build inconnu');
+                        }
+                        statusCache.build.set(box.value, payload);
+                        button.dataset.statusChecked = '1';
+                        applyStatusPayload(button, payload);
+                        // Cas 1 : le Docker a besoin d'un nouveau TAR.
+                        if (payload.state === 'needed' && payload.needs_action === true && payload.can_run === true) {
+                            results.set(box.value, true);
+                            continue;
+                        }
+                        // Cas 2 : son TAR est à jour, mais le registre peut nécessiter
+                        // un envoi. Vérifier AUSSI le registre plutôt que de se fier
+                        // au simple état « À jour » du TAR.
+                        if (payload.state === 'current' && payload.needs_action === false) {
+                            const registry = await selectionStatus('registry', box.value);
+                            if (epoch !== mainBuildSelectionEpoch) return;
+                            if (isRunning(button)) { results.set(box.value, false); continue; }
+                            if (!registry || registry.ok === false || !['current', 'needed', 'disabled'].includes(registry.state)) {
+                                throw new Error(registry && registry.message || 'État du registre inconnu');
+                            }
+                            statusCache.registry.set(box.value, registry);
+                            applyMainRegistryPayload(box.value, registry);
+                            results.set(box.value, registry.state === 'needed' &&
+                                registry.needs_action === true && registry.can_run === true);
+                            continue;
+                        }
+                        // Indisponible ou autre état non exploitable : rien à cocher.
+                        results.set(box.value, false);
+                    } catch (error) {
+                        results.set(box.value, null);
+                    }
+                }
+            };
+            await Promise.all(Array.from({length: Math.min(4, boxes.length)}, worker));
+            if (epoch !== mainBuildSelectionEpoch) return; // L'utilisateur a changé la sélection.
+            if (Array.from(results.values()).some(value => value === null)) {
+                window.alert('Impossible de vérifier tous les Dockers. La sélection précédente est conservée. Réessaie.');
+                return;
+            }
+            document.querySelectorAll('#buildTable tbody .build-batch-check').forEach(box => {
+                const button = box.closest('tr')?.querySelector('.smart-action-button[data-status-kind="build"]');
+                box.checked = !box.disabled && !isRunning(button) && results.get(box.value) === true;
+                updateMainBuildSelection(box);
+            });
+        } finally {
+            mainBuildNeededBusy = false;
+            if (control) {
+                control.disabled = false;
+                control.removeAttribute('aria-busy');
+                control.title = originalTitle;
+            }
+        }
+    }
+    function runMainBuildSelected(button) {
+        const selected = mainBuildSelectedNames();
+        if (!selected.length) {
+            window.alert('Coche au moins un Docker dans la colonne Action avant de lancer le build de la sélection.');
+            return false;
+        }
+        runTask('build_registry_all', '', 'normal', false, button || null, true, selected);
+        return false;
+    }
+    // Le menu haut actif peut être une personnalisation conservée dans conf/menu_top.
+    // On complète uniquement cette page si sa configuration actuelle ne contient pas
+    // encore la nouvelle action. Le clic droit clone le même lien automatiquement.
+    function ensureMainBuildSelectedMenuItem() {
+        const nav = document.querySelector('#yoleoPageSettingsMenu .yoleo-page-settings-dropdown');
+        if (!nav || Array.from(nav.querySelectorAll('a')).some(a =>
+            (a.getAttribute('onclick') || '').includes('runMainBuildSelected('))) return;
+        const link = document.createElement('a');
+        link.href = '#';
+        link.className = 'is-action';
+        link.setAttribute('onclick', 'return runMainBuildSelected(this);');
+        const icon = document.createElement('span');
+        icon.className = 'page-settings-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = '☑';
+        const label = document.createElement('span');
+        label.textContent = 'Builder la sélection';
+        link.append(icon, label);
+        const normal = Array.from(nav.querySelectorAll('a')).find(a =>
+            (a.textContent || '').includes('Tout builder - normal'));
+        if (normal) normal.after(link);
+        else nav.prepend(link);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ensureMainBuildSelectedMenuItem);
+    } else {
+        ensureMainBuildSelectedMenuItem();
+    }
+
+    const buildRowMoreState = { trigger: null, primary: null, name: '' };
+
+    function closeBuildRowMoreMenu() {
+        const menu = document.getElementById('buildRowMoreMenu');
+        if (!menu || menu.hidden) return;
+        menu.hidden = true;
+        if (buildRowMoreState.trigger) buildRowMoreState.trigger.setAttribute('aria-expanded', 'false');
+        buildRowMoreState.trigger = null;
+        buildRowMoreState.primary = null;
+        buildRowMoreState.name = '';
+    }
+
+    function positionBuildRowMoreMenu(trigger) {
+        const menu = document.getElementById('buildRowMoreMenu');
+        if (!menu || menu.hidden || !trigger) return;
+        const rect = trigger.getBoundingClientRect();
+        const gap = 6;
+        const margin = 8;
+        const width = menu.offsetWidth || 184;
+        const height = menu.offsetHeight || 120;
+        let left = rect.right - width;
+        let top = rect.bottom + gap;
+        left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+        if (top + height > window.innerHeight - margin) top = Math.max(margin, rect.top - height - gap);
+        menu.style.left = `${Math.round(left)}px`;
+        menu.style.top = `${Math.round(top)}px`;
+    }
+
+    function toggleBuildRowMoreMenu(event, trigger) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        const menu = document.getElementById('buildRowMoreMenu');
+        if (!menu || !trigger || trigger.disabled) return;
+        const sameTrigger = buildRowMoreState.trigger === trigger && !menu.hidden;
+        closeBuildRowMoreMenu();
+        if (sameTrigger) return;
+
+        const rowActions = trigger.closest('.build-row-actions');
+        buildRowMoreState.trigger = trigger;
+        buildRowMoreState.primary = rowActions ? rowActions.querySelector('.smart-action-button') : null;
+        buildRowMoreState.name = String(trigger.dataset.buildRowName || '').trim();
+
+        const busy = trigger.dataset.buildRowBusy === '1' || Boolean(buildRowMoreState.primary && buildRowMoreState.primary.classList.contains('is-running'));
+        const canBuild = trigger.dataset.canBuild === '1' && !busy;
+        const row = trigger.closest('tr');
+        const tarBadge = row ? row.querySelector('[data-tar-cell="build"] .build-main-tar-line > .badge') : null;
+        const liveTarExists = tarBadge ? !tarBadge.classList.contains('badge-no') : (trigger.dataset.canSend === '1');
+        const canSend = trigger.dataset.hasRegistry === '1' && liveTarExists && !busy;
+        const buildButton = menu.querySelector('[data-menu-action="build"]');
+        const forceButton = menu.querySelector('[data-menu-action="force"]');
+        const sendButton = menu.querySelector('[data-menu-action="send"]');
+        if (buildButton) buildButton.disabled = !canBuild;
+        if (forceButton) forceButton.disabled = !canBuild;
+        if (sendButton) sendButton.disabled = !canSend;
+
+        menu.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        positionBuildRowMoreMenu(trigger);
+        const firstEnabled = menu.querySelector('button:not(:disabled)');
+        if (firstEnabled) window.setTimeout(() => firstEnabled.focus({preventScroll:true}), 0);
+    }
+
+    function runBuildRowMoreAction(kind) {
+        const menu = document.getElementById('buildRowMoreMenu');
+        const clicked = menu ? menu.querySelector(`[data-menu-action="${kind}"]`) : null;
+        if (!clicked || clicked.disabled) return;
+
+        const name = cleanDockerName(buildRowMoreState.name || '');
+        const primary = buildRowMoreState.primary;
+        const trigger = buildRowMoreState.trigger;
+        if (!name) {
+            closeBuildRowMoreMenu();
+            return;
+        }
+
+        let action = 'build_registry_one';
+        let mode = 'normal';
+        let runningText = 'Build…';
+        if (kind === 'force') {
+            mode = 'force';
+            runningText = 'Force Build…';
+        } else if (kind === 'send') {
+            action = 'registry_one';
+            runningText = 'Envoi TAR…';
+        }
+
+        closeBuildRowMoreMenu();
+        const progressButton = primary || trigger;
+        const previousRunningText = progressButton ? (progressButton.dataset.runningText || 'Build…') : '';
+        if (progressButton) progressButton.dataset.runningText = runningText;
+        if (trigger) trigger.dataset.buildRowBusy = '1';
+
+        const restore = event => {
+            const detail = event && event.detail ? event.detail : {};
+            const finishedAction = String(detail.action || '');
+            const finishedName = cleanDockerName(detail.name || '');
+            const expectedFinished = finishedAction === action && finishedName === name;
+            const resumedExistingJob = !expectedFinished && Boolean(detail.job);
+            if (!expectedFinished && !resumedExistingJob) return;
+            document.removeEventListener('build:task-finished', restore);
+            if (progressButton) progressButton.dataset.runningText = previousRunningText;
+            if (trigger) delete trigger.dataset.buildRowBusy;
+            if ((action === 'registry_one' || finishedAction === 'registry_one') && typeof startMainRegistryStatusScan === 'function') {
+                window.setTimeout(() => startMainRegistryStatusScan(true), 800);
+            }
+        };
+        document.addEventListener('build:task-finished', restore);
+        runTask(action, name, mode, false, progressButton, true);
+    }
+
+    document.addEventListener('click', event => {
+        const menu = document.getElementById('buildRowMoreMenu');
+        if (!menu || menu.hidden) return;
+        if (menu.contains(event.target) || (buildRowMoreState.trigger && buildRowMoreState.trigger.contains(event.target))) return;
+        closeBuildRowMoreMenu();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeBuildRowMoreMenu();
+    });
+    window.addEventListener('resize', closeBuildRowMoreMenu);
+    window.addEventListener('scroll', closeBuildRowMoreMenu, true);
+
     const clientImportUploadUrl = {{ url_for('builds_bp.import_client_dirs')|tojson }};
     const buildDeleteProjectUrl = {{ url_for('builds_bp.delete_project_route')|tojson }};
     const clientImportBuildsDir = {{ conf.DOCKER_BUILDS_DIR|tojson }};

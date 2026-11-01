@@ -1,0 +1,3 @@
+from pci_reservations import register_pci_routes
+
+register_pci_routes(system_bp)

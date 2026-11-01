@@ -337,10 +337,10 @@ def _load_registry_v2_engine():
     }
     source = chunk_path.read_text(encoding="utf-8")
     exec(compile(source, str(chunk_path), "exec"), namespace)
-    return namespace["registry_v2_import_oci"]
+    return namespace["registry_v2_import_oci"], namespace["registry_v2_manifest_status"]
 
 
-registry_v2_import_oci = _load_registry_v2_engine()
+registry_v2_import_oci, registry_v2_manifest_status = _load_registry_v2_engine()
 
 
 # ============================================================
@@ -399,8 +399,16 @@ def read_kv_file(path: Path) -> dict[str, str]:
 VALID_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
+IGNORED_BUILD_DIRS = {".update-common"}
+
+
+def is_ignored_build_dir(name: Optional[str]) -> bool:
+    return normalize_item_name(name or "") in IGNORED_BUILD_DIRS
+
+
 def is_valid_name(name: Optional[str]) -> bool:
-    return bool(name and VALID_NAME_RE.fullmatch(str(name)))
+    # Même exclusion que dans l inventaire web : ce dossier sert aux update.sh.
+    return bool(name and not is_ignored_build_dir(name) and VALID_NAME_RE.fullmatch(str(name)))
 
 
 def normalize_item_name(name: Optional[str]) -> str:
@@ -736,7 +744,8 @@ def load_registry_entries(registry_override: Optional[str] = None) -> list[Regis
     if registry_override:
         for tar_path in sorted(TAR_DIR.glob("*.tar")):
             name = strip_tar_suffix(tar_path.name)
-            entries.append(RegistryEntry(name=name, target=build_target_from_prefix(registry_override, name)))
+            if is_valid_name(name):
+                entries.append(RegistryEntry(name=name, target=build_target_from_prefix(registry_override, name)))
         return entries
 
     raise FileNotFoundError(
@@ -808,7 +817,11 @@ def iter_context_files(context_dir: Path) -> Iterable[Path]:
                 continue
             if any(filename.endswith(suffix) for suffix in EXCLUDED_SUFFIXES):
                 continue
-            yield root_path / filename
+            path = root_path / filename
+            # Comme le moteur Web, ignorer les liens cassés et les fichiers spéciaux.
+            if not path.is_file():
+                continue
+            yield path
 
 
 def context_hash(context_dir: Path) -> str:
@@ -910,6 +923,8 @@ FROM_LINE_RE = re.compile(
     r"^\s*FROM(?:\s+--platform=\S+)?\s+([^\s]+)(?:\s+AS\s+([A-Za-z0-9._-]+))?",
     re.IGNORECASE,
 )
+ARG_LINE_RE = re.compile(r"^\s*ARG\s+([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?\s*$", re.IGNORECASE)
+FROM_ARG_RE = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 
 
 def dockerfile_has_check_updates_marker(dockerfile: Path) -> bool:
@@ -921,20 +936,37 @@ def dockerfile_has_check_updates_marker(dockerfile: Path) -> bool:
         return False
 
 
+def resolve_dockerfile_from_args(image: str, args: dict[str, str]) -> str:
+    """Résout les ARG simples utilisés dans FROM (ARG IMAGE=repo/image:tag)."""
+    def replace(match: re.Match) -> str:
+        name = match.group(1) or match.group(2) or ""
+        return args.get(name, match.group(0))
+
+    return FROM_ARG_RE.sub(replace, image)
+
+
 def dockerfile_external_from_images(dockerfile: Path) -> list[str]:
-    """Liste les FROM externes, en ignorant scratch et les stages internes."""
+    """Liste les images parentes, y compris les FROM alimentés par un ARG."""
     images: list[str] = []
     stages: set[str] = set()
+    args: dict[str, str] = {}
     try:
         lines = dockerfile.read_text(encoding="utf-8-sig", errors="replace").splitlines()
     except OSError:
         return images
 
     for raw_line in lines:
+        arg_match = ARG_LINE_RE.match(raw_line)
+        if arg_match:
+            arg_name = arg_match.group(1)
+            arg_value = arg_match.group(2)
+            if arg_value is not None:
+                args[arg_name] = _strip_quotes(arg_value.strip())
+            continue
         match = FROM_LINE_RE.match(raw_line)
         if not match:
             continue
-        image = match.group(1).strip()
+        image = resolve_dockerfile_from_args(match.group(1).strip(), args)
         alias = (match.group(2) or "").strip().lower()
         image_key = image.lower()
         if image_key != "scratch" and image_key not in stages and "$" not in image and image not in images:
@@ -942,6 +974,35 @@ def dockerfile_external_from_images(dockerfile: Path) -> list[str]:
         if alias:
             stages.add(alias)
     return images
+
+
+def normalized_from_reference(value: str) -> str:
+    """Normalise une référence afin de la rapprocher d'une cible registre.conf."""
+    image = _strip_quotes(str(value or "")).strip().rstrip("/")
+    image = re.sub(r"^https?://", "", image, flags=re.IGNORECASE)
+    if not image:
+        return ""
+    if "@" not in image:
+        last_slash = image.rfind("/")
+        last_colon = image.rfind(":")
+        if last_colon <= last_slash:
+            image += ":latest"
+    return image.lower()
+
+
+def configured_registry_from_image(image: str) -> Optional[RegistryEntry]:
+    """Retourne l'entrée registre.conf correspondant exactement au FROM."""
+    wanted = normalized_from_reference(image)
+    if not wanted:
+        return None
+    try:
+        entries = load_registry_entries()
+    except Exception:
+        return None
+    for entry in entries:
+        if normalized_from_reference(entry.target) == wanted:
+            return entry
+    return None
 
 
 def docker_manifest_timeout() -> int:
@@ -990,6 +1051,19 @@ def dockerfile_remote_from_fingerprint(dockerfile: Path) -> tuple[bool, str, lis
     parts: list[str] = []
     lines: list[str] = []
     for image in images:
+        registered = configured_registry_from_image(image)
+        if registered:
+            exists, digest, _payload, error = registry_v2_manifest_status(
+                registry_v2_runtime_conf(), registered.name, registered.target
+            )
+            if not exists or not digest:
+                detail = error or "tag absent du registre"
+                lines.append(f"FROM registre impossible : {image} (API Registry V2) {detail}")
+                return False, "", lines
+            parts.append(f"{image}={digest}")
+            lines.append(f"FROM registre OK : {image} via API Registry V2 -> {digest}")
+            continue
+
         rc, payload, method = docker_manifest_payload(image)
         if rc != 0 or not payload.strip():
             short = " ".join((payload or "").strip().split())[:220]
@@ -1352,7 +1426,11 @@ def save_one(name: str, options: SaveOptions) -> bool:
             log.write(f"❌ Aucun Dockerfile trouvé dans : {context_dir}")
             return False
 
-        current_context_hash = context_hash(context_dir)
+        try:
+            current_context_hash = context_hash(context_dir)
+        except OSError as exc:
+            log.write(f"❌ Hash contexte impossible : {exc}")
+            return False
         old_context_hash = read_text_or_empty(state_context)
         old_platforms = read_text_or_empty(state_platforms)
         old_tar_hash = read_text_or_empty(state_tar_hash) or saved_sha_hash(sha_file)
@@ -1526,7 +1604,11 @@ def save_one(name: str, options: SaveOptions) -> bool:
 def list_projects() -> list[str]:
     if not BASE_DIR.is_dir():
         raise FileNotFoundError(f"Dossier build introuvable : {BASE_DIR}")
-    names = [p.name for p in BASE_DIR.iterdir() if p.is_dir() and is_valid_name(p.name)]
+    names = [
+        p.name
+        for p in BASE_DIR.iterdir()
+        if p.is_dir() and p.name not in IGNORED_BUILD_DIRS and is_valid_name(p.name)
+    ]
     return order_names_like_registry(names)
 
 
@@ -2029,7 +2111,8 @@ def handle_list(kind: str, args) -> int:
     if kind in {"tars", "all"}:
         print("=== TAR ===")
         for tar_path in sorted(TAR_DIR.glob("*.tar")):
-            print(f"{tar_path.name:<40} {human_size(tar_path)}")
+            if is_valid_name(strip_tar_suffix(tar_path.name)):
+                print(f"{tar_path.name:<40} {human_size(tar_path)}")
         print()
     if kind in {"registry", "all"}:
         print("=== REGISTRE ===")

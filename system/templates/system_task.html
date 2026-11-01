@@ -1628,7 +1628,7 @@
 
                     <div class="form-group" style="margin-bottom:12px;">
                         <label>Choisir une tâche</label>
-                        <select class="form-control" id="log-task-select" onchange="loadTaskLog()">
+                        <select class="form-control" id="log-task-select" onchange="loadTaskLog(true)">
                             {% for task in tasks %}
                                 <option value="{{ task.id }}" {% if selected_log_task|int == task.id %}selected{% endif %}>#{{ task.id }} - {{ task.title }}</option>
                             {% endfor %}
@@ -1692,6 +1692,8 @@ const INITIAL_LOG_TASK = "{{ selected_log_task }}";
 let activeConfirmModalClose = null;
 let pushConfig = null;
 let pushSubscription = null;
+let logPinnedToBottom = true;
+let logFollowTaskId = '';
 
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -2067,7 +2069,7 @@ function switchTab(name, btn) {
     history.replaceState(null, '', url.toString());
     if (name === 'progress') {
         refreshProgress();
-        loadTaskLog();
+        loadTaskLog(true);
     }
 }
 
@@ -2411,7 +2413,7 @@ function openLogs(taskId) {
     url.searchParams.set('log_task', String(taskId));
     history.replaceState(null, '', url.toString());
     refreshProgress();
-    loadTaskLog();
+    loadTaskLog(true);
 }
 
 async function stopTask(taskId, event) {
@@ -2526,19 +2528,36 @@ async function refreshProgress() {
     }
 }
 
-async function loadTaskLog() {
+function logIsNearBottom(box) {
+    if (!box) return true;
+    return (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+}
+
+async function loadTaskLog(forceBottom) {
     const select = document.getElementById('log-task-select');
     const box = document.getElementById('log-box');
     if (!select || !box || !select.value) return;
+    const taskId = String(select.value);
+    if (taskId !== logFollowTaskId) {
+        forceBottom = true;
+        logFollowTaskId = taskId;
+    }
     try {
-        const resp = await fetch(TASK_LOG_API_BASE_URL + '/' + encodeURIComponent(select.value) + '?limit=300', {cache: 'no-store'});
+        const resp = await fetch(TASK_LOG_API_BASE_URL + '/' + encodeURIComponent(taskId) + '?limit=300', {cache: 'no-store'});
         const data = await resp.json();
+        const shouldStick = forceBottom === true || logPinnedToBottom;
+        const previousScrollTop = box.scrollTop || 0;
         if (!data.lines || data.lines.length === 0) {
             box.textContent = 'Aucun log pour cette tâche.';
             return;
         }
         box.textContent = data.lines.map(l => `[${l.created_at}] ${l.source ? '[' + l.source + '] ' : ''}${l.line}`).join('\n');
-        box.scrollTop = box.scrollHeight;
+        if (shouldStick) {
+            box.scrollTop = box.scrollHeight;
+            logPinnedToBottom = true;
+        } else {
+            box.scrollTop = previousScrollTop;
+        }
     } catch (e) {
         box.textContent = 'Erreur lecture logs : ' + e;
     }
@@ -2576,8 +2595,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const select = document.getElementById('log-task-select');
         if (select) select.value = INITIAL_LOG_TASK;
     }
+    const logBox = document.getElementById('log-box');
+    if (logBox) {
+        logBox.addEventListener('scroll', () => {
+            logPinnedToBottom = logIsNearBottom(logBox);
+        });
+    }
     refreshProgress();
-    loadTaskLog();
+    loadTaskLog(true);
     setInterval(() => {
         refreshProgress();
         const active = document.querySelector('#tab-progress.active');

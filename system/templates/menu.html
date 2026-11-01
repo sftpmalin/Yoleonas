@@ -3,12 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="/manifest.json">
+    {% include "pwa_head.html" %}
     {% set effective_dashboard_config = system_dashboard_config if system_dashboard_config is defined and system_dashboard_config else (dashboard_config if dashboard_config is defined else none) %}
-    {% set yoleo_nav_icon = (effective_dashboard_config.nav_icons if effective_dashboard_config and effective_dashboard_config.nav_icons else '/static/logo/dashboard_flask.png') %}
+    {% set yoleo_nav_icon = (effective_dashboard_config.nav_icons if effective_dashboard_config and effective_dashboard_config.nav_icons else '/static/icone_menu/dashboard_flask.png') %}
     <link rel="icon" type="image/png" href="{{ yoleo_nav_icon }}">
     <link rel="shortcut icon" href="{{ yoleo_nav_icon }}">
-    <meta name="theme-color" content="#0e1218">
     <title>{% block title %}{{ effective_dashboard_config.titre_tab if effective_dashboard_config and effective_dashboard_config.titre_tab else 'Yoleo' }}{% endblock %}</title>
     {% include "style.html" %}
     {% block head_extra %}{% endblock %}
@@ -291,7 +290,7 @@
         {{ yoleo_icon(icon_value, 'yoleo-page-title-icon', 'yoleo-page-title-img') }}
     {%- endmacro %}
     {% set nav_menu_items = system_global_menu if system_global_menu is defined and system_global_menu else (raccourcis_menu if raccourcis_menu is defined else []) %}
-    {% set page_icon = namespace(value='/static/logo/01_accueil.png' if request.path in ['/', '/index'] else '') %}
+    {% set page_icon = namespace(value='/static/icone_menu/01_accueil.png' if request.path in ['/', '/index'] else '') %}
     {% for bouton in nav_menu_items %}
         {% set item_url = bouton.lien if bouton.lien is defined else (bouton.url if bouton.url is defined else '#') %}
         {% set item_path = item_url.split('?')[0] %}
@@ -326,7 +325,7 @@
 
             <nav class="yoleo-nav-scroll">
                 <a href="/index" class="yoleo-menu-item {% if request.path in ['/', '/index'] %}is-active{% endif %}">
-                    {{ yoleo_menu_icon('/static/logo/01_accueil.png') }}
+                    {{ yoleo_menu_icon('/static/icone_menu/01_accueil.png') }}
                     <span class="yoleo-menu-label">Accueil</span>
                 </a>
 
@@ -958,7 +957,7 @@
                 const home = document.createElement('a');
                 home.href = '/index';
                 home.className = 'yoleo-menu-item' + ((window.location.pathname === '/' || window.location.pathname === '/index') ? ' is-active' : '');
-                const homeIcon = yoleoSidebarIconNode('/static/logo/01_accueil.png');
+                const homeIcon = yoleoSidebarIconNode('/static/icone_menu/01_accueil.png');
                 const homeLabel = document.createElement('span');
                 homeLabel.className = 'yoleo-menu-label';
                 homeLabel.textContent = 'Accueil';

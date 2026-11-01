@@ -150,7 +150,26 @@ def home(default_tab='scripts'):
         scripts_configured=configured,
         settings_saved=request.args.get('saved') == '1',
         settings_error=request.args.get('error') or '',
+        save_error=request.args.get('error') or '',
+        blocked_cache_path=request.args.get('blocked_path') or '',
+        blocked_cache_role=request.args.get('blocked_role') or '',
+        blocked_cache_mount=request.args.get('blocked_mount') or '',
+        blocked_cache_fstype=request.args.get('blocked_fstype') or '',
     )
+
+
+@backup_bp.route('/api/validate-cache-mounts', methods=['POST'])
+def api_validate_cache_mounts():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = request.form
+    if str(payload.get('mode') or '').strip().lower() != 'cache':
+        return jsonify({'ok': True, 'details': []})
+
+    issues = cache_mergerfs_mount_issues(payload.get('source'), payload.get('target'))
+    if issues:
+        return jsonify({'ok': False, 'error': cache_mergerfs_error_payload(issues)}), 422
+    return jsonify({'ok': True, 'details': []})
 
 
 @backup_bp.route('/save', methods=['POST'])
@@ -160,8 +179,20 @@ def save_script():
         return backup_tab_redirect('settings', error='missing_scripts_dir')
     filename = slugify_filename(request.form.get('filename'))
     old_filename = request.form.get('old_filename') or ''
-    path = safe_script_path(filename)
     data = normalize_form(request.form)
+    if data.get('MODE') == 'cache':
+        issues = cache_mergerfs_mount_issues(data.get('SOURCE'), data.get('TARGET'))
+        if issues:
+            blocked = issues[0]
+            return backup_tab_redirect(
+                'create',
+                error='cache_mergerfs',
+                blocked_path=blocked.get('path') or '',
+                blocked_role=blocked.get('role') or '',
+                blocked_mount=blocked.get('mount_point') or '',
+                blocked_fstype=blocked.get('fs_type') or '',
+            )
+    path = safe_script_path(filename)
     with open(path, 'w', encoding='utf-8') as handle:
         handle.write(build_generated_script(data))
     current_mode = os.stat(path).st_mode
